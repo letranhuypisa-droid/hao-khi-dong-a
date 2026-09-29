@@ -52,73 +52,6 @@ const ico = (r, d = 0) => new THREE.IcosahedronGeometry(r, d);
 
 export const lambert = (opts = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, ...opts });
 
-// ---- Lính (instanced): thân + tay vũ khí tách riêng để vung được ------------------------------
-// Gốc toạ độ ở chân. Tay vũ khí có gốc ở vai (SHOULDER); instance matrix = thân × vai × xoay.
-export const SHOULDER = new THREE.Vector3(0.24, 1.42, 0);
-export const SHOULDER_KY = new THREE.Vector3(0.24, 2.12, 0.1);
-
-export function soldierGeometries(unit) {
-  if (unit === "GIAO_DV") {
-    const body = merge([
-      part(box(0.14, 0.78, 0.16), PAL.then, { x: -0.1, y: 0.39 }),
-      part(box(0.14, 0.78, 0.16), PAL.then, { x: 0.1, y: 0.39 }),
-      part(cyl(0.2, 0.3, 0.55, 7), PAL.son, { y: 0.98 }),
-      part(box(0.44, 0.48, 0.27), PAL.son, { y: 1.34 }),
-      part(box(0.46, 0.08, 0.29), PAL.then, { y: 1.12 }),
-      part(box(0.12, 0.44, 0.14), PAL.son, { x: -0.28, y: 1.26, rz: 0.15 }),
-      part(ico(0.15, 0), PAL.da, { y: 1.72 }),
-      part(cone(0.3, 0.14, 8), PAL.vai, { y: 1.86 }),
-    ]);
-    const arm = merge([
-      part(box(0.12, 0.46, 0.14), PAL.son, { y: -0.2 }),
-      part(cyl(0.022, 0.022, 2.7, 4), PAL.go, { y: -0.4, z: 0.5, rx: Math.PI / 2 }),
-      part(cone(0.05, 0.28, 4), PAL.sat, { y: -0.4, z: 1.98, rx: Math.PI / 2 }),
-      part(box(0.07, 0.05, 0.03), PAL.son, { y: -0.4, z: 1.78 }),
-    ]);
-    return { body, arm, shoulder: SHOULDER };
-  }
-  if (unit === "KHIEN_NG") {
-    const body = merge([
-      part(box(0.15, 0.78, 0.17), PAL.cham, { x: -0.1, y: 0.39 }),
-      part(box(0.15, 0.78, 0.17), PAL.cham, { x: 0.1, y: 0.39 }),
-      part(cyl(0.24, 0.32, 0.55, 7), PAL.thep, { y: 0.98 }),
-      part(box(0.46, 0.5, 0.3), PAL.thep, { y: 1.34 }),
-      part(box(0.5, 0.1, 0.33), PAL.cham, { y: 1.58 }),
-      part(ico(0.15, 0), PAL.da, { y: 1.74 }),
-      part(cone(0.17, 0.34, 6), PAL.xam, { y: 1.95 }),
-      part(cyl(0.2, 0.2, 0.06, 6), PAL.long, { y: 1.8 }),
-      part(cyl(0.36, 0.36, 0.06, 10), PAL.nau, { x: -0.32, y: 1.22, z: 0.22, rx: Math.PI / 2 }),
-      part(cyl(0.1, 0.1, 0.08, 6), PAL.sat, { x: -0.32, y: 1.22, z: 0.26, rx: Math.PI / 2 }),
-    ]);
-    const arm = merge([
-      part(box(0.13, 0.46, 0.15), PAL.thep, { y: -0.2 }),
-      part(box(0.05, 0.08, 0.9), PAL.sat, { y: -0.42, z: 0.45, rx: -0.1 }),
-      part(box(0.07, 0.07, 0.14), PAL.then, { y: -0.42, z: 0.02 }),
-    ]);
-    return { body, arm, shoulder: SHOULDER };
-  }
-  // Cung kỵ: ngựa + người nướng chung một lưới (21.2: kỵ 9 clip, người + ngựa nướng chung)
-  const body = merge([
-    part(box(0.5, 0.55, 1.35), PAL.ngua, { y: 1.12 }),
-    part(box(0.26, 0.6, 0.3), PAL.ngua, { y: 1.5, z: 0.72, rx: -0.6 }),
-    part(box(0.2, 0.22, 0.45), PAL.nguaDen, { y: 1.78, z: 0.95 }),
-    ...[[-0.17, 0.5], [0.17, 0.5], [-0.17, -0.5], [0.17, -0.5]].map(([x, z]) => part(box(0.12, 0.85, 0.12), PAL.nguaDen, { x, y: 0.43, z })),
-    part(box(0.1, 0.5, 0.1), PAL.nguaDen, { y: 1.2, z: -0.75, rx: 0.5 }),
-    part(box(0.56, 0.08, 0.6), PAL.cham, { y: 1.42 }),
-    part(box(0.4, 0.5, 0.26), PAL.thep, { y: 1.9 }),
-    part(box(0.14, 0.4, 0.14), PAL.cham, { x: -0.2, y: 1.45, z: 0.05, rz: 0.4 }),
-    part(box(0.14, 0.4, 0.14), PAL.cham, { x: 0.2, y: 1.45, z: 0.05, rz: -0.4 }),
-    part(ico(0.14, 0), PAL.da, { y: 2.3 }),
-    part(cyl(0.1, 0.19, 0.2, 6), PAL.long, { y: 2.46 }),
-  ]);
-  const arm = merge([
-    part(box(0.12, 0.42, 0.14), PAL.thep, { y: -0.18 }),
-    part(box(0.04, 1.2, 0.05), PAL.go, { y: -0.4, z: 0.25, rx: 0.1 }),
-    part(box(0.02, 1.1, 0.02), PAL.trung, { y: -0.4, z: 0.12 }),
-  ]);
-  return { body, arm, shoulder: SHOULDER_KY };
-}
-
 export function blobGeometry() {
   const g = new THREE.CircleGeometry(0.55, 10);
   g.rotateX(-Math.PI / 2);
@@ -154,6 +87,7 @@ export function makeRig({ scale = 1, cloth = PAL.son, armor = PAL.then, trim = P
   for (const s of [-1, 1]) {
     const side = s < 0 ? "L" : "R";
     const sh = joint(p.torso, 0.3 * s, 0.52, 0);
+    sh.rotation.order = "YXZ";          // quay cánh tay sang ngang sau khi giơ (xem anim.js)
     sh.add(mesh(merge([part(box(0.15, 0.36, 0.16), armor, { y: -0.16 }), part(box(0.2, 0.12, 0.2), trim, { y: 0.02 })])));
     const el = joint(sh, 0, -0.34, 0);
     el.add(mesh(merge([part(box(0.13, 0.32, 0.14), cloth, { y: -0.15 }), part(ico(0.07, 0), skin, { y: -0.34 })])));

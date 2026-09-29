@@ -5,20 +5,27 @@
 //     Không trúng đòn, không gây đòn.
 //   - zone / garrison / squad / landing / guard / follow: lính thật trong vùng r 25 m quanh
 //     tướng người chơi — trúng đòn, gây đòn, KO của chúng trừ Q hoặc G.
-// Vẽ bằng InstancedMesh: mỗi binh chủng một lưới thân + một lưới tay vũ khí (tay vung được).
+// Mỗi binh chủng chia thành vài kiểu lính (KITS: đao, thương, cung, lực sĩ, nỏ…) khác vũ khí, tầm
+// đánh và hoạt ảnh. Vẽ bằng InstancedMesh theo khúc thân (soldiers.js): mỗi kiểu lính × mỗi khúc
+// là một lưới, khớp nào cũng xoay được nên lính bước chân, vung đòn, ngã theo nhiều kiểu.
 
 import * as THREE from "three";
-import { soldierGeometries, blobGeometry, lambert } from "./models.js";
+import { blobGeometry, lambert } from "./models.js";
+import { kitGeometry, poseFor, jointMatrices, NCH, JOINT_NAMES } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
-import { TIERS, UNITS, g, heSoGiap } from "../data/tuning.js";
+import { TIERS, UNITS, KITS, pickKit, g, heSoGiap } from "../data/tuning.js";
 
-const UNIT_IDS = ["GIAO_DV", "KHIEN_NG", "CUNGKY_NG"];
-const CAP = { GIAO_DV: 700, KHIEN_NG: 700, CUNGKY_NG: 500 };
+const KIT_IDS = Object.keys(KITS);
+const CAP = 900;                 // mỗi kiểu lính; lính diễn tối đa ~800 + vùng chiến đấu
+const TWO_PI = Math.PI * 2;
 const HITTABLE = new Set(["zone", "garrison", "squad", "landing", "guard", "follow"]);
 
-const _m = new THREE.Matrix4(), _a = new THREE.Matrix4(), _r = new THREE.Matrix4();
+const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const _c = new THREE.Color();
+const _pose = new Float32Array(NCH);
+const JOINT_INDEX = Object.fromEntries(JOINT_NAMES.map((j, i) => [j, i]));
+const LOD_FAR2 = 40 * 40;        // xa hơn 40 m: tính lại tư thế mỗi 3 khung, khung khác chép ma trận cũ
 
 let NEXT_ID = 1;
 
@@ -27,17 +34,23 @@ export class Crowd {
     this.ctx = ctx; this.agents = []; this.free = [];
     this.meshes = {};
     const mat = lambert();
-    for (const u of UNIT_IDS) {
-      const geo = soldierGeometries(u);
-      const body = new THREE.InstancedMesh(geo.body, mat, CAP[u]);
-      const arm = new THREE.InstancedMesh(geo.arm, mat, CAP[u]);
-      for (const m of [body, arm]) {
-        m.frustumCulled = false; m.count = 0; m.castShadow = false;
-        m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP[u] * 3).fill(1), 3);
-        scene.add(m);
+    for (const k of KIT_IDS) {
+      const geo = kitGeometry(k);
+      // một bộ màu instance dùng chung cho mọi khúc của kiểu lính (chớp trắng, ánh đỏ báo đòn…)
+      const color = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3);
+      const parts = {};
+      for (const j of JOINT_NAMES) {
+        const m = new THREE.InstancedMesh(geo.parts[j], mat, CAP);
+        m.frustumCulled = false; m.count = 0; m.castShadow = false; m.instanceColor = color;
+        scene.add(m); parts[j] = m;
       }
-      this.meshes[u] = { body, arm, shoulder: geo.shoulder };
+      this.meshes[k] = { parts, color, skel: geo.skel, arrays: JOINT_NAMES.map((j) => parts[j].instanceMatrix.array) };
     }
+    this._M = null; this._i = 0; this._mc = null; this.frame = 0;
+    this._setJoint = (name, mat4) => {
+      this._M.parts[name].instanceMatrix.array.set(mat4.elements, this._i * 16);
+      this._mc.set(mat4.elements, JOINT_INDEX[name] * 16);
+    };
     this.blob = new THREE.InstancedMesh(blobGeometry(), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }), 2200);
     this.blob.frustumCulled = false; this.blob.count = 0; scene.add(this.blob);
     this.arrows = [];
@@ -51,17 +64,22 @@ export class Crowd {
     const tier = TIERS[o.tier || "thuong"], U = UNITS[o.unit];
     const R = this.ctx.R;
     const lvl = o.side === "dich" ? g(R) : g(R) * (o.legionMult || 1);
+    // Kiểu lính chọn theo băm id (dãy tỉ lệ vàng, phủ đều tỉ lệ w) — không ăn vào chuỗi rng của trận.
+    const id = NEXT_ID++;
+    const kit = o.kit || pickKit(o.unit, (id * 0.6180339887) % 1), K = KITS[kit];
     Object.assign(a, {
-      id: NEXT_ID++, alive: true, side: o.side, unit: o.unit, tier: o.tier || "thuong", role: o.role || "zone",
+      id, alive: true, side: o.side, unit: o.unit, kit, K, tier: o.tier || "thuong", role: o.role || "zone",
       front: o.front ?? null, src: o.src ?? null,
       x: o.x, z: o.z, y: 0, vy: 0, yaw: o.yaw ?? (o.side === "ta" ? Math.PI / 2 : -Math.PI / 2), vx: 0, vz: 0,
-      maxHp: tier.hp * U.rel[0] * lvl, cong: tier.cong * U.rel[1] * lvl, giap: tier.giap * U.rel[2] * lvl,
-      speed: (o.unit === "CUNGKY_NG" ? 5.2 : 3.1) * (0.9 + 0.2 * this.ctx.rng.next()),
-      state: "move", st: 0, atkCd: 1 + this.ctx.rng.next() * tier.every, windup: 0, swing: 0,
+      maxHp: tier.hp * U.rel[0] * K.hp * lvl, cong: tier.cong * U.rel[1] * K.cong * lvl, giap: tier.giap * U.rel[2] * K.giap * lvl,
+      speed: (o.unit === "CUNGKY_NG" ? 5.2 : 3.1) * K.speed * (0.9 + 0.2 * this.ctx.rng.next()),
+      state: "move", st: 0, atkCd: 1 + this.ctx.rng.next() * tier.every, windup: 0, windupT: K.windup, atkT: 9, fake: false,
       token: false, target: null, sx: o.sx ?? o.x, sz: o.sz ?? o.z, anchor: o.anchor || null,
-      flash: 0, stun: 0, dieT: 0, lean: 0, bob: this.ctx.rng.next() * 6.28, fakeCd: this.ctx.rng.next() * 3,
-      hitBy: 0, scale: tier.scale, lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
+      flash: 0, stun: 0, dieT: 0, flinch: 0, hitFront: 1, launchDeath: false, bob: this.ctx.rng.next() * 6.28, fakeCd: this.ctx.rng.next() * 3,
+      walk: this.ctx.rng.next() * TWO_PI, spd: 0, ready: false, poseInit: false, frontRow: false,
+      hitBy: 0, scale: tier.scale * (K.scale || 1), lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
     });
+    if (!a.pose) a.pose = new Float32Array(NCH);
     a.hp = a.maxHp;
     this.agents.push(a);
     return a;
@@ -83,12 +101,17 @@ export class Crowd {
     if (opt.stun) a.stun = Math.max(a.stun, opt.stun);
     const kx = opt.kx ?? 0, kz = opt.kz ?? 0;
     if (a.hp <= 0) { this.kill(a, opt); return true; }
-    if (opt.launch && a.unit !== "CUNGKY_NG") { a.state = "launch"; a.vy = 6.5; a.st = 0; a.vx = kx * 2; a.vz = kz * 2; }
+    // lực sĩ trọng giáp: đòn thường chỉ làm khựng người, không cắt được đòn đang gồng
+    const hard = opt.launch || (opt.knock || 2.5) >= 5;
+    if (a.K.stable && !hard) { a.flinch = 0.18; return false; }
+    a.hitFront = kx * Math.sin(a.yaw) + kz * Math.cos(a.yaw) <= 0 ? 1 : -1;   // bị đẩy về sau lưng = trúng trước mặt
+    if (opt.launch && !a.K.mounted && !a.K.stable) { a.state = "launch"; a.vy = 6.5; a.st = 0; a.vx = kx * 2; a.vz = kz * 2; a.windup = 0; }
     else if (a.state !== "launch") { a.state = "hit"; a.st = 0.32; a.vx = kx * (opt.knock || 2.5); a.vz = kz * (opt.knock || 2.5); a.windup = 0; }
     return false;
   }
 
   kill(a, opt = {}) {
+    a.launchDeath = a.state === "launch" || !!opt.launch;
     a.state = "dead"; a.dieT = 0; a.hp = 0; a.token = false;
     a.vx = (opt.kx ?? 0) * (opt.knock || 3); a.vz = (opt.kz ?? 0) * (opt.knock || 3);
     if (opt.launch) a.vy = Math.max(a.vy, 5);
@@ -104,7 +127,7 @@ export class Crowd {
 
     for (let i = this.agents.length - 1; i >= 0; i--) {
       const a = this.agents[i];
-      a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7;
+      a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7; a.atkT += dt; a.flinch = Math.max(0, a.flinch - dt);
       if (a.panicT > 0) a.panicT -= dt;
       if (a.state === "dead") {
         a.dieT += dt;
@@ -114,13 +137,13 @@ export class Crowd {
         continue;
       }
       if (a.state === "launch") {
-        a.y += a.vy * dt; a.vy -= 16 * dt; a.x += a.vx * dt; a.z += a.vz * dt;
-        if (a.y <= 0) { a.y = 0; a.state = "down"; a.st = 0.7; a.vx = a.vz = 0; }
+        a.st += dt; a.y += a.vy * dt; a.vy -= 16 * dt; a.x += a.vx * dt; a.z += a.vz * dt;
+        if (a.y <= 0) { a.y = 0; a.state = "down"; a.st = 0.9; a.vx = a.vz = 0; ctx.fx?.dust(a.x, a.z, 0.5); }
         continue;
       }
       if (a.state === "down") { a.st -= dt; if (a.st <= 0) { a.state = "move"; } continue; }
       if (a.state === "hit") {
-        a.st -= dt; a.x += a.vx * dt; a.z += a.vz * dt; a.vx *= 0.85; a.vz *= 0.85;
+        a.spd *= 0.8; a.st -= dt; a.x += a.vx * dt; a.z += a.vz * dt; a.vx *= 0.85; a.vz *= 0.85;
         if (a.st <= 0) a.state = "move";
         continue;
       }
@@ -130,24 +153,24 @@ export class Crowd {
 
       // chọn mục tiêu
       let tx, tz, target = null, wantDist = 2.0;
-      const ranged = UNITS[a.unit].attack === "ranged";
+      const K = a.K, ranged = !!K.ranged, reach = K.reach || 1.7;
       if (a.side === "dich") {
         const toHero = Math.hypot(hero.x - a.x, hero.z - a.z);
         const aggro = a.role === "garrison" ? 20 : a.role === "squad" ? 14 : 60;
         if (hero.alive && toHero < aggro) {
           target = hero; tx = hero.x; tz = hero.z;
-          wantDist = ranged ? 14 : a.token ? 1.7 : 4.2 + (a.id % 5) * 0.6;
+          wantDist = ranged ? K.range * 0.7 : a.token ? reach : 4.2 + (a.id % 5) * 0.6 + (reach - 1.7);
         } else if (a.anchor) {
           const at = a.anchor.target && a.anchor.target.alive && !a.anchor.target.dead ? a.anchor.target : null;
           target = at; tx = at ? at.x : a.anchor.x; tz = at ? at.z : a.anchor.z; wantDist = a.anchor.r ?? 3;
         } else {
-          const al = nearest(a, allies, 14);
-          if (al) { target = al; tx = al.x; tz = al.z; wantDist = ranged ? 12 : 1.7; }
+          const al = nearest(a, allies, ranged ? K.range : 14);
+          if (al) { target = al; tx = al.x; tz = al.z; wantDist = ranged ? K.range * 0.6 : reach; }
           else { tx = a.sx; tz = a.sz; wantDist = 1; }
         }
       } else {
-        const en = nearest(a, enemies, a.role === "guard" || a.role === "follow" ? 9 : 16);
-        if (en) { target = en; tx = en.x; tz = en.z; wantDist = 1.7; }
+        const en = nearest(a, enemies, a.role === "guard" || a.role === "follow" ? 9 : ranged ? K.range + 2 : 16);
+        if (en) { target = en; tx = en.x; tz = en.z; wantDist = ranged ? K.range * 0.7 : reach; }
         else if (a.role === "guard" || a.role === "follow") {
           const k = a.id % 12, ang = hero.yaw + Math.PI + (k - 5.5) * 0.35, rr = a.role === "guard" ? 3 : 5.5;
           tx = hero.x + Math.sin(ang) * rr; tz = hero.z + Math.cos(ang) * rr; wantDist = 0.6;
@@ -157,6 +180,8 @@ export class Crowd {
 
       // di chuyển
       const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz) || 1e-6;
+      a.ready = !!target && d < (ranged ? K.range + 4 : 8);
+      const px = a.x, pz = a.z;
       let mvx = 0, mvz = 0;
       if (target) a.yaw = turn(a.yaw, Math.atan2(dx, dz), dt * 8);
       if (a.windup <= 0) {
@@ -180,33 +205,56 @@ export class Crowd {
       }
       a.x += (mvx * a.speed + sx * 4) * dt; a.z += (mvz * a.speed + sz * 4) * dt;
       [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates);
+      this.stride(a, px, pz, dt);
 
       // đánh
       a.atkCd -= dt;
       if (a.windup > 0) {
-        a.windup -= dt; a.swing = 1 - Math.max(0, a.windup) / 0.45;
-        if (a.windup <= 0) { a.swing = 1.4; this.strike(a); a.atkCd = TIERS[a.tier].every * (0.85 + 0.3 * rng.next()); }
+        a.windup -= dt;
+        if (a.windup <= 0) { a.atkT = 0; this.strike(a); a.atkCd = TIERS[a.tier].every * (0.85 + 0.3 * rng.next()); }
       } else {
-        a.swing = Math.max(0, a.swing - dt * 4);
-        const canHit = target && (target === hero ? a.token : true) && d <= (ranged ? 20 : wantDist + 0.9);
-        if (canHit && a.atkCd <= 0) a.windup = ranged ? 0.7 : 0.45;
+        const canHit = target && (target === hero ? a.token : true) && d <= (ranged ? K.range : wantDist + 0.9);
+        if (canHit && a.atkCd <= 0) { a.windup = a.windupT = K.windup; a.fake = false; }
       }
     }
     this.updateArrows(dt);
   }
 
+  // Tốc độ thật và pha bước chân lấy từ quãng đã đi (không trượt chân khi bị đẩy, khi đứng).
+  stride(a, px, pz, dt) {
+    const moved = Math.hypot(a.x - px, a.z - pz);
+    a.spd += (moved / dt - a.spd) * Math.min(1, dt * 10);
+    a.walk += moved * (TWO_PI / (a.K.mounted ? 3.4 : 1.7)) / a.scale;
+  }
+
   updateActor(a, dt) {
-    const dx = a.sx - a.x, dz = a.sz - a.z, d = Math.hypot(dx, dz);
+    const dx = a.sx - a.x, dz = a.sz - a.z, d = Math.hypot(dx, dz), px = a.x, pz = a.z;
+    const K = a.K, face = a.side === "ta" ? Math.PI / 2 : -Math.PI / 2;
+    a.ready = a.frontRow || (K.ranged && d <= 0.3);
     if (d > 0.3) {
       const sp = Math.min(a.speed * 0.8, d * 2);
       a.x += dx / d * sp * dt; a.z += dz / d * sp * dt;
       a.yaw = turn(a.yaw, Math.atan2(dx, dz), dt * 5);
     } else {
-      a.yaw = turn(a.yaw, a.side === "ta" ? Math.PI / 2 : -Math.PI / 2, dt * 3);
+      a.yaw = turn(a.yaw, face, dt * 3);
       a.fakeCd -= dt;
-      if (a.fakeCd <= 0 && a.frontRow) { a.swing = 1.4; a.fakeCd = 1.2 + this.ctx.rng.next() * 2.4; }
+      // hàng đầu diễn chém; cung, nỏ ở hàng sau bắn tên cảnh (không trúng ai)
+      if (a.fakeCd <= 0 && a.windup <= 0 && (a.frontRow || K.ranged)) {
+        a.windup = a.windupT = K.windup; a.fake = true;
+        a.fakeCd = K.ranged ? 2.5 + this.ctx.rng.next() * 4 : 1.2 + this.ctx.rng.next() * 2.4;
+      }
     }
-    a.swing = Math.max(0, a.swing - dt * 3);
+    if (a.windup > 0) {
+      a.windup -= dt;
+      if (a.windup <= 0) {
+        a.atkT = 0;
+        if (K.ranged && this.arrows.length < 90) {
+          const r = 14 + this.ctx.rng.next() * 12, s = this.ctx.rng.next() * 6 - 3;
+          this.fireArrow(a, { x: a.x + Math.sin(face) * r + s, z: a.z + Math.cos(face) * r + s }, true);
+        }
+      }
+    }
+    this.stride(a, px, pz, dt);
   }
 
   strike(a) {
@@ -215,12 +263,14 @@ export class Crowd {
     const tier = TIERS[a.tier];
     // Hoang mang (Kế Sách "Cờ áo Tống"): chính xác −30%
     if (a.panicT > 0 && ctx.rng.next() < 0.3) { if (t === ctx.hero) ctx.fx.text(a.x, a.z, "trượt", "#b0a090"); return; }
-    if (UNITS[a.unit].attack === "ranged") { this.fireArrow(a, t); return; }
+    if (a.K.ranged) { this.fireArrow(a, t); return; }
     const dx = t.x - a.x, dz = t.z - a.z, d = Math.hypot(dx, dz);
-    if (d > 2.6) return;
+    if (d > (a.K.reach || 1.7) + 0.9) return;
+    if (a.K.heavy) { ctx.fx?.dust(a.x + Math.sin(a.yaw) * 1.6, a.z + Math.cos(a.yaw) * 1.6, 0.8); ctx.fx?.shake(0.12); }
     if (t === ctx.hero) {
       const raw = a.cong * tier.mv * heSoGiap(ctx.hero.giap, ctx.R) * ctx.diff.dmg;
-      ctx.hero.receiveHit({ dmg: raw * (0.95 + 0.1 * ctx.rng.next()), x: a.x, z: a.z, red: false, src: a });
+      // đòn lực sĩ là đòn nặng: cắt được đòn đang ra của tướng, phải né hoặc đỡ
+      ctx.hero.receiveHit({ dmg: raw * (0.95 + 0.1 * ctx.rng.next()), x: a.x, z: a.z, red: false, src: a, heavy: !!a.K.heavy });
     } else if (t.isBig) {
       // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s
       t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * 0.2, x: a.x, z: a.z, src: a });
@@ -230,12 +280,14 @@ export class Crowd {
     }
   }
 
-  fireArrow(a, t) {
-    const y0 = heightAt(a.x, a.z) + 2.2;
-    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + 1.2;
+  // fake: tên cảnh của lính diễn — bay thật, không trúng ai, không phát tiếng.
+  fireArrow(a, t, fake = false) {
+    const y0 = heightAt(a.x, a.z) + (a.K.mounted ? 2.2 : 1.45) * a.scale;
+    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + (fake ? 0 : 1.2);
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
-    this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a, side: a.side, tgt: t });
-    this.ctx.audio?.play("bow", a.x, a.z);
+    this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a,
+      side: fake ? "fx" : a.side, tgt: fake ? null : t });
+    if (!fake) this.ctx.audio?.play("bow", a.x, a.z);
   }
 
   updateArrows(dt) {
@@ -247,7 +299,11 @@ export class Crowd {
       // mục tiêu không phải tướng người chơi (thuyền, tướng đồng minh): tính trúng khi tên tới nơi
       if (!done && r.tgt && r.tgt !== hero && r.t >= r.T0) {
         const g = r.tgt, a = r.src;
-        if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
+        if (g.K) {      // lính thường: tính như đòn cận chiến giữa hai đám lính
+          const d = Math.hypot(g.x - r.x, g.z - r.z), v = Math.hypot(r.vx, r.vz) || 1;
+          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6),
+            { kx: r.vx / v, kz: r.vz / v, knock: 1.2, by: r.side === "ta" ? "ally" : "enemy" });
+        } else if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
         done = true;
       }
       if (!done && r.side === "dich" && hero.alive && Math.hypot(hero.x - r.x, hero.z - r.z) < 0.9 && Math.abs(r.y - (hero.y + 1.1)) < 1.3) {
@@ -263,7 +319,7 @@ export class Crowd {
   // thẻ riêng ≈ 2/3 N (ĐỀ XUẤT BẢN THỬ) — không có thẻ thì 12 cung kỵ cùng bắn hạ tướng trong 12 s.
   assignTokens(enemies) {
     const hero = this.ctx.hero, N = this.ctx.diff.tokens, NR = Math.max(1, Math.round(N * 0.67));
-    const isR = (e) => UNITS[e.unit].attack === "ranged";
+    const isR = (e) => !!e.K.ranged;
     let held = 0, heldR = 0;
     for (const e of enemies) {
       if (!e.token) continue;
@@ -281,47 +337,58 @@ export class Crowd {
   }
 
   // ---- vẽ ----------------------------------------------------------------------------------
-  render(camX, camZ) {
-    const counts = { GIAO_DV: 0, KHIEN_NG: 0, CUNGKY_NG: 0 };
+  // Hoạt ảnh chạy theo đồng hồ trận (ctx.clock), nên hit-stop đóng băng cả đám lính.
+  render() {
+    const clk = this.ctx.clock, dtA = Math.min(0.1, Math.max(0, clk - (this.lastClock ?? clk)));
+    this.lastClock = clk;
+    const kSoft = 1 - Math.exp(-dtA * 18), kSnap = 1 - Math.exp(-dtA * 55);
+    const counts = {}, hero = this.ctx.hero, frame = ++this.frame;
+    for (const k of KIT_IDS) counts[k] = 0;
     let nb = 0;
     for (const a of this.agents) {
-      const M = this.meshes[a.unit], i = counts[a.unit];
-      if (i >= CAP[a.unit]) continue;
-      counts[a.unit]++;
+      const M = this.meshes[a.kit], i = counts[a.kit];
+      if (i >= CAP) continue;
+      counts[a.kit]++;
       const gy = heightAt(a.x, a.z);
-      let pitch = 0, sink = 0;
-      if (a.state === "dead") { pitch = -Math.min(1, a.dieT / 0.45) * 1.45; if (a.dieT > 1.8) sink = (a.dieT - 1.8) * 1.0; }
-      else if (a.state === "launch") pitch = -0.6;
-      else if (a.state === "down") pitch = -1.3;
-      else if (a.state === "hit") pitch = -0.25;
-      const moving = a.role === "actor" ? Math.hypot(a.sx - a.x, a.sz - a.z) > 0.35 : true;
-      const bob = a.state === "move" && moving ? Math.abs(Math.sin(a.bob)) * 0.08 : 0;
-      _e.set(pitch, a.yaw, 0); _q.setFromEuler(_e);
-      _p.set(a.x, gy + a.y + bob - sink, a.z); _s.setScalar(a.scale);
-      _m.compose(_p, _q, _s);
-      M.body.setMatrixAt(i, _m);
-      // tay: nâng lên khi báo trước, chém xuống khi swing > 1
-      const sw = a.swing, armX = sw <= 1 ? -sw * 1.7 : -1.7 + (sw - 1) * 5.5;
-      _r.makeRotationX(armX);
-      _a.makeTranslation(M.shoulder.x, M.shoulder.y, M.shoulder.z).multiply(_r);
-      _a.premultiply(_m);
-      M.arm.setMatrixAt(i, _a);
-      let k = a.flash > 0 ? 2.6 : 1;
+      const sink = a.state === "dead" && a.dieT > 1.8 ? (a.dieT - 1.8) * 1.0 : 0;
+      const far = (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 > LOD_FAR2;
+      if (!a.mc) { a.mc = new Float32Array(JOINT_NAMES.length * 16); a.mcv = JOINT_NAMES.map((_, j) => a.mc.subarray(j * 16, j * 16 + 16)); }
+      if (far && a.poseInit && (frame + a.id) % 3 !== 0) {
+        for (let j = 0; j < JOINT_NAMES.length; j++) M.arrays[j].set(a.mcv[j], i * 16);
+      } else {
+        poseFor(a, a.kit, a.K, clk, _pose);
+        const P = a.pose;
+        if (!a.poseInit || far) { P.set(_pose); a.poseInit = true; }
+        else {
+          const k = a.atkT < 0.14 || a.state === "hit" ? kSnap : kSoft;
+          for (let c = 0; c < NCH; c++) P[c] += (_pose[c] - P[c]) * k;
+        }
+        this._M = M; this._i = i; this._mc = a.mc;
+        jointMatrices(M.skel, a.x, gy + a.y - sink, a.z, a.yaw, a.scale, P, this._setJoint);
+      }
+
+      // màu: mỗi lính lệch sáng tối một chút cho đám đông khỏi đúc khuôn; chớp trắng khi trúng
+      const k = a.flash > 0 ? 2.6 : 0.9 + 0.2 * ((a.id * 0.377) % 1);
       if (a.tint) _c.setRGB(a.tint[0] * k, a.tint[1] * k, a.tint[2] * k);
-      else if (a.tier === "tinhnhue") _c.setRGB(0.75 * k, 0.72 * k, 0.62 * k); else _c.setRGB(k, k, k);
+      else if (a.tier === "tinhnhue") _c.setRGB(0.8 * k, 0.76 * k, 0.64 * k); else _c.setRGB(k, k, k);
       if (a.panicT > 0 && Math.floor(a.bob) % 2) _c.multiplyScalar(1.35);
-      if (a.windup > 0 && a.target === this.ctx.hero) _c.setRGB(1.5, 0.9, 0.8);
-      M.body.instanceColor.setXYZ(i, _c.r, _c.g, _c.b); M.arm.instanceColor.setXYZ(i, _c.r, _c.g, _c.b);
+      if (a.windup > 0 && !a.fake && a.target === this.ctx.hero) {
+        if (a.K.heavy) { const f = 0.5 + 0.5 * Math.sin(clk * 30); _c.setRGB(1.5 + 0.7 * f, 0.55 + 0.2 * f, 0.45); }
+        else _c.setRGB(1.5, 0.9, 0.8);
+      }
+      M.color.setXYZ(i, _c.r, _c.g, _c.b);
       if (nb < 2200 && sink < 0.5) {
-        _p.set(a.x, gy + 0.06, a.z); _s.setScalar(a.unit === "CUNGKY_NG" ? 1.5 : 1);
+        _p.set(a.x, gy + 0.06, a.z); _s.setScalar(a.K.mounted ? 1.5 : a.scale);
         _m.compose(_p, _q.identity(), _s); this.blob.setMatrixAt(nb++, _m);
       }
     }
-    for (const u of UNIT_IDS) {
-      const M = this.meshes[u];
-      M.body.count = M.arm.count = counts[u];
-      M.body.instanceMatrix.needsUpdate = M.arm.instanceMatrix.needsUpdate = true;
-      M.body.instanceColor.needsUpdate = M.arm.instanceColor.needsUpdate = true;
+    for (const k of KIT_IDS) {
+      const M = this.meshes[k], n = counts[k];
+      for (const j of JOINT_NAMES) {
+        const m = M.parts[j]; m.count = n;
+        m.instanceMatrix.clearUpdateRanges(); m.instanceMatrix.addUpdateRange(0, n * 16); m.instanceMatrix.needsUpdate = true;
+      }
+      M.color.clearUpdateRanges(); M.color.addUpdateRange(0, n * 3); M.color.needsUpdate = true;
     }
     this.blob.count = nb; this.blob.instanceMatrix.needsUpdate = true;
     let na = 0;

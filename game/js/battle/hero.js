@@ -9,14 +9,14 @@ import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
 import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
+import { HERO_ANIM as ANIM } from "./hero-anim.js";
+import { BladeTrail } from "./trail.js";
+import * as THREE from "three";
+
+const BLADE_BASE = new THREE.Vector3(0, 0.02, 0.32), BLADE_TIP = new THREE.Vector3(0, 0.02, 1.06);
+const _b = new THREE.Vector3(), _t = new THREE.Vector3(), _s = new THREE.Vector3();
 
 const CHAIN_N = ["N1", "N2", "N3", "N4", "N5", "N6"];
-const ANIM = {
-  N1: (u) => A.slash(u, 1), N2: (u) => A.slash(u, -1), N3: (u) => A.slash(u, 1, 0.6), N4: (u) => A.slash(u, -1, 0.6),
-  N5: (u) => A.slash(u, 1, 1), N6: (u) => A.spin(u, 1.25), C1: (u) => A.doubleChop(u), C2: (u) => A.uppercut(u),
-  C3: (u) => A.spin(u, 3.5), C4: (u) => A.spin(u, 1), C5: (u) => A.dash(u), C6: (u) => A.spin(u, 2),
-  DN: (u) => A.dash(u), DC: (u) => A.dash(u), DQ: (u) => A.doubleChop(u), CT: (u) => A.slash(u, 1, 0.3),
-};
 
 export class Hero {
   constructor(ctx, stats) {
@@ -24,6 +24,7 @@ export class Hero {
     this.rig = makeRig({ scale: 1.08, cloth: PAL.son, armor: PAL.then, trim: PAL.vang, hat: "tocbui", weapon: "songdao",
       flag: { text: "破強敵報皇恩", bg: "#9b2d20", fg: "#f1d98a" } });
     ctx.scene.add(this.rig.root);
+    this.trails = [new BladeTrail(ctx.scene, 0xd9b36a, 0.14), new BladeTrail(ctx.scene, 0xd9b36a, 0.14)];
     this.x = 72; this.z = -32; this.yaw = Math.PI / 2;     // ngoài rào bản doanh, để camera không kẹt vào lều this.vx = 0; this.vz = 0; this.y = 0;
     this.maxHp = stats.hp; this.hp = this.maxHp; this.giap = stats.giap;
     this.ki = 0; this.kiMax = HERO.kiLucBars * HERO.kiLucPerBar;
@@ -44,11 +45,28 @@ export class Hero {
   get parryWindow() { return (this.inTouch ? DEFENSE.parryWindowTouch : DEFENSE.parryWindow) + this.mods.parryWin; }
   get inTPC() { return this.ctx.hk.tpc; }
 
-  press(action) { this.buf = { a: action, t: this.ctx.clock }; }
+  // Bộ đệm giữ phím bấm trong lúc đang ra đòn cho tới khi đòn kế được phép (bấm dồn), ngoài ra
+  // giữ 0,15 s. swing ghi lại đòn đang ra lúc bấm để biết khi nào hết hạn.
+  press(action) { this.buf = { a: action, t: this.ctx.clock, swing: this.state === "attack" ? this.swingId : -1 }; }
+
+  // Nhận phím cạnh MỖI KHUNG HÌNH, kể cả khung không chạy bước mô phỏng nào (hit-stop, màn
+  // 120/144 Hz, vòng Mệnh Lệnh ×0,2). Trước đây phím chỉ được đọc ở bước đầu tiên của khung, nên
+  // khung 0 bước làm rơi mất phím: bấm dồn khi đang chém trúng (hit-stop) hầu như không ăn.
+  intake(inp) {
+    if (!this.alive) return;
+    const P = inp.pressed;
+    if (P.n) this.press("n");
+    if (P.c) this.press("c");
+    if (P.dodge) this.press("dodge");
+    if (P.skill) this.press("skill");
+    if (P.ult) this.press("ult");
+    if (P.block && this.ctx.clock > this.parryLock) this.parryAt = this.ctx.clock;
+  }
 
   update(dt, inp) {
     const ctx = this.ctx;
     this.animT += dt; this.inTouch = inp.touch;
+    for (const tr of this.trails) tr.update(dt);
     this.invuln = Math.max(0, this.invuln - dt); this.dodgeCd = Math.max(0, this.dodgeCd - dt);
     this.postDodge = Math.max(0, this.postDodge - dt); this.chainGrace = Math.max(0, this.chainGrace - dt);
     this.phaTran.cd = Math.max(0, this.phaTran.cd - dt);
@@ -57,7 +75,7 @@ export class Hero {
     if (this.lienHoanT > 0) { this.lienHoanT -= dt; if (this.lienHoanT <= 0) this.lienHoan = 0; }
     this.comboT -= dt; if (this.comboT <= 0) this.combo = 0;
     if (this.parryAt > 0 && ctx.clock - this.parryAt > this.parryWindow) { this.parryAt = -9; this.parryLock = ctx.clock + DEFENSE.counterLockout; }
-    if (this.buf && ctx.clock - this.buf.t > DEFENSE.inputBuffer) this.buf = null;
+    if (this.buf && ctx.clock - this.buf.t > DEFENSE.inputBuffer && !(this.state === "attack" && this.buf.swing === this.swingId)) this.buf = null;
 
     // Khí Lực nạp khi giao chiến
     const engaged = this.nearestEnemy(12) !== null;
@@ -66,14 +84,7 @@ export class Hero {
 
     if (!this.alive) { this.setPose(A.knockdown(this.st += dt), 0.3); this.place(); return; }
 
-    // input cạnh
-    if (inp.pressed.n) this.press("n");
-    if (inp.pressed.c) this.press("c");
-    if (inp.pressed.dodge) this.press("dodge");
-    if (inp.pressed.skill) this.press("skill");
-    if (inp.pressed.ult) this.press("ult");
-    if (inp.pressed.block && ctx.clock > this.parryLock) this.parryAt = ctx.clock;
-    this.blocking = inp.block;
+    this.blocking = inp.block;     // phím cạnh đã vào bộ đệm qua intake()
 
     // hướng input theo camera
     const cy = ctx.cam.yaw, fx = Math.sin(cy), fz = Math.cos(cy);
@@ -153,7 +164,7 @@ export class Hero {
   updateAttack(dt) {
     const m = MOVES[this.move];
     this.st += dt; const u = this.st / this.dur;
-    this.setPose(ANIM[this.move](Math.min(1, u)), 0.55);
+    this.setPose(ANIM[this.move](Math.min(1, u)), 0.8);
     // bước tới / lao tới
     if (this.stepLeft > 0) {
       const rate = m.dash ? m.dash / (this.dur * 0.45) : (m.step / (this.dur * 0.5));
@@ -509,5 +520,15 @@ export class Hero {
     if (this.rig.p.flagCloth) this.rig.p.flagCloth.rotation.x = Math.sin(this.animT * 6) * 0.15 + (this.state === "free" && this.inputMag > 0.2 ? 0.35 : 0);
     const vis = this.invuln > 0 && this.state !== "ult" ? (Math.floor(this.animT * 14) % 2 === 0) : true;
     r.visible = vis || !this.alive;
+    // vệt lưỡi đao khi ra đòn, lao, Tuyệt Kỹ
+    const swinging = this.state === "attack" || this.state === "skill" || this.state === "ult";
+    if (swinging) {
+      r.updateMatrixWorld(true);
+      const P = this.rig.p;
+      [[P.handR, P.shR], [P.handL, P.shL]].forEach(([hand, sh], i) => {
+        _b.copy(BLADE_BASE); hand.localToWorld(_b); _t.copy(BLADE_TIP); hand.localToWorld(_t); sh.getWorldPosition(_s);
+        this.trails[i].push(_b, _t, _s);
+      });
+    } else for (const tr of this.trails) tr.cut();
   }
 }

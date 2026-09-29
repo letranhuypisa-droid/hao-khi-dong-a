@@ -133,7 +133,6 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
 
     // ---- vòng lặp ------------------------------------------------------------------------
-    const noPress = { pressed: {} };
     let hudAcc = 0, endShown = false, time = 0;
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
@@ -168,12 +167,12 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         let scale = inp.cmdHeld ? 0.2 : 1;
         if (slowT > 0) { slowT -= dt; scale *= slowK; }
         if (ctx.hitstopT > 0) { ctx.hitstopT -= dt; scale = 0; }
+        ctx.hero.intake(inp);
         acc += dt * scale;
-        let steps = 0, first = true;
+        let steps = 0;
         while (acc >= STEP && steps < 4) {
           acc -= STEP; steps++; ctx.clock += STEP;
-          ctx.hero.update(STEP, first ? inp : Object.assign(noPress, inp, { pressed: {} }));
-          first = false;
+          ctx.hero.update(STEP, inp);
           ctx.crowd.update(STEP);
           for (const u of ctx.units) u.update(STEP);
           d.update(STEP);

@@ -1,7 +1,7 @@
 // tests/run.mjs — kiểm thử phần thuần (mô phỏng, Hào Khí, tiến triển) trong Node.
 //   node hao-khi-viet/game/tests/run.mjs
 import assert from "node:assert/strict";
-import { heSoGiap, g, E, EXP_NEXT, MOVES, TIERS, HERO, HAO_KHI } from "../js/data/tuning.js";
+import { heSoGiap, g, E, EXP_NEXT, MOVES, TIERS, HERO, HAO_KHI, UNITS, KITS, KITS_OF, pickKit } from "../js/data/tuning.js";
 import { FRONTS, BASES, ENEMY_MIX } from "../js/data/battle-b15.js";
 import { createSim, simTick, issueOrder, triggerTPC, totalQ, snapshot } from "../js/sim/front.js";
 import { createHaoKhi, gain, tick, activate, tpcReady } from "../js/sim/haokhi.js";
@@ -36,6 +36,30 @@ t("H35 hạ Toa Đô trong 20–25 s (~172/s)", () => {
 });
 t("E(R) khớp 12.7", () => { near(E(10), 1.135, 1e-9); near(E(25), 1.36, 1e-9); near(E(50), 1.735, 1e-9); });
 t("EXP_next khớp bảng 12.1", () => { assert.equal(EXP_NEXT(1), 300); assert.equal(EXP_NEXT(10), 5250); assert.equal(EXP_NEXT(35), 61500); });
+
+console.log("Kiểu lính (KITS)");
+t("mỗi binh chủng có kiểu lính, tỉ lệ w cộng lại = 1", () => {
+  for (const u of Object.keys(UNITS)) {
+    assert.ok(KITS_OF[u].length >= 1, u);
+    near(KITS_OF[u].reduce((s, k) => s + KITS[k].w, 0), 1, 1e-9, u);
+  }
+});
+t("băm id theo tỉ lệ vàng chia đúng tỉ lệ w (1000 lính khiên binh)", () => {
+  const n = {}; for (let id = 1; id <= 1000; id++) { const k = pickKit("KHIEN_NG", (id * 0.6180339887) % 1); n[k] = (n[k] || 0) + 1; }
+  for (const k of KITS_OF.KHIEN_NG) near(n[k] / 1000, KITS[k].w, 0.02, k);
+});
+t("đao thuẫn vẫn là khiên binh chuẩn: 3 đòn N1", () => {
+  const K = KITS.NG_DAO, d = HERO.cong1 * MOVES.N1.mv * heSoGiap(30 * K.giap, 1), hp = 120 * 1.3 * K.hp;
+  assert.ok(2 * d < hp && 3 * d >= hp);
+});
+t("lực sĩ trọng giáp cần 7–10 đòn N1, cung thủ chỉ 2", () => {
+  const n = (k) => Math.ceil((120 * 1.3 * KITS[k].hp) / (HERO.cong1 * MOVES.N1.mv * heSoGiap(30 * KITS[k].giap, 1)));
+  assert.ok(n("NG_TANK") >= 7 && n("NG_TANK") <= 10, `tank ${n("NG_TANK")}`);
+  assert.equal(n("NG_CUNG"), 2);
+});
+t("kiểu bắn xa có tầm, kiểu cận chiến có tầm chém", () => {
+  for (const [k, K] of Object.entries(KITS)) assert.ok(K.ranged ? K.range > 0 : K.reach > 0, k);
+});
 
 console.log("Mô phỏng mặt trận (4.2)");
 const mk = () => createSim({ fronts: FRONTS, bases: BASES, enemyMix: ENEMY_MIX, R: 1 });

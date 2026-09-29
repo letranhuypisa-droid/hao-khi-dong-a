@@ -156,7 +156,7 @@ export class Director {
         actors.forEach((a, i) => {
           const row = Math.floor(i / cols), col = i % cols;
           const jitter = ((a.id * 7919) % 100) / 100 - 0.5;
-          a.sx = lx + dir * (2.2 + row * 2.6 + jitter * 0.8) + (a.unit === "CUNGKY_NG" ? dir * 6 : 0);
+          a.sx = lx + dir * (2.2 + row * 2.6 + jitter * 0.8) + (a.K.mounted ? dir * 6 : a.K.ranged ? dir * 3.5 : 0);   // cung, nỏ đứng sau hàng chém
           a.sz = F.laneZ - 20 + col * 4 + jitter * 1.4;
           a.frontRow = row === 0;
           if (instant) { a.x = a.sx; a.z = a.sz; }

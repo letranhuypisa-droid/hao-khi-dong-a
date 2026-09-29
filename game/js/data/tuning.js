@@ -98,6 +98,32 @@ export const UNITS = {
   KHIEN_NG:   { name: "Khiên binh",  side: "dich", branch: "Khien", rel: [1.3, 0.8, 1.0, 0.9, 1.5], simC: 1.0, counters: ["CungNo"], weakTo: ["Ky", "Tuong"], attack: "melee" },
   CUNGKY_NG:  { name: "Cung kỵ",     side: "dich", branch: "Ky", rel: [1.4, 1.2, 1.3, 1.8, 1.0], simC: 1.4, counters: ["Khien", "CungNo"], weakTo: ["Giao", "Tuong"], attack: "ranged", rangeM: 20 },
 };
+// ---- Kiểu lính trong một binh chủng (ĐỀ XUẤT BẢN THỬ) ---------------------------------------
+// Mô phỏng 1 Hz chỉ biết binh chủng (UNITS). Vùng chiến đấu và lính diễn chia mỗi binh chủng thành
+// vài kiểu lính khác vũ khí, để một toán Nguyên có người cầm đao, người cầm thương, người bắn cung
+// và vài lực sĩ trọng giáp. w: tỉ lệ trong binh chủng (cộng lại = 1). hp/cong/giap/speed: hệ số nhân
+// thêm trên UNITS.rel. reach: tầm chém (m). ranged + range: bắn tên. windup: thời gian báo trước
+// đòn (s). heavy: đòn nặng (ngắt được đòn đang ra của tướng, như đòn của Đội trưởng). stable: đòn N
+// không đẩy lùi, không hất tung được, chỉ đòn có knock ≥ 5 hoặc hất tung mới làm khựng.
+export const KITS = {
+  NG_DAO:  { unit: "KHIEN_NG", name: "Đao thuẫn",   w: 0.40, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  reach: 1.7, windup: 0.45 },
+  NG_GIAO: { unit: "KHIEN_NG", name: "Thương binh", w: 0.27, hp: 0.9, cong: 1.1, giap: 0.9, speed: 0.95, reach: 2.5, windup: 0.5 },
+  NG_CUNG: { unit: "KHIEN_NG", name: "Cung thủ",    w: 0.20, hp: 0.7, cong: 0.8, giap: 0.7, speed: 1.0,  ranged: true, range: 16, windup: 0.8 },
+  NG_TANK: { unit: "KHIEN_NG", name: "Lực sĩ trọng giáp", w: 0.13, hp: 3.0, cong: 1.6, giap: 1.4, speed: 0.72, reach: 2.3, windup: 0.85,
+             heavy: true, stable: true, scale: 1.3 },
+  NG_KY:   { unit: "CUNGKY_NG", name: "Cung kỵ",    w: 1.00, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  ranged: true, range: 20, windup: 0.7, mounted: true },
+  DV_GIAO: { unit: "GIAO_DV", name: "Giáo binh",    w: 0.50, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  reach: 2.4, windup: 0.5 },
+  DV_DAO:  { unit: "GIAO_DV", name: "Đao khiên",    w: 0.30, hp: 1.15, cong: 0.95, giap: 1.1, speed: 1.0, reach: 1.7, windup: 0.42 },
+  DV_NO:   { unit: "GIAO_DV", name: "Nỏ thủ",       w: 0.20, hp: 0.8, cong: 0.9, giap: 0.8, speed: 1.0,  ranged: true, range: 14, windup: 0.9 },
+};
+export const KITS_OF = Object.fromEntries(Object.keys(UNITS).map((u) => [u, Object.keys(KITS).filter((k) => KITS[k].unit === u)]));
+// Chọn kiểu lính theo một số u ∈ [0,1) (thường là băm của id lính, để không ăn vào chuỗi rng).
+export function pickKit(unit, u) {
+  let acc = 0;
+  for (const k of KITS_OF[unit]) { acc += KITS[k].w; if (u < acc) return k; }
+  return KITS_OF[unit][KITS_OF[unit].length - 1];
+}
+
 // khắc chế trong mô phỏng: 1,5 nếu i khắc j, 0,75 nếu j khắc i, còn lại 1 (mục 3.12 khacChe)
 export function khac(unitA, unitB) {
   const a = UNITS[unitA], b = UNITS[unitB];

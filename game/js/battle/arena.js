@@ -274,7 +274,6 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       overlay.querySelector("[data-a=leave]").onclick = () => finish(res);
     };
 
-    const noPress = { pressed: {} };
     const step = (dt, inp, draw) => {
       time += dt; ctx.touch = inp.touch;
       if (inp.pressed.pause) { pause(true); input.endFrame(); return; }
@@ -285,10 +284,11 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
         let scale = 1;
         if (slowT > 0) { slowT -= dt; scale *= slowK; }
         if (ctx.hitstopT > 0) { ctx.hitstopT -= dt; scale = 0; }
-        acc += dt * scale; let steps = 0, first = true;
+        ctx.hero.intake(inp);
+        acc += dt * scale; let steps = 0;
         while (acc >= STEP && steps < 4) {
           acc -= STEP; steps++; ctx.clock += STEP;
-          ctx.hero.update(STEP, first ? inp : Object.assign(noPress, inp, { pressed: {} })); first = false;
+          ctx.hero.update(STEP, inp);
           ctx.crowd.update(STEP); for (const u of ctx.units) u.update(STEP); d.update(STEP);
           if (ctx.hitstopT > 0) break;
         }
