@@ -1,0 +1,261 @@
+// battle/units.js — đơn vị lớn có rig riêng: Đội trưởng, Phó tướng, Toa Đô, tướng đồng minh.
+//
+// Bậc có thanh Phá Thế dùng HP = 120 × hệ số bậc × S(R) (11.1). Phá Thế về 0 → Vỡ Thế: đứng
+// khựng, nhận sát thương ×1,5, mở Đòn Quyết (3.7). Đòn viền đỏ báo trước 0,6 s và chỉ phản đòn
+// được, không đỡ được (3.6).
+
+import { makeRig, PAL } from "./models.js";
+import * as A from "./anim.js";
+import { heightAt, collide } from "./world.js";
+import { TIERS, S, g, heSoGiap, DEFENSE } from "../data/tuning.js";
+import { turn } from "./crowd.js";
+
+const RIGS = {
+  doitruong: { scale: 1.12, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dao", shield: true },
+  photuong:  { scale: 1.22, cloth: PAL.cham, armor: PAL.then, trim: PAL.xam, hat: "mulong", weapon: "dadao", cape: 0x3b4a5a },
+  tuong:     { scale: 1.38, cloth: 0x3a2f3a, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x4a2f2a },
+  H33:       { scale: 1.15, cloth: 0x2f4a6a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "giao", cape: PAL.son },
+  H40:       { scale: 1.15, cloth: 0x4a5a2a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "cung", cape: PAL.sonDam },
+};
+
+export class BigUnit {
+  constructor(ctx, o) {
+    this.ctx = ctx; this.isBig = true; this.alive = true;
+    Object.assign(this, { kind: o.kind, side: o.side, tier: o.tier, name: o.name, id: o.id, base: o.base || null });
+    this.rigKey = o.rigKey || o.tier;
+    const R = ctx.R;
+    if (o.side === "dich") {
+      const T = TIERS[o.tier];
+      this.maxHp = T.hp * S(R); this.cong = T.cong * g(R); this.giap = T.giap * g(R);
+      this.poiseMax = T.poise * S(R); this.T = T;
+    } else {
+      this.maxHp = o.hp * g(R) * (1 + (ctx.stats?.mods.allyHpPct || 0)); this.cong = 110 * g(R); this.giap = 60 * g(R); this.poiseMax = 0;
+      this.T = { mv: 1.5, every: 1.4, red: 0 };
+    }
+    this.hp = this.maxHp * (o.hpFrac ?? 1); this.poise = this.poiseMax;
+    this.rig = makeRig(RIGS[o.rigKey || o.tier]);
+    ctx.scene.add(this.rig.root);
+    this.x = o.x; this.z = o.z; this.yaw = o.yaw ?? -Math.PI / 2; this.home = { x: o.x, z: o.z };
+    this.post = { x: o.x, z: o.z };
+    this.state = "idle"; this.st = 0; this.atkCd = 1.5; this.redCd = 4 + ctx.rng.next() * 3; this.ultCd = 8;
+    this.broken = 0; this.noHit = 0; this.flash = 0; this.animT = 0; this.runPhase = 0;
+    this.pose = A.idle(0); this.awake = o.awake ?? (o.side === "ta"); this.aggro = o.aggro ?? 22;
+    this.giapPen = 0; this.dead = 0; this.retreating = false; this.speed = o.side === "dich" ? 4.2 : 4.6;
+  }
+
+  get y() { return heightAt(this.x, this.z); }
+  get radius() { return 0.9 * this.rig.scale; }
+
+  dispose() { this.ctx.scene.remove(this.rig.root); this.alive = false; }
+
+  update(dt) {
+    const ctx = this.ctx, hero = ctx.hero;
+    this.animT += dt; this.flash = Math.max(0, this.flash - dt);
+    if (!this.alive) return;
+    if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.dead), 0.3); if (this.dead > 3.5) this.dispose(); this.place(); return; }
+    if (this.retreating) { this.updateRetreat(dt); return; }
+
+    if (this.poiseMax > 0) {
+      this.noHit += dt;
+      if (this.broken > 0) {
+        this.broken -= dt;
+        this.setPose(A.knockdown(Math.min(0.2, this.broken * 0.1)), 0.25);
+        if (this.broken <= 0) this.poise = this.poiseMax;
+        this.place(); return;
+      }
+      if (this.noHit > 3) this.poise = Math.min(this.poiseMax, this.poise + this.poiseMax * 0.2 * dt);
+    }
+
+    if (this.side === "dich") this.updateEnemy(dt, hero); else this.updateAlly(dt);
+    this.place();
+  }
+
+  updateEnemy(dt, hero) {
+    const ctx = this.ctx;
+    const dx = hero.x - this.x, dz = hero.z - this.z, d = Math.hypot(dx, dz);
+    if (!this.awake && hero.alive && (d < 16 || Math.hypot(hero.x - this.home.x, hero.z - this.home.z) < this.aggro)) {
+      this.awake = true; ctx.director?.onOfficerAwake(this);
+    }
+    if (this.state === "hit") { this.st -= dt; this.setPose(A.hitReact(1 - this.st / 0.3), 0.4); if (this.st <= 0) this.state = "idle"; return; }
+    if (this.state === "stagger") { this.st -= dt; this.setPose(A.hitReact(0.5), 0.3); if (this.st <= 0) this.state = "idle"; return; }
+
+    if (this.state === "atk" || this.state === "red" || this.state === "ult") { this.updateAttack(dt, hero, d); return; }
+
+    if (!this.awake || !hero.alive) {
+      const hd = Math.hypot(this.home.x - this.x, this.home.z - this.z);
+      if (hd > 2) this.moveToward(this.home.x, this.home.z, dt, 0.5); else this.setPose(A.idle(this.animT), 0.1);
+      return;
+    }
+    // Đội trưởng, Phó tướng bị giữ quanh Cứ Điểm; Toa Đô đuổi khắp bãi.
+    const leash = this.tier === "tuong" ? 999 : 40;
+    if (Math.hypot(this.x - this.home.x, this.z - this.home.z) > leash && d > 8) { this.moveToward(this.home.x, this.home.z, dt, 1); return; }
+
+    this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 6);
+    this.atkCd -= dt; this.redCd -= dt; this.ultCd -= dt;
+    const T = this.T;
+    if (this.tier === "tuong" && T.ult && this.hp < this.maxHp * 0.5 && this.ultCd <= 0 && d < 9) {
+      this.state = "ult"; this.st = 0; this.hitDone = false; this.ultCd = 16;
+      ctx.fx.telegraph(this, 7, T.ultTelegraph, true); ctx.audio.play("horn", this.x, this.z); return;
+    }
+    if (T.red && this.redCd <= 0 && d < 4.2) {
+      this.state = "red"; this.st = 0; this.hitDone = false; this.redCd = 6 + ctx.rng.next() * 3;
+      this.impactAt = ctx.clock + DEFENSE.redTelegraph;
+      ctx.fx.telegraph(this, 3.4, DEFENSE.redTelegraph, false); ctx.audio.play("warn", this.x, this.z); return;
+    }
+    if (d > 2.6) { this.moveToward(hero.x, hero.z, dt, 1); return; }
+    if (this.atkCd <= 0) { this.state = "atk"; this.st = 0; this.hitDone = false; this.combo = (this.combo || 0) + 1; return; }
+    this.setPose(A.idle(this.animT), 0.15);
+  }
+
+  updateAttack(dt, hero, d) {
+    const ctx = this.ctx, T = this.T;
+    this.st += dt;
+    if (this.state === "atk") {
+      const dur = 0.95, u = this.st / dur;
+      this.setPose(this.combo % 2 ? A.sweep(u) : A.heavyChop(u, 0.4), 0.5);
+      if (!this.hitDone && u > 0.5) {
+        this.hitDone = true;
+        if (d < 3.3 && facing(this, hero, 1.2)) hero.receiveHit({ dmg: this.cong * T.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: false, src: this, heavy: true });
+        this.hitCrowd(3, T.mv * 0.6);
+      }
+      if (u >= 1) { this.state = "idle"; this.atkCd = T.every * (0.8 + 0.4 * ctx.rng.next()); }
+    } else if (this.state === "red") {
+      const tele = DEFENSE.redTelegraph, u = this.st / (tele + 0.35);
+      this.setPose(A.heavyChop(u, tele / (tele + 0.35)), 0.6);
+      if (!this.hitDone && this.st >= tele) {
+        this.hitDone = true;
+        if (d < 3.8 && facing(this, hero, 1.3)) {
+          const r = hero.receiveHit({ dmg: this.cong * T.red * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: true, src: this, heavy: true });
+          if (r === "parried") { this.state = "stagger"; this.st = 1.3; return; }
+        }
+        ctx.fx.shake(0.35); ctx.fx.dust(this.x + Math.sin(this.yaw) * 2, this.z + Math.cos(this.yaw) * 2, 1.4);
+      }
+      if (u >= 1) { this.state = "idle"; this.atkCd = 0.8; }
+    } else if (this.state === "ult") {
+      const tele = T.ultTelegraph, dur = tele + 1.1;
+      this.setPose(this.st < tele ? A.heavyChop(this.st / tele * 0.5, 0.9) : A.spin((this.st - tele) / 1.1, 2), 0.6);
+      if (!this.hitDone && this.st >= tele + 0.3) {
+        this.hitDone = true;
+        ctx.fx.shake(0.7); ctx.fx.shockwave(this.x, this.z, 7);
+        if (d < 7) hero.receiveHit({ dmg: this.cong * T.ult * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: false, unblockable: true, src: this, knockdown: true });
+        this.hitCrowd(7, 3);
+      }
+      if (this.st >= dur) { this.state = "idle"; this.atkCd = 1.2; }
+    }
+  }
+
+  hitCrowd(r, mv) {
+    const ctx = this.ctx;
+    for (const a of ctx.crowd.agents) {
+      if (a.side !== (this.side === "dich" ? "ta" : "dich") || !ctx.crowd.hittable(a)) continue;
+      const dx = a.x - this.x, dz = a.z - this.z, d = Math.hypot(dx, dz);
+      if (d > r) continue;
+      ctx.crowd.damage(a, this.cong * mv * heSoGiap(a.giap, ctx.R), { kx: dx / (d || 1), kz: dz / (d || 1), knock: 4, by: this.side === "ta" ? "ally" : "enemy" });
+    }
+  }
+
+  updateAlly(dt) {
+    const ctx = this.ctx;
+    this.atkCd -= dt;
+    let best = null, bd = 64;
+    for (const a of ctx.crowd.agents) {
+      if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
+      const d2 = (a.x - this.x) ** 2 + (a.z - this.z) ** 2;
+      if (d2 < bd) { bd = d2; best = a; }
+    }
+    if (this.state === "atk") {
+      this.st += dt; const u = this.st / 0.8;
+      this.setPose(this.rigKey === "H40" ? A.shoot(u) : A.slash(u, 1, 0.3), 0.5);
+      if (!this.hitDone && u > 0.55) {
+        this.hitDone = true;
+        if (this.atkTarget && ctx.crowd.hittable(this.atkTarget)) {
+          const a = this.atkTarget, dx = a.x - this.x, dz = a.z - this.z, dd = Math.hypot(dx, dz) || 1;
+          ctx.crowd.damage(a, this.cong * 1.5 * heSoGiap(a.giap, ctx.R), { kx: dx / dd, kz: dz / dd, knock: 4, by: "ally" });
+          if (this.rigKey !== "H40") this.hitCrowd(2.6, 0.8);
+        }
+      }
+      if (u >= 1) { this.state = "idle"; this.atkCd = this.T.every; }
+      return;
+    }
+    const range = this.rigKey === "H40" ? 16 : 2.8;
+    if (best && Math.sqrt(bd) < (this.rigKey === "H40" ? 18 : 10)) {
+      const dx = best.x - this.x, dz = best.z - this.z, d = Math.hypot(dx, dz);
+      this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 6);
+      if (d > range) { this.moveToward(best.x, best.z, dt, 0.9); return; }
+      if (this.atkCd <= 0) { this.state = "atk"; this.st = 0; this.hitDone = false; this.atkTarget = best; return; }
+      this.setPose(A.idle(this.animT), 0.15); return;
+    }
+    const pd = Math.hypot(this.post.x - this.x, this.post.z - this.z);
+    if (pd > 1.5) { this.moveToward(this.post.x, this.post.z, dt, pd > 10 ? 1 : 0.5); return; }
+    this.yaw = turn(this.yaw, Math.PI / 2, dt * 3);
+    // diễn: vung vũ khí về phía tuyến
+    if (this.atkCd <= 0) { this.state = "atk"; this.st = 0; this.hitDone = true; this.atkTarget = null; this.atkCd = 2 + this.ctx.rng.next() * 2; return; }
+    this.setPose(A.idle(this.animT), 0.1);
+  }
+
+  moveToward(tx, tz, dt, k) {
+    const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz) || 1;
+    const sp = this.speed * k;
+    this.x += dx / d * sp * dt; this.z += dz / d * sp * dt;
+    [this.x, this.z] = collide(this.ctx.world, this.x, this.z, 0.7, this.ctx.openGates);
+    this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 7);
+    this.runPhase += dt * sp * 2.2;
+    this.setPose(A.run(this.runPhase, Math.min(1, k + 0.2)), 0.3);
+  }
+
+  setPose(p, k) { this.pose = A.blendPose(this.pose, p, Math.min(1, k)); A.applyPose(this.rig, this.pose); }
+
+  place() {
+    const r = this.rig.root;
+    r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw;
+    if (this.rig.p.flagCloth) this.rig.p.flagCloth.rotation.x = Math.sin(this.animT * 5) * 0.12;
+  }
+
+  // Đòn của tướng người chơi. Trả về { killed, broke }.
+  takeHeroHit(dmg, poiseDmg, opt = {}) {
+    if (!this.alive || this.dead || this.retreating || this.side !== "dich") return {};
+    const ctx = this.ctx;
+    const mult = this.broken > 0 ? 1.5 : 1;
+    this.hp -= dmg * mult; this.flash = 0.12; this.noHit = 0; this.awake = true;
+    let broke = false;
+    if (this.poiseMax > 0 && this.broken <= 0) {
+      this.poise -= poiseDmg;
+      if (this.poise <= 0) { this.poise = 0; this.broken = 3.5; this.state = "idle"; broke = true; ctx.director?.onBreak(this); }
+    }
+    if (this.hp <= 0) {
+      this.hp = 0;
+      if (this.tier === "tuong") { this.retreating = true; this.retreatT = 0; ctx.director?.onBossDefeated(this); }
+      else { this.dead = 0.001; ctx.director?.onOfficerKilled(this, opt); }
+      return { killed: true, broke };
+    }
+    const interrupt = (opt.knock || opt.launch) && this.state === "atk";
+    if (!broke && (interrupt || (this.poiseMax > 0 && this.poise < this.poiseMax * 0.35 && this.state === "idle"))) { this.state = "hit"; this.st = 0.3; }
+    return { killed: false, broke };
+  }
+
+  // Đòn của địch vào tướng đồng minh.
+  receiveHit({ dmg }) {
+    if (this.side !== "ta" || !this.alive || this.dead) return;
+    this.hp -= dmg; this.flash = 0.1;
+    if (this.hp <= 0) { this.hp = 0; this.dead = 0.001; this.ctx.director?.onAllyGeneralDown(this); }
+  }
+
+  updateRetreat(dt) {
+    // defeatMeans = "rút chạy": chạy ra mép nước rồi lên thuyền.
+    this.retreatT += dt;
+    const tx = this.retreatTo?.x ?? 540, tz = this.retreatTo?.z ?? -175;
+    if (this.retreatT < 1.2) { this.setPose(A.hitReact(this.retreatT / 1.2), 0.3); }
+    else {
+      this.moveToward(tx, tz, dt, 1.2);
+      if (this.retreatT > 6) { this.rig.root.visible = Math.floor(this.retreatT * 8) % 2 === 0; }
+      if (this.retreatT > 8) { this.dispose(); }
+    }
+    this.place();
+  }
+}
+
+function facing(u, t, halfArc) {
+  const dx = t.x - u.x, dz = t.z - u.z, a = Math.atan2(dx, dz);
+  let d = a - u.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+  return Math.abs(d) <= halfArc;
+}
