@@ -1,0 +1,6 @@
+# Ảnh gốc 2K từ Higgsfield (~8MB/tấm) — cố ý nằm ngoài git, giống quy ước ảnh nguồn HD của
+# My Room ở .gitignore gốc. Sinh lại được bằng `node _tool/render.mjs <chương>` (PROMPTS.md của
+# mỗi chương ghi đúng prompt). Trang đã dàn (<chương>/pages/*.jpg, ~1MB/trang) thì giữ lại.
+*/renders/
+_shared/refs/
+*/pages/_raw-*

@@ -1,0 +1,2651 @@
+{
+  "group": "G4",
+  "designRules": [
+    "Nhãn sử liệu chỉ dùng 3 giá trị: Chính sử / Tương truyền / Hư cấu. Trường historicity của nhân vật chỉ gắn nhãn cho SỰ TỒN TẠI của nhân vật; sắc thái của từng chi tiết ghi ở basis của trường đó và ở notes.",
+    "Hào Khí theo systems §6: Tuyệt Kỹ KHÔNG cộng Hào Khí trực tiếp (Khí Lực và Hào Khí không chuyển đổi, §6.4) — phần thưởng của Tuyệt Kỹ đi qua Sĩ Khí hoặc qua nguồn chung (hạ tướng, chiếm Cứ Điểm, phá cổng); kỹ năng thường tối đa +3 mỗi lần và tổng Hào Khí từ kỹ năng không quá +10 mỗi phút; Kế Sách thành công +10 (nhỏ) / +20 (lớn); chiếm Cứ Điểm +3/+6, hạ tướng +5, đại tướng +10 (§6.1). Tổng Phản Công do người chơi chủ động kích (A_RALLY) khi Hào Khí đạt 100; nhịp mục tiêu 1–2 lần mỗi trận.",
+    "Hiệu ứng địa hình của kỹ năng/Tuyệt Kỹ là volume modifier (vùng làm chậm, chặn đạn, lực đẩy mềm cấm đi qua), KHÔNG sửa navmesh. Chỉ Kế Sách được đổi hình học, và hình học đó được bake sẵn trong level (ví dụ cầu có 2 trạng thái: nguyên / gãy).",
+    "Nhập liệu đặc biệt chỉ có 2 mẫu dùng chung: 'nhấn theo nhịp' (WC15 và các hệ nhịp sau này; luôn có mức tự chạy mặc định nếu người chơi không nhấn) và 'chọn hướng/điểm đích' (tối đa 3 điểm mốc). Không có mini-game vẽ đường hay chọn thứ tự tùy ý.",
+    "Ngân sách cinematic Tuyệt Kỹ (L6): template trong engine 2–3 giây, 4 mẫu camera chung (khung G4 quy về: cận vũ khí → lướt theo đòn, toàn thân hô lệnh → hạ góc thấp, góc rộng quân ta xông lên → toàn cảnh chiến trường) cộng 1 VFX đặc trưng mỗi tướng. Mỗi đợt sau R1 tối đa 2 cinematic 3D riêng ≤ 6 giây (U1: Lê Lợi, Lê Lai; U2: Quang Trung). Cảnh dựng lớn chuyển thành VFX gameplay hoặc comic (systems §12.6).",
+    "Mỗi màn lưu checkpoint tự động khi sang pha mới; mỗi pha lý tưởng 4–6 phút; pha 'trong trướng'/ngoại giao được bỏ qua khi chơi lại.",
+    "Ngân sách chỉ số tướng chơi được (L8, toàn dự án): tổng 5 chỉ số trong khoảng 15–19.",
+    "VFX lớp WC13 (hỏa khí) và mọi hiệu ứng lửa: lính trúng lửa chỉ bị đẩy lùi, bốc khói, hoảng chạy; không có hiệu ứng cháy trên nhân vật, không có xác cháy.",
+    "Địa danh 'nay thuộc…' ghi theo địa giới sau đợt sáp nhập tỉnh và bỏ cấp huyện năm 2025; tên huyện cũ ghi dạng 'huyện … cũ'."
+  ],
+  "eras": [
+    {
+      "id": "E8",
+      "name": "Khởi nghĩa Lam Sơn",
+      "period": "1418–1427",
+      "enemyFactions": [
+        "Nhà Minh (quân Minh)"
+      ],
+      "overview": "Từ 1407, Đại Việt bị nhà Minh đặt thành quận Giao Chỉ. Ngày 7/2/1418, Lê Lợi xưng Bình Định vương, dựng cờ ở Lam Sơn (Thanh Hóa). Những năm đầu (1418–1423) nghĩa quân nhiều lần bị vây, phải lui về núi Chí Linh. Cuối năm 1424, theo kế của Nguyễn Chích, nghĩa quân vào Nghệ An, lấy miền Nam làm bàn đạp rồi đánh ra Bắc và vây Đông Quan (1426–1427).",
+      "campaignArc": "Hồi I (Chí Linh, 1418–1419): sống sót. Lê Lai mặc áo chủ tướng cứu Lê Lợi, ngọn cờ Lam Sơn không tắt. Hồi II (Nghệ An, 1424): đổi thế; nút chiến dịch 'Tập kích Đa Căng' ở Thanh Hóa mở đường, rồi nghĩa quân tràn vào thung lũng sông Lam. Hồi III (Tốt Động, 1426): một trận phục kích làm tan chủ lực Vương Thông, dồn quân Minh vào thành Đông Quan. Hồi IV (Chi Lăng – Xương Giang, 1427): vây thành diệt viện, chặn hai đạo viện binh, rồi vây Đông Quan. Kết: comic kết Quyển VIII là Hội thề Đông Quan (quân Minh được cấp thuyền, ngựa, lương về nước), lời dẫn trích Bình Ngô đại cáo (1428). Truyện trả gươm (Tương truyền) chỉ là một khung comic sau credit, đọc lại trong Sử quán.",
+      "mapNodes": [
+        "B23",
+        "B24",
+        "B25",
+        "B26",
+        "B27"
+      ]
+    },
+    {
+      "id": "E9",
+      "name": "Tây Sơn",
+      "period": "1785–1789",
+      "enemyFactions": [
+        "Xiêm (vương triều Rattanakosin)",
+        "Nhà Thanh (quân Thanh)"
+      ],
+      "overview": "Phong trào Tây Sơn của ba anh em Nguyễn Nhạc, Nguyễn Huệ, Nguyễn Lữ nổi lên ở Bình Định từ 1771. Nguyễn Ánh sang Xiêm xin viện binh; năm 1784–1785, quân Xiêm vào Gia Định và bị Nguyễn Huệ đánh tan ở Rạch Gầm – Xoài Mút. Năm 1788, Lê Chiêu Thống sang cầu viện nhà Thanh; Tôn Sĩ Nghị đưa quân vào Thăng Long. Ngày 22/12/1788, Nguyễn Huệ lên ngôi ở núi Bân, xưng Quang Trung, rồi tiến quân ra Bắc đánh trận Tết Kỷ Dậu.",
+      "campaignArc": "Hồi I (sông Tiền, 1/1785): Nguyễn Huệ phục kích thủy chiến, quân Xiêm gần như mất cả hạm đội. Hồi II (Tết Kỷ Dậu 1789): nút chiến lược trên bản đồ chiến dịch 'Lui giữ Tam Điệp – hành quân đêm Tết' (chọn đạo quân theo lượt), rồi màn 3D Hà Hồi – Ngọc Hồi. Hồi III (Đống Đa, mùng 5 Tết): đạo quân Đô đốc Long bất ngờ tập kích đồn Khương Thượng; quân Thanh đoạn hậu bên sông, Tôn Sĩ Nghị rút qua cầu phao sông Hồng. Kết: comic kết Quyển IX, Quang Trung vào Thăng Long, áo bào sạm khói súng (Tương truyền).",
+      "mapNodes": [
+        "B28",
+        "B29",
+        "B30"
+      ]
+    }
+  ],
+  "heroes": [
+    {
+      "id": "H41",
+      "name": "Lê Lợi",
+      "title": "Bình Định vương, sau là Lê Thái Tổ",
+      "lifespan": "1385–1433",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Hào trưởng ở Lam Sơn, Thanh Hóa. Ngày 7/2/1418 xưng Bình Định vương và dựng cờ khởi nghĩa. Trực tiếp chỉ huy ở Chí Linh, Sách Khôi (1422), Khả Lưu; năm 1427 đóng bản doanh ở Bồ Đề, điều các tướng chặn viện binh Liễu Thăng.",
+      "battlesPresent": [
+        "B23",
+        "B24"
+      ],
+      "debut": "B23",
+      "weaponClass": "WC01",
+      "uniqueWeapon": {
+        "name": "Gươm Thuận Thiên",
+        "desc": "Lưỡi gươm do Lê Thận kéo lưới được, chuôi gươm Lê Lợi thấy trên cây đa; ghép lại vừa khít. Trong game là đại kiếm hai tay, lưỡi khắc hai chữ Thuận Thiên.",
+        "basis": "Tương truyền"
+      },
+      "archetype": "Chỉ huy hạng nặng",
+      "roles": [
+        "Chỉ huy",
+        "Tấn công vùng"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 4,
+        "toc": 2,
+        "tam": 3,
+        "thongSuat": 5
+      },
+      "skills": [
+        {
+          "name": "Dựng cờ Lam Sơn",
+          "type": "Chủ động",
+          "effect": "Cắm đại kiếm xuống đất, hô tụ nghĩa. 20 nghĩa quân từ Cứ Điểm quân ta gần nhất xuất hiện quanh Lê Lợi (trừ vào lính mô phỏng của Cứ Điểm đó, không tạo quân mới). Quân ta trong 12 m +15 Sĩ Khí ngay (điểm); cánh quân đang tan vỡ trong vùng lập tức tập hợp lại. Cứ Điểm trong vùng được chiếm nhanh hơn 30% trong 15 giây.",
+          "cooldownSec": 30,
+          "basis": "Chính sử (dựng cờ ngày 7/2/1418); cơ chế Hư cấu"
+        },
+        {
+          "name": "Thuận Thiên trảm",
+          "type": "Chủ động",
+          "effect": "Chém vòng cung 180°, tầm 8 m, bỏ qua 100% giáp. Mỗi lính địch bị hạ trong đòn +0,5 Hào Khí, tối đa +3 mỗi lần dùng.",
+          "cooldownSec": 18,
+          "basis": "Tương truyền (gươm thần); cơ chế Hư cấu"
+        },
+        {
+          "name": "Nếm mật nằm gai",
+          "type": "Nội tại",
+          "effect": "Khi Sinh lực dưới 30%: nhận ít hơn 25% sát thương và nạp Khí Lực nhanh hơn 50% trong 10 giây. Kích hoạt tối đa 1 lần mỗi 90 giây.",
+          "cooldownSec": 90,
+          "basis": "Chính sử (Bình Ngô đại cáo tả những năm gian khổ); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Gươm Thuận Thiên",
+        "effect": "12 giây. Mỗi nhát chém phóng sóng kiếm dài 15 m. Toàn bộ quân ta trên bản đồ +15 Sĩ Khí (điểm) ngay lập tức. Kết thúc bằng nhát cắm gươm xuống đất: lính địch trong 10 m bỏ vũ khí, đứng yên 4 giây (không sát thương thêm). Hạ được ít nhất 1 tướng địch trong thời gian Tuyệt Kỹ: mọi cánh ta +10 Sĩ Khí (Hào Khí từ việc hạ tướng tính theo luật chung).",
+        "cinematic": "Cinematic riêng ≤6 giây: lưỡi gươm và chuôi gươm hợp lại trong tay Lê Lợi, hai chữ Thuận Thiên sáng lên.",
+        "basis": "Tương truyền (gươm thần); cơ chế Hư cấu",
+        "cinematicTemplate": "bespoke-≤6s",
+        "scope": "toàn bản đồ"
+      },
+      "commandTrait": {
+        "name": "Lòng dân Lam Sơn",
+        "effect": "Mỗi Cứ Điểm quân ta giữ được sinh thêm 1 đội nghĩa quân 10 người mỗi 60 giây. Tiếp viện quân ta (vàng trên minimap) đến nhanh hơn 20%."
+      },
+      "unlock": "Hoàn thành B23",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Đánh nhanh thì sống, không đánh nhanh thì chết.",
+        "basis": "Chính sử (lời ở trận Sách Khôi 1422, dẫn theo vi.wikipedia mục Lê Thái Tổ)"
+      },
+      "notes": "Lê Lợi KHÔNG trực tiếp có mặt ở Tốt Động (B25), Chi Lăng (B26), Xương Giang (B27); ở B26–B27 chỉ xuất hiện qua lệnh từ bản doanh Bồ Đề (giọng nói, không điều khiển được). Truyện trả gươm ở hồ Tả Vọng chỉ xuất hiện trong văn bản thế kỷ 20; bản cũ hơn kể Lê Lợi đuổi rùa. Chỉ dùng làm một khung comic sau credit, đọc lại trong Sử quán, nhãn Tương truyền; comic kết Quyển VIII là Hội thề Đông Quan."
+    },
+    {
+      "id": "H42",
+      "name": "Nguyễn Trãi",
+      "title": "Ức Trai, mưu sĩ nghĩa quân Lam Sơn",
+      "lifespan": "1380–1442",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Mưu sĩ của Lê Lợi, soạn thư từ gửi các tướng Minh (Quân trung từ mệnh tập: thư cho Trần Trí, Phương Chính, Vương Thông). Năm 1428 soạn Bình Ngô đại cáo. Mất năm 1442 trong vụ án Lệ Chi Viên, được minh oan năm 1464.",
+      "battlesPresent": [
+        "B24",
+        "B27"
+      ],
+      "debut": "B24",
+      "weaponClass": "WC12",
+      "uniqueWeapon": {
+        "name": "Bút Ức Trai",
+        "desc": "Bút lông và quạt giấy; nét mực hóa thành lệnh, vùng chữ và thư dụ hàng.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Mưu sĩ điều binh",
+      "roles": [
+        "Hỗ trợ",
+        "Khống chế",
+        "Chỉ huy"
+      ],
+      "stats": {
+        "cong": 2,
+        "thu": 2,
+        "toc": 3,
+        "tam": 5,
+        "thongSuat": 5
+      },
+      "skills": [
+        {
+          "name": "Thư dụ hàng",
+          "type": "Chủ động",
+          "effect": "Phóng một cuộn thư vào Cứ Điểm địch trong 25 m. Sau 8 giây, 30% lính mô phỏng của Cứ Điểm rời vị trí (không chết, rời trận). Tướng giữ Cứ Điểm -20% thủ trong 20 giây.",
+          "cooldownSec": 40,
+          "basis": "Chính sử (Quân trung từ mệnh tập); cơ chế Hư cấu"
+        },
+        {
+          "name": "Lá cây hóa chữ",
+          "type": "Chủ động",
+          "effect": "Rải 20 lá chữ trong vùng bán kính 15 m, tồn tại 20 giây. Lính địch đứng trong vùng mỗi giây −3 Sĩ Khí; khi Sĩ Khí một nhóm địch dưới 30 thì nhóm đó dừng đánh 3 giây (dao động). Quân ta trong vùng +10 Sĩ Khí một lần.",
+          "cooldownSec": 22,
+          "basis": "Tương truyền (chuyện chữ trên lá cây để lay lòng người); cơ chế Hư cấu"
+        },
+        {
+          "name": "Tâm công",
+          "type": "Nội tại",
+          "effect": "Khi một tướng địch bị hạ trong 30 m quanh Nguyễn Trãi, 10% lính địch xung quanh đầu hàng thay vì chiến đấu. Mỗi đợt đầu hàng từ 10 lính trở lên: Hào Khí +2.",
+          "cooldownSec": 0,
+          "basis": "Hư cấu (lấy ý tư tưởng đánh vào lòng người gắn với Nguyễn Trãi)"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Quân trung từ mệnh",
+        "effect": "10 giây. Viết bốn nét đại tự trên không theo thứ tự cố định, mỗi nét là một hiệu ứng toàn bản đồ: nét 1 quân ta +25% thủ trong 20 giây; nét 2 toàn quân địch −20 Sĩ Khí; nét 3 hồi 30% Sinh lực cho mọi tướng đồng minh; nét 4 mọi cánh ta +10 Sĩ Khí. Bị ngắt giữa chừng thì mất các nét chưa viết.",
+        "cinematic": "Khung chung ≤3 giây (cận vũ khí): ngọn bút lướt, bốn nét mực sáng lên giữa không trung.",
+        "basis": "Chính sử (thư từ quân trung 1423–1427); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "lướt theo đòn",
+        "scope": "toàn bản đồ"
+      },
+      "commandTrait": {
+        "name": "Mưu sĩ trong trướng",
+        "effect": "Mỗi Kế Sách của trận hiện gợi ý thời điểm tối ưu trên minimap, và hiệu ứng phụ của Kế Sách (Sĩ Khí địch giảm, khống chế) kéo dài thêm 25%. Mệnh Lệnh truyền tới quân ta trễ 1 giây thay vì 2 giây."
+      },
+      "unlock": "Hoàn thành B27",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Việc nhân nghĩa cốt ở yên dân.",
+        "basis": "Chính sử (Bình Ngô đại cáo, 1428; nguyên văn 仁義之舉，要在安民 – Nhân nghĩa chi cử, yếu tại an dân)"
+      },
+      "notes": "Năm gặp Lê Lợi không được sử ghi; giả thuyết từ 1416 đến 1426. Ở B24, lựa chọn 'gửi thư' ở pha Vây Trà Lân gọi Nguyễn Trãi làm đồng minh AI (Hư cấu). Sự có mặt ở trận địa Xương Giang KHÔNG có căn cứ; ở B27 ông chỉ chơi được ở pha cuối 'Vây Đông Quan' (có căn cứ chung: Đông Quan bị vây 1426–1427 và ông soạn thư cho Vương Thông; chi tiết giao tranh Hư cấu). Bình Ngô đại cáo (đầu 1428) chỉ dùng làm lời dẫn comic kết Quyển VIII, không làm Tuyệt Kỹ để tránh lệch thời gian. Câu 'Dĩ đại nghĩa nhi thắng hung tàn' là nguyên văn (以大義而勝兇殘), nhưng không dùng làm câu đại diện vì gọi đối phương là 'hung tàn'. Vụ Lệ Chi Viên không đưa vào gameplay; chỉ nhắc trong tiểu sử."
+    },
+    {
+      "id": "H43",
+      "name": "Lê Lai",
+      "title": "Trung Túc vương",
+      "lifespan": "?–1418 hoặc 1419",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Tướng Lam Sơn. Theo Lam Sơn thực lục, khi nghĩa quân bị vây, Lê Lợi hỏi ai dám mặc áo vàng của mình, lĩnh 500 quân và 2 voi; Lê Lai nhận, ra trước trại quân Minh khiêu chiến, xưng là chúa Lam Sơn, để Lê Lợi thoát vây. Ông bị quân Minh bắt và giết; sau được truy phong Trung Túc vương.",
+      "battlesPresent": [
+        "B23"
+      ],
+      "debut": "B23",
+      "weaponClass": "WC02",
+      "uniqueWeapon": {
+        "name": "Khiên mây Chí Linh và áo bào Bình Định vương",
+        "desc": "Kiếm ngắn, khiên mây đan; khi dùng kỹ năng, khoác áo vàng của Lê Lợi.",
+        "basis": "Chính sử (việc mặc áo vàng, theo Lam Sơn thực lục); vũ khí Hư cấu"
+      },
+      "archetype": "Hộ vệ khiêu khích",
+      "roles": [
+        "Phòng thủ",
+        "Hộ vệ",
+        "Thu hút"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 5,
+        "toc": 2,
+        "tam": 3,
+        "thongSuat": 3
+      },
+      "skills": [
+        {
+          "name": "Đổi áo",
+          "type": "Chủ động",
+          "effect": "Khoác áo bào 20 giây. Mọi địch trong 40 m quên mục tiêu hiện tại và chỉ đuổi Lê Lai. Lê Lai +40% thủ. Riêng ở B23, kịch bản kích hoạt thêm hiệu ứng che giấu cho cánh Lê Lợi ở lối phía tây.",
+          "cooldownSec": 45,
+          "basis": "Chính sử (Lam Sơn thực lục; Toàn thư không chép); lời thoại và chi tiết dân gian Tương truyền; cơ chế Hư cấu"
+        },
+        {
+          "name": "Voi phá vây",
+          "type": "Chủ động",
+          "effect": "Gọi 2 voi chiến lao thẳng 30 m, hất tung lính trên đường, để lại một vùng hành lang rộng 6 m trong 8 giây (volume modifier: địch đi vào bị chậm 50%).",
+          "cooldownSec": 35,
+          "basis": "Chính sử (2 voi, theo Lam Sơn thực lục); cơ chế Hư cấu"
+        },
+        {
+          "name": "Năm trăm cảm tử",
+          "type": "Nội tại",
+          "effect": "Luôn đi kèm đội cảm tử 50 người (đại diện cho 500). Mỗi cảm tử còn sống +1% sát thương cho Lê Lai. Khi Lê Lai dưới 25% Sinh lực, đội cảm tử +50% tốc đánh.",
+          "cooldownSec": 0,
+          "basis": "Chính sử (con số 500 quân, theo Lam Sơn thực lục); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Liều mình cứu chúa",
+        "effect": "15 giây. Lê Lai và đội cảm tử xung phong; Sinh lực Lê Lai không xuống dưới 1. Mỗi giây kéo 10 lính địch trong 30 m về phía mình. Khi kết thúc, tướng đồng minh được chỉ định hồi 100% Sinh lực và được dịch chuyển về Cứ Điểm an toàn gần nhất; cánh quân của tướng được cứu +20 Sĩ Khí. Ở B23, Tuyệt Kỹ này mở cảnh kết màn.",
+        "cinematic": "Cinematic riêng ≤6 giây: Lê Lai khoác áo vàng, hô lớn danh hiệu chúa Lam Sơn, dẫn cảm tử quân và hai voi lao xuống sườn núi trong sương.",
+        "basis": "Chính sử (Lam Sơn thực lục); cơ chế Hư cấu",
+        "cinematicTemplate": "bespoke-≤6s",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Trung nghĩa",
+        "effect": "Mỗi cánh quân ta đang hộ vệ một tướng hoặc Cứ Điểm: lần đầu Sĩ Khí chạm ngưỡng tan vỡ trong trận, cánh đó không tan mà giữ vị trí thêm 20 giây với +25% thủ (mỗi cánh 1 lần/trận). Đội cảm tử và cận vệ quân ta +10% Sinh lực."
+      },
+      "unlock": "Có sẵn trong B23",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Chúa công cứ đi, áo này để tôi mặc.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Năm mất tranh cãi: en.wikipedia ghi 4/1418; vi.wikipedia ghi 1419. Cốt lõi sự kiện (áo vàng, 500 quân, 2 voi, khiêu chiến xưng chúa Lam Sơn) có trong Lam Sơn thực lục (bộ sử triều Lê soạn năm 1431), nên gắn nhãn Chính sử; Đại Việt sử ký toàn thư không chép chuyện này. Toàn thư lại chép ngày 13 tháng Giêng năm Đinh Mùi (1427) giết Tư mã Lê Lai vì cậy công, nói năng khinh mạn; có ý kiến cho đó là người khác. Theo Lam Sơn thực lục, Lê Lợi là người hỏi ai dám mặc áo; lời thoại trong game (Lê Lai xin đổi áo) là Hư cấu. Không tái hiện việc hành hình; cảnh cuối dừng ở lúc Lê Lai xông vào hàng quân Minh. Phiên bản Lê Lai sống sót chỉ có ở whatIf của B23."
+    },
+    {
+      "id": "H44",
+      "name": "Nguyễn Chích",
+      "title": "Đình thượng hầu, thụy Trinh Vũ",
+      "lifespan": "1382–1448",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Người Đông Sơn, Thanh Hóa; từ khoảng 1413 đã tự khởi nghĩa, lập căn cứ ở núi Hoàng, núi Nghiêu. Theo Lê Lợi, cuối năm 1424 đề xuất đánh Nghệ An, lấy Trà Lân trước rồi làm bàn đạp đánh ra Bắc. Dự các trận Trà Lân, Khả Lưu, Bồ Ải.",
+      "battlesPresent": [
+        "B24"
+      ],
+      "debut": "B24",
+      "weaponClass": "WC06",
+      "uniqueWeapon": {
+        "name": "Côn tre Hoàng Nghiêu",
+        "desc": "Côn dài bịt đồng hai đầu, vũ khí của nghĩa binh vùng núi.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Du kích khống chế",
+      "roles": [
+        "Khống chế",
+        "Chiến lược"
+      ],
+      "stats": {
+        "cong": 3,
+        "thu": 3,
+        "toc": 4,
+        "tam": 4,
+        "thongSuat": 3
+      },
+      "skills": [
+        {
+          "name": "Kế Nghệ An",
+          "type": "Chủ động",
+          "effect": "Đánh dấu một Cứ Điểm địch trong 60 m. Trong 30 giây: quân ta đánh Cứ Điểm đó +30% sát thương; tiếp viện địch đi tới Cứ Điểm đó chậm 40%.",
+          "cooldownSec": 50,
+          "basis": "Chính sử (đề xuất đánh Nghệ An); cơ chế Hư cấu"
+        },
+        {
+          "name": "Cuồng phong côn",
+          "type": "Chủ động",
+          "effect": "Xoay côn 4 giây, bán kính 5 m, hút địch vào tâm rồi hất tung ở giây cuối.",
+          "cooldownSec": 14,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Chiến khu Hoàng Nghiêu",
+          "type": "Nội tại",
+          "effect": "Trên địa hình Rừng núi: quân ta trong 20 m quanh Nguyễn Chích +20% tốc chạy và +1 Sĩ Khí mỗi 5 giây.",
+          "cooldownSec": 0,
+          "basis": "Chính sử (căn cứ núi Hoàng, núi Nghiêu); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Tiên thủ Trà Lân",
+        "effect": "12 giây. Dựng vùng vây bán kính 25 m quanh một Cứ Điểm (volume modifier: vòng rào tre hiện dần trong 1 giây, lực đẩy mềm giữ địch bên trong, không sửa navmesh). Địch bên trong −5 Sĩ Khí mỗi giây. Nếu Cứ Điểm thất thủ trong 12 giây đó, 50% lính địch bên trong đầu hàng; Hào Khí từ việc chiếm Cứ Điểm tính theo luật chung.",
+        "cinematic": "Khung chung ≤3 giây (toàn thân hô lệnh): Nguyễn Chích chỉ côn về phía thành; VFX rào tre mọc lên quanh Cứ Điểm.",
+        "basis": "Chính sử (vây Trà Lân 1424, thành mở cửa sau khi bị vây); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "hạ góc thấp",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Nghĩa binh địa phương",
+        "effect": "Mỗi làng hoặc Cứ Điểm dân sự quân ta giữ được: cứ mỗi 3 phút +3 Hào Khí và sinh 1 đội dân binh 15 người (tối đa 3 đội mỗi làng)."
+      },
+      "unlock": "Hoàn thành B24",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Lấy Trà Lân trước, dựa Nghệ An mà đánh ra.",
+        "basis": "Hư cấu (tóm ý lời đề xuất được vi.wikipedia dẫn)"
+      },
+      "notes": "Ngày đánh Khả Lưu – Bồ Ải: vi.wikipedia mục Nguyễn Chích ghi 1425, các nguồn khác ghi cuối 1424. Không có căn cứ cho việc ông dự Chi Lăng. Ẩn thân khỏi minimap là bản sắc của Lê Sát và Lưu Nhân Chú, nên nội tại của Nguyễn Chích thiên về cơ động và giữ Sĩ Khí."
+    },
+    {
+      "id": "H45",
+      "name": "Đinh Lễ",
+      "title": "Tướng Lam Sơn, cháu gọi Lê Lợi bằng cậu",
+      "lifespan": "?–1427",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Người sách Thùy Cối (thị trấn Lam Sơn, huyện Thọ Xuân cũ, Thanh Hóa), cháu gọi Lê Lợi bằng cậu, lúc trẻ làm cận vệ cho Lê Lợi. Cùng Lý Triện, Nguyễn Xí chỉ huy trận Tốt Động – Chúc Động (1426). Ngô Sĩ Liên xếp Lễ và Triện đứng đầu các tướng thời ấy.",
+      "battlesPresent": [
+        "B23",
+        "B24",
+        "B25"
+      ],
+      "debut": "B23",
+      "weaponClass": "WC03",
+      "uniqueWeapon": {
+        "name": "Song đao thị vệ",
+        "desc": "Hai đao ngắn của cận vệ Bình Định vương.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Tiên phong tốc độ",
+      "roles": [
+        "Tấn công",
+        "Truy kích"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 2,
+        "toc": 5,
+        "tam": 3,
+        "thongSuat": 3
+      },
+      "skills": [
+        {
+          "name": "Lướt ba nhịp",
+          "type": "Chủ động",
+          "effect": "Lướt 3 lần liên tiếp, mỗi lần 10 m, xuyên đội hình; lính trên đường choáng 1 giây. Lần thứ 3 để lại vệt bùn 8 giây làm địch chậm 30%.",
+          "cooldownSec": 16,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Bám gót",
+          "type": "Chủ động",
+          "effect": "Đánh dấu một tướng địch trong 10 giây. Đinh Lễ +50% tốc chạy, đòn lên mục tiêu +40% sát thương. Nếu mục tiêu đang rút chạy, thời gian đánh dấu kéo dài thêm 5 giây.",
+          "cooldownSec": 30,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Dũng lược",
+          "type": "Nội tại",
+          "effect": "Mỗi chuỗi 30 đòn liên tiếp: quân ta trong 15 m +10% công trong 20 giây, cộng dồn tối đa 3 lần.",
+          "cooldownSec": 0,
+          "basis": "Hư cấu (lấy ý lời khen của Ngô Sĩ Liên)"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Phục binh Tốt Động",
+        "effect": "12 giây. Đinh Lễ lặn vào bãi lau, lần lượt xuất hiện ở 5 điểm trong 30 m, mỗi lần chém một đòn vùng 4 m và gọi 1 đội phục binh 15 người đứng dậy từ đầm (trừ vào lính mô phỏng của Cứ Điểm quân ta gần nhất). Kết thúc: lính địch trong vùng không thể chạy trong 3 giây.",
+        "cinematic": "Khung chung ≤3 giây (góc rộng quân ta xông lên): tiếng tù và, hàng mũi giáo nhô lên khỏi lau sậy.",
+        "basis": "Chính sử (phục kích ở Tốt Động); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "toàn cảnh chiến trường",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Tiên phong Lam Sơn",
+        "effect": "Cánh tiên phong quân ta +15% tốc hành quân. Chiếm được một Cứ Điểm trong vòng 60 giây kể từ lúc tấn công: Hào Khí +5."
+      },
+      "unlock": "Hoàn thành B23 (dạng đồng minh), chơi được từ B24",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Đầm này là thành của ta.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Có mặt ở Chí Linh thời kỳ đầu theo vi.wikipedia, nhưng không có căn cứ ông ở đúng trận Lê Lai mặc áo; ở B23 chỉ là đồng minh AI. Tháng 3/1427 ông cùng Nguyễn Xí bị bắt ở Mỹ Động và bị giết (vi.wikipedia ghi ngày 9/3/1427), nên không có mặt ở Chi Lăng, Xương Giang. Không làm màn tái hiện cái chết."
+    },
+    {
+      "id": "H46",
+      "name": "Lê Sát",
+      "title": "Đại tư đồ",
+      "lifespan": "?–1437",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Tướng Lam Sơn người Thanh Hóa, dự Lỗi Giang (1420), Khả Lưu (1424). Năm 1427 cùng Lưu Nhân Chú bày phục binh ở Chi Lăng, nơi Liễu Thăng tử trận. Sau làm Đại tư đồ; năm 1437 bị buộc tự tử.",
+      "battlesPresent": [
+        "B24",
+        "B26",
+        "B27"
+      ],
+      "debut": "B24",
+      "weaponClass": "WC04",
+      "uniqueWeapon": {
+        "name": "Thương Chi Lăng",
+        "desc": "Trường thương cán tre đặc, mũi sắt dài, dùng cho trận địa phục kích trong hẻm núi.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Phục binh tầm dài",
+      "roles": [
+        "Tấn công",
+        "Phục kích"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 3,
+        "toc": 3,
+        "tam": 3,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Xuyên hàng",
+          "type": "Chủ động",
+          "effect": "Đâm thẳng 12 m, xuyên tối đa 3 hàng lính, hất lùi 3 m. Trúng kỵ binh: làm ngã ngựa.",
+          "cooldownSec": 12,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Đoạn kiều",
+          "type": "Chủ động",
+          "effect": "Phóng thương cắm vào một đoạn cầu hoặc đường trong 20 m, tạo vùng 'đường sụt' bán kính 10 m trong 20 giây: địch trong vùng chậm 60%, kỵ binh ngã ngựa. Cầu KHÔNG bị phá (phá cầu thật chỉ qua Kế Sách).",
+          "cooldownSec": 45,
+          "basis": "Chính sử (Minh sử: cầu gãy, Liễu Thăng sa lầy ở Đảo Mã pha); cơ chế Hư cấu"
+        },
+        {
+          "name": "Nằm chờ",
+          "type": "Nội tại",
+          "effect": "Đứng yên 3 giây trong bụi hoặc rừng: Lê Sát và quân ta trong 20 m ẩn thân. Đòn đầu tiên từ trạng thái ẩn gây gấp đôi sát thương.",
+          "cooldownSec": 0,
+          "basis": "Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Mã Yên sơn",
+        "effect": "12 giây. Lê Sát lao 40 m theo đường thẳng. Tướng địch đầu tiên trúng đòn bị ghim xuống đất 4 giây và mất mọi hiệu ứng buff lên quân trong 10 giây. Sau đó ông đâm 6 nhát tỏa hình quạt 120°, mỗi nhát xuyên 15 m; kỵ binh trúng đòn ngã ngựa. Ghim được tướng: cánh địch của tướng đó −15 Sĩ Khí.",
+        "cinematic": "Khung chung ≤3 giây (cận vũ khí): mũi thương ghim xuống bùn chân núi Mã Yên.",
+        "basis": "Chính sử (Chi Lăng – Mã Yên 1427); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "lướt theo đòn",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Quân lệnh nghiêm",
+        "effect": "Ngưỡng tan vỡ Sĩ Khí của quân ta hạ từ 20 xuống 10 (điểm). Đổi lại, quân ta hồi Sĩ Khí chậm hơn 10% (nhân tương đối ×0,9)."
+      },
+      "unlock": "Hoàn thành B24",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Chờ nó qua cầu.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Sử khen công nhưng chê tính nóng, hà khắc; commandTrait phản ánh điều đó. Cảnh 'hai vách núi cùng đứng dậy' là Tổng Phản Công đặc thù của B26, không lặp trong Tuyệt Kỹ. Cái chết 1437 là chuyện nội bộ triều Lê, không đưa vào gameplay."
+    },
+    {
+      "id": "H47",
+      "name": "Trần Nguyên Hãn",
+      "title": "Thái úy, sau là Tả tướng quốc",
+      "lifespan": "1390–1429",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Dòng dõi nhà Trần, quê Sơn Đông (nay thuộc tỉnh Phú Thọ). Năm 1427 làm Thái úy, chỉ huy vây và hạ thành Xương Giang, tham gia chặn đường tiếp tế của viện binh Minh. Năm 1429 bị nghi oan, chết đuối trên sông khi bị bắt giải.",
+      "battlesPresent": [
+        "B27"
+      ],
+      "debut": "B27",
+      "weaponClass": "WC08",
+      "uniqueWeapon": {
+        "name": "Nỏ liên châu Sơn Đông",
+        "desc": "Nỏ lớn lên dây bằng tời, bắn liền 3 mũi, dùng đánh thành.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Công thành tầm xa",
+      "roles": [
+        "Công thành",
+        "Tầm xa"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 2,
+        "toc": 2,
+        "tam": 4,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Tên xuyên lũy",
+          "type": "Chủ động",
+          "effect": "Bắn một mũi nỏ lớn xuyên 40 m, xuyên cả khiên và công sự gỗ. Gây 300% sát thương lên máy công thành, rào gỗ, cổng gỗ.",
+          "cooldownSec": 18,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Bãi chông",
+          "type": "Chủ động",
+          "effect": "Đặt 3 bãi chông, mỗi bãi bán kính 4 m, tồn tại 40 giây. Địch dẫm vào bị giữ chân 3 giây.",
+          "cooldownSec": 20,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Thế cao",
+          "type": "Nội tại",
+          "effect": "Đứng trên tường thành hoặc đồi: +15% tầm bắn và +10% sát thương. Quân nỏ quân ta trong 20 m cũng được +10% tầm bắn.",
+          "cooldownSec": 0,
+          "basis": "Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Hạ thành Xương Giang",
+        "effect": "15 giây. Đánh dấu một đoạn tường thành. 5 loạt nỏ liên châu và thang của quân ta dồn vào đó: đoạn tường mất 60% độ bền; quân ta leo tường nhanh hơn 50%. Nếu đoạn tường sập (trạng thái bake sẵn trong level): Cứ Điểm đó chuyển thành cổng mở trong 30 giây.",
+        "cinematic": "Khung chung ≤3 giây (góc rộng quân ta xông lên): loạt thang tre dựng vào tường dưới làn tên.",
+        "basis": "Chính sử (hạ thành Xương Giang 1427); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "toàn cảnh chiến trường",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Vây thành diệt viện",
+        "effect": "Khi quân ta đang vây một Cứ Điểm: đạo viện binh địch đi tới bị lộ trên minimap sớm hơn 30 giây và −15 Sĩ Khí khi thấy thành đã thất thủ."
+      },
+      "unlock": "Hoàn thành B26",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Thành đã mất, viện binh đến cũng muộn rồi.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Cái chết năm 1429: có bản nói bị dìm, có bản nói thuyền lật trong bão. Không đưa vào gameplay. Vai trò chính xác trong trận dã chiến ngày 15/10 âm lịch cần đối chiếu thêm Toàn thư; ở B27 ông giữ vai hạ thành (pha 1) là phần có căn cứ rõ nhất. Unlock trước debut là chủ ý: người chơi dùng ông ngay từ đầu B27."
+    },
+    {
+      "id": "H48",
+      "name": "Lưu Nhân Chú",
+      "title": "Khai quốc công thần, truy phong Vinh quốc công",
+      "lifespan": "?–1433",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Người Vạn Phú, Thái Nguyên, dự hội thề Lũng Nhai. Đánh Khả Lưu (1424), Tây Đô (1425), cùng Lê Sát bày trận Chi Lăng – Xương Giang (1427). Năm 1433 bị Lê Sát đầu độc; năm 1484 được truy phong Vinh quốc công.",
+      "battlesPresent": [
+        "B24",
+        "B26",
+        "B27"
+      ],
+      "debut": "B24",
+      "weaponClass": "WC09",
+      "uniqueWeapon": {
+        "name": "Cung Thái Nguyên",
+        "desc": "Cung sừng trâu, tên kêu dùng làm hiệu lệnh trong hẻm núi.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Cung thủ điều phối",
+      "roles": [
+        "Tầm xa",
+        "Chỉ huy"
+      ],
+      "stats": {
+        "cong": 3,
+        "thu": 2,
+        "toc": 4,
+        "tam": 5,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Mưa tên vách núi",
+          "type": "Chủ động",
+          "effect": "Bắn loạt 20 mũi xuống vùng bán kính 8 m, tầm tối đa 35 m. Kỵ binh trúng từ 3 mũi trở lên bị ngã ngựa.",
+          "cooldownSec": 15,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Tên hiệu lệnh",
+          "type": "Chủ động",
+          "effect": "Bắn tên kêu đánh dấu một điểm. Mọi đội cung, nỏ quân ta trong 60 m tập trung bắn điểm đó trong 6 giây.",
+          "cooldownSec": 30,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Huynh đệ Lũng Nhai",
+          "type": "Nội tại",
+          "effect": "Khi ở trong 20 m với Lê Lợi, Lê Lai hoặc Lê Sát: cả hai tướng +10% công và nạp Khí Lực nhanh hơn 10%.",
+          "cooldownSec": 0,
+          "basis": "Tương truyền (hội thề Lũng Nhai; năm ghi 1416 hoặc 1418 tùy nguồn)"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Chi Lăng tiễn trận",
+        "effect": "12 giây. Hai vách hẻm núi hiện hàng cung thủ. Trong hành lang dài 50 m, rộng 15 m: địch bị ghim tại chỗ 2 giây sau mỗi 3 giây; tướng địch trong hành lang mất 40% giáp.",
+        "cinematic": "Khung chung ≤3 giây (cận vũ khí): một mũi tên kêu vút lên trời, VFX vệt tên trả lời từ hai vách đá.",
+        "basis": "Chính sử (phục kích Chi Lăng); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "lướt theo đòn",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Bày trận cùng Lê Sát",
+        "effect": "Kế Sách phục kích của trận chuẩn bị nhanh hơn 30%. Phục binh quân ta không hiện trên minimap địch cho đến khi ra đòn."
+      },
+      "unlock": "Hoàn thành B24",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Một mũi tên kêu, nghìn mũi tên đáp.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Cái chết do Lê Sát đầu độc (1433) là tranh chấp nội bộ; không khai thác. Khi Lê Sát và Lưu Nhân Chú cùng đội, không viết thoại gợi mâu thuẫn sau này."
+    },
+    {
+      "id": "H49",
+      "name": "Nguyễn Xí",
+      "title": "Chỉ huy quân Thiết Đột, khai quốc công thần nhà Hậu Lê",
+      "lifespan": "1397–1465",
+      "era": "E8",
+      "faction": "Nghĩa quân Lam Sơn",
+      "historicity": "Chính sử",
+      "bio": "Người Thượng Xá, Nghệ An; theo Lê Lợi từ nhỏ, từng coi đội chó săn rồi chỉ huy quân Thiết Đột. Cùng Đinh Lễ, Lý Triện đánh Tốt Động – Chúc Động (1426). Tháng 3/1427 cùng Đinh Lễ bị bắt ở Mỹ Động, bị giam ở thành Đông Quan, lợi dụng đêm mưa gió trốn thoát; sau góp công ở Xương Giang.",
+      "battlesPresent": [
+        "B25",
+        "B27"
+      ],
+      "debut": "B25",
+      "weaponClass": "WC07",
+      "uniqueWeapon": {
+        "name": "Búa Thiết Đột",
+        "desc": "Búa sắt cán ngắn, lưỡi dày, chuyên phá khiên.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Xung kích phá khiên",
+      "roles": [
+        "Tấn công",
+        "Phá trận"
+      ],
+      "stats": {
+        "cong": 5,
+        "thu": 3,
+        "toc": 3,
+        "tam": 2,
+        "thongSuat": 3
+      },
+      "skills": [
+        {
+          "name": "Thiết Đột xung phong",
+          "type": "Chủ động",
+          "effect": "Lao 15 m cùng 20 lính Thiết Đột. Phá toàn bộ khiên trên đường, choáng 2 giây.",
+          "cooldownSec": 20,
+          "basis": "Chính sử (chỉ huy quân Thiết Đột); cơ chế Hư cấu"
+        },
+        {
+          "name": "Chó săn Lam Sơn",
+          "type": "Chủ động",
+          "effect": "Thả 3 chó săn. Trong 12 giây, đánh dấu mọi tướng địch và đội phục kích trong 50 m; mục tiêu bị cắn chậm 30%.",
+          "cooldownSec": 35,
+          "basis": "Chính sử (từng coi đội chó săn, theo tiểu sử); cơ chế Hư cấu"
+        },
+        {
+          "name": "Thoát thân đêm mưa",
+          "type": "Nội tại",
+          "effect": "Thời gian bị khống chế giảm 50%. Mỗi 120 giây, lần đầu bị choáng hoặc trói sẽ tự thoát ngay và ẩn thân 3 giây.",
+          "cooldownSec": 120,
+          "basis": "Chính sử (bị bắt ở Mỹ Động, giam ở Đông Quan, trốn thoát đêm mưa gió); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Chẻ đôi trận Minh",
+        "effect": "12 giây. Nguyễn Xí dẫn 100 Thiết Đột thành mũi tam giác, lao theo hướng người chơi chọn (chọn hướng/điểm đích). Đội hình địch bị xuyên qua tách làm hai; mỗi nửa −30 Sĩ Khí và -20% thủ trong 10 giây.",
+        "cinematic": "Khung chung ≤3 giây (góc rộng quân ta xông lên): mũi Thiết Đột đâm qua hàng khiên.",
+        "basis": "Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "toàn cảnh chiến trường",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Quân Thiết Đột",
+        "effect": "Đơn vị xung kích quân ta +20% phá khiên và +10% Sinh lực."
+      },
+      "unlock": "Hoàn thành B25",
+      "releaseTier": "U1",
+      "quote": {
+        "text": "Thiết Đột, theo búa ta!",
+        "basis": "Hư cấu"
+      },
+      "notes": "Vai trò sau 1427 (phế Lê Nghi Dân, lập Lê Thánh Tông) nằm ngoài phạm vi game. Cắt Mệnh Lệnh tướng địch chỉ là bản sắc của Ngô Thì Nhậm (H55), nên Tuyệt Kỹ của Nguyễn Xí đánh vào Sĩ Khí và thủ."
+    },
+    {
+      "id": "H50",
+      "name": "Quang Trung",
+      "title": "Nguyễn Huệ, Long Nhương tướng quân, Bắc Bình vương, hoàng đế Quang Trung",
+      "displayNameByBattle": {
+        "B28": "Nguyễn Huệ",
+        "B29": "Quang Trung",
+        "B30": "Quang Trung"
+      },
+      "lifespan": "1753–1792",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Em Nguyễn Nhạc. Tháng 1/1785 chỉ huy trận Rạch Gầm – Xoài Mút đánh tan quân Xiêm. Ngày 22/12/1788 lên ngôi ở núi Bân, rồi dịp Tết Kỷ Dậu 1789 đánh tan quân Thanh ở Hà Hồi, Ngọc Hồi, Đống Đa. Mất ngày 16/9/1792.",
+      "battlesPresent": [
+        "B28",
+        "B29",
+        "B30"
+      ],
+      "debut": "B28",
+      "weaponClass": "WC05",
+      "uniqueWeapon": {
+        "name": "Trường đao Tây Sơn",
+        "desc": "Đại đao cán dài, lưỡi cong rộng, múa được trên lưng ngựa hoặc voi.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Kỵ tướng cuồng chiến",
+      "roles": [
+        "Tấn công",
+        "Chỉ huy",
+        "Cơ động"
+      ],
+      "stats": {
+        "cong": 5,
+        "thu": 3,
+        "toc": 4,
+        "tam": 2,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Thần tốc",
+          "type": "Chủ động",
+          "effect": "15 giây. Quân ta trong 40 m +40% tốc hành quân và không mất thể lực khi chạy. Đơn vị đến Cứ Điểm trong thời gian này được +10 Sĩ Khí.",
+          "cooldownSec": 45,
+          "basis": "Chính sử (cuộc hành quân Tết Kỷ Dậu); cơ chế Hư cấu"
+        },
+        {
+          "name": "Hoành đao",
+          "type": "Chủ động",
+          "effect": "Quét 3 nhịp, cung 240°, tầm 7 m; nhịp cuối hất lùi 4 m. Trên lưng ngựa, tầm tăng lên 9 m.",
+          "cooldownSec": 12,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Cuồng phong Tây Sơn",
+          "type": "Nội tại",
+          "effect": "Mỗi 10 lính địch bị hạ trong 5 giây được 1 tầng Cuồng phong (tối đa 5 tầng, mỗi tầng +6% công và +4% tốc đánh; mất dần 1 tầng mỗi 4 giây nếu ngừng đánh). Khi Sinh lực dưới 40%: +20% công và miễn choáng trong 8 giây (hồi 60 giây). Đạt 5 tầng khi đang cưỡi ngựa: quân kỵ ta trong 20 m +10% sát thương xung phong.",
+          "cooldownSec": 0,
+          "basis": "Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Ngọc Hồi – Đống Đa",
+        "effect": "18 giây. Quang Trung cưỡi voi (màn không có voi thì cưỡi ngựa), lao qua tối đa 3 điểm mốc do người chơi chọn (tổng tối đa 150 m). Mọi Cứ Điểm trên đường mất 50% phòng thủ và 30% lính mô phỏng; quân ta dọc đường nhập thành mũi tấn công. Xuyên qua từ 2 Cứ Điểm trở lên: mọi cánh ta +10 Sĩ Khí.",
+        "cinematic": "Cinematic riêng ≤6 giây: voi chiến húc tung cửa đồn; Quang Trung đứng trên bành voi, áo bào sạm khói súng.",
+        "basis": "Chính sử (trận Tết Kỷ Dậu); Tương truyền (áo bào nhuộm khói súng); cơ chế Hư cấu",
+        "cinematicTemplate": "bespoke-≤6s",
+        "scope": "toàn bản đồ"
+      },
+      "commandTrait": {
+        "name": "Tuyển binh Nghệ An",
+        "effect": "Quân ta vào trận với Sĩ Khí 70 thay vì 50 (trần kịch bản systems §5.1). Tiếp viện gọi trong trận có chỉ số như lính kỳ cựu."
+      },
+      "unlock": "Hoàn thành B28",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Đánh cho để dài tóc, đánh cho để đen răng.",
+        "basis": "Tương truyền (Lời hiểu dụ tướng sĩ / Hịch đánh Thanh cuối năm 1788; địa điểm không thống nhất giữa các nguồn)"
+      },
+      "notes": "Theo ý người dùng: WC05 Trường đao, Cavalry/Berserker (nội tại Cuồng phong). Tên hiển thị ở B28 (1/1785) là 'Nguyễn Huệ' vì niên hiệu Quang Trung có từ 22/12/1788. Lời tả 'mắt sáng như chớp' (Tương truyền) chỉ đưa vào bio và thẻ Sử quán. Ở B30 ông là đồng minh AI ở pha cuối (vào Thăng Long); đồn Khương Thượng do đạo Đô đốc Long đánh."
+    },
+    {
+      "id": "H51",
+      "name": "Nguyễn Nhạc",
+      "title": "Thái Đức hoàng đế, Trung ương hoàng đế",
+      "lifespan": "1743–1793 (năm sinh theo vi.wikipedia; có nguồn ghi khác)",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Anh cả nhà Tây Sơn, khởi binh năm 1771, chiếm thành Quy Nhơn năm 1773, xưng Thái Đức hoàng đế năm 1778. Năm 1789 trấn giữ Quy Nhơn, không trực tiếp ra Bắc. Mất năm 1793.",
+      "battlesPresent": [],
+      "debut": "Chronicle C06: Ba anh em cùng ra Bắc",
+      "weaponClass": "WC11",
+      "uniqueWeapon": {
+        "name": "Cờ đỏ Tây Sơn",
+        "desc": "Kỳ thương cán dài gắn cờ đỏ, vừa là vũ khí vừa là hiệu lệnh.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Chỉ huy cắm cờ",
+      "roles": [
+        "Chỉ huy",
+        "Hỗ trợ"
+      ],
+      "stats": {
+        "cong": 3,
+        "thu": 4,
+        "toc": 2,
+        "tam": 4,
+        "thongSuat": 5
+      },
+      "skills": [
+        {
+          "name": "Kỳ lệnh tam quân",
+          "type": "Chủ động",
+          "effect": "Vung kỳ thương chỉ một Cứ Điểm trong 60 m: tối đa 3 cánh quân ta gần nhất nhận Mệnh Lệnh 'Hợp kích' đến đó, hành quân +30% tốc; khi cả 3 cánh đến nơi, Cứ Điểm địch mất 20% lính mô phỏng.",
+          "cooldownSec": 45,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Cắm cờ lệnh",
+          "type": "Chủ động",
+          "effect": "Cắm cờ bán kính 15 m trong 20 giây. Quân ta trong vùng +20% thủ và +2 Sĩ Khí mỗi giây.",
+          "cooldownSec": 30,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Ba anh em Tây Sơn",
+          "type": "Nội tại",
+          "effect": "Khi Quang Trung hoặc Nguyễn Lữ cùng trận: cả ba nạp Khí Lực nhanh hơn 10%, và Tổng Phản Công kéo dài thêm 5 giây (tính vào trần kéo dài chung +10 giây mọi nguồn).",
+          "cooldownSec": 0,
+          "basis": "Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Thái Đức hiệu triệu",
+        "effect": "12 giây. Gọi 3 đạo quân từ mép bản đồ (trừ vào lính mô phỏng của mặt trận hậu phương, không tạo quân mới), mỗi đạo tiến vào một Cứ Điểm gần nhất. Cứ Điểm quân ta trong 60 m quanh Nguyễn Nhạc được +50% lính mô phỏng trong 60 giây (cục bộ, để E9 giữ trần 2 Tuyệt Kỹ toàn bản đồ: H50, H55).",
+        "cinematic": "Khung chung ≤3 giây (toàn thân hô lệnh): Nguyễn Nhạc giương cờ; VFX ba lá cờ đỏ hiện trên ba ngọn đồi.",
+        "basis": "Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "hạ góc thấp",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Đất võ Bình Định",
+        "effect": "Lính quân ta +10% Sinh lực. Dân binh có 5% tỷ lệ phản đòn."
+      },
+      "unlock": "Hoàn thành B30",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Thành cao không bằng lòng người mở cửa.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Không có mặt ở Rạch Gầm (người chỉ huy là Nguyễn Huệ) và không ra Bắc năm 1789, nên chỉ chơi ở Chronicle 'Ba anh em cùng ra Bắc' (premise Hư cấu: Nguyễn Nhạc gác bất hòa, đưa quân Quy Nhơn ra hội ở Tam Điệp, giữ đồn và điều binh ở pha Hà Hồi của bản đồ B29). Không làm màn 1773 (đánh thành Quy Nhơn là giao tranh giữa người Việt) và không làm màn nội chiến Nhạc – Huệ 1787. Chuyện vào thành Quy Nhơn trong cũi chỉ giữ trong thẻ Sử quán, nhãn Tương truyền."
+    },
+    {
+      "id": "H52",
+      "name": "Nguyễn Lữ",
+      "title": "Đông Định vương",
+      "lifespan": "1754–1787",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Em út nhà Tây Sơn. Tương truyền trước khi cầm quân từng tu theo Minh giáo (Thầy Tư Lữ), chữa bệnh và giảng đạo. Dự các đợt đánh Gia Định năm 1776 và 1783; năm 1786 được phong Đông Định vương; mất cuối năm 1787.",
+      "battlesPresent": [],
+      "debut": "Chronicle C08: Rạch Gầm – theo lời kể",
+      "weaponClass": "WC15",
+      "uniqueWeapon": {
+        "name": "Trống lệnh Tây Sơn",
+        "desc": "Trống trận da đeo trước ngực, dùi gỗ lim; tiếng trống là hiệu lệnh và sóng âm. Lớp WC15 dùng chung mesh trống, skin theo thời đại (trống đồng kiểu Đông Sơn ở E1–E3, trống da ở các thời đại sau).",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Hỗ trợ nhịp trống",
+      "roles": [
+        "Hỗ trợ",
+        "Khống chế"
+      ],
+      "stats": {
+        "cong": 2,
+        "thu": 3,
+        "toc": 3,
+        "tam": 4,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Nhịp trống xung phong",
+          "type": "Chủ động",
+          "effect": "Đánh 3 nhịp trong 6 giây. Mỗi nhịp: quân ta trong 25 m +10% tốc đánh (cộng dồn 3), địch trong 25 m −5 Sĩ Khí.",
+          "cooldownSec": 25,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Sóng âm",
+          "type": "Chủ động",
+          "effect": "Sóng âm hình nón 12 m, làm ngã và choáng 1,5 giây. Địch đứng trên thuyền còn bị -20% công trong 6 giây.",
+          "cooldownSec": 16,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Người tu hành",
+          "type": "Nội tại",
+          "effect": "Khi Nguyễn Lữ không đánh trong 3 giây: quân ta trong 12 m hồi 1% Sinh lực mỗi giây.",
+          "cooldownSec": 0,
+          "basis": "Tương truyền (Thầy Tư Lữ tu theo Minh giáo, chữa bệnh, theo vi.wikipedia); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Trống lệnh sông Tiền",
+        "effect": "14 giây, mẫu 'nhấn theo nhịp' 8 nhịp. Nếu người chơi không nhấn, Tuyệt Kỹ tự chạy với 4/8 nhịp đúng. Mỗi nhịp đúng: một đội thuyền phục quân ta xuất kích từ một rạch nhánh. Từ 6 nhịp đúng trở lên: toàn bộ thuyền địch trong khu vực bị chặn đường lui 10 giây.",
+        "cinematic": "Khung chung ≤3 giây (toàn thân hô lệnh): dùi trống giáng xuống; VFX sóng âm lan trên mặt sông.",
+        "basis": "Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "hạ góc thấp",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Đông Định vương",
+        "effect": "Thuyền quân ta +15% độ bền. Lính trên thuyền không mất Sĩ Khí khi thuyền bên cạnh chìm."
+      },
+      "unlock": "Màn Chronicle C08 'Rạch Gầm – theo lời kể' mở sau khi hoàn thành B28; mở tự do sau khi hoàn thành C08.",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Trống còn, thuyền còn.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Sự tồn tại và tước Đông Định vương là Chính sử. Không có nguồn đặt ông ở Rạch Gầm 1785 (kiểm chứng 29/09/2026: trang Nguyễn Lữ chỉ nêu các chiến dịch Gia Định 1776, 1782–1783; trang về trận không có câu nào đặt ông ở trận). Chỉ chơi ở Chronicle C08 'Rạch Gầm – theo lời kể' (khung Tương truyền)."
+    },
+    {
+      "id": "H53",
+      "name": "Bùi Thị Xuân",
+      "title": "Nữ tướng Tây Sơn",
+      "lifespan": "?–1802",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Người Bình Định, vợ Trần Quang Diệu. Tương truyền giỏi võ, cưỡi ngựa, huấn luyện voi. Bị nhà Nguyễn xử tử năm 1802 sau khi Tây Sơn sụp đổ.",
+      "battlesPresent": [
+        "B29"
+      ],
+      "debut": "B29",
+      "weaponClass": "WC16",
+      "uniqueWeapon": {
+        "name": "Voi chiến và song kiếm",
+        "desc": "Voi chiến mặc giáp da, bà ngồi bành, cầm song kiếm.",
+        "basis": "Tương truyền"
+      },
+      "archetype": "Tượng binh phá trận",
+      "roles": [
+        "Phá trận",
+        "Khắc chế kỵ"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 5,
+        "toc": 2,
+        "tam": 3,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Voi húc",
+          "type": "Chủ động",
+          "effect": "Voi lao 20 m, hất tung lính. Phá hoàn toàn cổng gỗ cấp 1; cổng cấp cao hơn mất 40% độ bền.",
+          "cooldownSec": 25,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Giẫm đạp",
+          "type": "Chủ động",
+          "effect": "3 cú giẫm, mỗi cú bán kính 6 m, choáng 1 giây.",
+          "cooldownSec": 14,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Nữ tướng huấn tượng",
+          "type": "Nội tại",
+          "effect": "Voi chiến quân ta trong 30 m miễn trạng thái 'voi hoảng' khi gặp lửa hoặc pháo, và +20% Sinh lực.",
+          "cooldownSec": 0,
+          "basis": "Tương truyền"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Đàn voi Ngọc Hồi",
+        "effect": "16 giây. 6 voi chiến quân ta xếp hàng ngang 40 m; người chơi lái hướng cả hàng (rẽ tối đa 45°). Mỗi 2 giây cả hàng giẫm một nhịp: lính địch trong dải 8 m trước hàng bị hất tung; kỵ binh địch trong 30 m hoảng ngựa, không xung phong được trong 8 giây; voi địch va vào hàng bị đẩy lùi 5 m. Không gây sát thương lên công trình.",
+        "cinematic": "Khung chung ≤3 giây (góc rộng quân ta xông lên): sáu voi bước ra khỏi màn khói.",
+        "basis": "Chính sử (voi chiến ở trận Ngọc Hồi); Tương truyền (vai trò của bà); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "toàn cảnh chiến trường",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Tượng binh Bình Định",
+        "effect": "Voi chiến và bộ binh quân ta đi cùng voi (trong 20 m) không mất Sĩ Khí khi bị pháo hoặc lửa bắn trúng. Mỗi Cứ Điểm quân ta có voi đóng giữ: +20% thủ, và cứ mỗi 3 phút giữ được thì +2 Hào Khí."
+      },
+      "unlock": "Hoàn thành B29",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Voi không sợ lửa khi người cưỡi không sợ.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Sự tồn tại là Chính sử. vi.wikipedia mục Bùi Thị Xuân nói bà dự trận Kỷ Dậu 1789, nhưng bài về trận Ngọc Hồi – Đống Đa không nhắc tên bà; nhiều chi tiết về bà đến từ văn chương đời sau, nên vai trò ở B29 gắn nhãn Tương truyền. Phân vai với Quang Trung: Quang Trung phá Cứ Điểm, bà phá đội hình và khắc chế kỵ binh. Không gán bà vào vai hậu cần. Năm sinh 1752 chưa được kiểm chứng chắc chắn. Không tái hiện cái chết năm 1802."
+    },
+    {
+      "id": "H54",
+      "name": "Trần Quang Diệu",
+      "title": "Thái phó",
+      "lifespan": "1746?–1802 (năm sinh theo vi.wikipedia, chưa đối chiếu nguồn thứ hai)",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Tên thật Trần Văn Đạt, theo Tây Sơn từ những ngày đầu, là chồng Bùi Thị Xuân. Thời Nguyễn Quang Toản (1792–1802, niên hiệu Cảnh Thịnh rồi Bảo Hưng) là trụ cột quân sự phía nam. Bị bắt và xử tử năm 1802.",
+      "battlesPresent": [],
+      "debut": "Chronicle C08: Rạch Gầm – theo lời kể",
+      "weaponClass": "WC04",
+      "uniqueWeapon": {
+        "name": "Thương Thái phó",
+        "desc": "Trường thương mũi lá tre, cán sơn đỏ.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Thương tướng trấn trận",
+      "roles": [
+        "Phòng thủ",
+        "Khắc chế kỵ"
+      ],
+      "stats": {
+        "cong": 4,
+        "thu": 4,
+        "toc": 3,
+        "tam": 3,
+        "thongSuat": 4
+      },
+      "skills": [
+        {
+          "name": "Lũy tạm",
+          "type": "Chủ động",
+          "effect": "Trong 3 giây dựng một đoạn lũy tạm dài 10 m trước mặt (volume modifier chặn tên đạn, không sửa navmesh). Quân ta sau lũy +30% thủ trước tên đạn trong 40 giây.",
+          "cooldownSec": 30,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Hổ trận",
+          "type": "Chủ động",
+          "effect": "Đâm 3 nhát xuyên hàng 10 m; nhát cuối quét 360°, bán kính 5 m.",
+          "cooldownSec": 12,
+          "basis": "Tương truyền (chuyện gặp hổ, gắn với Bùi Thị Xuân)"
+        },
+        {
+          "name": "Phu thê tướng",
+          "type": "Nội tại",
+          "effect": "Khi Bùi Thị Xuân cùng trận: cả hai +15% công và hồi phục sau khi gục nhanh hơn 30%.",
+          "cooldownSec": 0,
+          "basis": "Chính sử (hai người là vợ chồng)"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Hổ tướng trấn trận",
+        "effect": "15 giây. Trần Quang Diệu cắm thương làm tâm. Lính giáo quân ta trong 25 m kết thành rừng giáo hình vòng cung 120° quay theo hướng ông nhìn. Kỵ binh và voi địch lao vào rừng giáo bị chặn đứng, ngã ngựa và choáng 3 giây. Mỗi 3 giây ông đâm một nhát xuyên hàng 15 m. Kết thúc bằng một nhát quét 360°, bán kính 8 m, hất tung.",
+        "cinematic": "Khung chung ≤3 giây (cận vũ khí): mũi thương cắm xuống, hàng giáo dựng lên.",
+        "basis": "Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "lướt theo đòn",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Hổ tướng Tây Sơn",
+        "effect": "Tướng đồng minh AI quân ta +10% mọi chỉ số. Lính giáo quân ta +15% sát thương lên kỵ binh. Khi quân ta vây một Cứ Điểm địch quá 3 phút, Cứ Điểm đó không nhận tiếp tế."
+      },
+      "unlock": "Màn Chronicle C08 'Rạch Gầm – theo lời kể' mở sau khi hoàn thành B28; mở tự do sau khi hoàn thành C08.",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Thành không đổ trong một ngày, thì vây một năm.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Sự tồn tại là Chính sử. Sự có mặt ở Rạch Gầm 1785 chỉ theo lời Quách Tấn; vi.wikipedia về trận ghi chưa xác định chắc (kiểm chứng 29/09/2026). Chỉ chơi ở Chronicle C08 'Rạch Gầm – theo lời kể' (Tương truyền); ở B29–B30 cũng chỉ có ở Chronicle. Ý 'vây thành lâu dài' thời Nguyễn Quang Toản chuyển vào commandTrait. Không tái hiện cái chết năm 1802."
+    },
+    {
+      "id": "H55",
+      "name": "Ngô Thì Nhậm",
+      "title": "Mưu sĩ Tây Sơn, sau là Hải Lượng thiền sư",
+      "lifespan": "1746–1803",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Chính sử",
+      "bio": "Nho sĩ Bắc Hà theo Tây Sơn. Cuối năm 1788 cùng Ngô Văn Sở rút quân từ Thăng Long về giữ phòng tuyến Tam Điệp – Biện Sơn, bảo toàn lực lượng. Sau năm 1789 phụ trách văn thư bang giao với nhà Thanh, rồi lập Trúc Lâm tông ở Thăng Long.",
+      "battlesPresent": [
+        "B29"
+      ],
+      "debut": "B29",
+      "weaponClass": "WC12",
+      "uniqueWeapon": {
+        "name": "Quạt Tam Điệp",
+        "desc": "Quạt giấy vẽ bản đồ phòng tuyến Tam Điệp; mở quạt là mở thế trận.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Mưu sĩ lui giữ",
+      "roles": [
+        "Chiến lược",
+        "Phòng thủ",
+        "Hỗ trợ"
+      ],
+      "stats": {
+        "cong": 1,
+        "thu": 3,
+        "toc": 3,
+        "tam": 5,
+        "thongSuat": 5
+      },
+      "skills": [
+        {
+          "name": "Lui giữ chỗ hiểm",
+          "type": "Chủ động",
+          "effect": "Chọn một Cứ Điểm quân ta. Quân ta trong 50 m rút về đó trong 10 giây: không mất Sĩ Khí, địch truy kích chậm 50%. Cứ Điểm +50% phòng thủ trong 30 giây.",
+          "cooldownSec": 60,
+          "basis": "Chính sử (rút về Tam Điệp cuối 1788); cơ chế Hư cấu"
+        },
+        {
+          "name": "Văn thư chặn bút",
+          "type": "Chủ động",
+          "effect": "Ném một văn thư vào tướng địch trong 20 m. Tướng đó 'chần chừ' 6 giây: không dùng kỹ năng, chỉ đánh thường, không ra được Mệnh Lệnh.",
+          "cooldownSec": 30,
+          "basis": "Hư cấu (lấy ý vai trò soạn văn thư bang giao)"
+        },
+        {
+          "name": "Thiền tâm",
+          "type": "Nội tại",
+          "effect": "Đứng yên 2 giây: Khí Lực tự hồi 3% mỗi giây. Miễn hoàn toàn trạng thái hoảng loạn.",
+          "cooldownSec": 0,
+          "basis": "Chính sử (về sau là Hải Lượng thiền sư); cơ chế Hư cấu"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Không mất một mũi tên",
+        "effect": "15 giây, toàn bản đồ. Mọi đơn vị quân ta đang bị bao vây rút về Cứ Điểm gần nhất, giữ nguyên quân số. Địch tràn vào vị trí cũ dẫm phải bẫy đặt sẵn: choáng 3 giây. Sau đó quân ta +25% công trong 20 giây để phản công.",
+        "cinematic": "Khung chung ≤3 giây (toàn thân hô lệnh): Ngô Thì Nhậm gập quạt; VFX các mũi tên xanh trên minimap cùng lùi về.",
+        "basis": "Tương truyền (câu nói được các sách chép lại); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "hạ góc thấp",
+        "scope": "toàn bản đồ"
+      },
+      "commandTrait": {
+        "name": "Tham mưu Bắc Hà",
+        "effect": "Mệnh Lệnh 'Rút lui' và 'Giữ vị trí' không có thời gian hồi. Quân ta rút lui theo lệnh không mất Sĩ Khí."
+      },
+      "unlock": "Có sẵn ở pha Hà Hồi của B29; mở tự do sau khi hoàn thành B29",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Rút về chỗ hiểm Tam Điệp, không mất một mũi tên.",
+        "basis": "Tương truyền (tóm lược lời bàn, được vi.wikipedia dẫn)"
+      },
+      "notes": "Cùng lớp WC12 với Nguyễn Trãi nhưng khác hẳn cơ chế: Nguyễn Trãi làm địch đầu hàng (tấn công bằng lòng người); Ngô Thì Nhậm bảo toàn và dịch chuyển quân ta (phòng thủ chiến lược), và là tướng duy nhất của G4 cắt Mệnh Lệnh tướng địch. Cuộc lui về Tam Điệp là nút chiến lược trên bản đồ chiến dịch trước B29. Vai trò của ông ở Hà Hồi (vây đồn gọi hàng) là Hư cấu; vai trò trong trận Ngọc Hồi ngày mùng 5 không rõ."
+    },
+    {
+      "id": "H56",
+      "name": "Đô đốc Long",
+      "title": "Đô đốc chỉ huy đạo quân tập kích Khương Thượng (danh tính còn tranh cãi)",
+      "lifespan": "?",
+      "era": "E9",
+      "faction": "Tây Sơn",
+      "historicity": "Tương truyền",
+      "bio": "Tướng chỉ huy một đạo quân có tượng binh, kỵ binh, nửa đêm bất ngờ tập kích đồn Khương Thượng (Đống Đa) dịp mùng 5 Tết Kỷ Dậu 1789. Danh tính thật chưa xác định: có ý kiến cho là Đặng Tiến Đông (1738–khoảng 1794/1797), có ý kiến khác đề xuất Đặng Văn Long hoặc Lê Văn Long.",
+      "battlesPresent": [
+        "B30"
+      ],
+      "debut": "B30",
+      "weaponClass": "WC13",
+      "uniqueWeapon": {
+        "name": "Hỏa đồng Khương Thượng",
+        "desc": "Ống phun lửa và pháo tay ngắn, nạp từng phát.",
+        "basis": "Hư cấu"
+      },
+      "archetype": "Hỏa khí đột kích",
+      "roles": [
+        "Công thành",
+        "Tấn công vùng"
+      ],
+      "stats": {
+        "cong": 5,
+        "thu": 2,
+        "toc": 3,
+        "tam": 3,
+        "thongSuat": 3
+      },
+      "skills": [
+        {
+          "name": "Phun lửa",
+          "type": "Chủ động",
+          "effect": "Phun lửa hình nón 10 m trong 3 giây. Công sự gỗ mất 40% độ bền; lính địch trúng lửa bị đẩy lùi và hoảng loạn 2 giây. Sau đó phải nạp lại 4 giây. VFX: lính trúng lửa chỉ bốc khói, hoảng chạy; không có hiệu ứng cháy trên nhân vật.",
+          "cooldownSec": 18,
+          "basis": "Hư cấu"
+        },
+        {
+          "name": "Mộc bọc rơm ướt",
+          "type": "Chủ động",
+          "effect": "Dựng một tấm mộc di động rộng 6 m trong 12 giây (volume modifier chặn đạn, di chuyển cùng đội). Chặn 100% tên, đạn phía trước; quân ta đứng sau +40% thủ.",
+          "cooldownSec": 28,
+          "basis": "Tương truyền (Hoàng Lê nhất thống chí: 20 tấm mộc bọc rơm ướt ở Ngọc Hồi); gán cho Đô đốc Long là Hư cấu"
+        },
+        {
+          "name": "Kỵ tượng binh",
+          "type": "Nội tại",
+          "effect": "Voi chiến và kỵ binh quân ta trong 30 m +15% sát thương xung phong.",
+          "cooldownSec": 0,
+          "basis": "Chính sử (đạo quân đánh Khương Thượng có tượng binh, kỵ binh)"
+        }
+      ],
+      "tuyetKy": {
+        "name": "Khương Thượng dạ tập",
+        "effect": "15 giây. Phủ bóng đêm và sương bán kính 60 m: quân ta trong vùng ẩn khỏi tháp canh. Mọi cổng đồn trong vùng trúng 3 phát pháo liên tiếp, mỗi phát -25% độ bền. Phá được cổng đồn: Hào Khí tính theo luật chung (+5 mỗi cổng).",
+        "cinematic": "Khung chung ≤3 giây (góc rộng quân ta xông lên): ánh lửa pháo trong đêm chiếu lên lá cờ không tên họ.",
+        "basis": "Chính sử (tập kích đồn Khương Thượng lúc nửa đêm); cơ chế Hư cấu",
+        "cinematicTemplate": "template-2-3s",
+        "cinematicCamera": "toàn cảnh chiến trường",
+        "scope": "cục bộ"
+      },
+      "commandTrait": {
+        "name": "Thọc sâu bất ngờ",
+        "effect": "Quân ta mở màn tấn công khi chưa bị phát hiện: +20% sát thương trong 30 giây đầu. Mệnh Lệnh phụ 'Nghi binh' (Hư cấu): đơn vị quân ta được lệnh hiện trên minimap địch với quân số gấp 3 lần thật, trong 30 giây."
+      },
+      "unlock": "Hoàn thành B30",
+      "releaseTier": "U2",
+      "quote": {
+        "text": "Tên ta chưa cần sử ghi, đồn này phải hạ trước.",
+        "basis": "Hư cấu"
+      },
+      "notes": "Việc có một đạo quân Tây Sơn tập kích đồn Khương Thượng là Chính sử (vi.wikipedia dẫn Thánh vũ ký: đây là mũi tập kích chủ lực, không phải nghi binh). Tên gọi 'Đô đốc Long' và danh tính đến từ văn bản đời sau và còn tranh cãi, nên historicity là Tương truyền. Không khẳng định Đô đốc Long là Đặng Tiến Đông; trong game hiển thị 'Đô đốc Long' và một trang hồ sơ nêu các giả thuyết. Nếu sau này giới sử học ngả về một người, chỉ cần sửa tên hiển thị."
+    }
+  ],
+  "enemies": [
+    {
+      "id": "X26",
+      "name": "Trần Trí",
+      "original": "陳智 (Chén Zhì)",
+      "faction": "Nhà Minh",
+      "era": "E8",
+      "historicity": "Chính sử",
+      "bio": "Tướng Minh ở Giao Chỉ, cùng Phương Chính chỉ huy các đợt đánh nghĩa quân Lam Sơn ở Nghệ An năm 1424. Là người nhận thư của Lê Lợi do Nguyễn Trãi soạn (Quân trung từ mệnh tập).",
+      "fate": "Nguồn đã mở không ghi rõ kết cục sau năm 1424; cần đối chiếu Minh sử.",
+      "appearsIn": [
+        "B24"
+      ],
+      "bossTier": "Chủ soái",
+      "weaponClass": "EWC03",
+      "mechanics": [
+        "Thành trì dự phòng: dưới 50% Sinh lực, rút vào Cứ Điểm gần nhất và hồi 20% Sinh lực nếu Cứ Điểm còn trên 50% lính mô phỏng.",
+        "Hợp kích với Phương Chính: khi cả hai trong 30 m, cả hai +20% thủ; phải tách họ ra (nghi binh, vùng đường sụt).",
+        "Chùy chấn động: đập đất 3 lần, sóng chấn 6 m, phá thế thủ của người chơi.",
+        "Lệnh vượt sông: gọi 2 đợt quân vượt sông Lam; nếu đợt quân lên bờ đủ 60 giây, lập Cứ Điểm mới."
+      ],
+      "counterplay": "Chặn đợt vượt sông giữa dòng bằng phục binh; tách ông khỏi Phương Chính rồi đánh Cứ Điểm dự phòng trước.",
+      "dignity": "Tướng thận trọng, giữ quân kỷ luật; thoại thể hiện trách nhiệm với binh lính dưới quyền."
+    },
+    {
+      "id": "X27",
+      "name": "Phương Chính",
+      "original": "方政 (Fāng Zhèng)",
+      "faction": "Nhà Minh",
+      "era": "E8",
+      "historicity": "Chính sử",
+      "bio": "Đô đốc Minh, năm 1419 được Lý Bân (李彬) sai tập kích Lê Lợi ở trại Khả Lam; năm 1424 cùng Trần Trí đánh ở Nghệ An. Minh sử khen ông liêm, dũng, giỏi đánh trận.",
+      "fate": "Tử trận năm 1439 ở Lộc Xuyên (Vân Nam) khi bị voi chiến Lộc Xuyên tấn công; truy tặng Uy Viễn bá, thụy Trung Nghị.",
+      "appearsIn": [
+        "B23",
+        "B24",
+        "B25"
+      ],
+      "bossTier": "Đại tướng",
+      "weaponClass": "EWC02",
+      "mechanics": [
+        "Truy sơn: truy đuổi theo đường núi, mỗi 15 giây đánh dấu một lối mòn; quân ta đi qua lối bị đánh dấu −10 Sĩ Khí.",
+        "Kích quét ngang: quét 6 m, hất ngã; trúng tướng đang cưỡi ngựa hoặc voi thì làm ngã xuống.",
+        "Giữ vững trận: dưới 40% Sinh lực, lính trong 20 m không thể bị làm hoảng loạn.",
+        "Kẻ thù cũ: ở B25 ông nhớ các kế đã dùng ở B23–B24; kế phục kích lặp lại lần thứ hai gây ít hơn 30% hiệu quả."
+      ],
+      "counterplay": "Đổi kế giữa các lần gặp; dùng voi hoặc nghi binh để kéo ông khỏi lối mòn đã đánh dấu.",
+      "dignity": "Đối thủ đáng gờm, liêm và dũng; là 'kỳ phùng địch thủ' xuyên suốt ba màn đầu của E8."
+    },
+    {
+      "id": "X28",
+      "name": "Vương Thông",
+      "original": "王通 (Wáng Tōng)",
+      "faction": "Nhà Minh",
+      "era": "E8",
+      "historicity": "Chính sử",
+      "bio": "Thành Sơn hầu, được giao ấn Chinh di tướng quân sang Giao Chỉ năm 1426. Thua ở Tốt Động – Chúc Động, bị thương, rút về giữ thành Đông Quan; năm 1427 lập đàn thề với Lê Lợi rồi rút quân.",
+      "fate": "Về nước bị luận tội chết, hạ ngục; năm 1439 được tha; sau được dùng lại, dự việc giữ Bắc Kinh. Mất năm 1452.",
+      "appearsIn": [
+        "B25",
+        "B27"
+      ],
+      "bossTier": "Chủ soái",
+      "weaponClass": "WC11",
+      "mechanics": [
+        "Chia quân hai ngả: đầu trận tách làm hai cánh; mỗi 60 giây hai cánh đổi vai tiên phong – hậu vệ.",
+        "Cờ soái: mỗi 20 giây cắm cờ, lính địch trong 15 m +15% công; phá cờ thì lính quanh đó −20 Sĩ Khí.",
+        "Tìm đường tắt: nếu không thấy quân ta trên đường đi trong 30 giây, ông cho quân đi đường tắt qua đầm (đây là điều kiện để Kế Sách phục kích ở B25 thành công).",
+        "Bị thương rút lui: dưới 30% Sinh lực, ông rút về Đông Quan cùng cận vệ; người chơi phải cản cận vệ để tối đa Hào Khí. Ở B27 (pha Vây Đông Quan) ông ở trong thành, chỉ sai các đợt xuất kích."
+      ],
+      "counterplay": "Giữ im lặng (không để quân ta lộ) để dụ ông đi đường tắt; phá cờ soái trước khi đánh vào thân tướng.",
+      "dignity": "Chủ soái biết dừng đúng lúc; việc ông chấp nhận hội thề để cứu quân lính được thể hiện là lựa chọn có trách nhiệm."
+    },
+    {
+      "id": "X29",
+      "name": "Liễu Thăng",
+      "original": "柳升 (Liǔ Shēng), có bản chép 柳昇",
+      "faction": "Nhà Minh",
+      "era": "E8",
+      "historicity": "Chính sử",
+      "bio": "An Viễn hầu, Chinh lỗ phó tướng quân, năm 1427 dẫn đạo viện binh chính (khoảng 7 vạn quân theo Minh sử) qua ải Pha Lũy. Thắng liên tiếp vài trận đầu nên khinh địch; bộ hạ can mà ông không nghe.",
+      "fate": "Ngày 20 tháng 9 âm lịch năm Đinh Mùi 1427, tử trận ở núi Mã Yên (Đảo Mã pha): cầu gãy, sa lầy, trúng phi tiêu.",
+      "appearsIn": [
+        "B26"
+      ],
+      "bossTier": "Chủ soái",
+      "weaponClass": "EWC04",
+      "mechanics": [
+        "Thừa thắng xông lên: mỗi lần quân ta rút lui trước mặt, ông +10% tốc và +10% công (cộng dồn 5) nhưng -10% thủ mỗi tầng.",
+        "Kỵ đội trăm người: luôn đi cùng khoảng 100 kỵ binh; khi kỵ đội vượt cầu, hậu quân tách ra phía sau.",
+        "Mã tấu xung phong: lao 20 m, chém mọi thứ trên đường; trượt vào bùn thì mắc kẹt 4 giây.",
+        "Hậu quân tiếp ứng: khi Sinh lực dưới 50%, Lương Minh (tướng phó không ID) đưa hậu quân lên; nếu cầu đã gãy, hậu quân không qua được."
+      ],
+      "counterplay": "Đừng đánh chính diện: rút giả cho ông cộng dồn tầng thừa thắng, rồi dụ qua cầu và dùng Kế Sách 'Cầu gãy – bùn lầy'.",
+      "dignity": "Danh tướng dày trận mạc; thất bại vì tự tin quá mức, không vì hèn nhát. Cảnh cuối dừng ở lúc ông ngã giữa bùn, không cận cảnh vết thương."
+    },
+    {
+      "id": "X30",
+      "name": "Thôi Tụ",
+      "original": "崔聚 (Cuī Jù)",
+      "faction": "Nhà Minh",
+      "era": "E8",
+      "historicity": "Chính sử",
+      "bio": "Đô đốc Minh, người Hoài Viễn, nắm quyền chỉ huy tàn quân sau khi Liễu Thăng, Lương Minh và Lý Khánh lần lượt chết, kéo đến Xương Giang thì bị vây giữa đồng. Bình Ngô đại cáo tả ông quỳ gối xin hàng; ghi chép phía Minh (đoạn Minh sử trích trên zh.wikipedia) chỉ nói không ai hàng, toàn quân bị diệt.",
+      "fate": "Bị bắt ở trận Xương Giang (15/10 âm lịch 1427) theo sử Việt. Ghi chép phía Minh nhấn mạnh việc không hàng; kết cục cụ thể của ông sau khi bị bắt chưa kiểm chứng được từ nguồn đã mở.",
+      "appearsIn": [
+        "B27"
+      ],
+      "bossTier": "Đại tướng",
+      "weaponClass": "WC02",
+      "mechanics": [
+        "Trận lũy giữa đồng: dựng 4 lớp rào xe và khiên; mỗi lớp phải phá hết mới vào được lớp trong (4 trạng thái bake sẵn).",
+        "Khiên tường: giơ khiên chặn 100% sát thương phía trước trong 5 giây, rồi phản đòn.",
+        "Cạn nước: mỗi Cứ Điểm nước/lương mà quân ta chiếm được làm ông -10% thủ và lính địch −10 Sĩ Khí.",
+        "Không lùi: dưới 20% Sinh lực, không rút chạy; lính cận vệ +30% thủ. Trận kết khi ông bị khống chế đủ 5 giây (bị bắt)."
+      ],
+      "counterplay": "Đánh tiếp vận trước (chiếm giếng, kho lương), để cạn nước làm yếu trận lũy; dùng búa hoặc nỏ xuyên khiên.",
+      "dignity": "Vị tướng giữ tàn quân đến cùng. Game theo hướng 'bị bắt', không có cảnh hành quyết, không có cảnh quỳ xin hàng; nêu cả hai ghi chép trong hồ sơ."
+    },
+    {
+      "id": "X31",
+      "name": "Chiêu Tăng",
+      "original": "กรมหลวงเทพหริรักษ์ (Krom Luang Thepharirak), tên húy ตัน (Tan)",
+      "faction": "Xiêm (vương triều Rattanakosin)",
+      "era": "E9",
+      "historicity": "Chính sử",
+      "bio": "Hoàng thân Xiêm, cháu gọi vua Rama I bằng cậu. Năm 1784–1785 được lệnh đem quân (Wikipedia tiếng Anh ghi 50.000) cùng Nguyễn Ánh đánh Gia Định.",
+      "fate": "Thua ở Rạch Gầm – Xoài Mút ngày 20/1/1785, rút về Bangkok; mất năm 1805. Là tổ dòng họ Devahastin.",
+      "appearsIn": [
+        "B28"
+      ],
+      "bossTier": "Chủ soái",
+      "weaponClass": "EWC05",
+      "mechanics": [
+        "Soái thuyền: đứng trên soái thuyền có 2 khẩu pháo, bắn vòng cung 30 m mỗi 12 giây.",
+        "Hàng thuyền nối đuôi: thuyền địch đi thành hàng; thuyền đầu bị phá thì hàng sau khựng 5 giây.",
+        "Lệnh vượt cạn: dưới 50% Sinh lực, ra lệnh cho thuyền quay đầu; nếu cửa rạch phía sau còn mở, ông thoát (thua nhiệm vụ phụ).",
+        "Thủy triều giữ nhịp: mỗi 90 giây, ông đổi hướng tiến theo con nước."
+      ],
+      "counterplay": "Khóa cửa rạch phía sau trước khi đánh soái thuyền; dùng thuyền nhỏ áp sát, tránh tầm pháo.",
+      "dignity": "Hoàng thân trẻ, gánh trách nhiệm một cuộc viễn chinh xa; thoại tôn trọng, không chế giễu."
+    },
+    {
+      "id": "X32",
+      "name": "Chiêu Sương",
+      "original": "พระยาวิชิตณรงค์ (Phraya Wichitnarong)",
+      "faction": "Xiêm (vương triều Rattanakosin)",
+      "era": "E9",
+      "historicity": "Chính sử",
+      "bio": "Tướng Xiêm dẫn quân Xiêm và quân Chân Lạp đi trước qua đất Chân Lạp, tiến về khu vực Rạch Gầm. Sử Việt gọi là Chiêu Sương.",
+      "fate": "Thua ở Rạch Gầm – Xoài Mút; nguồn đã mở không ghi kết cục riêng.",
+      "appearsIn": [
+        "B28"
+      ],
+      "bossTier": "Tướng",
+      "weaponClass": "EWC06",
+      "mechanics": [
+        "Voi bờ sông: cưỡi voi chiến trên bờ, bảo vệ các bến đổ quân.",
+        "Tiền quân: mỗi 45 giây đưa một đợt lính lên bờ lập bến mới.",
+        "Hợp binh Chân Lạp: khi có đồng minh Chân Lạp gần đó, +15% thủ; đánh bại nhóm ấy thì hiệu ứng mất.",
+        "Rút xuống thuyền: dưới 30% Sinh lực, xuống thuyền và nhập vào hàng thuyền của Chiêu Tăng."
+      ],
+      "counterplay": "Phá bến đổ quân trước; dùng hỏa khí hoặc sóng âm làm voi hoảng.",
+      "dignity": "Tướng tiền quân dày dạn; khắc họa như đối thủ ngang tầm trên bờ. Trong thoại dùng 'quân Chân Lạp', không dùng 'Miên/Cao Man'; trang phục Xiêm và Khmer theo tư liệu, không biếm họa; không dùng tượng Phật hay biểu tượng tôn giáo làm vật trang trí phe địch hoặc mục tiêu phá hủy."
+    },
+    {
+      "id": "X33",
+      "name": "Tôn Sĩ Nghị",
+      "original": "孫士毅 (Sūn Shìyì)",
+      "faction": "Nhà Thanh",
+      "era": "E9",
+      "historicity": "Chính sử",
+      "bio": "Tiến sĩ, Tổng đốc Lưỡng Quảng. Năm 1788 đưa quân vào Thăng Long, phong Lê Duy Kỳ (Lê Chiêu Thống); được phong Nhất đẳng Mưu dũng công nhưng nán lại thay vì rút quân như lệnh triều đình.",
+      "fate": "Tháng Giêng 1789 chạy qua sông Phú Lương (sông Hồng) rồi cắt cầu phao; bị Càn Long tước tước vị và chức Tổng đốc. Mất năm 1796 khi đang cầm quân ở Tứ Xuyên.",
+      "appearsIn": [
+        "B29",
+        "B30"
+      ],
+      "bossTier": "Chủ soái",
+      "weaponClass": "WC12",
+      "mechanics": [
+        "Yến Tết (Tương truyền): đầu trận quân Thanh -20% cảnh giác (phát hiện quân ta chậm hơn) cho đến khi đồn đầu tiên báo động.",
+        "Hệ thống đồn: mỗi đồn còn đứng cho ông +5% thủ; mất 3 đồn thì ông chuyển sang pha rút chạy.",
+        "Cầu phao: khi rút, ông đi về cầu phao; nếu ông qua cầu, cầu bị cắt (trạng thái bake sẵn), quân Thanh còn lại bờ nam −50 Sĩ Khí.",
+        "Ấn tín (Tương truyền): ấn tín bị bỏ lại trong doanh trại khi rút; người chơi thu giữ được thì Hào Khí +5 (nhiệm vụ phụ). Không có cảnh ông hoảng loạn làm rơi ấn."
+      ],
+      "counterplay": "Hạ đồn nhanh để ông không kịp tổ chức lại; chặn cầu phao bằng kỵ binh nếu muốn điểm tối đa.",
+      "dignity": "Quan văn giỏi chữ, đánh giá sai tình thế; khắc họa là người mắc kẹt giữa lệnh triều đình và công danh. Không mô tả quân lính bị chết đuối."
+    },
+    {
+      "id": "X34",
+      "name": "Hứa Thế Hanh",
+      "original": "許世亨 (Xǔ Shìhēng)",
+      "faction": "Nhà Thanh",
+      "era": "E9",
+      "historicity": "Chính sử",
+      "bio": "Người Hồi ở Tân Đô, Tứ Xuyên; xuất thân kỵ binh, từng đánh Kim Xuyên và Tây Tạng. Tháng 2/1788 làm Đề đốc Quảng Tây, theo Tôn Sĩ Nghị sang Đại Việt.",
+      "fate": "Theo sử Thanh (zh.wikipedia), tử trận bên sông Phú Lương (sông Hồng) khi cùng Thượng Duy Thăng, Trương Triều Long đoạn hậu cho Tôn Sĩ Nghị rút qua sông, dịp mùng 5 Tết Kỷ Dậu 1789. vi.wikipedia (dẫn Thánh vũ ký) nhắc cái chết của ông trong phần trận Ngọc Hồi, không nêu địa điểm cụ thể.",
+      "appearsIn": [
+        "B29",
+        "B30"
+      ],
+      "bossTier": "Đại tướng",
+      "weaponClass": "EWC01",
+      "mechanics": [
+        "Cung kỵ vòng: chạy vòng quanh người chơi bán kính 15 m, bắn 3 mũi mỗi 2 giây.",
+        "Rút giữ đường (B29): dưới 40% Sinh lực, ông gọi đội hậu vệ lập hàng chặn 20 m rồi rút về hướng Thăng Long (không bị hạ ở B29).",
+        "Lão tướng: miễn hoảng loạn; khi lính quanh ông bị hoảng, ông hô quân và giải 50% hiệu ứng.",
+        "Đoạn hậu đầu cầu phao (B30): không rút; +30% công dưới 20% Sinh lực. Khi bị hạ, màn hình chuyển sang lời kể ngắn về việc ông tử trận khi che chắn quân rút."
+      ],
+      "counterplay": "Dùng voi hoặc mộc chắn để chặn tên; thu hẹp vòng chạy của ông bằng chông và vùng đường sụt; ở B30 đánh vào hai bên sườn hàng đoạn hậu trước.",
+      "dignity": "Lão tướng kỵ binh, chết khi che chắn cho quân rút; được khắc họa như người lính trọn phận sự. Là người Hồi: không dùng chữ Ả Rập hay biểu tượng tôn giáo làm vật trang trí phe địch; trang phục theo tư liệu quân Thanh."
+    },
+    {
+      "id": "X35",
+      "name": "Sầm Nghi Đống",
+      "original": "岑宜棟 (Cén Yídòng)",
+      "faction": "Nhà Thanh",
+      "era": "E9",
+      "historicity": "Chính sử",
+      "bio": "Người Choang, tri châu Điền Châu thuộc dòng thổ ty thế tập; năm 1755 lập thư viện Hóa Thành. Năm 1789 chỉ huy khoảng 2.000 quân giữ đồn Khương Thượng.",
+      "fate": "Khi đồn vỡ, ông thắt cổ tự vẫn ở Loa Sơn (gò Đống Đa), mùng 5 Tết Kỷ Dậu 1789 (zh.wikipedia: tự ải ở Đống Đa; vi.wikipedia: tự sát trên đài chỉ huy ở Loa Sơn). Có đền thờ ông ở Hà Nội; được nhà Thanh truy tặng.",
+      "appearsIn": [
+        "B30"
+      ],
+      "bossTier": "Tướng",
+      "weaponClass": "EWC02",
+      "mechanics": [
+        "Đài chỉ huy: đứng trên đài cao, mỗi 15 giây đổi hướng phòng thủ cho một mặt đồn (+30% thủ mặt đó).",
+        "Lính thổ binh: đội cận vệ thổ binh +20% tốc trên địa hình gò đồi.",
+        "Chiêng báo động: đánh chiêng gọi quân từ đồn khác; nếu tiếng chiêng vang 3 lần, một đạo tiếp viện đỏ xuất hiện.",
+        "Giữ đồn: không rời đài; màn kết thúc pha khi đài bị bao vây kín trong 10 giây (không có cảnh tự vẫn, chuyển sang một khung comic chèn mờ kèm lời dẫn)."
+      ],
+      "counterplay": "Phá chiêng hoặc cắt đường báo động; tấn công mặt đồn ông không vừa chọn.",
+      "dignity": "Một thổ quan có học, giữ đồn tới cùng. Không dùng các câu dân gian giễu cợt ông; cái chết chỉ được thuật bằng lời, ngoài khung hình. Trang phục thổ binh Choang theo tư liệu, không phóng đại."
+    }
+  ],
+  "battles": [
+    {
+      "id": "B23",
+      "name": "Lê Lai cứu chúa – Núi Chí Linh",
+      "date": "1418 hoặc 1419 (nguồn khác nhau; en.wikipedia: 4/1418; vi.wikipedia và một số nguồn: 1419)",
+      "era": "E8",
+      "act": "Hồi I – Chí Linh",
+      "history": "Sau khi dựng cờ (7/2/1418), nghĩa quân nhiều lần phải lui về núi Chí Linh. Theo Lam Sơn thực lục, khi bị quân Minh vây ngặt, Lê Lợi hỏi ai dám mặc áo vàng của mình, lĩnh 500 quân và 2 voi; Lê Lai nhận, ra trước trại quân Minh khiêu chiến, xưng là chúa Lam Sơn. Quân Minh vây bắt Lê Lai, tưởng đã bắt được chủ tướng nên nới vây, Lê Lợi thoát ra. Năm 1419, Lý Bân (李彬) sai Phương Chính tập kích Lê Lợi ở trại Khả Lam.",
+      "outcome": "Thua (nghĩa quân mất Lê Lai và đội cảm tử, nhưng chủ tướng thoát vây)",
+      "playable": [
+        "H43",
+        "H41"
+      ],
+      "allies": [
+        "H45"
+      ],
+      "enemies": [
+        "X27"
+      ],
+      "mapTemplate": "Rừng núi",
+      "mapNotes": "Đỉnh núi Chí Linh với trại nghĩa quân; ba vòng vây quân Minh ở sườn núi; hai lối xuống: lối chính (nơi Lê Lai xông ra) và lối mòn phía tây qua suối (lối thoát của Lê Lợi). Cứ Điểm: trại đỉnh núi, kho lương cuối cùng, suối nước, ba chốt vây của quân Minh.",
+      "objectives": {
+        "primary": [
+          "Giữ trại đỉnh núi đến khi Lê Lai sẵn sàng (pha 1–2)",
+          "Lê Lai kéo ít nhất 60% quân vây về lối chính",
+          "Lê Lợi cùng ít nhất 200 lính mô phỏng thoát qua lối phía tây"
+        ],
+        "secondary": [
+          "Cứu 3 nhóm dân kiếm củi bị kẹt ở sườn núi",
+          "Không để kho lương cuối bị đốt",
+          "Phá chốt vây phía tây trong 90 giây"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Bị vây trên núi",
+          "trigger": "Bắt đầu màn",
+          "events": "Sĩ Khí quân ta giảm 1 điểm mỗi 30 giây vì thiếu lương. Người chơi (Lê Lai) giữ ba lối lên núi trước các đợt dò của quân Minh."
+        },
+        {
+          "name": "Bàn kế trong trướng",
+          "trigger": "Sĩ Khí xuống 40 hoặc sau 6 phút",
+          "events": "Cảnh ngắn (bỏ qua được khi chơi lại): Lê Lợi hỏi ai dám mặc áo vàng, Lê Lai nhận. Người chơi chọn 50 cảm tử và vị trí đặt 2 voi."
+        },
+        {
+          "name": "Xuống núi",
+          "trigger": "Lê Lai kích hoạt kỹ năng Đổi áo",
+          "events": "Lê Lai khoác áo vàng, xông xuống lối chính. Minimap: đỏ dồn về phía Lê Lai; lối phía tây thưa dần."
+        },
+        {
+          "name": "Đổi vai: mở đường thoát",
+          "trigger": "60% quân vây đã dồn về lối chính",
+          "events": "Người chơi chuyển sang điều khiển Lê Lợi, dẫn chủ lực qua suối phía tây, phá chốt vây với Đinh Lễ (đồng minh AI)."
+        },
+        {
+          "name": "Chí Linh còn lửa",
+          "trigger": "Lê Lợi ra khỏi vòng vây",
+          "events": "Người chơi quay về Lê Lai, Tuyệt Kỹ 'Liều mình cứu chúa' tự nạp đầy. Kích hoạt để kết màn; cinematic Tuyệt Kỹ dừng ở lúc Lê Lai lao vào hàng quân Minh; comic kết chương kể phần sau bằng lời dẫn."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Nghi binh hoàng bào (Lớn)",
+          "how": "Lê Lai dùng Đổi áo ở lối chính khi Hào Khí từ 30 trở lên; đốt 3 đống lửa hiệu để địch tin chủ tướng ở đó.",
+          "payoff": "+20 Hào Khí; quân vây ở lối phía tây rút đi 50%; mở khóa pha 4 sớm hơn 60 giây.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Voi mở đường (Nhỏ)",
+          "how": "Đặt 2 voi ở đầu lối chính trong pha 2, rồi ra Mệnh Lệnh 'Xung phong' khi Lê Lai xuống núi.",
+          "payoff": "+10 Hào Khí; hàng rào chốt thứ nhất đổ (trạng thái bake sẵn); quân Minh ở chốt đó −30 Sĩ Khí.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X27",
+        "arena": "Chốt vây chân núi, lối chính",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Đổi vai hai tướng trong một màn (Lê Lai ↔ Lê Lợi). Thanh 'Lương cạn' thay đồng hồ: khi cạn, quân ta bắt đầu bỏ trốn. Phương Chính không thể bị hạ; chỉ cần đẩy lùi mũi truy kích.",
+      "lose": [
+        "Lê Lợi bị hạ",
+        "Lê Lợi bị địch nhận ra trước khi Lê Lai xuống núi (Lê Lợi ra khỏi trại quá sớm)",
+        "Thanh Lương cạn về 0 trước pha 3"
+      ],
+      "lengthMin": 20,
+      "difficulty": 2,
+      "whatIf": {
+        "title": "Lê Lai trở về",
+        "premise": "Voi phá vây mở được đường lui cho cả đội cảm tử.",
+        "changes": "Lê Lai sống sót, rút về với 30% Sinh lực và đi theo nghĩa quân. Mở Lê Lai làm tướng chơi được trong bản Chronicle của B24–B27. Tuyệt Kỹ đổi thành 'Người mặc áo chúa' (khiêu khích toàn bản đồ 10 giây, không hy sinh)."
+      },
+      "releaseTier": "U1",
+      "caveats": "Năm (1418 hay 1419) chưa thống nhất. Cốt lõi sự kiện (áo vàng, 500 quân, 2 voi, khiêu chiến) có trong Lam Sơn thực lục, nhãn Chính sử; Đại Việt sử ký toàn thư không chép chuyện này, và lại chép ngày 13 tháng Giêng Đinh Mùi (1427) giết Tư mã Lê Lai vì cậy công, nói năng khinh mạn (có ý kiến cho là người khác). Lời thoại và chi tiết dân gian là Tương truyền. Tướng Minh trực tiếp vây Chí Linh không được nguồn đã mở ghi tên; vai boss của Phương Chính là Hư cấu, dựa trên việc năm 1419 ông tập kích Lê Lợi ở Khả Lam.",
+      "sensitivity": "Không tái hiện việc Lê Lai bị bắt và hành hình. Không miêu tả quân Minh tàn ác; họ là quân vây núi làm đúng nhiệm vụ.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E8",
+        "chuong": 1,
+        "quyetSach": {
+          "lichSu": "Nghi binh hoàng bào (Lớn)",
+          "khac": [
+            "Dồn toàn quân mở đường máu phá vây",
+            "Giải tán nghĩa quân, ẩn vào rừng chờ thời"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B24",
+      "name": "Chiến dịch Nghệ An: Trà Lân – Khả Lưu – Bồ Ải",
+      "date": "Khoảng cuối 1424 – đầu 1425 (nút chiến dịch Đa Căng 12/10/1424; vây Trà Lân cuối 1424; Khả Lưu, Bồ Ải ngay sau đó)",
+      "era": "E8",
+      "act": "Hồi II – Nghệ An",
+      "history": "Cuối năm 1424, Lê Lợi nghe kế Nguyễn Chích, đưa quân vào Nghệ An. Ngày 12/10/1424 nghĩa quân tập kích đồn Đa Căng ở Thanh Hóa (do Lương Nhữ Hốt giữ), rồi hành quân vào Nghệ An, vây thành Trà Lân (do Cầm Bành giữ). Quân Minh do Trần Trí, Phương Chính chỉ huy kéo đến, bị phục kích ở Khả Lưu và lại mắc bẫy ở Bồ Ải, phải rút về giữ thành Nghệ An.",
+      "outcome": "Thắng",
+      "playable": [
+        "H41",
+        "H44",
+        "H45",
+        "H46",
+        "H48"
+      ],
+      "allies": [
+        "H42"
+      ],
+      "enemies": [
+        "X26",
+        "X27"
+      ],
+      "mapTemplate": "Sông",
+      "mapNotes": "Đa Căng (nay thuộc xã Thọ Nguyên, huyện Thọ Xuân cũ, Thanh Hóa) KHÔNG nằm trên bản đồ 3D: là nút chiến dịch mở đầu dạng khung comic kèm lựa chọn theo lượt trên bản đồ chiến dịch. Bản đồ 3D là thung lũng sông Lam (Nghệ An): thành Trà Lân (huyện Con Cuông cũ) ở thượng lưu, Khả Lưu (xã Vĩnh Sơn cũ, huyện Anh Sơn cũ) ở giữa, Bồ Ải (xã Đức Sơn cũ, huyện Anh Sơn cũ) ở hạ lưu. Cứ Điểm: thành Trà Lân, bến vượt sông Khả Lưu, doanh trại Minh bờ nam, rừng phục binh Bồ Ải, 3 làng ven sông.",
+      "objectives": {
+        "primary": [
+          "Vây Trà Lân đến khi thành chịu mở cửa",
+          "Đánh lui quân Minh ở Khả Lưu",
+          "Chặn và đánh bại quân Minh ở Bồ Ải"
+        ],
+        "secondary": [
+          "Giữ cho dân làng ven sông không bị cuốn vào giao tranh (3 làng)",
+          "Hạ Trần Trí trước khi ông lập được Cứ Điểm mới ở bờ bắc",
+          "Chiếm 5 thuyền vượt sông của quân Minh"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Vây Trà Lân",
+          "trigger": "Bắt đầu màn (sau nút chiến dịch Đa Căng)",
+          "events": "Màn hướng dẫn Kế Sách: Nguyễn Chích đánh dấu mục tiêu, dựng vòng vây, cắt đường tiếp tế. Cầm Bành (NPC trung lập, không phải boss) giữ thành; người chơi có thể chọn gửi thư thay vì đánh (gọi Nguyễn Trãi làm đồng minh AI, Hư cấu)."
+        },
+        {
+          "name": "Viện binh Minh đến",
+          "trigger": "Trà Lân mở cửa hoặc sau 8 phút",
+          "events": "Trần Trí và Phương Chính kéo quân theo sông Lam. Minimap: hai mũi đỏ."
+        },
+        {
+          "name": "Khả Lưu",
+          "trigger": "Quân Minh đến bến Khả Lưu",
+          "events": "Quân Minh vượt sông. Người chơi chọn lúc đánh: khi một nửa quân đã sang sông."
+        },
+        {
+          "name": "Bồ Ải",
+          "trigger": "Quân Minh thua ở Khả Lưu và rút",
+          "events": "Đi đường tắt vượt lên trước, phục ở rừng Bồ Ải, đánh Trần Trí (boss) và Phương Chính (tướng phó)."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Đánh khi đang vượt sông (Lớn)",
+          "how": "Giấu quân ở rừng bờ bắc; ra Mệnh Lệnh 'Phục kích' khi thanh 'Quân Minh đã sang sông' chạm 50%.",
+          "payoff": "+20 Hào Khí; nửa quân Minh bên kia sông không kịp cứu; nửa bên này −40 Sĩ Khí.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Đường tắt Bồ Ải (Nhỏ)",
+          "how": "Ra lệnh cho một cánh quân đi đường núi (mất 90 giây) trong khi cánh chính đeo bám.",
+          "payoff": "+10 Hào Khí; quân Minh rút về Bồ Ải bị chặn đầu.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X26",
+        "arena": "Rừng và bãi sông Bồ Ải",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Thanh 'Sang sông' hiển thị tỷ lệ quân Minh đã qua sông; đánh quá sớm hay quá muộn đều giảm hiệu quả Kế Sách. Lựa chọn thư hay đánh ở Trà Lân thay đổi quân số của pha 2.",
+      "lose": [
+        "Lê Lợi (nếu có trong trận) bị hạ",
+        "Quân Minh lập được 2 Cứ Điểm ở bờ bắc",
+        "Cả 3 làng ven sông bị cuốn vào giao tranh"
+      ],
+      "lengthMin": 22,
+      "difficulty": 3,
+      "whatIf": {
+        "title": "Không vào Nghệ An",
+        "premise": "Lê Lợi bác kế Nguyễn Chích, ở lại vùng núi Thanh Hóa.",
+        "changes": "Màn đổi thành phòng thủ núi rừng: quân Minh vây ba mặt, không có Cứ Điểm đồng bằng; Hào Khí tăng chậm hơn 50%. Mở bình luận của Nguyễn Chích về cái giá của việc không đổi thế."
+      },
+      "releaseTier": "U1",
+      "caveats": "Thứ tự và năm (1424 hay 1425) của Khả Lưu – Bồ Ải khác nhau giữa các nguồn. Chi tiết cách phục kích (đánh lúc vượt sông, đường tắt) dựa trên các bài tổng hợp; cần đối chiếu Toàn thư quyển X. Kết cục của Trần Trí chưa kiểm chứng. Nguyễn Trãi có mặt ở Trà Lân là Hư cấu.",
+      "sensitivity": "Cầm Bành được thể hiện như thủ lĩnh địa phương giữ đất cho dân mình: trung lập, không làm boss, có thể thương lượng, không dùng từ 'phản'. Trang phục theo tư liệu, không biếm họa.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E8",
+        "chuong": 2,
+        "quyetSach": {
+          "lichSu": "Đánh khi đang vượt sông (Lớn)",
+          "khac": [
+            "Dồn toàn lực hạ thành Trà Lân trước khi viện binh tới",
+            "Rút về giữ vùng núi Lam Sơn ở Thanh Hóa"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B25",
+      "name": "Tốt Động – Chúc Động",
+      "date": "7/11/1426 (tháng 10 âm lịch năm Bính Ngọ)",
+      "era": "E8",
+      "act": "Hồi III – Tốt Động",
+      "history": "Vương Thông được sai sang Giao Chỉ, chia quân hai ngả đánh vào doanh trại Lam Sơn phía tây nam Đông Quan. Lý Triện, Đinh Lễ, Nguyễn Xí, Đỗ Bí biết trước kế hoạch nhờ bắt được thám báo, cho quân im lặng; quân Minh tưởng không có địch, đi đường tắt và rơi vào phục kích gần sông Yên Duyệt. Sử Việt ghi 5 vạn quân Minh chết, 1 vạn bị bắt; sử Minh ghi 2–3 vạn. Thượng thư Trần Hiệp tử trận; Vương Thông bị thương, chạy về Đông Quan.",
+      "outcome": "Thắng",
+      "playable": [
+        "H45",
+        "H49"
+      ],
+      "allies": [],
+      "enemies": [
+        "X28",
+        "X27"
+      ],
+      "mapTemplate": "Đầm lầy",
+      "mapNotes": "Cánh đồng trũng giữa Tốt Động và Chúc Động (nay thuộc Hà Nội), sông Yên Duyệt, cầu Nhân Mục, đường đê hẹp. Cứ Điểm: doanh trại Lam Sơn, trạm thám báo, cầu (2 trạng thái bake sẵn), hai gò đất cao, lối đường tắt qua đầm.",
+      "objectives": {
+        "primary": [
+          "Bắt thám báo địch để lộ kế hoạch chia hai ngả",
+          "Giữ im lặng: không để quân ta lộ trên minimap địch đến khi Vương Thông vào đường tắt",
+          "Đánh bại cánh chính và buộc Vương Thông rút"
+        ],
+        "secondary": [
+          "Chiếm cờ soái của Vương Thông",
+          "Chặn cánh Phương Chính ở Chúc Động không cho hợp quân",
+          "Bắt sống ít nhất 500 lính mô phỏng (tính trên bảng tổng kết)"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Thám báo",
+          "trigger": "Bắt đầu màn",
+          "events": "Nguyễn Xí thả chó săn tìm 4 toán thám báo. Mỗi toán bắt được lộ một phần lộ trình quân Minh."
+        },
+        {
+          "name": "Lặng im",
+          "trigger": "Bắt được ít nhất 2 toán",
+          "events": "Người chơi đặt phục binh trong lau sậy. Thanh 'Tiếng động' tăng khi quân ta di chuyển nhiều; đầy thì quân Minh đổi đường."
+        },
+        {
+          "name": "Đường tắt",
+          "trigger": "Vương Thông không thấy địch trong 30 giây",
+          "events": "Cánh chính đi vào đường đê qua đầm; cánh Phương Chính đi hướng Chúc Động."
+        },
+        {
+          "name": "Phục kích Yên Duyệt",
+          "trigger": "Người chơi ra lệnh 'Phục kích' hoặc cánh chính đến giữa đầm",
+          "events": "Phục binh đứng dậy. Cầu Nhân Mục có thể bị phá bằng Mệnh Lệnh để chặn đường lui."
+        },
+        {
+          "name": "Chúc Động",
+          "trigger": "Cánh chính tan vỡ",
+          "events": "Đánh cánh Phương Chính; Vương Thông (boss) bị thương, cùng cận vệ rút về Đông Quan."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Im lặng phục kích (Lớn)",
+          "how": "Giữ thanh Tiếng động dưới 50% trong pha 2; không tấn công đội tiền trạm.",
+          "payoff": "+20 Hào Khí; Vương Thông chọn đường tắt qua đầm; kỵ binh Minh mất 60% tốc trong đầm.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Tin từ thám báo (Nhỏ)",
+          "how": "Bắt đủ 4 toán thám báo trong pha 1.",
+          "payoff": "+10 Hào Khí; minimap hiện trước đường đi của cả hai cánh Minh suốt màn.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X28",
+        "arena": "Đường đê giữa đầm, gần cầu Nhân Mục",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Thanh 'Tiếng động': lần đầu trong game, thắng lợi phụ thuộc vào việc KHÔNG đánh. Đầm lầy làm chậm kỵ binh và voi; bộ binh quân ta được +20% tốc trong lau sậy.",
+      "lose": [
+        "Thanh Tiếng động đầy hai lần",
+        "Doanh trại Lam Sơn thất thủ",
+        "Cả Đinh Lễ và Nguyễn Xí bị hạ"
+      ],
+      "lengthMin": 25,
+      "difficulty": 3,
+      "whatIf": {
+        "title": "Vương Thông không đi đường tắt",
+        "premise": "Vương Thông giữ đường lớn, hai cánh hội quân trước khi giao chiến.",
+        "changes": "Màn thành trận dã chiến quân ta ít hơn gấp 5: người chơi phải cầm cự, rút về Ninh Kiều và đánh du kích. Mục tiêu đổi thành bảo toàn 50% quân."
+      },
+      "releaseTier": "U1",
+      "caveats": "Quân số Minh: sử Việt 10 vạn, sử Minh 5,4 vạn; thương vong cũng khác nhau (5 vạn chết theo sử Việt; 2–3 vạn theo sử Minh). Vai trò cụ thể của từng tướng Lam Sơn cần đối chiếu Toàn thư.",
+      "sensitivity": "Không có cảnh quân Minh chết đuối hàng loạt trong đầm; lính địch 'tan vỡ' và 'bị bắt'. Trần Hiệp được nhắc như một quan văn tử trận, không bị bêu.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E8",
+        "chuong": 3,
+        "quyetSach": {
+          "lichSu": "Im lặng phục kích (Lớn)",
+          "khac": [
+            "Dàn trận đón đánh trực diện giữa đồng",
+            "Lui quân tránh chủ lực Vương Thông"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B26",
+      "name": "Chi Lăng – Mã Yên",
+      "date": "18–20 tháng 9 âm lịch năm Đinh Mùi 1427 (khoảng 8–10/10/1427); Lương Minh tử trận ngày 25, Lý Khánh tự vẫn ngày 28 tháng 9 âm lịch (theo Bình Ngô đại cáo)",
+      "era": "E8",
+      "act": "Hồi IV – Chi Lăng – Xương Giang",
+      "history": "Năm 1427, nhà Minh đưa hai đạo viện binh: Liễu Thăng từ Quảng Tây và Mộc Thạnh (X13) từ Vân Nam. Ngày 18/9 âm lịch Liễu Thăng qua ải Pha Lũy. Nghĩa quân nhử địch vào ải Chi Lăng; theo Minh sử, Liễu Thăng cùng hơn 100 kỵ vượt cầu trước, cầu gãy, hậu quân không theo kịp, ông sa lầy ở Đảo Mã pha và trúng phi tiêu. Bình Ngô đại cáo chép: ngày 20, Liễu Thăng chết ở núi Mã Yên; ngày 25, Bảo Định bá Lương Minh tử trận.",
+      "outcome": "Thắng",
+      "playable": [
+        "H46",
+        "H48"
+      ],
+      "allies": [],
+      "enemies": [
+        "X29"
+      ],
+      "mapTemplate": "Đèo núi",
+      "mapNotes": "Thung lũng Chi Lăng hẹp, hai bên vách núi; ải Pha Lũy ở đầu bắc; cầu gỗ qua bãi lầy (2 trạng thái bake sẵn: nguyên / gãy); núi Mã Yên. Cứ Điểm: ải Pha Lũy, đồn ải Lưu, cầu gỗ, hai điểm phục binh trên vách, doanh trại hậu quân Minh.",
+      "objectives": {
+        "primary": [
+          "Nhử đạo tiền quân Minh vào sâu thung lũng Chi Lăng",
+          "Tách Liễu Thăng khỏi hậu quân",
+          "Đánh bại Liễu Thăng ở Mã Yên"
+        ],
+        "secondary": [
+          "Không để hậu quân Minh lập doanh trại trong thung lũng",
+          "Chặn Lương Minh (tướng phó, không ID) trước khi ông tập hợp lại tàn quân",
+          "Chiếm 3 kho lương dọc đường"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Nhử địch",
+          "trigger": "Bắt đầu màn",
+          "events": "Người chơi đánh rồi rút liên tục, dụ Liễu Thăng cộng dồn tầng 'Thừa thắng'. Không được thắng quá sớm."
+        },
+        {
+          "name": "Vào hẻm",
+          "trigger": "Liễu Thăng đạt 3 tầng Thừa thắng",
+          "events": "Liễu Thăng dẫn kỵ đội tiến nhanh, bỏ xa hậu quân. Minimap: khoảng cách hai khối đỏ tăng dần."
+        },
+        {
+          "name": "Cầu gãy",
+          "trigger": "Kỵ đội của Liễu Thăng lên cầu",
+          "events": "Người chơi kích hoạt Kế Sách 'Cầu gãy – bùn lầy'. Hậu quân bị kẹt bên kia."
+        },
+        {
+          "name": "Mã Yên",
+          "trigger": "Cầu gãy",
+          "events": "Đấu boss Liễu Thăng trong bãi lầy chân núi Mã Yên; phục binh hai vách núi đứng dậy khi Hào Khí đạt 100 (Tổng Phản Công)."
+        },
+        {
+          "name": "Hậu quân mất chủ",
+          "trigger": "Liễu Thăng bị hạ",
+          "events": "Lương Minh tổ chức lại hậu quân; người chơi truy kích. Kết màn: tàn quân kéo về hướng Xương Giang (nối sang B27)."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Cầu gãy – bùn lầy (Lớn)",
+          "how": "Trước pha 3, cử một đội cưa trụ cầu (60 giây, không bị phát hiện); khi Liễu Thăng lên cầu, ra lệnh 'Phá cầu'.",
+          "payoff": "+20 Hào Khí; Liễu Thăng và khoảng 100 kỵ bị tách khỏi hậu quân; kỵ binh trong bùn mất 70% tốc.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Thua giả (Nhỏ)",
+          "how": "Trong pha 1, ra Mệnh Lệnh 'Rút lui có trật tự' 3 lần mà không để quân ta tan vỡ.",
+          "payoff": "+10 Hào Khí; Liễu Thăng đạt tầng Thừa thắng tối đa: −50% thủ khi vào bùn.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X29",
+        "arena": "Bãi lầy chân núi Mã Yên",
+        "defeatMeans": "bị giết"
+      },
+      "specialMechanic": "Hệ số 'Kiêu binh' của boss: người chơi phải cố tình thua các trận nhỏ để thắng trận lớn. Tổng Phản Công ở màn này là biến thể 'Hai vách núi' (25 s): hai vách núi cùng đứng dậy (toàn bộ phục binh xuất kích cùng lúc).",
+      "lose": [
+        "Liễu Thăng hợp được với hậu quân trước khi vào bãi lầy",
+        "Quân ta tan vỡ trong pha Nhử địch (Sĩ Khí về 0)",
+        "Cả Lê Sát và Lưu Nhân Chú bị hạ"
+      ],
+      "lengthMin": 22,
+      "difficulty": 4,
+      "whatIf": {
+        "title": "Liễu Thăng nghe lời can",
+        "premise": "Liễu Thăng nghe bộ hạ, không khinh địch, cho hậu quân đi sát.",
+        "changes": "Không thể tách kỵ đội; người chơi phải chặn cả đạo quân ở ải bằng nhiều lớp phục kích và đánh tiêu hao 3 đợt. Liễu Thăng bị đánh lui chứ không tử trận; mở nhánh Chronicle nơi Mộc Thạnh (X13) tiến vào Đại Việt."
+      },
+      "releaseTier": "U1",
+      "caveats": "Ngày: Bình Ngô đại cáo ghi Chi Lăng ngày 18, Mã Yên ngày 20; vi.wikipedia ghi 18/9 vào Pha Lũy, 20/9 Chi Lăng. Minh sử chép Lương Minh chết vì bệnh và Lý Khánh chết ngày hôm sau; Bình Ngô đại cáo chép Lương Minh tử trận, Lý Khánh tự vẫn. Người trực tiếp nhử địch (Trần Lựu) không có ID tướng trong game.",
+      "sensitivity": "Cái chết của Liễu Thăng không cận cảnh; màn hình chuyển trắng khi ông ngã giữa bùn. Lý Khánh (quan văn) không xuất hiện trong gameplay.",
+      "tongPhanCong": {
+        "variant": "Hai vách núi",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E8",
+        "chuong": 4,
+        "quyetSach": {
+          "lichSu": "Cầu gãy – bùn lầy (Lớn)",
+          "khac": [
+            "Giữ chặt ải Pha Lũy, chặn cả đạo quân ở biên giới",
+            "Dồn quân vây Đông Quan, bỏ ngỏ đường Lạng Sơn"
+          ],
+          "danhDau": [
+            "Cầu gãy – bùn lầy (Lớn)",
+            "Thua giả (Nhỏ)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B27",
+      "name": "Xương Giang",
+      "date": "15 tháng 10 âm lịch năm Đinh Mùi 1427 (3/11/1427); Hội thề Đông Quan: 22 tháng 11 âm lịch theo sử Việt (10/12/1427)",
+      "era": "E8",
+      "act": "Hồi IV – Chi Lăng – Xương Giang",
+      "history": "Trước khi viện binh đến, Trần Nguyên Hãn đã vây và hạ thành Xương Giang (8/9 âm lịch). Tàn quân Liễu Thăng do Thôi Tụ chỉ huy kéo đến, không vào được thành, phải đóng trại giữa đồng và bị vây. Ngày 15/10 âm lịch, nghĩa quân tổng công kích; sử Việt ghi hơn 5 vạn quân Minh bị giết, Thôi Tụ và thượng thư Hoàng Phúc bị bắt. Mộc Thạnh (X13) nghe tin hoảng sợ bỏ chạy, bị Phạm Văn Xảo và Trịnh Khả truy kích đánh tan (theo sử Việt). Vương Thông ở Đông Quan xin hòa và lập đàn thề với Lê Lợi.",
+      "outcome": "Thắng",
+      "playable": [
+        "H47",
+        "H46",
+        "H48",
+        "H49",
+        "H42"
+      ],
+      "allies": [],
+      "enemies": [
+        "X30",
+        "X28"
+      ],
+      "mapTemplate": "Thành lũy",
+      "mapNotes": "Thành Xương Giang (phế tích nay thuộc phường Bắc Giang, tỉnh Bắc Ninh) đã về tay quân ta; trại quân Minh giữa đồng, rào xe bốn lớp; giếng nước và bãi cỏ ngựa bên ngoài trại. Pha cuối chuyển sang bản đồ nhỏ trước thành Đông Quan (dùng chung bộ asset thành lũy).",
+      "objectives": {
+        "primary": [
+          "Giữ thành Xương Giang trước đợt tấn công đầu của tàn quân Minh",
+          "Cắt nước và lương của trại Minh",
+          "Phá 4 lớp trận lũy và bắt Thôi Tụ",
+          "Hộ tống thượng thư Hoàng Phúc ra cửa ải an toàn"
+        ],
+        "secondary": [
+          "Chặn đợt tiếp viện cuối từ hướng Chi Lăng",
+          "Nhận đầu hàng của ít nhất 30% quân Minh thay vì giao chiến",
+          "Ở pha Vây Đông Quan: đẩy lui 3 đợt xuất kích mà không để mất Cứ Điểm nào"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Thành đã mất",
+          "trigger": "Bắt đầu màn",
+          "events": "Người chơi (Trần Nguyên Hãn) giữ thành; quân Minh đến chân thành mới biết thành đã đổi chủ, Sĩ Khí địch −15."
+        },
+        {
+          "name": "Trại giữa đồng",
+          "trigger": "Đẩy lui đợt tấn công đầu",
+          "events": "Quân Minh đóng trại; người chơi chiếm giếng, bãi cỏ, kho lương xung quanh."
+        },
+        {
+          "name": "Tổng công kích",
+          "trigger": "Ngày 15/10 (sau khi chiếm đủ 3 nguồn tiếp tế)",
+          "events": "Đánh vào 4 lớp rào xe; Nguyễn Xí dẫn Thiết Đột phá khiên."
+        },
+        {
+          "name": "Thôi Tụ",
+          "trigger": "Lớp rào thứ 4 bị phá",
+          "events": "Đấu boss; kết thúc khi Thôi Tụ bị khống chế đủ 5 giây."
+        },
+        {
+          "name": "Hộ tống Hoàng Phúc",
+          "trigger": "Thôi Tụ bị bắt",
+          "events": "Nhiệm vụ nhân đạo: đưa vị quan được dân Giao Chỉ kính trọng ra cửa ải với lương và kiệu, theo lệnh Lê Lợi."
+        },
+        {
+          "name": "Vây Đông Quan",
+          "trigger": "Hoàng Phúc ra khỏi bản đồ",
+          "events": "Màn chiến đấu nhẹ 6–8 phút, người chơi điều khiển Nguyễn Trãi: quân Minh trong thành xuất kích 2–3 đợt (Hư cấu); dùng Thư dụ hàng lên các đồn ngoại vi, Tâm công khi hạ tướng phó, rồi gửi 3 lá thư vào thành cho Vương Thông. Kết: comic kết chương gộp kết Quyển VIII, cảnh Hội thề Đông Quan, quân Minh nhận thuyền, ngựa và lương để về nước; lời dẫn trích Bình Ngô đại cáo."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Vây thành diệt viện (Lớn)",
+          "how": "Giữ thành Xương Giang và chiếm cả 3 nguồn tiếp tế (giếng, bãi cỏ, kho lương) trước khi tổng công kích.",
+          "payoff": "+20 Hào Khí; quân Minh −30 Sĩ Khí, trận lũy mất 1 lớp.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Đánh vào lòng người (Nhỏ)",
+          "how": "Nguyễn Trãi hoặc cờ hàng: ra Mệnh Lệnh 'Gọi hàng' khi một lớp rào vừa đổ.",
+          "payoff": "+5 Hào Khí mỗi lần gọi hàng thành công (cộng dồn, tối đa +10); 15% quân Minh trong lớp đó đầu hàng, không cần giao chiến.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X30",
+        "arena": "Lớp rào trong cùng của trại giữa đồng",
+        "defeatMeans": "bị bắt"
+      },
+      "specialMechanic": "Thanh 'Tiếp tế' của địch: mỗi nguồn nước, cỏ, lương quân ta giữ làm giảm sức bền trận lũy. Pha cuối 'Vây Đông Quan' là màn chiến đấu nhẹ bằng mưu sĩ, mở comic kết Quyển VIII.",
+      "lose": [
+        "Thành Xương Giang bị chiếm lại",
+        "Hoàng Phúc bị hạ trong pha hộ tống",
+        "Thôi Tụ phá vây ra khỏi bản đồ",
+        "Nguyễn Trãi bị hạ ở pha Vây Đông Quan"
+      ],
+      "lengthMin": 28,
+      "difficulty": 4,
+      "whatIf": {
+        "title": "Vương Thông phá vây",
+        "premise": "Vương Thông dốc quân từ Đông Quan đánh ra, hợp với tàn quân Thôi Tụ ở Xương Giang.",
+        "changes": "Thêm mặt trận đỏ từ hướng Đông Quan; người chơi chia quân giữ thành Xương Giang và chặn đường sông. Vương Thông (X28) thành boss thứ hai; kết thúc vẫn là hội thề nếu cả hai mặt đều thắng."
+      },
+      "releaseTier": "U1",
+      "caveats": "Số phận Thôi Tụ: Bình Ngô đại cáo tả ông quỳ xin hàng; ghi chép phía Minh nhấn mạnh không ai hàng, toàn quân bị diệt. Hoàng Phúc bị bắt ở ải Kê Lăng theo Minh sử (chưa kiểm chứng trực tiếp), không hẳn ở trận địa Xương Giang. Ngày hội thề: sử Việt 22/11 âm lịch; Minh thực lục chép ngày 24/10 năm Tuyên Đức thứ 2 (12/11/1427) Vương Thông lập đàn thề ở sông Hạ Tiêu. Comic dùng ngày theo sử Việt, thẻ Sử quán nêu cả hai. Các đợt xuất kích ở pha Vây Đông Quan là Hư cấu.",
+      "sensitivity": "Hội thề được tái hiện như một kết cục có danh dự cho cả hai bên. Không có cảnh xử tử tù binh. Hoàng Phúc được thể hiện là quan tốt, được cả người Việt kính trọng.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E8",
+        "chuong": 5,
+        "quyetSach": {
+          "lichSu": "Vây thành diệt viện (Lớn)",
+          "khac": [
+            "Dồn quân hạ thành Đông Quan ngay",
+            "Chặn tàn quân ở ải, không cho xuống đồng bằng"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B28",
+      "name": "Rạch Gầm – Xoài Mút",
+      "date": "Đêm 19 rạng sáng 20/1/1785 (tháng Chạp năm Giáp Thìn; ngày âm lịch cụ thể chưa thống nhất giữa các nguồn)",
+      "era": "E9",
+      "act": "Hồi I – Sông Tiền",
+      "history": "Nguyễn Ánh sang Xiêm xin viện binh. Quân Xiêm do Chiêu Tăng (Krom Luang Thepharirak) và Chiêu Sương (Phraya Wichitnarong) chỉ huy vào Gia Định theo cả đường thủy lẫn đường qua Chân Lạp. Nguyễn Huệ giả giảng hòa, tặng quà, rồi bí mật bố trí bộ binh, pháo ở hai bờ và giấu thuyền trong các rạch nhánh quanh cù lao Thới Sơn trên sông Tiền (gần Mỹ Tho). Khi hạm đội Xiêm lọt vào khúc Rạch Gầm – Xoài Mút, quân Tây Sơn đánh chặn hai đầu, hạm đội Xiêm gần như bị diệt; Chiêu Tăng và Nguyễn Ánh chạy về Bangkok.",
+      "outcome": "Thắng",
+      "playable": [
+        "H50"
+      ],
+      "allies": [],
+      "enemies": [
+        "X31",
+        "X32"
+      ],
+      "mapTemplate": "Sông",
+      "mapNotes": "Khúc sông Tiền dài khoảng 6 km giữa Rạch Gầm và Xoài Mút (nay thuộc tỉnh Đồng Tháp, trước 2025 thuộc Tiền Giang); cù lao Thới Sơn giữa dòng; nhiều rạch nhánh kín đáo. Cứ Điểm: 4 ụ pháo bờ bắc, 3 ụ pháo bờ nam, 5 rạch giấu thuyền, bến đổ quân của Chiêu Sương, cửa rạch thượng lưu và hạ lưu.",
+      "objectives": {
+        "primary": [
+          "Giữ bí mật các vị trí phục binh trong pha hòa hoãn",
+          "Dụ toàn bộ hạm đội Xiêm vào khúc sông",
+          "Khóa hai đầu và đánh bại soái thuyền Chiêu Tăng"
+        ],
+        "secondary": [
+          "Phá bến đổ quân của Chiêu Sương trên bờ",
+          "Không để quá 20% thuyền Xiêm thoát khỏi hạ lưu",
+          "Cứu dân chài ở cù lao Thới Sơn trước khi giao chiến"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Hòa hoãn giả",
+          "trigger": "Bắt đầu màn",
+          "events": "Người chơi đưa thuyền quà đến doanh trại Xiêm; trong lúc đó bí mật đặt ụ pháo, giấu thuyền. Thanh 'Nghi ngờ' của địch tăng nếu bị trinh sát thấy."
+        },
+        {
+          "name": "Bố trận",
+          "trigger": "Đặt đủ 5 ụ pháo và 3 rạch phục",
+          "events": "Tướng NPC (model tướng phụ chung) đặt trống lệnh; một cánh dựng lũy tạm ở bờ."
+        },
+        {
+          "name": "Mồi nhử",
+          "trigger": "Rạng sáng",
+          "events": "Một đội thuyền nhỏ đánh rồi lui vào khúc sông; hạm đội Xiêm theo vào."
+        },
+        {
+          "name": "Khóa hai đầu",
+          "trigger": "Soái thuyền Chiêu Tăng qua cù lao Thới Sơn",
+          "events": "Trống lệnh vang; thuyền phục từ rạch nhánh ra, pháo hai bờ bắn. Chiêu Sương đổ quân lên bờ."
+        },
+        {
+          "name": "Soái thuyền",
+          "trigger": "Hàng thuyền Xiêm bị chia cắt",
+          "events": "Đấu boss Chiêu Tăng; khi dưới 50% Sinh lực ông tìm đường rút. Nguyễn Ánh (NPC trung lập) rời chiến trường bằng một thuyền nhỏ, không thể bị tấn công."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Khóa hai đầu sông (Lớn)",
+          "how": "Giấu thuyền ở cả rạch thượng lưu và hạ lưu; ra Mệnh Lệnh 'Chặn' đồng thời khi soái thuyền qua cù lao.",
+          "payoff": "+20 Hào Khí; hạm đội Xiêm không thể quay đầu 20 giây; thuyền Xiêm va nhau, mất 20% độ bền.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Giảng hòa giả (Nhỏ)",
+          "how": "Hoàn tất pha 1 với thanh Nghi ngờ dưới 30%.",
+          "payoff": "+10 Hào Khí; hạm đội Xiêm vào khúc sông với đội hình lỏng; không có thuyền trinh sát đi trước.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X31",
+        "arena": "Soái thuyền giữa khúc sông Rạch Gầm",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Thủy chiến: thuyền của người chơi, pháo cố định trên bờ, và trống lệnh theo mẫu 'nhấn theo nhịp' (có mức tự chạy). Mô phỏng con nước: mỗi 90 giây, dòng chảy đổi làm thuyền nặng quay đầu chậm.",
+      "lose": [
+        "Thanh Nghi ngờ đầy (hạm đội Xiêm không vào khúc sông)",
+        "Nguyễn Huệ bị hạ",
+        "Quá 50% thuyền Xiêm thoát ra hạ lưu"
+      ],
+      "lengthMin": 25,
+      "difficulty": 3,
+      "whatIf": {
+        "title": "Hạm đội Xiêm dừng ở Mỹ Tho",
+        "premise": "Chiêu Tăng nghi ngờ lời giảng hòa và dừng lại, cho quân bộ đi trước.",
+        "changes": "Màn đổi thành trận trên bộ và bến sông: người chơi phải đánh bến đổ quân của Chiêu Sương trước, rồi dùng thuyền lửa dụ hạm đội. Thời gian màn +10 phút."
+      },
+      "releaseTier": "U2",
+      "caveats": "Quân số khác nhau giữa các nguồn: vi.wikipedia ghi Tây Sơn khoảng 2 vạn quân; phía Xiêm khoảng 5.000 thủy binh, 300 chiến thuyền, cộng quân Chân Lạp và quân Nguyễn Ánh, tổng khoảng 2–3 vạn. en.wikipedia ghi Tây Sơn trên 30.000 quân, 55 chiến thuyền; phía Xiêm – Chân Lạp trên 73.000 (40.000 thủy binh, 30.000 bộ binh, 300 thuyền). Con số thương vong 4 vạn là của sử Việt. Kiểm chứng 29/09/2026: trang vi.wikipedia về trận ghi chưa xác định chắc Trần Quang Diệu có tham gia (chỉ theo Quách Tấn) và không có câu nào đặt Nguyễn Lữ ở trận 1785; trang Nguyễn Lữ chỉ nêu các chiến dịch Gia Định 1776, 1782–1783. Hai tướng chuyển sang Chronicle C08; B28 chỉ chơi Quang Trung. Việc đồng nhất Chiêu Sương = Phraya Wichitnarong theo en.wikipedia.",
+      "sensitivity": "Nguyễn Ánh là NPC trung lập, không làm boss, không bị gọi bằng từ miệt thị. Quân Xiêm là đối thủ có danh dự; không có cảnh lính chết đuối cận cảnh. Dùng 'quân Chân Lạp', không dùng 'Miên/Cao Man'; trang phục Xiêm, Khmer theo tư liệu, không biếm họa; không dùng biểu tượng Phật giáo làm vật trang trí phe địch hay mục tiêu phá hủy.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E9",
+        "chuong": 1,
+        "quyetSach": {
+          "lichSu": "Khóa hai đầu sông (Lớn)",
+          "khac": [
+            "Đánh thẳng hạm đội Xiêm ở Mỹ Tho",
+            "Rút khỏi Gia Định, về giữ Quy Nhơn"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B29",
+      "name": "Hà Hồi – Ngọc Hồi",
+      "date": "Tết Kỷ Dậu: đêm 30 tháng Chạp xuất quân từ Tam Điệp (nút chiến lược); đêm mùng 3 tháng Giêng (28/1/1789) vây Hà Hồi; mùng 4 tiến đến Ngọc Hồi, rạng sáng mùng 5 (30/1/1789) đánh đồn Ngọc Hồi",
+      "era": "E9",
+      "act": "Hồi II – Tết Kỷ Dậu",
+      "history": "Cuối năm 1788, Tôn Sĩ Nghị đưa quân Thanh (khoảng 29 vạn quân và dân binh theo vi.wikipedia) vào Thăng Long. Ngô Văn Sở và Ngô Thì Nhậm rút quân về giữ Tam Điệp – Biện Sơn. Quang Trung chia quân làm 5 đạo, dịp Tết tiến ra Bắc: ngày mồng 3 đến Hà Hồi, ngày mồng 4 đến Ngọc Hồi. Ở Ngọc Hồi, quân Tây Sơn có voi chiến (100–300 con tùy nguồn) và kỵ binh đánh vỡ cụm đồn phía nam Thăng Long; theo Hoàng Lê nhất thống chí, đội cảm tử 600 người chia 20 tốp dùng mộc bọc rơm ướt tiến dưới làn pháo.",
+      "outcome": "Thắng",
+      "playable": [
+        "H50",
+        "H55",
+        "H53"
+      ],
+      "allies": [],
+      "enemies": [
+        "X34",
+        "X33"
+      ],
+      "mapTemplate": "Đồng bằng",
+      "mapNotes": "Chỉ một bản đồ 3D: Hà Hồi – Ngọc Hồi (nén khoảng cách thực tế khoảng 15 km). Đồn Hà Hồi (huyện Thường Tín cũ, Hà Nội) giữa ruộng mùa đông; cụm đồn Ngọc Hồi với lũy đất, hào, chông. Phòng tuyến Tam Điệp và cuộc hành quân đêm Tết là nút chiến lược trên bản đồ chiến dịch, không có bản đồ 3D. Cứ Điểm: đồn Hà Hồi, 4 đồn vệ tinh quanh Ngọc Hồi, đồn chính Ngọc Hồi, 2 kho thuốc súng, đường cái về Thăng Long.",
+      "objectives": {
+        "primary": [
+          "Hà Hồi: khiến đồn đầu hàng trước khi trời sáng",
+          "Ngọc Hồi: phá đồn chính",
+          "Đánh lui Hứa Thế Hanh và mở đường cái về Thăng Long"
+        ],
+        "secondary": [
+          "Không để quân nào ở Hà Hồi chạy về báo tin",
+          "Giữ ít nhất 4 voi chiến sống sót đến cuối màn",
+          "Chiếm 2 kho thuốc súng của quân Thanh trước khi chúng nổ"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Vây Hà Hồi",
+          "trigger": "Bắt đầu màn (sau nút chiến lược Tam Điệp; điều khiển Ngô Thì Nhậm hoặc Quang Trung)",
+          "events": "Vây đồn trong đêm mồng 3; dùng loa và tiếng hô để đồn tưởng quân ta rất đông, khiến đồn đầu hàng. Ngô Thì Nhậm dùng 'Lui giữ chỗ hiểm' và 'Văn thư chặn bút' để giữ vòng vây."
+        },
+        {
+          "name": "Đồn vệ tinh Ngọc Hồi",
+          "trigger": "Hà Hồi đầu hàng (chuyển cảnh sang rạng sáng mùng 5)",
+          "events": "Chuyển sang Quang Trung; hạ các đồn vệ tinh và chiếm kho thuốc súng; Thần tốc đưa các đạo quân áp sát."
+        },
+        {
+          "name": "Tường mộc Ngọc Hồi",
+          "trigger": "Ít nhất 2 đồn vệ tinh thất thủ",
+          "events": "20 tấm mộc bọc rơm ướt tiến dưới làn pháo; voi chiến (Bùi Thị Xuân nếu được chọn) phá đội hình và chặn kỵ binh; Quang Trung phá đồn chính."
+        },
+        {
+          "name": "Hứa Thế Hanh",
+          "trigger": "Đồn chính Ngọc Hồi vỡ",
+          "events": "Đấu boss với lão tướng kỵ binh; dưới 40% Sinh lực ông lập hàng hậu vệ rồi rút về hướng Thăng Long. Kết màn khi đường cái về Thăng Long mở."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Tường mộc bọc rơm ướt (Lớn)",
+          "how": "Ghép đủ 20 tấm mộc thành một hàng rồi ra Mệnh Lệnh 'Tiến chậm'; không được tách hàng.",
+          "payoff": "+20 Hào Khí; quân ta sau mộc chịu ít hơn 80% sát thương từ pháo và tên; đến chân lũy còn nguyên đội hình.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Đánh đêm Tết (Nhỏ)",
+          "how": "Đến Hà Hồi trước khi đồng hồ màn qua giờ Tý của đêm mồng 3.",
+          "payoff": "+10 Hào Khí; đồn Hà Hồi đầu hàng không giao chiến; quân Thanh ở Ngọc Hồi −20% cảnh giác.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        },
+        {
+          "name": "Lui để tiến (Nhỏ)",
+          "how": "Nút chiến lược Tam Điệp trên bản đồ chiến dịch: ra lệnh rút toàn quân theo lượt mà không mất đạo nào.",
+          "payoff": "+10 Hào Khí cộng vào Hào Khí khởi điểm màn; Quang Trung nhận thêm 1 đạo quân đầy đủ khi vào màn; Sĩ Khí khởi điểm mọi cánh 70 (trần kịch bản systems §5.1).",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X34",
+        "arena": "Sân đồn Ngọc Hồi và đường cái phía bắc",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Nút chiến lược trước màn (Tam Điệp, hành quân đêm Tết, chọn đạo quân theo lượt) rồi một bản đồ 3D với hai tướng nối tiếp (Ngô Thì Nhậm → Quang Trung; tùy chọn Bùi Thị Xuân ở pha voi). Tường mộc là đơn vị chung người chơi điều khiển như một khối.",
+      "lose": [
+        "Quang Trung bị hạ",
+        "Đồn Hà Hồi báo động được về Ngọc Hồi trước khi đầu hàng (hai lần)",
+        "Tường mộc bị phá trước khi đến chân lũy"
+      ],
+      "lengthMin": 25,
+      "difficulty": 4,
+      "whatIf": {
+        "title": "Không lui về Tam Điệp",
+        "premise": "Ngô Văn Sở giữ Thăng Long và đánh chặn quân Thanh ngay ở ngoại thành.",
+        "changes": "Nút chiến lược Tam Điệp thành trận phòng thủ theo lượt trên bản đồ chiến dịch (không thêm bản đồ 3D); nếu thua, Quang Trung vào màn với ít hơn 30% quân. Mở bình luận của Ngô Thì Nhậm về giá trị của việc lui đúng lúc."
+      },
+      "releaseTier": "U2",
+      "caveats": "Số voi chiến và quân số khác nhau nhiều giữa các nguồn. Chi tiết 20 tấm mộc bọc rơm ướt (600 người, 20 tốp) đến từ Hoàng Lê nhất thống chí, nhãn Tương truyền. Việc Bùi Thị Xuân chỉ huy tượng binh ở Ngọc Hồi là Tương truyền. Chi tiết 'loa gọi hàng ở Hà Hồi' dựa trên các tường thuật phổ biến; cần đối chiếu Hoàng Lê nhất thống chí. Sử Thanh chép Hứa Thế Hanh tử trận khi đoạn hậu bên sông Phú Lương, nên ở B29 ông chỉ rút lui; việc ông trực tiếp chỉ huy ở Ngọc Hồi là Hư cấu. Vai trò của Ngô Thì Nhậm ở Hà Hồi là Hư cấu.",
+      "sensitivity": "Lê Chiêu Thống xuất hiện như NPC trung lập ở Thăng Long, không làm boss. Không có cảnh xác chết chất đống; dùng khói và cờ đổ để thể hiện đồn vỡ. Hứa Thế Hanh là người Hồi: không dùng biểu tượng tôn giáo làm vật trang trí phe địch.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E9",
+        "chuong": 2,
+        "quyetSach": {
+          "lichSu": "Tường mộc bọc rơm ướt (Lớn)",
+          "khac": [
+            "Vây chặt đồn Ngọc Hồi, chờ quân trong đồn hết lương",
+            "Giữ Tam Điệp, đợi quân Thanh tiến xuống rồi mới đánh"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B30",
+      "name": "Đống Đa – Khương Thượng",
+      "date": "Đêm mùng 4 rạng sáng mùng 5 tháng Giêng năm Kỷ Dậu (30/1/1789)",
+      "era": "E9",
+      "act": "Hồi III – Đống Đa",
+      "history": "Cùng lúc Quang Trung đánh Ngọc Hồi, đạo quân của Đô đốc Long (có tượng binh và kỵ binh) nửa đêm bất ngờ tập kích đồn Khương Thượng (vùng Đống Đa ngày nay) do Sầm Nghi Đống giữ; đây là mũi tập kích chủ lực. Đồn vỡ, Sầm Nghi Đống thắt cổ tự vẫn ở Loa Sơn. Tôn Sĩ Nghị bỏ Thăng Long chạy sang bờ bắc sông Phú Lương (sông Hồng) rồi cắt cầu phao; theo sử Thanh, Hứa Thế Hanh, Thượng Duy Thăng, Trương Triều Long tử trận khi đoạn hậu. Chiều mùng 5, Quang Trung vào Thăng Long.",
+      "outcome": "Thắng",
+      "playable": [
+        "H56"
+      ],
+      "allies": [
+        "H50"
+      ],
+      "enemies": [
+        "X35",
+        "X34",
+        "X33"
+      ],
+      "mapTemplate": "Thành lũy",
+      "mapNotes": "Cụm đồn Khương Thượng trên gò, lũy tre, hào nước; phía bắc là kinh thành Thăng Long và cầu phao sông Hồng (2 trạng thái bake sẵn: nguyên / đứt). Cứ Điểm: 3 đồn vệ tinh, đài chỉ huy trên gò, cổng nam kinh thành, kho lương quân Thanh, đầu cầu phao.",
+      "objectives": {
+        "primary": [
+          "Tiếp cận Khương Thượng trong đêm mà không bị báo động sớm",
+          "Hạ đài chỉ huy của Sầm Nghi Đống",
+          "Đuổi Tôn Sĩ Nghị ra khỏi Thăng Long qua cầu phao"
+        ],
+        "secondary": [
+          "Phá chiêng báo động trước khi vang 3 lần",
+          "Thu giữ ấn tín Tôn Sĩ Nghị bỏ lại trong doanh trại",
+          "Chiếm cổng nam trước khi Quang Trung đến"
+        ]
+      },
+      "phases": [
+        {
+          "name": "Tập kích trong đêm",
+          "trigger": "Bắt đầu màn",
+          "events": "Đô đốc Long dẫn chủ lực đi vòng lên gò; tùy chọn chia một cánh nhỏ dùng Mệnh Lệnh 'Nghi binh' (Hư cấu) để kéo quân phòng thủ sang hướng sai."
+        },
+        {
+          "name": "Phá đồn vệ tinh",
+          "trigger": "Chủ lực đến chân gò",
+          "events": "Hạ 3 đồn vệ tinh bằng hỏa khí và voi; ngăn chiêng báo động."
+        },
+        {
+          "name": "Đài chỉ huy",
+          "trigger": "3 đồn vệ tinh thất thủ",
+          "events": "Đấu Sầm Nghi Đống (tướng giữ đồn). Khi đài bị vây kín 10 giây: khung comic chèn mờ, lời dẫn ngắn về việc ông tuẫn tiết."
+        },
+        {
+          "name": "Cầu phao",
+          "trigger": "Đồn Khương Thượng vỡ",
+          "events": "Truy qua kinh thành về đầu cầu phao. Hứa Thế Hanh lập hàng đoạn hậu (mini-boss); Tôn Sĩ Nghị (boss, chỉ chạy) tìm đường qua cầu. Nếu ông qua cầu, cầu bị cắt; nhiệm vụ đổi sang tiếp nhận quân Thanh đầu hàng ở bờ nam."
+        },
+        {
+          "name": "Vào Thăng Long",
+          "trigger": "Tôn Sĩ Nghị qua sông hoặc bị chặn",
+          "events": "Quang Trung (đồng minh AI) đến cổng nam; comic kết chương gộp kết Quyển IX."
+        }
+      ],
+      "keSach": [
+        {
+          "name": "Nghi binh hai hướng (Lớn)",
+          "how": "Dùng Mệnh Lệnh 'Nghi binh' cho một cánh 200 lính ở hướng tây trong khi cánh chính im lặng tiến từ hướng nam.",
+          "payoff": "+20 Hào Khí; Sầm Nghi Đống chuyển 50% quân phòng thủ sang hướng sai.",
+          "quyMo": "lon",
+          "haoKhiMax": 20
+        },
+        {
+          "name": "Đánh trước giờ Mão (Nhỏ)",
+          "how": "Mở đợt tấn công trước khi đồng hồ màn qua giờ Mão.",
+          "payoff": "+10 Hào Khí; quân Thanh còn trong không khí Tết: −25% phát hiện; cổng đồn đóng chậm 15 giây.",
+          "quyMo": "nho",
+          "haoKhiMax": 10
+        }
+      ],
+      "boss": {
+        "enemy": "X33",
+        "arena": "Đường phố Thăng Long và đầu cầu phao sông Hồng",
+        "defeatMeans": "rút chạy"
+      },
+      "specialMechanic": "Ba đối thủ nối tiếp với ba kiểu kết khác nhau: Sầm Nghi Đống (giữ đồn, không thể rút), Hứa Thế Hanh (đoạn hậu đến cùng ở đầu cầu) và Tôn Sĩ Nghị (chỉ chạy, không đánh). Cầu phao là vật thể có thể bị cắt, đổi mục tiêu của pha 4.",
+      "lose": [
+        "Đô đốc Long bị hạ",
+        "Chiêng báo động vang 3 lần trước khi hạ đồn vệ tinh thứ 2",
+        "Hết giờ trước khi đồn Khương Thượng vỡ (20 phút)"
+      ],
+      "lengthMin": 22,
+      "difficulty": 4,
+      "whatIf": {
+        "title": "Quang Trung sống thêm 20 năm",
+        "premise": "Không mất năm 1792; sau Đống Đa, Quang Trung tiếp tục cải cách và giữ yên hai đầu đất nước.",
+        "changes": "Chuỗi Chronicle giới hạn 2 màn (ý tưởng gốc của người dùng), nối từ B30 bằng cảnh Quang Trung duyệt quân ở Thăng Long: (1) duyệt quân và phòng thủ biên giới phía bắc trước một đạo quân Thanh báo thù giả định (quân Thanh vẫn là đối thủ có danh dự); (2) bảo vệ Phú Xuân khỏi một cuộc đổ bộ giả định. Không có màn tiến đánh lãnh thổ ngoài Đại Việt (không Lưỡng Quảng). Không màn nào lấy Nguyễn Ánh làm boss; xung đột nội bộ chỉ thể hiện trên bản đồ chiến lược."
+      },
+      "releaseTier": "U2",
+      "caveats": "Danh tính Đô đốc Long còn tranh cãi (Đặng Tiến Đông, Đặng Văn Long, Lê Văn Long). Nơi Sầm Nghi Đống tự vẫn: vi.wikipedia ghi đài chỉ huy ở Loa Sơn; zh.wikipedia ghi tự ải ở Đống Đa. Việc chia cánh nghi binh là Hư cấu (sử chỉ nói đạo Đô đốc Long tập kích bất ngờ). Việc Hứa Thế Hanh đối đầu trực tiếp với đạo Đô đốc Long ở đầu cầu là Hư cấu; địa điểm tử trận theo sử Thanh. Ấn tín bị bỏ lại là Tương truyền. Số quân Thanh chết đuối khi cầu phao đứt không có con số tin cậy.",
+      "sensitivity": "Không mô tả lính Thanh chết đuối khi cầu đứt; chỉ thấy cầu đổ và quân bờ nam hạ vũ khí. Không dùng câu đối, câu vè giễu Sầm Nghi Đống. Thổ binh Choang được thể hiện theo tư liệu, không biếm họa. Lê Chiêu Thống cùng Tôn Sĩ Nghị rời thành, khắc họa trung lập.",
+      "tongPhanCong": {
+        "variant": "Chuẩn",
+        "durationSec": 25,
+        "maxExtensionSec": 10
+      },
+      "chapter": {
+        "quyen": "E9",
+        "chuong": 3,
+        "quyetSach": {
+          "lichSu": "Nghi binh hai hướng (Lớn)",
+          "khac": [
+            "Dồn mọi đạo vào Ngọc Hồi, không tách quân đánh Khương Thượng",
+            "Chờ Ngọc Hồi vỡ rồi mới đánh Khương Thượng lúc trời sáng"
+          ]
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "title": "Lê Lai – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Lê_Lai"
+    },
+    {
+      "title": "Lê Lai – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Lê_Lai"
+    },
+    {
+      "title": "Bàn thêm về câu hỏi: Ai giết Lê Lai? – Nghiên cứu lịch sử",
+      "url": "https://nghiencuulichsu.com/2012/09/26/ban-them-ve-cau-hoi-ai-giet-le-lai/"
+    },
+    {
+      "title": "Khởi nghĩa Lam Sơn – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Khởi_nghĩa_Lam_Sơn"
+    },
+    {
+      "title": "Khởi nghĩa Lam Sơn (1418–1427) – quankhoasu (Google Sites)",
+      "url": "https://sites.google.com/site/quankhoasu/kh%E1%BB%9Fi-ngh%C4%A9a-lam-s%C6%A1n-1418-1427"
+    },
+    {
+      "title": "Lam Sơn uprising – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Lam_Sơn_uprising"
+    },
+    {
+      "title": "藍山起義 – 維基百科",
+      "url": "https://zh.wikipedia.org/zh-hant/藍山起義"
+    },
+    {
+      "title": "Lê Thái Tổ – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Lê_Thái_Tổ"
+    },
+    {
+      "title": "Thuận Thiên (kiếm) – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Thuận_Thiên_(kiếm)"
+    },
+    {
+      "title": "Nguyễn Trãi – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Nguyễn_Trãi"
+    },
+    {
+      "title": "Quân trung từ mệnh tập – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Quân_trung_từ_mệnh_tập"
+    },
+    {
+      "title": "Bình Ngô đại cáo – Wikisource tiếng Việt",
+      "url": "https://vi.wikisource.org/wiki/Bình_Ngô_đại_cáo"
+    },
+    {
+      "title": "Nguyễn Chích – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Nguyễn_Chích"
+    },
+    {
+      "title": "Đinh Lễ – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Đinh_Lễ"
+    },
+    {
+      "title": "Lê Sát – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Lê_Sát"
+    },
+    {
+      "title": "Trần Nguyên Hãn – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trần_Nguyên_Hãn"
+    },
+    {
+      "title": "Lưu Nhân Chú – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Lưu_Nhân_Chú"
+    },
+    {
+      "title": "Nguyễn Xí – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Nguyễn_Xí"
+    },
+    {
+      "title": "Lê Văn An – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Lê_Văn_An"
+    },
+    {
+      "title": "Trận Tốt Động – Chúc Động – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trận_Tốt_Động_–_Chúc_Động"
+    },
+    {
+      "title": "Battle of Tốt Động – Chúc Động – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Battle_of_Tốt_Động_–_Chúc_Động"
+    },
+    {
+      "title": "Trận Chi Lăng – Xương Giang – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trận_Chi_Lăng_–_Xương_Giang"
+    },
+    {
+      "title": "支棱昌江之战 – 维基百科",
+      "url": "https://zh.wikipedia.org/zh-hans/支棱昌江之战"
+    },
+    {
+      "title": "Chiến thắng Chi Lăng – Xương Giang (8/10 đến 3/11/1427) – Bảo tàng Lịch sử Quốc gia",
+      "url": "https://baotanglichsu.vn/vi/Articles/3097/15231/chien-thang-chi-lang-xuong-giang-8-10-djen-3-11-1427.html"
+    },
+    {
+      "title": "Thành Xương Giang – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Thành_Xương_Giang"
+    },
+    {
+      "title": "Hội thề Đông Quan – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Hội_thề_Đông_Quan"
+    },
+    {
+      "title": "Ming Shi-lu: Xuande year 2, month 10, day 24 – NUS Press",
+      "url": "https://epress.nus.edu.sg/msl/reign/xuan-de/year-2-month-10-day-24"
+    },
+    {
+      "title": "柳升 – 維基百科",
+      "url": "https://zh.wikipedia.org/wiki/柳升"
+    },
+    {
+      "title": "黄福 – 维基百科",
+      "url": "https://zh.wikipedia.org/zh-hans/黄福"
+    },
+    {
+      "title": "李彬 (丰城侯) – 維基百科",
+      "url": "https://zh.wikipedia.org/zh-tw/李彬_(丰城侯)"
+    },
+    {
+      "title": "方政 (明朝) – 维基百科",
+      "url": "https://zh.wikipedia.org/wiki/方政_(明朝)"
+    },
+    {
+      "title": "王通 (成山侯) – 维基百科",
+      "url": "https://zh.wikipedia.org/wiki/王通_(成山侯)"
+    },
+    {
+      "title": "Trận Rạch Gầm – Xoài Mút – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trận_Rạch_Gầm_–_Xoài_Mút"
+    },
+    {
+      "title": "Battle of Rạch Gầm–Xoài Mút – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Battle_of_Rạch_Gầm–Xoài_Mút"
+    },
+    {
+      "title": "Krom Luang Thepharirak – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Krom_Luang_Thepharirak"
+    },
+    {
+      "title": "สงครามสยาม-เวียดนาม พ.ศ. 2327 – วิกิพีเดีย",
+      "url": "https://th.wikipedia.org/wiki/สงครามสยาม-เวียดนาม_พ.ศ._2327"
+    },
+    {
+      "title": "Trận Ngọc Hồi – Đống Đa – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trận_Ngọc_Hồi_–_Đống_Đa"
+    },
+    {
+      "title": "Battle of Ngọc Hồi-Đống Đa – Wikipedia (en)",
+      "url": "https://en.wikipedia.org/wiki/Battle_of_Ngọc_Hồi-Đống_Đa"
+    },
+    {
+      "title": "孫士毅 – 維基百科",
+      "url": "https://zh.wikipedia.org/wiki/孫士毅"
+    },
+    {
+      "title": "許世亨 – 維基百科",
+      "url": "https://zh.wikipedia.org/wiki/許世亨"
+    },
+    {
+      "title": "岑宜栋 – 维基百科",
+      "url": "https://zh.wikipedia.org/wiki/岑宜栋"
+    },
+    {
+      "title": "Quang Trung – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Quang_Trung"
+    },
+    {
+      "title": "Nguyễn Nhạc – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Nguyễn_Nhạc"
+    },
+    {
+      "title": "Nguyễn Lữ – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Nguyễn_Lữ"
+    },
+    {
+      "title": "Bùi Thị Xuân – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Bùi_Thị_Xuân"
+    },
+    {
+      "title": "Trần Quang Diệu – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Trần_Quang_Diệu"
+    },
+    {
+      "title": "Ngô Thì Nhậm – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Ngô_Thì_Nhậm"
+    },
+    {
+      "title": "Đặng Tiến Đông – Wikipedia tiếng Việt",
+      "url": "https://vi.wikipedia.org/wiki/Đặng_Tiến_Đông"
+    }
+  ],
+  "openQuestions": [
+    "B23: chốt năm 1418 hay 1419 cho sự kiện Lê Lai; cần mở trực tiếp Lam Sơn thực lục và Toàn thư quyển X (bản Wikisource chưa tìm được đường dẫn đúng).",
+    "B23: tướng Minh trực tiếp vây núi Chí Linh không rõ tên; hiện gán Phương Chính (X27), vai boss nhãn Hư cấu. Chấp nhận gán ghép hay thay bằng boss vô danh?",
+    "B24: kiểm chứng kết cục của Trần Trí (陳智, võ tướng) trong Minh sử; bài zh.wikipedia tìm được là một Trần Trí khác (quan văn).",
+    "B24: ngày tập kích Đa Căng (12/10/1424) lấy từ trang tổng hợp; chưa rõ dương lịch hay âm lịch, cần đối chiếu Toàn thư.",
+    "B27: số phận Thôi Tụ sau khi bị bắt và nơi Hoàng Phúc bị bắt (ải Kê Lăng theo Minh sử) chưa kiểm chứng trực tiếp; hiện dùng 'bị bắt'.",
+    "B28: ngày âm lịch chính xác của trận Rạch Gầm – Xoài Mút chưa kiểm chứng (các lần đọc vi.wikipedia không nhất quán).",
+    "B29: xác minh vai trò Bùi Thị Xuân ở Ngọc Hồi và năm sinh của bà; hiện để Tương truyền.",
+    "B29/B30: nguồn Việt và nguồn Thanh khác nhau về nơi Hứa Thế Hanh tử trận; hiện theo sử Thanh (bên sông Phú Lương, B30). Cần đối chiếu Khâm định Việt sử thông giám cương mục.",
+    "B30: danh tính Đô đốc Long; hiện dùng tên hiển thị trung tính.",
+    "Lương Minh (梁銘) và Mã Kỳ (馬騏) chưa có ID vì dải X26–X35 đã đủ 10; Lương Minh xuất hiện như tướng phó không ID ở B26. Có nên xin thêm ID dự phòng không?",
+    "Trường mới ngoài định dạng chuẩn: 'designRules' (cấp file) và 'displayNameByBattle' (H50). Cần pipeline dữ liệu chấp nhận hoặc gộp vào tài liệu thiết kế chung.",
+    "Phân bổ lớp vũ khí G4: WC04 và WC12 mỗi lớp 2 tướng; các lớp còn lại 1 tướng. WC10 và WC14 chưa dùng trong G4."
+  ],
+  "chronicleMissions": [
+    {
+      "id": "C06",
+      "title": "Ba anh em cùng ra Bắc",
+      "heroes": [
+        "H51"
+      ],
+      "era": "E9",
+      "mapReuse": "B29",
+      "premise": "Giả định Nguyễn Nhạc gác bất hòa, đưa quân Quy Nhơn ra hội với Quang Trung ở Tam Điệp năm 1789. Ông giữ đồn và điều binh ở pha Hà Hồi trên bản đồ B29; toàn bộ tiền đề là Hư cấu.",
+      "releaseTier": "U2",
+      "historicity": "Hư cấu"
+    },
+    {
+      "id": "C08",
+      "title": "Rạch Gầm – theo lời kể",
+      "heroes": [
+        "H52",
+        "H54"
+      ],
+      "era": "E9",
+      "mapReuse": "B28",
+      "premise": "Kể lại Rạch Gầm – Xoài Mút theo truyền ngôn (Quách Tấn) rằng Nguyễn Lữ đánh trống lệnh ở rạch thượng lưu và Trần Quang Diệu chặn hạ lưu. Dùng lại bản đồ B28; nhãn Tương truyền vì chính sử không xác nhận hai tướng có mặt.",
+      "releaseTier": "U2",
+      "historicity": "Tương truyền",
+      "source": "Kiểm chứng web (d), 29/09/2026"
+    }
+  ]
+}
