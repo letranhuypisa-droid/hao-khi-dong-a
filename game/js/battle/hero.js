@@ -7,7 +7,7 @@
 import { makeRig, PAL } from "./models.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI } from "../data/tuning.js";
+import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI, AI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 import { HERO_ANIM as ANIM } from "./hero-anim.js";
 import { BladeTrail } from "./trail.js";
@@ -115,7 +115,9 @@ export class Hero {
       const sp = HERO.move * mag * (this.inTPC ? 1.1 : 1);
       this.x += (wx / mag) * sp * dt; this.z += (wz / mag) * sp * dt;
       this.yaw = turn(this.yaw, this.lock?.alive ? this.faceLock() : Math.atan2(wx, wz), dt * 12);
+      const before = Math.floor(this.runPhase / Math.PI);
       this.runPhase += dt * sp * 1.6;
+      if (mag > 0.6 && Math.floor(this.runPhase / Math.PI) !== before) this.ctx.fx.dust(this.x - Math.sin(this.yaw) * 0.4, this.z - Math.cos(this.yaw) * 0.4, 0.3);   // bụi bước chân
       this.setPose(A.run(this.runPhase, mag), 0.35);
     } else this.setPose(A.idle(this.animT), 0.15);
   }
@@ -257,6 +259,8 @@ export class Hero {
       if (key === "DQ") { ctx.fx.banner("ĐÒN QUYẾT", "#f1d98a"); }
     }
     if (m.shape === "ring" && (heavy || key === "N6")) ctx.fx.shockwave(this.x, this.z, m.range);
+    // bổ xuống đất: tung bụi ở chỗ lưỡi chạm đất
+    if (last && (key === "C1" || key === "C4" || key === "C6" || key === "DQ")) ctx.fx.dust(this.x + Math.sin(this.yaw) * 1.6, this.z + Math.cos(this.yaw) * 1.6, 1.1);
     ctx.fx.slashArc(this, key, m);
   }
 
@@ -416,6 +420,7 @@ export class Hero {
   // ---- Tuyệt Kỹ "Bóp Nát Quân Thù": 1 vạch, 10 s bất tử, 24 đòn tổng MV 20 -------------------------
   startUlt() {
     this.buf = null;
+    if (this.ctx.crowd && (this.ki >= HERO.tuyetKy.cost || (this.inTPC && this.hkUltReady))) this.ctx.crowd.rout(this.x, this.z, AI.rout.ultR);
     const T = HERO.tuyetKy;
     const hkUlt = this.inTPC && this.hkUltReady;
     if (!hkUlt && this.ki < T.cost) return false;

@@ -7,7 +7,7 @@
 import { makeRig, PAL } from "./models.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { TIERS, S, g, heSoGiap, DEFENSE } from "../data/tuning.js";
+import { TIERS, S, g, heSoGiap, DEFENSE, AI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 
 const RIGS = {
@@ -41,6 +41,7 @@ export class BigUnit {
     this.broken = 0; this.noHit = 0; this.flash = 0; this.animT = 0; this.runPhase = 0;
     this.pose = A.idle(0); this.awake = o.awake ?? (o.side === "ta"); this.aggro = o.aggro ?? 22;
     this.giapPen = 0; this.dead = 0; this.retreating = false; this.speed = o.side === "dich" ? 4.2 : 4.6;
+    this.roarT = 0; this.strafeT = 0; this.strafeDir = 1; this.blockWatch = 0; this.hitTimes = []; this.backCd = 0;
   }
 
   get y() { return heightAt(this.x, this.z); }
@@ -75,6 +76,16 @@ export class BigUnit {
     const dx = hero.x - this.x, dz = hero.z - this.z, d = Math.hypot(dx, dz);
     if (!this.awake && hero.alive && (d < 16 || Math.hypot(hero.x - this.home.x, hero.z - this.home.z) < this.aggro)) {
       this.awake = true; ctx.director?.onOfficerAwake(this);
+      this.roarT = 0.9; ctx.audio.play("horn", this.x, this.z);          // gầm thị uy khi phát hiện tướng
+    }
+    this.backCd -= dt;
+    if (this.roarT > 0) { this.roarT -= dt; this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 8); this.setPose(A.roar(1 - this.roarT / 0.9), 0.3); return; }
+    if (this.state === "evade") {
+      this.st -= dt; const sp = 3.2 / 0.4;
+      this.x -= dx / (d || 1) * sp * dt; this.z -= dz / (d || 1) * sp * dt;
+      [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates);
+      this.setPose(A.backstep(1 - this.st / 0.4), 0.5); if (this.st <= 0) { this.state = "idle"; this.atkCd = Math.min(this.atkCd, 0.4); }
+      return;
     }
     if (this.state === "hit") { this.st -= dt; this.setPose(A.hitReact(1 - this.st / 0.3), 0.4); if (this.st <= 0) this.state = "idle"; return; }
     if (this.state === "stagger") { this.st -= dt; this.setPose(A.hitReact(0.5), 0.3); if (this.st <= 0) this.state = "idle"; return; }
@@ -102,9 +113,23 @@ export class BigUnit {
       this.impactAt = ctx.clock + DEFENSE.redTelegraph;
       ctx.fx.telegraph(this, 3.4, DEFENSE.redTelegraph, false); ctx.audio.play("warn", this.x, this.z); return;
     }
+    // tướng cứ đứng đỡ trước mặt → dùng đòn viền đỏ (không đỡ được, chỉ phản được)
+    this.blockWatch = hero.state === "block" && d < 4.5 ? this.blockWatch + dt : Math.max(0, this.blockWatch - dt * 2);
+    if (this.blockWatch > 1.2 && T.red) { this.redCd = Math.min(this.redCd, 0); this.blockWatch = 0; }
+    // bắt lỗi: tướng đang hồi đòn, vừa trúng đòn, vừa né xong → ra đòn ngay
+    const open = hero.state === "hit" || hero.state === "down" || (hero.state === "attack" && hero.st / hero.dur > 0.72) || (hero.state === "dodge" && hero.st > 0.22);
+    if (open && d < 3.4 && this.atkCd < 0.9) this.atkCd = 0;
     if (d > 2.6) { this.moveToward(hero.x, hero.z, dt, 1); return; }
     if (this.atkCd <= 0) { this.state = "atk"; this.st = 0; this.hitDone = false; this.combo = (this.combo || 0) + 1; return; }
-    this.setPose(A.idle(this.animT), 0.15);
+    // chờ đòn: đi vòng thăm dò quanh tướng, quá sát thì lùi lại
+    this.strafeT -= dt;
+    if (this.strafeT <= 0) { this.strafeDir = ctx.rng.next() < 0.5 ? -1 : 1; this.strafeT = 1.2 + ctx.rng.next() * 1.6; }
+    const nx = dx / (d || 1), nz = dz / (d || 1), back = d < 1.8 ? -1.2 : 0;
+    const vx = -nz * this.strafeDir * 1.5 + nx * back, vz = nx * this.strafeDir * 1.5 + nz * back;
+    this.x += vx * dt; this.z += vz * dt;
+    [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates);
+    this.runPhase += dt * 6;
+    this.setPose(A.strafe(this.runPhase, this.strafeDir), 0.2);
   }
 
   updateAttack(dt, hero, d) {
@@ -225,8 +250,15 @@ export class BigUnit {
     if (this.hp <= 0) {
       this.hp = 0;
       if (this.tier === "tuong") { this.retreating = true; this.retreatT = 0; ctx.director?.onBossDefeated(this); }
-      else { this.dead = 0.001; ctx.director?.onOfficerKilled(this, opt); }
+      else { this.dead = 0.001; ctx.director?.onOfficerKilled(this, opt); ctx.crowd?.rout(this.x, this.z, AI.rout.officerR); }
       return { killed: true, broke };
+    }
+    // bị dồn 3 đòn trong 1,5 s mà chưa vỡ thế: có thể lùi né thoát khỏi chuỗi đòn
+    const now = ctx.clock; this.hitTimes.push(now);
+    while (this.hitTimes.length && now - this.hitTimes[0] > 1.5) this.hitTimes.shift();
+    if (!broke && this.broken <= 0 && this.hitTimes.length >= 3 && this.backCd <= 0 && this.state === "idle" && ctx.rng.next() < 0.4) {
+      this.state = "evade"; this.st = 0.4; this.backCd = 5; this.hitTimes.length = 0;
+      return { killed: false, broke };
     }
     const interrupt = (opt.knock || opt.launch) && this.state === "atk";
     if (!broke && (interrupt || (this.poiseMax > 0 && this.poise < this.poiseMax * 0.35 && this.state === "idle"))) { this.state = "hit"; this.st = 0.3; }

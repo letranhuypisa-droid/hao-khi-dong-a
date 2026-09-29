@@ -272,6 +272,29 @@ export function sweep(u) {
   ]);
 }
 
+// Lùi né: nhún sau, bước một chân lùi, vũ khí giữ trước ngực.
+export function backstep(u) {
+  const k = Math.sin(clamp01(u) * Math.PI);
+  return blendPose(GUARD, P({ torsoX: -0.2, hipsY: -0.22, shRx: -0.9, shLx: -0.9, shRy: -0.3, shLy: 0.4, elRx: -1.1, elLx: -1.0, handRx: 0.4,
+    hipLx: 0.55, kneeLx: 0.7, hipRx: -0.5, kneeRx: 0.9, headX: 0.1 }), k);
+}
+
+// Đi ngang thăm dò (dir 1 = sang phải), thế thủ giữ nguyên, bước chéo chân.
+export function strafe(phase, dir = 1) {
+  const s = Math.sin(phase), c = Math.cos(phase), p = { ...GUARD };
+  p.hipLz = -0.06 + 0.28 * s * dir; p.hipRz = 0.08 + 0.28 * s * dir;
+  p.kneeLx = 0.42 + 0.35 * Math.max(0, c); p.kneeRx = 0.3 + 0.35 * Math.max(0, -c);
+  p.hipsY = -0.1 - 0.04 * Math.abs(c); p.torsoZ = -0.05 * dir; p.torsoY = GUARD.torsoY + 0.1 * s;
+  return p;
+}
+
+// Gầm thị uy: ưỡn ngực, giơ vũ khí lên trời, đầu ngửa.
+export function roar(u) {
+  const k = Math.sin(clamp01(u) * Math.PI) ** 0.6;
+  return blendPose(GUARD, P({ torsoX: -0.35, hipsY: -0.12, shRx: -2.8, shRy: 0.2, elRx: -0.3, handRx: 0.1, shLx: -0.3, shLz: -0.9, elLx: -0.6,
+    hipLx: -0.4, kneeLx: 0.45, hipRx: 0.35, kneeRx: 0.3, hipLz: -0.12, hipRz: 0.12, headX: -0.45 }), k);
+}
+
 // Giương cung bắn (tướng H40): tay trái đẩy cung, tay phải kéo dây về má.
 export function shoot(u) {
   const d = EASE.out(seg(u, 0, 0.55)), rel = seg(u, 0.55, 0.7);

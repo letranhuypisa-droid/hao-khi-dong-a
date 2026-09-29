@@ -35,6 +35,10 @@ const STATES = {
   launch: { label: "hất tung", a: { state: "launch", st: 0.2 } },
   down: { label: "nằm", a: { state: "down", st: 0.6 } },
   getup: { label: "dậy", a: { state: "down", st: 0.12 } },
+  block: { label: "đỡ khiên", a: { ready: true, blockT: 0.16 } },
+  evade: { label: "nhảy lùi", a: { ready: true, evadeT: 0.15 } },
+  flee: { label: "tháo chạy", a: { fleeT: 2, spd: 3.6, walk: 1.2 }, anim: (a, t) => { a.walk = 1.2 + t * 10; } },
+  charge: { label: "lao húc", a: { chargeT: 0.5, spd: 6, walk: 2, ready: true }, anim: (a, t) => { a.walk = 2 + t * 12; } },
   dead0: { label: "chết ngửa", a: { state: "dead", dieT: 1.2, id: 4 } },
   dead1: { label: "chết sấp", a: { state: "dead", dieT: 1.2, id: 5 } },
   dead2: { label: "quỵ gối", a: { state: "dead", dieT: 0.4, id: 6 } },
@@ -88,6 +92,7 @@ function build() {
       const K = KITS[o.kit];
       it.K = K; it.pose = new Float32Array(NCH);
       it.a = { id: 1, state: "move", st: 0, windup: 0, windupT: K.windup, atkT: 9, spd: 0, walk: 0, ready: false, flinch: 0, hitFront: 1, dieT: 0, panicT: 0,
+        blockT: 0, evadeT: 0, fleeT: 0, chargeT: 0,
         ...(STATES[o.s]?.a || {}) };
       if (o.s === "windup") it.a.windup = 0.001;
     }

@@ -308,6 +308,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       const k = time < 0.2 ? 1 : Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
       camera.position.set(cam.x + ctx.fx.shakeX, cam.y + ctx.fx.shakeY, cam.z); camera.lookAt(tx, ty, tz);
+      ctx.world.fadeOccluders(camera.position, tx, tz, dt);
       ctx.world.sun.position.set(h.x - 40, 80, h.z + 30); ctx.world.sun.target.position.set(h.x, 0, h.z);
       ctx.world.update(time); ctx.crowd.render(); ctx.fx.update(dt, W, H); ctx.hud.update();
       if (draw) renderer.render(scene, camera);

@@ -116,7 +116,21 @@ export const KITS = {
   DV_DAO:  { unit: "GIAO_DV", name: "Đao khiên",    w: 0.30, hp: 1.15, cong: 0.95, giap: 1.1, speed: 1.0, reach: 1.7, windup: 0.42 },
   DV_NO:   { unit: "GIAO_DV", name: "Nỏ thủ",       w: 0.20, hp: 0.8, cong: 0.9, giap: 0.8, speed: 1.0,  ranged: true, range: 14, windup: 0.9 },
 };
-export const KITS_OF = Object.fromEntries(Object.keys(UNITS).map((u) => [u, Object.keys(KITS).filter((k) => KITS[k].unit === u)]));
+// ---- AI lính vùng chiến đấu (ĐỀ XUẤT BẢN THỬ) ------------------------------------------------
+// block: tỉ lệ đỡ khiên đòn N trúng trước mặt (đòn C, đòn hất tung luôn phá được), đỡ xong nhận
+// blockDmg sát thương, nghỉ blockCd giây mới đỡ lại. evade: tỉ lệ nhảy lùi khi tướng gồng đòn nặng
+// (đòn C, đòn vòng). kite: cung thủ lùi khi tướng áp sát dưới kite × tầm bắn. charge: lực sĩ lao
+// húc khi tướng cách 5–11 m. rout: vỡ trận — lính quanh sĩ quan vừa chết, quanh Tuyệt Kỹ, hoặc khi
+// tướng hạ ≥ rout.kills lính trong rout.window giây gần đó thì bỏ chạy rout.dur giây.
+export const AI = {
+  block: { NG_DAO: 0.3, DV_DAO: 0.3, NG_GIAO: 0.15 }, blockDmg: 0.25, blockCd: 1.4,
+  evade: { thuong: 0.2, tinhnhue: 0.45 }, evadeDist: 2.2,
+  kite: 0.4,
+  charge: { minD: 5, maxD: 11, speed: 2.6, dur: 0.9, cd: 8, dmg: 1.25 },   // dmg: hệ số sát thương cú húc, húc trúng thì tướng ngã
+  rout: { officerR: 22, ultR: 12, kills: 6, window: 4, nearR: 10, dur: [2.5, 4.5] },
+  slotSep: 0.9,        // hệ số giãn góc giữa các lính vây tướng (1 = chia đều vòng tròn)
+};
+export const KITS_OF =Object.fromEntries(Object.keys(UNITS).map((u) => [u, Object.keys(KITS).filter((k) => KITS[k].unit === u)]));
 // Chọn kiểu lính theo một số u ∈ [0,1) (thường là băm của id lính, để không ăn vào chuỗi rng).
 export function pickKit(unit, u) {
   let acc = 0;

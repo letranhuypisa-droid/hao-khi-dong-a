@@ -25,9 +25,11 @@ node hao-khi-viet/game/tests/run.mjs
 | Phần | Nội dung | Nguồn GDD |
 | --- | --- | --- |
 | Bản đồ | Bến Hàm Tử 600 × 400 m, sông Hồng mép bắc và mép đông, 2 mặt trận cách 150 m, bản doanh, 2 đồn, 2 doanh trại, Hàm Tử quan có 2 cổng, bãi cát cho boss | 21.2 (bố cục Hư cấu) |
+| Cảnh | Màu đất theo nhiễu (cỏ tươi, cỏ khô, đất trống, đầm ven sông, đất cháy quanh trại Nguyên); ruộng lúa bậc thềm có bờ, ô ngập nước, mạ, lúa chín; lũy tre quanh làng, cây đa đầu làng, cau; 4 gò đá giữa hai mặt trận; cỏ, hoa dại; bến gỗ, thuyền nan; giáo cắm, khiên rơi, tên cắm, xe hỏng dọc làn; lều cháy, hòm, thùng, khói ở trại Nguyên; núi xa, mây. Cột cờ che camera thì tự mờ | Hư cấu (scenery.js) |
 | Tướng | H35 Trần Quốc Toản, song đao WC03: N1–N6, C1–C4 (C5 mở ở cấp 5, C6 ở cấp 10), Lướt N/C, Né 0,25 s, Đỡ 120°, phản đòn, Phá Trận 3 lần lao, Tuyệt Kỹ "Bóp Nát Quân Thù", Đòn Quyết khi Vỡ Thế, Gượng dậy | 3, 21.6 |
 | Địch | Lính, tinh nhuệ, Đội trưởng, Phó tướng, Toa Đô (rút chạy khi hết Sinh lực); khiên binh và cung kỵ; thẻ tấn công theo độ khó; đòn viền đỏ báo trước 0,6 s | 11.1, 21.6 |
 | Kiểu lính | Khiên binh Nguyên chia thành Đao thuẫn (đao + khiên tròn), Thương binh (tầm 2,5 m), Cung thủ bộ (bắn 16 m) và Lực sĩ trọng giáp (chùy lang nha, máu ×3, đòn nặng cắt được đòn của tướng, đòn N không đẩy lùi được). Giáo binh Đại Việt chia thành Giáo binh, Đao khiên, Nỏ thủ. Mô phỏng 1 Hz vẫn chỉ biết binh chủng | 21.5 (mở rộng) |
+| AI | Lính có thẻ tấn công chia góc vây quanh tướng (có người đánh sườn, đánh lưng), lính chờ đứng thành vòng thưa; khiên binh đỡ đòn N trúng trước mặt; lính nhảy lùi khi tướng gồng đòn nặng; cung thủ lùi giữ tầm; lực sĩ lao húc (trúng thì tướng ngã); vỡ trận khi sĩ quan chết, khi tướng tung Tuyệt Kỹ, khi tướng hạ ≥ 6 lính trong 4 s; thân binh ưu tiên kẻ đang đánh tướng. Sĩ quan gầm thị uy khi phát hiện tướng, đi vòng thăm dò, bắt lỗi lúc tướng hồi đòn/vừa né, chuyển sang đòn viền đỏ khi tướng cứ đứng đỡ, lùi né khi bị dồn 3 đòn | ĐỀ XUẤT (AI trong tuning.js) |
 | Hoạt ảnh | Lính có khớp (hông, thân, tay trên, cẳng tay, đùi, cẳng chân; kỵ binh có 4 chân ngựa): bước chân theo quãng đi, thế thủ theo vũ khí, báo trước → đánh → hồi thế, trúng đòn ngả theo hướng, hất tung lộn người, nằm rồi chống dậy, 4 kiểu ngã. Tướng: đòn dựng bằng khung khoá (gồng → chém → theo đà → hồi), cổ tay lật lưỡi đao, bước chân khi chém, lộn khi né, vệt lưỡi đao | 21.4 (thủ tục) |
 | Quân ta | Mô phỏng 1 Hz theo công thức 4.2, Sĩ Khí, tuyến, sụp đổ cánh, tiếp viện hai phe; vùng chiến đấu r 25 m (30 địch + 20 ta); lính diễn ở tuyến theo số lính hiển thị | 4, 15.2 |
 | Chỉ huy | 4 Mệnh Lệnh (Tiến công, Giữ vững, Theo ta, Gọi tiếp viện), đồng hồ trận ×0,2 khi mở vòng; 2 sự kiện động (Cứ Điểm bị phản công, Tướng ta bị vây) có thể tự làm hoặc giao cho quân | 4.5, 4.8, 21.2 |
@@ -60,11 +62,12 @@ Những chỗ dưới đây là số bản thử tự đặt, ghi `ĐỀ XUẤT 
 - Nguồn rơi vật phẩm trong trận.
 - Kiểu lính (KITS trong `tuning.js`): tỉ lệ trong binh chủng, hệ số máu/công/giáp/tốc, tầm chém, tầm bắn, thời gian báo trước. Lực sĩ máu ×3, công ×1,6, tốc ×0,72; đòn N của tướng chỉ làm khựng, đòn có knock ≥ 5 hoặc hất tung mới làm bật. Kiểu lính chọn theo băm id, không ăn vào chuỗi rng của trận.
 - Tên của cung thủ, nỏ thủ trúng lính thường tính như đòn cận chiến giữa hai đám lính (×0,8 cho quân ta, ×0,6 cho địch). Trước đây tên nhắm lính thường không gây sát thương.
+- AI (khối `AI` trong `tuning.js`): tỉ lệ đỡ khiên 30% (đao thuẫn, đao khiên), 15% (thương binh), đỡ xong nhận 25% sát thương, nghỉ 1,4 s; nhảy lùi 20% (lính thường), 45% (tinh nhuệ); cung thủ lùi khi tướng dưới 40% tầm bắn; lực sĩ húc 5–11 m, ×2,6 tốc, 0,9 s, hồi 8 s, sát thương ×1,25; vỡ trận 2,5–4,5 s trong 22 m quanh sĩ quan chết, 12 m quanh Tuyệt Kỹ. Sĩ quan lùi né 40% khi trúng 3 đòn trong 1,5 s, hồi 5 s; đứng đỡ quá 1,2 s thì sĩ quan chuyển sang đòn viền đỏ.
 - Bộ đệm input: phím bấm lúc đang ra đòn được giữ tới khi đòn kế được phép (bấm dồn), ngoài ra giữ 0,15 s.
 
 ## Khác với mục 15
 
-- Lính vẽ bằng `InstancedMesh` theo khúc thân (mỗi kiểu lính × 10 khúc), ma trận khớp tính trên CPU, hoạt ảnh thủ tục (chưa có texture xương three-vat, chưa có clip nướng). Lính xa tướng hơn 40 m chỉ tính lại tư thế mỗi 3 khung. Ở mức "Rất cao" (≈ 800 lính) phần vẽ lính tốn ≈ 4 ms/khung trên máy phát triển.
+- Lính vẽ bằng `InstancedMesh` skinned: 10 khúc thân gộp một lưới, ma trận khớp tính trên CPU rồi đọc từ texture float trong vertex shader (gần với hướng three-vat của mục 15, nhưng hoạt ảnh vẫn thủ tục, chưa có clip nướng). Mỗi kiểu lính một lượt vẽ. Lính xa tướng hơn 40 m chỉ tính lại tư thế mỗi 3 khung. Cả trận khoảng 120 lượt vẽ, 470 nghìn tam giác (kể cả lượt đổ bóng) trên máy phát triển.
 - Mô phỏng chạy trên luồng chính, chưa tách Worker.
 - Vùng chiến đấu dùng `Math.sin` và `Math.hypot`, nên chưa xác định từng bit giữa các trình duyệt. Mô phỏng 1 Hz thì xác định (có kiểm thử).
 - Lưu bằng localStorage, có nút xuất/nhập file, thay cho IndexedDB.

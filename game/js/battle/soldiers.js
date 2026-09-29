@@ -257,6 +257,66 @@ export function kitGeometry(kit) {
   return { parts, skel: kit === "NG_KY" ? "horse" : "human" };
 }
 
+// ---- skinning instanced: một lượt vẽ cho cả kiểu lính -----------------------------------------------
+// 10 khúc gộp thành một lưới, mỗi đỉnh mang số khúc (aBone). Ma trận thế giới của từng khúc (dạng
+// affine 3 × 4, 3 texel RGBA) nằm trong texture float: lính i, khúc j ở texel (i·10 + j)·3, xếp liền
+// theo hàng rộng BONE_TEX_W. Vertex shader đọc bằng texelFetch(gl_InstanceID); instanceMatrix để
+// nguyên đơn vị. Nhờ vậy 8 kiểu lính chỉ tốn 8 lượt vẽ thay vì 80.
+export const NJ = JOINT_NAMES.length, BONE_TEX_W = 1024, BONE_FLOATS = NJ * 12;
+
+export function skinnedKit(kit, cap, material) {
+  const { parts, skel } = kitGeometry(kit);
+  let n = 0; for (const j of JOINT_NAMES) n += parts[j].attributes.position.count;
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), bone = new Float32Array(n);
+  let o = 0;
+  JOINT_NAMES.forEach((j, bi) => {
+    const g = parts[j], c = g.attributes.position.count;
+    pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); col.set(g.attributes.color.array, o * 3);
+    bone.fill(bi, o, o + c); o += c;
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  geo.setAttribute("aBone", new THREE.BufferAttribute(bone, 1));
+  const rows = Math.ceil((cap * NJ * 3) / BONE_TEX_W);
+  const data = new Float32Array(BONE_TEX_W * rows * 4);
+  const tex = new THREE.DataTexture(data, BONE_TEX_W, rows, THREE.RGBAFormat, THREE.FloatType);
+  tex.needsUpdate = true;
+  const mat = material.clone();
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.boneTex = { value: tex };
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", `#include <common>
+attribute float aBone;
+uniform highp sampler2D boneTex;
+mat4 boneMatrix() {
+  int t = (gl_InstanceID * ${NJ} + int(aBone + 0.5)) * 3;
+  vec4 r0 = texelFetch(boneTex, ivec2(t % ${BONE_TEX_W}, t / ${BONE_TEX_W}), 0);
+  vec4 r1 = texelFetch(boneTex, ivec2((t + 1) % ${BONE_TEX_W}, (t + 1) / ${BONE_TEX_W}), 0);
+  vec4 r2 = texelFetch(boneTex, ivec2((t + 2) % ${BONE_TEX_W}, (t + 2) / ${BONE_TEX_W}), 0);
+  return mat4(r0.x, r1.x, r2.x, 0.0, r0.y, r1.y, r2.y, 0.0, r0.z, r1.z, r2.z, 0.0, r0.w, r1.w, r2.w, 1.0);
+}`)
+      .replace("#include <beginnormal_vertex>", `mat4 bm = boneMatrix();
+vec3 objectNormal = normalize(mat3(bm) * vec3(normal));
+#ifdef USE_TANGENT
+  vec3 objectTangent = vec3(tangent.xyz);
+#endif`)
+      .replace("#include <begin_vertex>", `vec3 transformed = (bm * vec4(position, 1.0)).xyz;`);
+  };
+  mat.customProgramCacheKey = () => "skinnedKit";
+  const mesh = new THREE.InstancedMesh(geo, mat, cap);
+  mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = false;
+  return { mesh, data, tex, skel };
+}
+
+// Chép ma trận khớp (Matrix4, cột chính) vào mảng affine 3 × 4 theo hàng tại vị trí o.
+export function writeAffine(out, o, e) {
+  out[o] = e[0]; out[o + 1] = e[4]; out[o + 2] = e[8]; out[o + 3] = e[12];
+  out[o + 4] = e[1]; out[o + 5] = e[5]; out[o + 6] = e[9]; out[o + 7] = e[13];
+  out[o + 8] = e[2]; out[o + 9] = e[6]; out[o + 10] = e[10]; out[o + 11] = e[14];
+}
+
 // ---- tư thế -------------------------------------------------------------------------------------
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const ease = (t) => t * t * (3 - 2 * t);
@@ -370,6 +430,29 @@ export function poseFor(a, kit, K, t, out) {
     else { const r = ease(clamp01((a.atkT - 0.16) / 0.34)); for (const k of KEYS) P[k] = K2[k] + (BASE[k] - K2[k]) * r; }
   }
   if (a.flinch > 0) { const k = a.flinch / 0.18; P.tx -= 0.22 * k; P.hipY -= 0.03 * k; }
+  // đỡ khiên: giơ khiên che mặt, hạ trọng tâm, vũ khí thu về
+  if (a.blockT > 0) {
+    const k = Math.sin(clamp01(a.blockT / 0.32) * Math.PI) ** 0.5;
+    P.lax += (-1.35 - P.lax) * k; P.laz += (0.25 - P.laz) * k; P.lfx += (-0.95 - P.lfx) * k;
+    P.tx -= 0.12 * k; P.hipY -= 0.08 * k; P.lsx += 0.3 * k; P.rsx += 0.3 * k; P.ty += 0.25 * k;
+  }
+  // nhảy lùi né đòn gồng của tướng
+  if (a.evadeT > 0 && !horse) {
+    const k = Math.sin(clamp01(1 - a.evadeT / 0.3) * Math.PI);
+    P.tx -= 0.3 * k; P.hipY += -0.12 * k + 0.1 * Math.sin(clamp01(1 - a.evadeT / 0.3) * Math.PI); P.ltx += 0.6 * k; P.lsx += 0.5 * k; P.rtx -= 0.35 * k; P.rsx += 0.6 * k;
+    P.lax -= 0.4 * k; P.rax -= 0.3 * k;
+  }
+  // lao húc (lực sĩ): chạy cúi người, chùy giơ cao
+  if (a.chargeT > 0) {
+    const K1 = ATTACK[w][0];
+    for (const k in K1) if (k[0] === "r" || k[0] === "l") { if (k[1] === "a" || k[1] === "f") P[k] = K1[k]; }
+    P.tx = 0.45; P.ty = 0.1;
+  }
+  // tháo chạy: chạy cúi, hai tay vung loạn, vũ khí buông thõng
+  if (a.fleeT > 0 && a.state === "move") {
+    P.rax = -2.2 + 0.5 * Math.sin(t * 11 + id); P.lax = -2.0 + 0.5 * Math.cos(t * 10 + id); P.raz = 0.4; P.laz = -0.4; P.rfx = -0.4; P.lfx = -0.4;
+    P.tx += 0.2;
+  }
 
   // phản ứng
   const st = a.state;

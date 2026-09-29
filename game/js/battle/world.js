@@ -7,10 +7,45 @@ import * as THREE from "three";
 import { MAP, FRONTS, BASES, BASE_RING, lineToX, VILLAGE } from "../data/battle-b15.js";
 import { PAL, merge, lambert, flagTexture, part } from "./models.js";
 import { makeRng } from "../core/rng.js";
+import { addScenery, tintTrees } from "./scenery.js";
 
 const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
 export function waterDist(x, z) { return Math.min(z - MAP.riverNorthZ, MAP.riverEastX - x); }
+
+// ---- nhiễu giá trị có seed (màu đất, rải đạo cụ) ------------------------------------------------
+const hash2 = (i, j) => { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+export function vnoise(x, z) {
+  const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j;
+  const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  const a = hash2(i, j), b = hash2(i + 1, j), c = hash2(i, j + 1), d = hash2(i + 1, j + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+export const fbm = (x, z) => 0.55 * vnoise(x, z) + 0.3 * vnoise(x * 2.1 + 17, z * 2.1 - 9) + 0.15 * vnoise(x * 4.3 - 5, z * 4.3 + 31);
+
+// ---- vùng cảnh của bản đồ Hàm Tử (Hư cấu, chỉ để nhìn; không đổi bố cục chơi) -------------------
+// Ruộng lúa bậc thềm ở dải nam quanh làng; gò đá giữa hai mặt trận; đất cháy quanh trại Nguyên.
+export const ZONES = {
+  paddy: { x0: 88, x1: 440, z0: 114, z1: 198, plotW: 16, plotD: 11 },
+  knolls: [{ x: 228, z: -2, r: 26, h: 4.2 }, { x: 338, z: 8, r: 22, h: 3.4 }, { x: 160, z: -18, r: 17, h: 2.6 }, { x: 420, z: -14, r: 15, h: 2.2 }],
+  scorch: { x0: 380, x1: 462 },
+};
+// Ô ruộng tại (x, z): null nếu ngoài vùng ruộng. kind: 0 ngập nước, 1 mạ non, 2 lúa chín, 3 gốc rạ.
+export function paddyAt(x, z) {
+  const Z = ZONES.paddy;
+  if (x < Z.x0 || x > Z.x1 || z < Z.z0 || z > Z.z1) return null;
+  if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 8) return null;
+  const i = Math.floor((x - Z.x0) / Z.plotW), j = Math.floor((z - Z.z0) / Z.plotD);
+  // vụ lúa đi theo mảng (nhiễu thưa theo ô) chứ không ngẫu nhiên từng ô; lác đác ô lệch vụ
+  const n = vnoise(i * 0.42 + 3.7, j * 0.55 - 1.3) * 0.85 + hash2(i + 101, j + 57) * 0.15;
+  return { i, j, kind: n < 0.36 ? 0 : n < 0.58 ? 1 : n < 0.8 ? 2 : 3, x0: Z.x0 + i * Z.plotW, z0: Z.z0 + j * Z.plotD };
+}
+// 0..1: mức "trong vùng ruộng" (mép mềm 8 m) — dùng để san phẳng địa hình.
+function paddyK(x, z) {
+  const Z = ZONES.paddy;
+  const k = smooth(Z.x0 - 8, Z.x0, x) * smooth(Z.x1 + 8, Z.x1, x) * smooth(Z.z0 - 8, Z.z0, z);
+  return k * smooth(VILLAGE.r + 2, VILLAGE.r + 10, Math.hypot(x - VILLAGE.x, z - VILLAGE.z));
+}
 
 // Võ trường dùng mặt đất phẳng; bản đồ Hàm Tử dùng địa hình. Mọi module import heightAt nên
 // đổi địa hình bằng setTerrain() trước khi dựng cảnh.
@@ -25,16 +60,47 @@ export function heightAt(x, z) {
   for (const f of Object.values(FRONTS)) h *= 1 - 0.75 * smooth(20, 6, Math.abs(z - f.laneZ));
   h *= 1 - 0.8 * smooth(30, 10, Math.hypot(x - 34, z));                        // bản doanh
   if (x > MAP.fortWallX - 4) h *= 0.25;                                         // trong Hàm Tử quan
+  for (const k of ZONES.knolls) h += k.h * smooth(k.r, k.r * 0.2, Math.hypot(x - k.x, z - k.z));
   h = Math.max(h, -0.2) + 0.9;
+  const pk = paddyK(x, z);
+  if (pk > 0) h += (1.05 + 0.18 * Math.floor((z - ZONES.paddy.z0) / (ZONES.paddy.plotD * 2)) - h) * pk;   // ruộng bậc thềm
   const d = waterDist(x, z);
   if (d < 14) h = h * smooth(-2, 14, d) + (d < 0 ? Math.max(-3.2, d * 0.35) : 0.25) * (1 - smooth(-2, 14, d));
   return h;
+}
+
+// Vật cao, mảnh (cột cờ) có thể lọt vào giữa camera và tướng: camera không va chạm với chúng, nên
+// một cột cờ sát ống kính thành dải đen che nửa màn hình. Mỗi khung, vật nào nằm trong hành lang
+// camera → tướng (lệch ngang < r + FADE_PAD m) hoặc cách ống kính < FADE_NEAR m thì mờ dần xuống
+// FADE_MIN; ra khỏi hành lang thì hiện lại. Mỗi vật có vật liệu riêng (nhân bản khi đăng ký).
+const FADE_PAD = 1.1, FADE_NEAR = 6, FADE_MIN = 0.12;
+function addFader(world) {
+  world.fadeables = [];
+  world.addFadeable = (obj, r = 0.3) => {
+    const mats = [];
+    obj.traverse((o) => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); } });
+    world.fadeables.push({ obj, r, mats, a: 1 });
+  };
+  const _p = new THREE.Vector3();
+  world.fadeOccluders = (cam, tx, tz, dt) => {
+    const dx = tx - cam.x, dz = tz - cam.z, L2 = dx * dx + dz * dz || 1e-6, L = Math.sqrt(L2);
+    for (const f of world.fadeables) {
+      f.obj.getWorldPosition(_p);
+      const px = _p.x - cam.x, pz = _p.z - cam.z, t = (px * dx + pz * dz) / L2;
+      const perp = Math.abs(px * dz - pz * dx) / L, near = Math.hypot(px, pz) < FADE_NEAR + f.r;
+      const block = near || (t > 0 && t < 1 && perp < f.r + FADE_PAD);
+      const want = block ? FADE_MIN : 1;
+      f.a += (want - f.a) * Math.min(1, dt * (block ? 14 : 5));
+      for (const m of f.mats) { m.opacity = f.a; m.depthWrite = f.a > 0.98; }
+    }
+  };
 }
 
 export function buildWorld(scene, { shadows = true } = {}) {
   setTerrain("map");
   const rng = makeRng(1285);
   const world = { bases: {}, gates: {}, lineFlags: {}, boats: [], torches: [], colliders: [], animated: [] };
+  addFader(world);
 
   // ---- trời, sương, ánh sáng ------------------------------------------------------------
   scene.background = new THREE.Color(0xd9b98a);
@@ -64,16 +130,31 @@ export function buildWorld(scene, { shadows = true } = {}) {
   const tg = new THREE.PlaneGeometry(760, 560, 152, 112).toNonIndexed();
   tg.rotateX(-Math.PI / 2); tg.translate(300, 0, 0);
   const pos = tg.attributes.position, col = new Float32Array(pos.count * 3);
-  const cGrass = [new THREE.Color(0x6f7a3c), new THREE.Color(0x7f8744), new THREE.Color(0x66713a)];
+  const cLush = new THREE.Color(0x5f7434), cGrass = new THREE.Color(0x76803f), cDry = new THREE.Color(0x9a8f52), cDirt = new THREE.Color(0x8a6d48);
   const cRoad = new THREE.Color(0x9a7b4f), cSand = new THREE.Color(0xcdb483), cMud = new THREE.Color(0x5e4b35), cFort = new THREE.Color(0x8f7a58);
+  const cPaddy = [new THREE.Color(0x587a66), new THREE.Color(0x7c9c3e), new THREE.Color(0xb7a043), new THREE.Color(0x8e7a4c)];
+  const cRock = new THREE.Color(0x857d6c), cBurnt = new THREE.Color(0x3d3326), cMarsh = new THREE.Color(0x4f6238);
   for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
   for (let i = 0; i < pos.count; i += 3) {
     let cx = 0, cz = 0, cy = 0;
     for (let k = 0; k < 3; k++) { cx += pos.getX(i + k); cy += pos.getY(i + k); cz += pos.getZ(i + k); }
     cx /= 3; cy /= 3; cz /= 3;
     const d = waterDist(cx, cz);
-    const gi = (Math.floor(cx * 0.13) * 7 + Math.floor(cz * 0.11) * 3 + i) % 3;
-    let c = cGrass[(gi + 3) % 3].clone();       // % của JS giữ dấu: toạ độ âm cho chỉ số âm
+    // cỏ: ba sắc (tươi, thường, khô) trộn theo nhiễu mượt, lốm đốm đất trống
+    const n1 = fbm(cx * 0.018, cz * 0.018), n2 = fbm(cx * 0.05 + 40, cz * 0.05 - 12);
+    let c = n1 < 0.5 ? cLush.clone().lerp(cGrass, smooth(0.3, 0.5, n1)) : cGrass.clone().lerp(cDry, smooth(0.5, 0.72, n1));
+    if (n2 > 0.66) c.lerp(cDirt, smooth(0.66, 0.8, n2) * 0.7);
+    // gò đá: sườn lộ đá xám
+    for (const k of ZONES.knolls) { const kd = Math.hypot(cx - k.x, cz - k.z) / k.r; if (kd < 0.9) c.lerp(cRock, smooth(0.9, 0.35, kd) * (0.45 + 0.4 * n2)); }
+    // đầm lầy ven sông phía bắc
+    const wd = waterDist(cx, cz);
+    if (wd > 5 && wd < 34 && cx < MAP.fortWallX) c.lerp(cMarsh, smooth(34, 12, wd) * 0.6);
+    // ruộng: màu từng ô, bờ ruộng hơi sẫm
+    const pd = paddyAt(cx, cz);
+    if (pd) c.copy(cPaddy[pd.kind]).multiplyScalar(0.95 + 0.1 * vnoise(pd.i * 3.1, pd.j * 2.7));
+    // đất cháy quanh trại Nguyên
+    const S = ZONES.scorch;
+    if (cx > S.x0 && cx < S.x1 && Math.abs(cz) < 150) { const b = fbm(cx * 0.06, cz * 0.06); if (b > 0.55) c.lerp(cBurnt, smooth(0.55, 0.75, b) * smooth(S.x0, S.x0 + 25, cx) * 0.8); }
     let road = 0; for (const f of Object.values(FRONTS)) road = Math.max(road, smooth(9, 3, Math.abs(cz - f.laneZ)) * (cx > 50 && cx < 470 ? 1 : 0));
     road = Math.max(road, smooth(14, 5, Math.abs(cx - 60)) * (Math.abs(cz) < 80 ? 1 : 0));
     c.lerp(cRoad, road * 0.85);
@@ -153,6 +234,7 @@ export function buildWorld(scene, { shadows = true } = {}) {
     cloth.position.set(0.95, h - 0.7, 0); g.add(cloth);
     scene.add(g);
     world.animated.push((t) => { cloth.rotation.y = Math.sin(t * 2 + x) * 0.25; });
+    world.addFadeable(g, 1.0);          // lá cờ dài 1,8 m chìa ra một bên cột
     return { group: g, cloth };
   };
 
@@ -253,6 +335,7 @@ export function buildWorld(scene, { shadows = true } = {}) {
     if (x < 130 && Math.abs(z) < 70) return false;          // hành lang xuất quân trước bản doanh
     if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r) return false;
     if (x > W - 8) return false;
+    if (paddyAt(x, z)) return false;
     return true;
   };
   const placeInst = (geo, count, filter, scaleRange) => {
@@ -267,8 +350,10 @@ export function buildWorld(scene, { shadows = true } = {}) {
     }
     im.count = n; scene.add(im); return im;
   };
-  placeInst(treeGeo, 260, clear, [0.8, 1.5]);
+  const trees = placeInst(treeGeo, 260, clear, [0.8, 1.5]);
+  tintTrees(trees, rng);
   placeInst(palmGeo, 60, (x, z) => clear(x, z) && waterDist(x, z) < 40, [0.8, 1.2]);
+  addScenery(scene, world, { shadows, mat });
   const reedGeo = merge([0, 1, 2, 3].map((k) => P(new THREE.ConeGeometry(0.06, 1.6, 3), 0x8f8a4a, { x: (k % 2) * 0.25 - 0.1, z: Math.floor(k / 2) * 0.25 - 0.1, y: 0.8, rz: (k - 1.5) * 0.12 })));
   placeInst(reedGeo, 700, (x, z) => { const d = waterDist(x, z); return d > -2 && d < 7 && !(x > W - 4 && z > MAP.riverNorthZ + 3); }, [0.9, 1.4]);
 
@@ -355,6 +440,7 @@ export function buildArena(scene, { shadows = true } = {}) {
   setTerrain("arena");
   const rng = makeRng(1287);
   const world = { arena: true, bases: {}, gates: {}, lineFlags: {}, boats: [], colliders: [], animated: [] };
+  addFader(world);
   scene.background = new THREE.Color(0xd9b98a);
   scene.fog = new THREE.Fog(0xcfae82, 120, 340);
   const skyGeo = new THREE.SphereGeometry(600, 24, 12), sc = new Float32Array(skyGeo.attributes.position.count * 3);
@@ -404,8 +490,11 @@ export function buildArena(scene, { shadows = true } = {}) {
   // cột cờ, giá binh khí, hình nộm rơm, lầu trống
   for (let k = 0; k < 8; k++) {
     const a = k * Math.PI / 4 + Math.PI / 8, x = Math.cos(a) * (ARENA_R + 5), z = Math.sin(a) * (ARENA_R + 5);
-    parts.push(P(new THREE.CylinderGeometry(0.08, 0.1, 9, 5), PAL.then, { x, y: 4.8, z }));
-    parts.push(P(new THREE.BoxGeometry(0.06, 2.6, 1.6), k % 2 ? PAL.son : PAL.vang, { x, y: 7.6, z: z + 0.8 }));
+    // cột cờ là lưới riêng (không gộp vào lưới tĩnh) để làm mờ được khi che camera
+    const flag = new THREE.Mesh(merge([P(new THREE.CylinderGeometry(0.08, 0.1, 9, 5), PAL.then, { y: 4.8 }),
+      P(new THREE.BoxGeometry(0.06, 2.6, 1.6), k % 2 ? PAL.son : PAL.vang, { y: 7.6, z: 0.8 })]), lambert());
+    flag.position.set(x, 0, z); flag.castShadow = shadows; scene.add(flag);
+    world.addFadeable(flag, 0.9);
   }
   for (let k = 0; k < 6; k++) {
     const a = rng.range(0, 6.28), x = Math.cos(a) * (ARENA_R + 12 + rng.range(0, 10)), z = Math.sin(a) * (ARENA_R + 12 + rng.range(0, 10));

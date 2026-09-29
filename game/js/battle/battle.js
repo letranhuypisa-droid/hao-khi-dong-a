@@ -133,7 +133,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
 
     // ---- vòng lặp ------------------------------------------------------------------------
-    let hudAcc = 0, endShown = false, time = 0;
+    let hudAcc = 0, endShown = false, time = 0, smokeT = 0;
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -198,6 +198,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (time < 0.2) { cam.x = cx; cam.y = cy; cam.z = cz; }
       camera.position.set(cam.x + ctx.fx.shakeX, cam.y + ctx.fx.shakeY, cam.z);
       camera.lookAt(tx, ty, tz);
+      ctx.world.fadeOccluders(camera.position, tx, tz, dt);
       const sun = ctx.world.sun; sun.position.set(h.x - 60, 90, h.z + 50); sun.target.position.set(h.x, 0, h.z);
 
       // cổng: rung khi trúng, đổ khi phá
@@ -211,6 +212,14 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       for (const fid in FRONTS) ctx.world.setLine(fid, ctx.sim.fronts[fid].x);
 
       if (ctx.hk.tpc && Math.random() < dt * 7) ctx.fx.embers(ctx.hero.x, ctx.hero.z);   // tàn lửa Tổng Phản Công
+      // khói từ đống lửa tàn ở trại Nguyên (chỉ những đống gần tướng)
+      smokeT -= dt;
+      if (smokeT <= 0 && ctx.world.smokes) {
+        smokeT = 0.6;
+        for (const s of ctx.world.smokes) if (Math.abs(s.x - h.x) < 150 && Math.abs(s.z - h.z) < 150)
+          ctx.fx.sprite("smoke", s.x + (Math.random() - 0.5), heightAt(s.x, s.z) + 1, s.z + (Math.random() - 0.5),
+            { size: 2.2, T: 4.5, grow: 3.2, rise: 1.5, rot: Math.random() * 6.28, spin: 0.2, opacity: 0.4 });
+      }
       ctx.world.update(time);
       ctx.crowd.render();
       ctx.fx.update(dt, W, H);
