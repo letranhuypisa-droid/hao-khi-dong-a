@@ -60,7 +60,7 @@ export class Crowd {
       state: "move", st: 0, atkCd: 1 + this.ctx.rng.next() * tier.every, windup: 0, swing: 0,
       token: false, target: null, sx: o.sx ?? o.x, sz: o.sz ?? o.z, anchor: o.anchor || null,
       flash: 0, stun: 0, dieT: 0, lean: 0, bob: this.ctx.rng.next() * 6.28, fakeCd: this.ctx.rng.next() * 3,
-      hitBy: 0, scale: tier.scale, lvl: o.lvl || 1, fading: 0,
+      hitBy: 0, scale: tier.scale, lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
     });
     a.hp = a.maxHp;
     this.agents.push(a);
@@ -105,6 +105,7 @@ export class Crowd {
     for (let i = this.agents.length - 1; i >= 0; i--) {
       const a = this.agents[i];
       a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7;
+      if (a.panicT > 0) a.panicT -= dt;
       if (a.state === "dead") {
         a.dieT += dt;
         a.x += a.vx * dt; a.z += a.vz * dt; a.vx *= 0.9; a.vz *= 0.9;
@@ -212,6 +213,8 @@ export class Crowd {
     const ctx = this.ctx, t = a.target;
     if (!t) return;
     const tier = TIERS[a.tier];
+    // Hoang mang (Kế Sách "Cờ áo Tống"): chính xác −30%
+    if (a.panicT > 0 && ctx.rng.next() < 0.3) { if (t === ctx.hero) ctx.fx.text(a.x, a.z, "trượt", "#b0a090"); return; }
     if (UNITS[a.unit].attack === "ranged") { this.fireArrow(a, t); return; }
     const dx = t.x - a.x, dz = t.z - a.z, d = Math.hypot(dx, dz);
     if (d > 2.6) return;
@@ -229,9 +232,9 @@ export class Crowd {
 
   fireArrow(a, t) {
     const y0 = heightAt(a.x, a.z) + 2.2;
-    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = heightAt(tx, tz) + 1.2;
+    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + 1.2;
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
-    this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, src: a, side: a.side });
+    this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a, side: a.side, tgt: t });
     this.ctx.audio?.play("bow", a.x, a.z);
   }
 
@@ -241,6 +244,12 @@ export class Crowd {
       const r = this.arrows[i];
       r.t += dt; r.x += r.vx * dt; r.z += r.vz * dt; r.y += r.vy * dt; r.vy -= 9.8 * dt;
       let done = r.t > r.T || r.y < heightAt(r.x, r.z);
+      // mục tiêu không phải tướng người chơi (thuyền, tướng đồng minh): tính trúng khi tên tới nơi
+      if (!done && r.tgt && r.tgt !== hero && r.t >= r.T0) {
+        const g = r.tgt, a = r.src;
+        if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
+        done = true;
+      }
       if (!done && r.side === "dich" && hero.alive && Math.hypot(hero.x - r.x, hero.z - r.z) < 0.9 && Math.abs(r.y - (hero.y + 1.1)) < 1.3) {
         const a = r.src, tier = TIERS[a.tier];
         hero.receiveHit({ dmg: a.cong * tier.mv * 0.85 * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
@@ -298,7 +307,9 @@ export class Crowd {
       _a.premultiply(_m);
       M.arm.setMatrixAt(i, _a);
       let k = a.flash > 0 ? 2.6 : 1;
-      if (a.tier === "tinhnhue") _c.setRGB(0.75 * k, 0.72 * k, 0.62 * k); else _c.setRGB(k, k, k);
+      if (a.tint) _c.setRGB(a.tint[0] * k, a.tint[1] * k, a.tint[2] * k);
+      else if (a.tier === "tinhnhue") _c.setRGB(0.75 * k, 0.72 * k, 0.62 * k); else _c.setRGB(k, k, k);
+      if (a.panicT > 0 && Math.floor(a.bob) % 2) _c.multiplyScalar(1.35);
       if (a.windup > 0 && a.target === this.ctx.hero) _c.setRGB(1.5, 0.9, 0.8);
       M.body.instanceColor.setXYZ(i, _c.r, _c.g, _c.b); M.arm.instanceColor.setXYZ(i, _c.r, _c.g, _c.b);
       if (nb < 2200 && sink < 0.5) {

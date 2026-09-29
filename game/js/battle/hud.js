@@ -2,7 +2,8 @@
 // bản đồ nhỏ vẽ canvas 2D, vòng Mệnh Lệnh 4 ô (đồng hồ trận ×0,2 khi mở, S5.7).
 
 import { FRONTS, MAP, PHASES, EVENTS, lineToX, BASES } from "../data/battle-b15.js";
-import { ORDERS, HERO, QUICK } from "../data/tuning.js";
+import { ORDERS, HERO, MODES } from "../data/tuning.js";
+import { KE_SACH, VILLAGE } from "../data/battle-b15.js";
 import { totalQ } from "../sim/front.js";
 import { tpcReady } from "../sim/haokhi.js";
 
@@ -22,7 +23,7 @@ export class HUD {
             <i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i></div>
           <div class="hk-state" data-k="hkstate"></div>
         </div>
-        <div class="hud-time"><b data-k="time">0:00</b><span>par ${fmt(QUICK.par)}</span></div>
+        <div class="hud-time"><b data-k="time">0:00</b><span>${MODES[ctx.mode || "nhanh"].name} · par ${fmt(MODES[ctx.mode || "nhanh"].par)}</span></div>
       </div>
       <div class="hud-hero">
         <div class="portrait"><span>H35</span><em data-k="lv"></em></div>
@@ -38,6 +39,7 @@ export class HUD {
       </div>
       <div class="hud-msgs" data-k="msgs"></div>
       <div class="hud-events" data-k="events"></div>
+      <div class="hud-ks" data-k="ks"></div>
       <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
       <div class="hud-hint" data-k="hint"></div>
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
@@ -79,7 +81,7 @@ export class HUD {
     E.phase.textContent = `${P.id} · ${P.name}`;
     E.goal.textContent = d.baseHint || P.goal;
     E.time.textContent = fmt(d.time);
-    E.time.classList.toggle("late", d.time > QUICK.par);
+    E.time.classList.toggle("late", d.time > d.M.par);
     // Hào Khí
     E.hkv.textContent = Math.floor(hk.value);
     E.hkfill.style.width = `${hk.value}%`;
@@ -125,6 +127,9 @@ export class HUD {
     // sự kiện
     E.events.innerHTML = Object.entries(d.events).filter(([, v]) => v.state === "run").map(([k, v]) =>
       `<div class="ev"><b>${EVENTS[k].name}</b><span>${Math.ceil(v.left)} s</span></div>`).join("");
+    // Kế Sách
+    E.ks.innerHTML = d.keSach.hud().filter((k) => k.state !== "khoa").map((k) =>
+      `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${k.detail ? " · " + k.detail : ""}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
     // tin nhắn
     E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${m.text}</div>`).join("");
     E.ko.textContent = d.ko;
@@ -215,6 +220,11 @@ export class HUD {
       if (d.events.counterA1?.state === "run") { const v = ctx.world.bases.A1; c.beginPath(); c.arc(X(v.x), Z(v.z), 10, 0, 7); c.stroke(); }
       if (d.events.surrounded?.state === "run" && d.generals.H40) { const g = d.generals.H40; c.beginPath(); c.arc(X(g.x), Z(g.z), 10, 0, 7); c.stroke(); }
     }
+    const ks = d.keSach;
+    c.fillStyle = "#8a6a3a"; c.beginPath(); c.arc(X(VILLAGE.x), Z(VILLAGE.z), 5, 0, 7); c.fill();
+    for (const b of ks.boats) { if (b.dead) continue; c.fillStyle = "#e0a24a"; c.fillRect(X(b.x) - 3, Z(b.z) - 1.5, 6, 3); }
+    for (const b of ks.bundles) if (!b.taken) { c.fillStyle = "#f1d98a"; c.beginPath(); c.arc(X(b.x), Z(b.z), 2.5, 0, 7); c.fill(); }
+    if (ks.list.some((k) => k.state === "sansang") && Math.floor(this.t * 4) % 2) { const L = KE_SACH.coAoTong.landing; c.strokeStyle = "#ffd27a"; c.lineWidth = 2; c.beginPath(); c.arc(X(L.x), Z(L.z), 8, 0, 7); c.stroke(); }
     for (const p of d.pickups) { c.fillStyle = "#f1d98a"; c.fillRect(X(p.x) - 1.5, Z(p.z) - 1.5, 3, 3); }
     // tướng người chơi + hướng camera
     const h = ctx.hero;

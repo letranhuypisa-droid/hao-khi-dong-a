@@ -4,15 +4,22 @@
 // gộp hoặc instanced để giữ trần draw call (mục 15.7: T2 ≤ 150 draw).
 
 import * as THREE from "three";
-import { MAP, FRONTS, BASES, BASE_RING, lineToX } from "../data/battle-b15.js";
-import { PAL, merge, lambert, flagTexture } from "./models.js";
+import { MAP, FRONTS, BASES, BASE_RING, lineToX, VILLAGE } from "../data/battle-b15.js";
+import { PAL, merge, lambert, flagTexture, part } from "./models.js";
 import { makeRng } from "../core/rng.js";
 
 const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
 export function waterDist(x, z) { return Math.min(z - MAP.riverNorthZ, MAP.riverEastX - x); }
 
+// Võ trường dùng mặt đất phẳng; bản đồ Hàm Tử dùng địa hình. Mọi module import heightAt nên
+// đổi địa hình bằng setTerrain() trước khi dựng cảnh.
+let TERRAIN = "map";
+export function setTerrain(t) { TERRAIN = t; }
+export const ARENA_R = 46;
+
 export function heightAt(x, z) {
+  if (TERRAIN === "arena") return 0.3 + (Math.hypot(x, z) > ARENA_R + 4 ? Math.min(6, (Math.hypot(x, z) - ARENA_R - 4) * 0.4) : 0);
   let h = 1.3 * Math.sin(x * 0.021 + 1.3) * Math.cos(z * 0.017) + 0.8 * Math.sin(x * 0.047 + z * 0.031) + 0.5 * Math.cos(z * 0.06 - x * 0.013);
   h += 2.2 * smooth(40, 0, x) + 1.5 * smooth(-150, -200, -Math.abs(z) - 50);   // gò phía tây và hai mép
   for (const f of Object.values(FRONTS)) h *= 1 - 0.75 * smooth(20, 6, Math.abs(z - f.laneZ));
@@ -25,6 +32,7 @@ export function heightAt(x, z) {
 }
 
 export function buildWorld(scene, { shadows = true } = {}) {
+  setTerrain("map");
   const rng = makeRng(1285);
   const world = { bases: {}, gates: {}, lineFlags: {}, boats: [], torches: [], colliders: [], animated: [] };
 
@@ -160,11 +168,11 @@ export function buildWorld(scene, { shadows = true } = {}) {
     const x = f ? lineToX(f, b.lineX) : b.x, z = f ? f.laneZ : b.z;
     const vis = { id: b.id, x, z, r: BASE_RING[b.type], type: b.type };
     if (b.type === "don") {
-      palisade(x, z, 10, Math.PI); tower(x + 3, z - 4); tent(x - 3, z + 3, 0.5, PAL.vai, 0.8);
+      palisade(x, z, 10, Math.PI); tower(x + 11, z - 12);   // tháp ngoài rào để không che camera tent(x - 3, z + 3, 0.5, PAL.vai, 0.8);
       vis.flag = flagPole(x - 5, z - 5, 8);
     } else if (b.type === "doanh_trai") {
       palisade(x, z, 13, Math.PI); tent(x - 4, z - 5, 0.3, PAL.vai); tent(x + 5, z - 4, -0.4, PAL.vai); tent(x - 3, z + 6, 0.1, PAL.xam); tent(x + 4, z + 5, 0.6, PAL.xam);
-      tower(x + 8, z + 8, 7);
+      tower(x + 14, z + 14, 7);
       vis.flag = flagPole(x, z, 10);
     } else if (b.type === "cong") {
       vis.x = MAP.fortWallX; vis.z = z;
@@ -181,6 +189,15 @@ export function buildWorld(scene, { shadows = true } = {}) {
     }
     world.bases[b.id] = vis;
   }
+
+  // ---- làng ven bãi (Hư cấu, cho Kế Sách "Mũi tên thư") --------------------------------------
+  const hut = (x, z, ry, s = 1) => {
+    const y = heightAt(x, z);
+    for (const [dx, dz] of [[-1.6, -1.2], [1.6, -1.2], [-1.6, 1.2], [1.6, 1.2]]) staticParts.push(P(new THREE.BoxGeometry(0.2, 1.2, 0.2), PAL.go, { x: x + dx * s, y: y + 0.6, z: z + dz * s }));
+    staticParts.push(P(new THREE.BoxGeometry(3.6 * s, 1.6 * s, 2.8 * s), 0xa08560, { x, y: y + 1.2 + 0.8 * s, z, ry }));
+    staticParts.push(P(new THREE.ConeGeometry(2.9 * s, 1.8 * s, 4), 0x8f7a4a, { x, y: y + 2.9 + 0.9 * s, z, ry: ry + Math.PI / 4, sx: 1.25 }));
+  };
+  [[-14, -8, 0.3], [0, -14, -0.2], [13, -6, 0.6], [-10, 9, -0.4], [9, 10, 0.1], [22, 4, 0.9]].forEach(([dx, dz, r]) => hut(VILLAGE.x + dx, VILLAGE.z + dz, r, 0.9 + ((dx * 7 + dz) % 3 + 3) % 3 * 0.08));
 
   // ---- Hàm Tử quan: tường tây có hai cổng, tường nam, lều Nguyên bên trong ------------------------
   const wallSeg = (x0, z0, x1, z1) => {
@@ -234,6 +251,7 @@ export function buildWorld(scene, { shadows = true } = {}) {
     for (const f of Object.values(FRONTS)) if (Math.abs(z - f.laneZ) < 34 && x > 40 && x < 470) return false;
     if (Math.hypot(x - 34, z) < 26) return false;
     if (x < 130 && Math.abs(z) < 70) return false;          // hành lang xuất quân trước bản doanh
+    if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r) return false;
     if (x > W - 8) return false;
     return true;
   };
@@ -311,6 +329,10 @@ function buildGate(scene, mat, P, x, z, shadows) {
 
 // Đẩy một điểm ra khỏi tường (đoạn thẳng có bề dày). Cổng đóng coi như tường.
 export function collide(world, x, z, radius, openGates) {
+  if (world.arena) {
+    const d = Math.hypot(x, z), max = ARENA_R - radius;
+    return d > max ? [x / d * max, z / d * max] : [x, z];
+  }
   for (const c of world.colliders) {
     const dx = c.x1 - c.x0, dz = c.z1 - c.z0, L2 = dx * dx + dz * dz;
     let t = ((x - c.x0) * dx + (z - c.z0) * dz) / L2; t = Math.max(0, Math.min(1, t));
@@ -326,4 +348,88 @@ export function collide(world, x, z, radius, openGates) {
   x = Math.max(4, Math.min(MAP.riverEastX + 3, x));
   z = Math.max(MAP.riverNorthZ - 3, Math.min(196, z));
   return [x, z];
+}
+
+// ---- Võ trường: sân tập tròn trong Doanh trại (12.9, cấp 3) ---------------------------------------
+export function buildArena(scene, { shadows = true } = {}) {
+  setTerrain("arena");
+  const rng = makeRng(1287);
+  const world = { arena: true, bases: {}, gates: {}, lineFlags: {}, boats: [], colliders: [], animated: [] };
+  scene.background = new THREE.Color(0xd9b98a);
+  scene.fog = new THREE.Fog(0xcfae82, 120, 340);
+  const skyGeo = new THREE.SphereGeometry(600, 24, 12), sc = new Float32Array(skyGeo.attributes.position.count * 3);
+  const top = new THREE.Color(0x24333a), mid = new THREE.Color(0x9a6a45), hor = new THREE.Color(0xe8c894);
+  for (let i = 0; i < skyGeo.attributes.position.count; i++) {
+    const y = skyGeo.attributes.position.getY(i) / 600;
+    const col = y > 0.25 ? mid.clone().lerp(top, (y - 0.25) / 0.75) : hor.clone().lerp(mid, Math.max(0, y) / 0.25);
+    sc.set([col.r, col.g, col.b], i * 3);
+  }
+  skyGeo.setAttribute("color", new THREE.BufferAttribute(sc, 3));
+  scene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false })));
+  scene.add(new THREE.HemisphereLight(0xffe6c0, 0x3a3020, 1.15));
+  const sun = new THREE.DirectionalLight(0xffd29a, 2.1); sun.position.set(-40, 80, 30); sun.castShadow = shadows;
+  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 10, far: 220 });
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04; scene.add(sun, sun.target); world.sun = sun;
+
+  const P = (geo, color, t = {}) => part(geo, color, t);
+  const parts = [];
+  // nền: sân cát nện trong, cỏ ngoài, gờ đất quanh
+  const ground = new THREE.PlaneGeometry(260, 260, 104, 104).toNonIndexed(); ground.rotateX(-Math.PI / 2);
+  const gp = ground.attributes.position, gc = new Float32Array(gp.count * 3);
+  for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(gp.getX(i), gp.getZ(i)));
+  const cIn = new THREE.Color(0x8f6d4a), cOut = new THREE.Color(0x6f7a3c), cRim = new THREE.Color(0x5a4230);
+  for (let i = 0; i < gp.count; i += 3) {
+    const x = (gp.getX(i) + gp.getX(i + 1) + gp.getX(i + 2)) / 3, z = (gp.getZ(i) + gp.getZ(i + 1) + gp.getZ(i + 2)) / 3, d = Math.hypot(x, z);
+    const col = (d < ARENA_R ? cIn : cOut).clone();                          // đất nện sẫm, tách khỏi màu sương
+    if (d < ARENA_R && ((Math.floor(x / 6) + Math.floor(z / 6)) & 1)) col.multiplyScalar(0.9);
+    if (d > ARENA_R - 3 && d < ARENA_R + 1) col.lerp(cRim, 0.6);
+    col.multiplyScalar(0.94 + 0.06 * (((i * 2654435761) >>> 0) % 97) / 97);
+    for (let k = 0; k < 3; k++) gc.set([col.r, col.g, col.b], (i + k) * 3);
+  }
+  ground.setAttribute("color", new THREE.BufferAttribute(gc, 3)); ground.computeVertexNormals();
+  const gm = new THREE.Mesh(ground, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })); gm.receiveShadow = true; scene.add(gm);
+  // vòng vẽ vạch sân
+  for (const r of [6, 18, 32]) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 72), new THREE.MeshBasicMaterial({ color: 0xc9a14a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.33; scene.add(ring);
+  }
+  // hàng rào cọc có 4 cửa
+  const n = 220;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    if ([0, 1, 2, 3].some((k) => Math.abs(Math.atan2(Math.sin(a - k * Math.PI / 2), Math.cos(a - k * Math.PI / 2))) < 0.07)) continue;
+    const x = Math.cos(a) * (ARENA_R + 1), z = Math.sin(a) * (ARENA_R + 1);
+    parts.push(P(new THREE.CylinderGeometry(0.13, 0.16, 1.6 + (i % 3) * 0.2, 5), PAL.go, { x, y: 1.1, z }));
+  }
+  // cột cờ, giá binh khí, hình nộm rơm, lầu trống
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4 + Math.PI / 8, x = Math.cos(a) * (ARENA_R + 5), z = Math.sin(a) * (ARENA_R + 5);
+    parts.push(P(new THREE.CylinderGeometry(0.08, 0.1, 9, 5), PAL.then, { x, y: 4.8, z }));
+    parts.push(P(new THREE.BoxGeometry(0.06, 2.6, 1.6), k % 2 ? PAL.son : PAL.vang, { x, y: 7.6, z: z + 0.8 }));
+  }
+  for (let k = 0; k < 6; k++) {
+    const a = rng.range(0, 6.28), x = Math.cos(a) * (ARENA_R + 12 + rng.range(0, 10)), z = Math.sin(a) * (ARENA_R + 12 + rng.range(0, 10));
+    parts.push(P(new THREE.BoxGeometry(3, 0.2, 0.6), PAL.go, { x, y: 1.5, z, ry: a }), P(new THREE.BoxGeometry(0.2, 1.6, 0.6), PAL.go, { x, y: 0.8, z, ry: a }));
+    parts.push(P(new THREE.CylinderGeometry(0.35, 0.3, 1.5, 6), 0xc8b070, { x: x + 3, y: 1.3, z }), P(new THREE.SphereGeometry(0.3, 6, 4), 0xc8b070, { x: x + 3, y: 2.3, z }));
+  }
+  const tower = (x, z) => {
+    for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) parts.push(P(new THREE.BoxGeometry(0.25, 7, 0.25), PAL.go, { x: x + dx, y: 3.8, z: z + dz }));
+    parts.push(P(new THREE.BoxGeometry(4, 0.3, 4), PAL.go, { x, y: 7.3, z }), P(new THREE.ConeGeometry(3.4, 2, 4), PAL.son, { x, y: 9.3, z, ry: Math.PI / 4 }));
+    parts.push(P(new THREE.CylinderGeometry(1, 1, 1.2, 12), PAL.son, { x, y: 8.2, z, rz: Math.PI / 2 }));
+  };
+  tower(-ARENA_R - 8, -ARENA_R + 10); tower(ARENA_R + 8, ARENA_R - 10);
+  const m = new THREE.Mesh(merge(parts), lambert()); m.castShadow = shadows; m.receiveShadow = true; scene.add(m);
+  // cây quanh sân
+  const treeGeo = merge([P(new THREE.CylinderGeometry(0.2, 0.3, 2.6, 5), PAL.nau, { y: 1.3 }), P(new THREE.IcosahedronGeometry(1.7, 0), 0x4f6a32, { y: 3.4 })]);
+  const im = new THREE.InstancedMesh(treeGeo, lambert(), 90), mm = new THREE.Matrix4();
+  for (let i = 0; i < 90; i++) {
+    const a = rng.range(0, 6.28), r = ARENA_R + 26 + rng.range(0, 40), s = rng.range(0.8, 1.5);
+    mm.compose(new THREE.Vector3(Math.cos(a) * r, heightAt(Math.cos(a) * r, Math.sin(a) * r) - 0.1, Math.sin(a) * r), new THREE.Quaternion(), new THREE.Vector3(s, s, s));
+    im.setMatrixAt(i, mm);
+  }
+  im.castShadow = shadows; scene.add(im);
+  world.update = (t) => { for (const fn of world.animated) fn(t); };
+  world.setBaseOwner = () => {}; world.setBaseProgress = () => {}; world.setLine = () => {};
+  world.gatePoints = [0, 1, 2, 3].map((k) => ({ x: Math.cos(k * Math.PI / 2) * (ARENA_R - 2), z: Math.sin(k * Math.PI / 2) * (ARENA_R - 2) }));
+  return world;
 }

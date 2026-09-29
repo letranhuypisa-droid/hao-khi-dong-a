@@ -47,6 +47,7 @@ export function createSim({ fronts, bases, enemyMix, R = 1, mods = {} }) {
       pendingKills: { ta: 0, dich: 0 },  // Q phải trừ từ vùng chiến đấu (KO thật)
       lastF: { ta: 0, dich: 0 },
       skBoost: 0,                         // Sĩ Khí +10 sau TPC rải trong 30 s
+      panic: 0, panicRate: 0,             // "Hoang mang" (Kế Sách Cờ áo Tống): Sĩ Khí địch −rate mỗi tick
     };
   }
   for (const b of bases) {
@@ -259,6 +260,7 @@ export function simTick(st) {
     if (st.heroFront === id && st.t % 5 === 0) f.sk.ta += st.mods.skPer5;
     if (f.skBoost > 0) { const d = Math.min(f.skBoost, HAO_KHI.tpc.after.skBonus / HAO_KHI.tpc.after.skDur); f.sk.ta += d; f.skBoost -= d; }
     if (st.tpc.active) f.sk.ta = Math.max(f.sk.ta, HAO_KHI.tpc.skLock);
+    if (f.panic > 0) { f.sk.dich -= f.panicRate; f.panic--; }
     f.sk.ta = clamp(f.sk.ta, 0, 100); f.sk.dich = clamp(f.sk.dich, 0, 100);
 
     // Cứ Điểm tại tuyến bị bào mòn

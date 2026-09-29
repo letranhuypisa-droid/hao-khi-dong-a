@@ -85,3 +85,31 @@ export const HISTORY_NOTES = [
   { label: "Hư cấu", text: "Bố cục đồn, doanh trại, cổng của trận này dựng để thử lối chơi, không phải bố cục thật của bến Hàm Tử." },
   { label: "Hư cấu", text: "Song đao của Trần Quốc Toản là chi tiết hư cấu của game." },
 ];
+
+// ---- Kế Sách B15 (GDD 5.6, 5.7; hồ sơ B15) --------------------------------------------------
+// Máy trạng thái: Khóa → Khả dụng → Sẵn sàng (cửa sổ) → Kết quả. Không có hồi chiêu.
+// Khung Hào Khí gốc: Lớn +20, Nhỏ +10; thưởng lẻ cộng dồn không vượt khung, trần cả trận.
+// Trận nhanh: Kế Sách Lớn giữ nguyên, cửa sổ ×0,75; bỏ Kế Sách Nhỏ.
+export const KE_SACH = {
+  coAoTong: {
+    id: "coAoTong", name: "Cờ áo Tống", quyMo: "lon", hk: 20, label: "Chính sử", modes: ["nhanh", "chuan"],
+    text: "Hộ tống 2 thuyền quân Triệu Trung cập bến trên, rồi bấm Lệnh Kế Sách.",
+    lore: "Quân Trần Nhật Duật có người Tống lưu vong (gia tướng Triệu Trung) mặc áo Tống ra trận khiến quân Nguyên hoảng hốt.",
+    unlockBase: "A1", boats: 2, boatSpeed: 3, stopEnemyR: 8, boatHp: 1500, perBoat: 5,
+    // đường thuyền dọc sông, cách bờ 8 m; bến trên ngay bắc A1 (vị trí là ĐỀ XUẤT BẢN THỬ)
+    route: [{ x: 24, z: -177 }, { x: 214, z: -177 }, { x: 214, z: -171 }],
+    landing: { x: 214, z: -160 },
+    guards: [{ x: 95, z: -164, n: 9 }, { x: 148, z: -164, n: 9 }, { x: 192, z: -163, n: 10, officer: "doitruong" }],
+    window: 40, retryAfter: 60,
+    effect: { radius: 40, dur: 30, skPerSec: 2, miss: 0.3, qTa: 80, troops: 12 },
+  },
+  muiTenThu: {
+    id: "muiTenThu", name: "Mũi tên thư", quyMo: "nho", hk: 10, label: "Tương truyền", modes: ["chuan"],
+    text: "Nhặt 3 bó tên buộc thư ở làng, giao cho Nguyễn Khoái, rồi bấm Lệnh Kế Sách để bắn yểm trợ vào doanh trại Nguyên.",
+    lore: "Thư trên mũi tên: chỉ đánh quân xâm lược, không đánh người bị bắt đi lính.",
+    bundles: [{ x: 150, z: 138 }, { x: 176, z: 152 }, { x: 196, z: 134 }],
+    deliverTo: "H40", deliverR: 7, targets: ["B2", "A2"], window: 60, retryAfter: 45,
+    effect: { g: 24 },     // 2 đội lính phụ trợ buông vũ khí (ĐỀ XUẤT BẢN THỬ: 24 người)
+  },
+};
+export const VILLAGE = { x: 172, z: 144, r: 26 };   // làng hư cấu cho "Mũi tên thư"

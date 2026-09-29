@@ -16,12 +16,12 @@ import { createSim } from "../sim/front.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
 import { FRONTS, BASES, ENEMY_MIX } from "../data/battle-b15.js";
-import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS } from "../data/tuning.js";
+import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
 import { heroStats } from "../meta/progress.js";
 
 const STEP = 1 / 60;
 
-export function runBattle({ container, save, R, difficulty, onSettings }) {
+export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, onSettings }) {
   return new Promise((resolve) => {
     const settings = save.settings;
     const diff = DIFFICULTY.find((d) => d.id === difficulty) || DIFFICULTY[1];
@@ -44,14 +44,15 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
       scene, camera, renderer, R, diff, stats, save,
       rng: makeRng(seed), clock: 0, openGates: { A3: false, B3: false }, units: [],
       troops: TROOP_LEVELS.find((t) => t.id === settings.troops) || TROOP_LEVELS[1],
-      touch: false,
+      touch: false, mode, music,
     };
     ctx.world = buildWorld(scene, { shadows: settings.shadows });
     ctx.sim = createSim({ fronts: FRONTS, bases: BASES, enemyMix: ENEMY_MIX, R, mods: {
       unitSimC: stats.legionSimC, reinfAmt: stats.mods.reinfAmt, reinfCharges: stats.mods.reinfCharges,
       holdThu: stats.mods.holdThu, skPer5: stats.mods.skPer5, cmdCdMult: stats.mods.cmdCdMult, allyHpPct: stats.mods.allyHpPct } });
-    ctx.hk = createHaoKhi({ quick: true, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt });
+    ctx.hk = createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt });
     ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
+    music?.play("battle");
     ctx.fx = new FX(scene, camera, hudRoot);
     ctx.crowd = new Crowd(scene, ctx);
     ctx.hero = new Hero(ctx, stats);
@@ -89,7 +90,7 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
     const pause = (on) => {
       if (finished) return;
       paused = on; overlay.innerHTML = on ? pauseHTML(save) : ""; overlay.classList.toggle("on", on);
-      if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); } else { ctx.audio.unlock(); last = performance.now(); }
+      if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
     };
     const bindPause = () => {
       overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
@@ -101,6 +102,7 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
         if (k === "troops") { ctx.troops = TROOP_LEVELS.find((t) => t.id === v); ctx.director.fillActors(false); }
         if (k === "renderScale") resize();
         if (k === "volume") ctx.audio.setVolume(v);
+        if (k === "music") music?.setVolume(v);
         if (k === "shadows") { renderer.shadowMap.enabled = v; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
       });
     };
@@ -159,6 +161,7 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
           inp.pressed.lock = false;
         } else ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
         if (inp.pressed.tpc) d.tryTPC();
+        if (inp.pressed.kesach) d.keSach.trigger();
         if (inp.pressed.lock) ctx.hero.toggleLock();
         if (inp.pressed.map) ctx.hud.root.classList.toggle("bigmap");
 
@@ -208,6 +211,7 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
       for (const [id, v] of Object.entries(ctx.world.bases)) if (v.ring) v.ring.visible = ctx.sim.bases[id].type !== "cong" || !ctx.openGates[id];
       for (const fid in FRONTS) ctx.world.setLine(fid, ctx.sim.fronts[fid].x);
 
+      if (ctx.hk.tpc && Math.random() < dt * 7) ctx.fx.embers(ctx.hero.x, ctx.hero.z);   // tàn lửa Tổng Phản Công
       ctx.world.update(time);
       ctx.crowd.render();
       ctx.fx.update(dt, W, H);
@@ -216,6 +220,9 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
       if (draw) renderer.render(scene, camera);
       input.endFrame();
 
+      // nhạc: P4 và Tổng Phản Công đổi sang bài trận boss
+      if (!d.over && music) music.play(ctx.hk.tpc || d.phase === 3 ? "boss" : "battle", { fade: 2 });
+      if (d.over && !endShown && music) { if (d.result.won) music.play("victory", { loop: false, then: "hub" }); else music.stop(2); }
       if (d.over && !endShown) { endShown = true; setTimeout(() => showEnd(d.result), d.result.won ? 1200 : 1800); }
       if (!d.over) endShown = false;
     };
@@ -223,7 +230,7 @@ export function runBattle({ container, save, R, difficulty, onSettings }) {
   });
 }
 
-function lerpAngle(a, b, t) {
+export function lerpAngle(a, b, t) {
   let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   return a + d * t;
 }
@@ -238,7 +245,8 @@ function pauseHTML(save) {
     <label>Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
     <label>Tỉ lệ render <input type="range" min="0.5" max="1" step="0.05" value="${s.renderScale}" data-set="renderScale"></label>
     <label>Bóng <input type="checkbox" ${s.shadows ? "checked" : ""} data-set="shadows"></label>
-    <label>Âm lượng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
+    <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
+    <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
     ${controlsHTML()}
   </div>`;
@@ -251,12 +259,13 @@ export function controlsHTML() {
     <tr><td>Space</td><td>Né (i-frame 0,25 s); Né → N/C = Lướt</td><td>Shift / L</td><td>Đỡ (giữ); bấm đúng lúc đòn viền đỏ = Phản đòn</td></tr>
     <tr><td>E</td><td>Phá Trận (3 lần lao)</td><td>R</td><td>Tuyệt Kỹ (1 vạch Khí Lực)</td></tr>
     <tr><td>F</td><td>Tổng Phản Công (Hào Khí 100)</td><td>Q</td><td>Khóa mục tiêu</td></tr>
+    <tr><td>G</td><td>Lệnh Kế Sách (khi Sẵn sàng)</td><td></td><td></td></tr>
     <tr><td>Tab (giữ)</td><td>Vòng Mệnh Lệnh; 1–4 ra lệnh, Z đổi mặt trận</td><td>M · Esc</td><td>Bản đồ lớn · Tạm dừng</td></tr>
-    <tr><td>Tay cầm</td><td colspan="3">X đòn N · Y đòn C · A né · RB đỡ · LB Phá Trận · B Tuyệt Kỹ · LT giữ = Mệnh Lệnh (D-pad chọn, LB đổi mặt trận) · D-pad lên = Tổng Phản Công</td></tr>
+    <tr><td>Tay cầm</td><td colspan="3">X đòn N · Y đòn C · A né · RB đỡ · LB Phá Trận · B Tuyệt Kỹ · LT giữ = Mệnh Lệnh (D-pad chọn, LB đổi mặt trận) · D-pad lên = Tổng Phản Công · D-pad phải = Kế Sách</td></tr>
   </table>`;
 }
 
-function buildTouch(root, input, ctx) {
+export function buildTouch(root, input, ctx) {
   root.classList.add("on"); root.parentElement.classList.add("touchmode");
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
@@ -266,7 +275,7 @@ function buildTouch(root, input, ctx) {
       <button data-b="dodge">Né</button><button data-b="block">Đỡ</button>
       <button data-b="skill">Phá<br>Trận</button><button data-b="ult">Tuyệt<br>Kỹ</button>
     </div>
-    <div class="tsys"><button data-b="cmd">Lệnh</button><button data-b="tpc">Phản<br>Công</button><button data-b="lock">Khóa</button><button data-b="pause">II</button></div>`;
+    <div class="tsys"><button data-b="kesach">Kế<br>Sách</button><button data-b="cmd">Lệnh</button><button data-b="tpc">Phản<br>Công</button><button data-b="lock">Khóa</button><button data-b="pause">II</button></div>`;
   root.querySelectorAll("[data-b]").forEach((b) => {
     const name = b.dataset.b;
     const down = (e) => { e.preventDefault(); ctx.audio.unlock(); if (name === "cmd") { input.touchButton("cmd", !input.touchHeld.cmd); return; } input.touchButton(name, true); b.classList.add("on"); };

@@ -146,6 +146,12 @@ export const HAO_KHI = {
 
 // ---- Trận nhanh (21.2): par 10 phút, thua sau 30 phút --------------------------------------
 export const QUICK = { par: 600, timeout: 1800, rewardMult: 0.6, koPar: 400 };
+// Chế độ (13.7): Trận nhanh nhân nguồn Hào Khí ×1,3, thưởng ×0,6, cửa sổ Kế Sách ×0,75, bỏ Kế Sách Nhỏ;
+// hạn giờ sự kiện ở Trận nhanh đã ×1,2 nên Trận chuẩn chia lại. Par/KO par Trận chuẩn là ĐỀ XUẤT BẢN THỬ.
+export const MODES = {
+  nhanh: { id: "nhanh", name: "Trận nhanh", par: 600, koPar: 400, timeout: 1800, hkQuick: true, reward: 0.6, eventMult: 1 },
+  chuan: { id: "chuan", name: "Trận chuẩn", par: 900, koPar: 600, timeout: 1800, hkQuick: false, reward: 1, eventMult: 1 / 1.2 },
+};
 
 // ---- Xếp hạng (mục 2.3) Diem = 35M + 15T + 20Q + 20C + 10K; S ≥ 85, A 70–84, B 50–69 --------
 export const RANKS = [

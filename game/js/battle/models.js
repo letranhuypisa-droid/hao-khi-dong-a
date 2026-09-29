@@ -14,7 +14,7 @@ export const PAL = {
 };
 
 // ---- ghép hình: mỗi mảnh là geometry + màu, gộp thành một BufferGeometry có vertex color ----
-function part(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1 } = {}) {
+export function part(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1 } = {}) {
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),

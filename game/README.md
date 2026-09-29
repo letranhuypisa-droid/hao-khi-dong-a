@@ -31,7 +31,11 @@ node hao-khi-viet/game/tests/run.mjs
 | Pha | P1 chiếm A1 → P2 chiếm A2 → P3 phá cổng → P4 Toa Đô; checkpoint đầu pha; thua khi hết Gượng dậy, mất bản doanh, quá 30 phút | 21.2 |
 | Tiến triển | Cấp 1–35 theo EXP_next = 50L² + 250; cây kỹ năng 27 nút (3 nhánh, 1 nút đỉnh); binh khí bậc Thường → Danh, rèn +1…+5, ô Khắc 7 dòng, Đúc thép; quân đoàn (giáo binh, thân binh); Doanh trại 3 cấp; 3 tiền tệ | 12 |
 | Vật phẩm | Cơm nắm, Rượu thuốc, Túi quân lương, Cờ lệnh, Rương Cứ Điểm; rơi cố định theo điều kiện, không ngẫu nhiên | 4.4, 12.12 |
-| Xếp hạng | Diem = 35M + 15T + 20Q + 20C + 10K; S ≥ 85, A 70–84, B 50–69 | 2.3 |
+| Kế Sách | "Cờ áo Tống" (Lớn +20, Chính sử): hộ tống 2 thuyền quân Triệu Trung cập bến, bấm G → cánh Nguyên hoang mang. "Mũi tên thư" (Nhỏ +10, Tương truyền, chỉ Trận chuẩn): 3 bó tên ở làng → Nguyễn Khoái → bắn thư vào doanh trại. Máy trạng thái Khóa → Khả dụng → Sẵn sàng → Kết quả, không hồi chiêu | 5.6, 5.7, hồ sơ B15 |
+| Chế độ | Trận nhanh (par 10, Hào Khí ×1,3, thưởng ×0,6, 1 Kế Sách, cửa sổ ×0,75) và Trận chuẩn (par 15, thưởng ×1, 2 Kế Sách) | 13.7, 5.6 |
+| Võ trường | Doanh trại cấp 3: Luyện tập (chọn bậc địch), Đua KO bến Hàm Tử (180 s, 150/220/300), Thử thách thời gian theo seed, Seed tuần (tuần ISO giờ VN); Đồng bộ cấp; bảng điểm cục bộ; huy chương 5/10/15 Tinh thiết; 4 tuần Vàng → binh khí Danh | 13.5, 12.9 |
+| Xếp hạng | Diem = 35M + 15T + 20Q + 20C + 10K (K = Kế Sách); S ≥ 85, A 70–84, B 50–69 | 2.3, 5.6 |
+| Asset | 8 ảnh hiệu ứng (GPT Image 2, nền trong suốt) và 4 bài nhạc (Sonilo Music) sinh bằng Higgsfield CLI — xem assets/SOURCES.md, tools/render-assets.sh | — |
 | Điều khiển | Bàn phím + chuột, tay cầm (Gamepad API), cảm ứng | 15.8 |
 
 ## Đề xuất của bản thử (GDD chưa chốt số)
@@ -45,6 +49,9 @@ Những chỗ dưới đây là số bản thử tự đặt, ghi `ĐỀ XUẤT 
 - Lính vây đánh tướng đồng minh chỉ gây 0,2 sát thương; có lệnh ở mặt trận thì quân ta hạ một lính của toán mỗi 2,5 s.
 - Liên hoàn WC03: mỗi 10 đòn trúng thì +4% tốc đánh trong 6 s, tối đa 3 tầng.
 - C5, C6 mở theo cấp tướng (5 và 10).
+- Kế Sách: vị trí đường thuyền và bến, 3 toán giữ bờ, máu thuyền 1.500, +80 quân Triệu Trung cho cánh A, cửa sổ 40 s, dựng lại sau 60 s; làng và vị trí bó tên (Hư cấu); "2 đội phụ trợ" = 24 người.
+- Trận chuẩn: par 15 phút, KO par 600.
+- Võ trường: ước lượng thời gian bố cục, Vàng ≤ 0,75 ×, Bạc ≤ 1,05 × ước lượng; Đua KO chạy trên sân tập thay vì từ checkpoint B15.
 - Thua vẫn nhận 25% EXP.
 - Nguồn rơi vật phẩm trong trận.
 
@@ -54,5 +61,5 @@ Những chỗ dưới đây là số bản thử tự đặt, ghi `ĐỀ XUẤT 
 - Mô phỏng chạy trên luồng chính, chưa tách Worker.
 - Vùng chiến đấu dùng `Math.sin` và `Math.hypot`, nên chưa xác định từng bit giữa các trình duyệt. Mô phỏng 1 Hz thì xác định (có kiểm thử).
 - Lưu bằng localStorage, có nút xuất/nhập file, thay cho IndexedDB.
-- Âm thanh tổng hợp bằng Web Audio, chưa có SFX thư viện.
-- Chưa có: Kế Sách, thuyền, ngựa, Võ trường, benchmark hạng máy, comic trong trận.
+- SFX tổng hợp bằng Web Audio; nhạc nền là file stream qua phần tử audio.
+- Chưa có: thuyền cho tướng, ngựa, benchmark hạng máy, comic trong trận; nút Mưu "Đốt kho" chưa có tác dụng vì B15 không có kho lương.

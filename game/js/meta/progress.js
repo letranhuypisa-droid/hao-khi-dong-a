@@ -1,7 +1,7 @@
 // meta/progress.js — tiến triển ngoài trận (GDD mục 12). Hàm thuần trên object save,
 // không đụng DOM, không đụng storage (save.js lo phần đó), nên kiểm được trong Node.
 
-import { g, E, EXP_NEXT, LEVEL_CAP, HERO, DIFFICULTY, RANKS, QUICK } from "../data/tuning.js";
+import { g, E, EXP_NEXT, LEVEL_CAP, HERO, DIFFICULTY, RANKS, MODES } from "../data/tuning.js";
 import { NODES, TREE_RULES, WEAPON_TIERS, FORGE, KHAC, LEGION, CAMP, R_LADDER } from "../data/progression.js";
 
 export const SAVE_VERSION = 1;
@@ -134,7 +134,7 @@ export function heroMods(save) {
     atkPct: 0, poisePct: 0, comboEvery: 10, parryWin: 0, breakKi: 0, ultPct: 0, phaTranLen: HERO.phaTran.len,
     afterimage: false, ultRefund: 0, bodyguards: 0, aura: 0, cmdCdMult: 1, reinfAmt: 0, allyHpPct: 0,
     skPer5: 0, holdThu: 0, reinfCharges: 0, tpcExt: 0, hkPct: 0, revealOfficers: false, capSpeed: 0,
-    m25: 0.05, hkDecay: 1, hkStart: 0,
+    m25: 0.05, hkDecay: 1, hkStart: 0, ksWindow: 0, ksEffect: 0,
     armorPen: 0, crit: 0, koHeal: 0, cStun: 0, atkSpeed: 0, koSk: 0, kiPct: 0,
   };
   for (const id of save.hero.nodes) {
@@ -172,10 +172,12 @@ export function heroStats(save, R) {
 
 // ---- Xếp hạng và phần thưởng (mục 2.3, 12.1, 12.10) ------------------------------------------
 // Diem = 35M + 15T + 20Q + 20C + 10K, mỗi thành phần 0..1:
-//   M nhiệm vụ (chính + phụ), T thời gian so với par, Q quân ta còn, C Cứ Điểm, K KO so với par.
-export function scoreBattle({ missions, timeSec, qRatio, baseRatio, ko }) {
-  const T = timeSec <= QUICK.par ? 1 : Math.max(0, 1 - (timeSec - QUICK.par) / QUICK.par);
-  const K = Math.min(1, ko / QUICK.koPar);
+//   M nhiệm vụ (chính + phụ), T thời gian so với par, Q quân ta còn, C Cứ Điểm, K Kế Sách thành công
+//   (5.6: "Kế Sách thất bại chỉ mất phần thưởng chưa nhận và điểm K khi xếp hạng").
+export function scoreBattle({ missions, timeSec, qRatio, baseRatio, keSach = 0, mode = "nhanh" }) {
+  const par = MODES[mode].par;
+  const T = timeSec <= par ? 1 : Math.max(0, 1 - (timeSec - par) / par);
+  const K = Math.min(1, keSach);
   const parts = { M: missions, T, Q: Math.min(1, qRatio), C: baseRatio, K };
   const diem = Math.round(35 * parts.M + 15 * parts.T + 20 * parts.Q + 20 * parts.C + 10 * parts.K);
   const rank = RANKS.find((r) => diem >= r.min);
@@ -184,7 +186,7 @@ export function scoreBattle({ missions, timeSec, qRatio, baseRatio, ko }) {
 
 export function computeRewards(save, res) {
   const diff = DIFFICULTY.find((d) => d.id === res.difficulty) || DIFFICULTY[1];
-  const R = res.R, quick = QUICK.rewardMult;
+  const R = res.R, quick = MODES[res.mode || "nhanh"].reward;
   const out = { exp: 0, tien: 0, tt: 0, qc: 0, drops: [], skillPoint: false, unlockR: null };
   if (!res.won) {
     // Thua vẫn giữ một phần EXP (ĐỀ XUẤT BẢN THỬ: 25%), không Tiền, không rơi đồ.
@@ -194,7 +196,7 @@ export function computeRewards(save, res) {
   out.exp = Math.round(2 * EXP_NEXT(R) * res.rankMult * diff.reward * quick);
   out.tien = Math.round((60 * res.diem * (1 + 0.05 * (R - 1)) * diff.reward) * quick) + (res.chestCoins || 0);
   out.tt = Math.round((2 * (res.bossDefeated ? 1 : 0)) * diff.reward) + (res.extraTT || 0);
-  out.qc = Math.round((2 * res.hkRaw + 5 * res.avgSK) * diff.qc);
+  out.qc = Math.round((2 * res.hkRaw + 150 * (res.keSachOk || 0) + 5 * res.avgSK) * diff.qc);   // 12.10
   const aOrBetter = res.rank === "S" || res.rank === "A";
   const f = save.firsts;
   if (aOrBetter && R >= 5 && R <= 14 && !f.tinh && save.weapon.tier < 2) out.drops.push({ kind: "weapon", tier: 2, why: "Lần đầu hạng A ở trận R 5–14" });
