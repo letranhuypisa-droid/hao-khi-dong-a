@@ -156,7 +156,7 @@ t("vào trận R 10 với tướng cấp 1: nâng lên cấp 8, binh khí ≥ E(
   assert.equal(h.level, 8); near(h.weaponMult, E(10) - 0.10, 1e-9);
 });
 t("xếp hạng: Diem 75 là hạng A", () => {
-  const r = P.scoreBattle({ missions: 0.8, timeSec: 600, qRatio: 0.75, baseRatio: 0.6, ko: 400 });
+  const r = P.scoreBattle({ missions: 0.8, timeSec: 600, qRatio: 0.75, baseRatio: 0.6, keSach: 1 });
   assert.equal(r.rank, "A");
 });
 t("thưởng thắng R 7 hạng A: rơi binh khí Tinh lần đầu, mở R 10", () => {
@@ -166,6 +166,41 @@ t("thưởng thắng R 7 hạng A: rơi binh khí Tinh lần đầu, mở R 10",
   assert.equal(rw.drops[0].tier, 2); assert.equal(rw.unlockR, 10);
   P.applyRewards(s, res, rw); assert.equal(s.weapon.tier, 2);
   assert.equal(P.computeRewards(s, res).drops.length, 0);
+});
+
+console.log("Võ trường (13.5)");
+const A = await import("../js/meta/arena.js");
+t("Seed tuần: số tuần ISO theo giờ Việt Nam, đổi lúc 0:00 thứ Hai", () => {
+  assert.equal(A.isoWeekKey(new Date("2026-09-29T05:00:00Z")), "2026-W40");
+  assert.equal(A.isoWeekKey(new Date("2026-10-04T16:59:00Z")), "2026-W40");   // 23:59 CN giờ VN
+  assert.equal(A.isoWeekKey(new Date("2026-10-04T17:00:00Z")), "2026-W41");   // 0:00 thứ Hai giờ VN
+  assert.equal(A.isoWeekKey(new Date("2027-01-01T12:00:00Z")), "2026-W53");
+});
+t("cùng seed → cùng bố cục 5 đợt, đợt cuối có Tướng", () => {
+  const a = A.makeLayout(4242), b = A.makeLayout(4242);
+  assert.deepEqual(a, b); assert.equal(a.waves.length, 5); assert.ok(a.waves[4].officers.includes("tuong"));
+  assert.notDeepEqual(A.makeLayout(1), A.makeLayout(2));
+});
+t("Đua KO: Đồng 150 · Bạc 220 · Vàng 300", () => {
+  assert.equal(A.medalFor("duako", 149), null); assert.equal(A.medalFor("duako", 150), "dong");
+  assert.equal(A.medalFor("duako", 220), "bac"); assert.equal(A.medalFor("duako", 300), "vang");
+});
+t("thưởng lần đầu mỗi mức 5/10/15 Tinh thiết, không nhận lại", () => {
+  const s = P.newSave();
+  const res = { mode: "duako", R: 1, difficulty: "quansi", medal: "bac", durSec: 180, ko: 230 };
+  const r1 = A.arenaRewards(s, res); assert.equal(r1.tt, 15); A.applyArena(s, res, r1);
+  const r2 = A.arenaRewards(s, res); assert.equal(r2.tt, 0);
+  const r3 = A.arenaRewards(s, { ...res, medal: "vang", ko: 310 }); assert.equal(r3.tt, 15);
+});
+t("chơi lại: hệ số EXP/Tiền = 0,6 × thời lượng ÷ 10 phút, trong [0,1; 0,6]", () => {
+  const s = P.newSave(), base = { mode: "duako", R: 1, difficulty: "quansi", medal: "dong" };
+  const e180 = A.arenaRewards(s, { ...base, durSec: 180 }).exp, e30 = A.arenaRewards(s, { ...base, durSec: 30 }).exp, e900 = A.arenaRewards(s, { ...base, durSec: 900 }).exp;
+  assert.equal(e180, Math.round(600 * 0.18)); assert.equal(e30, Math.round(600 * 0.1)); assert.equal(e900, Math.round(600 * 0.6));
+});
+t("Vàng Seed tuần ở 4 tuần khác nhau → binh khí Danh", () => {
+  const s = P.newSave(); s.arena = { medals: {}, best: {}, goldWeeks: ["2026-W37", "2026-W38", "2026-W39"] };
+  const rw = A.arenaRewards(s, { mode: "seedtuan", week: "2026-W40", R: 1, difficulty: "quansi", medal: "vang", durSec: 300 });
+  assert.equal(rw.drops[0]?.tier, 4);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

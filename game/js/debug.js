@@ -71,5 +71,6 @@ window.__state = () => {
     units: c.units.map((u) => `${u.name}:${Math.round(u.hp)}${u.broken > 0 ? "(vỡ)" : ""}`),
     events: Object.fromEntries(Object.entries(d.events).map(([k, v]) => [k, v.state + (v.left ? ":" + Math.round(v.left) : "")])),
     msgs: d.msgs.map((m) => m.text).slice(-3), over: d.over, res: d.result && d.result.why,
+    ks: d.keSach.hud().map((k) => `${k.name}:${k.state}:${k.got}${k.detail ? " (" + k.detail + ")" : ""}`),
   };
 };

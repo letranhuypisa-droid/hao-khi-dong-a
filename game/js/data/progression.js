@@ -3,7 +3,7 @@
 // Cây: 3 nhánh × (4 tầng × 2 nút) + 1 đỉnh mỗi nhánh = 27 nút; giá tầng = số tầng, đỉnh 5.
 // H35 thay 5 nút thư viện (12.6). Hai nút riêng của H35 cần Cờ Sáu Chữ và Quả Cam Bóp Nát,
 // mà hai kỹ năng này là nội dung VS (21.2), nên bản này giữ nút thư viện ở hai chỗ đó.
-// Nút Kế Sách hiện đủ nhưng có cờ `inert`: bản thử tắt Kế Sách (keSachEnabled = false).
+// Nút "Đốt kho" có cờ `inert`: trận B15 không có kho lương.
 
 export const TREE = {
   vo:   { name: "Võ",   title: "Song Đao Hoài Văn",   blurb: "Chiến đấu cá nhân" },
@@ -35,11 +35,11 @@ export const NODES = [
 
   { id: "M1a", b: "muu", t: 1, name: "Khí Thế Đông A",     text: "Hào Khí nhận +5%",                   fx: { hkPct: 0.05 } },
   { id: "M1b", b: "muu", t: 1, name: "Trinh Sát Hai Bờ",   text: "Hiện Đội trưởng, Phó tướng địch trên bản đồ nhỏ", fx: { revealOfficers: true } },
-  { id: "M2a", b: "muu", t: 2, name: "Tiên Liệu",          text: "Cửa sổ Kế Sách +10%",                fx: {}, inert: true },
-  { id: "M2b", b: "muu", t: 2, name: "Lửa Kho Giặc",       text: "Đốt kho nhanh 40%",                  fx: {}, inert: true },
+  { id: "M2a", b: "muu", t: 2, name: "Tiên Liệu",          text: "Cửa sổ Kế Sách +10%",                fx: { ksWindow: 0.1 } },
+  { id: "M2b", b: "muu", t: 2, name: "Lửa Kho Giặc",       text: "Đốt kho nhanh 40%",                  fx: {}, inert: true, inertWhy: "B15 không có kho lương" },
   { id: "M3a", b: "muu", t: 3, name: "Đoạt Trại",          text: "Chiếm Cứ Điểm nhanh 30%",            fx: { capSpeed: 0.3 } },
   { id: "M3b", b: "muu", t: 3, name: "Dấy Khí",            text: "Mốc Hào Khí 25: Công quân ta +7% thay vì +5%", fx: { m25: 0.07 } },
-  { id: "M4a", b: "muu", t: 4, name: "Kế Lớn Dài Hơi",     text: "Kế Sách lớn: hiệu ứng kéo dài +20%", fx: {}, inert: true },
+  { id: "M4a", b: "muu", t: 4, name: "Kế Lớn Dài Hơi",     text: "Kế Sách lớn: hiệu ứng kéo dài +20%", fx: { ksEffect: 0.2 } },
   { id: "M4b", b: "muu", t: 4, name: "Giữ Lửa",            text: "Suy giảm Hào Khí chậm 50%",          fx: { hkDecay: 0.5 } },
   { id: "MD",  b: "muu", t: 5, name: "Thiếu Niên Bình Than", text: "Bắt đầu mỗi trận với Hào Khí +15", fx: { hkStart: 15 }, apex: true },
 ];

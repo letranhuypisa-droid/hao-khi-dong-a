@@ -2,7 +2,7 @@
 
 const KEYMAP = {
   KeyJ: "n", KeyK: "c", Space: "dodge", KeyL: "block", ShiftLeft: "block", ShiftRight: "block",
-  KeyE: "skill", KeyU: "skill", KeyR: "ult", KeyI: "ult", KeyF: "tpc", KeyQ: "lock",
+  KeyE: "skill", KeyU: "skill", KeyR: "ult", KeyI: "ult", KeyF: "tpc", KeyQ: "lock", KeyG: "kesach",
   Tab: "cmd", KeyM: "map", Escape: "pause", KeyP: "pause",
   Digit1: "cmd1", Digit2: "cmd2", Digit3: "cmd3", Digit4: "cmd4", KeyZ: "cmdSwap",
 };
@@ -89,7 +89,7 @@ export class Input {
       if (edge(8)) this.pressed.map = true;
       if (edge(9)) this.pressed.pause = true;
       if (edge(12)) this.pressed[ring ? "cmd1" : "tpc"] = true;
-      if (edge(15) && ring) this.pressed.cmd2 = true;
+      if (edge(15)) this.pressed[ring ? "cmd2" : "kesach"] = true;
       if (edge(13) && ring) this.pressed.cmd3 = true;
       if (edge(14) && ring) this.pressed.cmd4 = true;
       block = block || b(5); cmdHeld = cmdHeld || ring;

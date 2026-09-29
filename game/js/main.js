@@ -3,13 +3,18 @@
 import { loadSave, writeSave, exportSave, importSave, resetSave } from "./meta/save.js";
 import * as P from "./meta/progress.js";
 import { NODES, TREE, TREE_RULES, WEAPON_TIERS, WEAPON_NAMES, FORGE, KHAC, LEGION, CAMP, R_LADDER } from "./data/progression.js";
-import { DIFFICULTY, TROOP_LEVELS, HERO, EXP_NEXT, LEVEL_CAP, MOVES, E } from "./data/tuning.js";
+import { DIFFICULTY, TROOP_LEVELS, HERO, EXP_NEXT, LEVEL_CAP, MOVES, MODES } from "./data/tuning.js";
+import { Music } from "./core/music.js";
+import { ARENA_MODES, MEDALS, isoWeekKey, seedFromKey, arenaRewards, applyArena } from "./meta/arena.js";
+import { TIERS } from "./data/tuning.js";
 import { HISTORY_NOTES, BOSS } from "./data/battle-b15.js";
 
 const app = document.getElementById("app");
 let save = loadSave();
 let tab = "xuattran";
 let pick = { R: Math.max(...save.ladder.unlocked), difficulty: save.settings.difficulty };
+const music = new Music(save.settings.music ?? 0.5);
+music.play("hub");
 const persist = () => writeSave(save);
 const n = (v) => Math.round(v).toLocaleString("vi-VN");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -25,7 +30,7 @@ const act = (r, okMsg) => { if (r.ok) { persist(); toast(okMsg); } else toast(r.
 function render() {
   const h = save.hero, w = save.wallet;
   const expPct = h.level >= LEVEL_CAP ? 100 : (h.exp / EXP_NEXT(h.level)) * 100;
-  const tabs = [["xuattran", "Xuất trận"], ["truongsoai", "Trướng soái"], ["loren", "Lò rèn"], ["luyenbinh", "Luyện binh"], ["doanhtrai", "Doanh trại"], ["hoso", "Hồ sơ"]];
+  const tabs = [["xuattran", "Xuất trận"], ["votruong", "Võ trường"], ["truongsoai", "Trướng soái"], ["loren", "Lò rèn"], ["luyenbinh", "Luyện binh"], ["doanhtrai", "Doanh trại"], ["hoso", "Hồ sơ"]];
   app.innerHTML = `
   <div class="hub">
     <header class="hub-head">
@@ -39,7 +44,7 @@ function render() {
         <div class="exp"><div style="width:${expPct}%"></div></div><small>${h.level >= LEVEL_CAP ? "Đã đạt trần" : `${n(h.exp)} / ${n(EXP_NEXT(h.level))} EXP`}</small></div>
     </header>
     <nav class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}${k === "truongsoai" && P.freePoints(save) > 0 ? ` <em>${P.freePoints(save)}</em>` : ""}</button>`).join("")}</nav>
-    <main class="hub-body">${{ xuattran, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
+    <main class="hub-body">${{ xuattran, votruong, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
   </div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); }));
   bind[tab]?.();
@@ -62,6 +67,8 @@ function xuattran() {
       return `<button data-r="${R}" class="${pick.R === R ? "on" : ""}" ${open ? "" : "disabled"}>R ${R}${best ? `<em class="rank r${best}">${best}</em>` : ""}${open ? "" : "<small>khóa</small>"}</button>`;
     }).join("")}</div>
     <p class="small">Thắng một cấp thì mở cấp kế (+3, như R1: B12 = 1 … B20 = 25). Địch mạnh theo R; tướng được nâng tối thiểu lên cấp R − 2 và binh khí tối thiểu E(R) − 0,10 khi vào trận (12.1, 12.7).</p>
+    <h3>Chế độ</h3>
+    <div class="ladder">${Object.values(MODES).map((m) => `<button data-mode="${m.id}" class="${(save.settings.mode || "nhanh") === m.id ? "on" : ""}">${m.name}<small>par ${m.par / 60} phút · ${m.id === "nhanh" ? "Hào Khí ×1,3 · thưởng ×0,6 · 1 Kế Sách" : "thưởng ×1 · 2 Kế Sách"}</small></button>`).join("")}</div>
     <h3>Độ khó</h3>
     <div class="ladder">${DIFFICULTY.map((d) => `<button data-diff="${d.id}" class="${pick.difficulty === d.id ? "on" : ""}">${d.name}<small>${d.tokens} lính đánh cùng lúc · thưởng ×${d.reward}</small></button>`).join("")}</div>
     <div class="grid2">
@@ -79,6 +86,43 @@ function xuattran() {
         <label class="field">Bóng <input type="checkbox" data-set="shadows" ${save.settings.shadows ? "checked" : ""}></label>
         <button class="primary go" data-go>VÀO TRẬN</button>
       </div>
+    </div>
+  </section>`;
+}
+
+// ---- Võ trường (13.5) -------------------------------------------------------------------------
+let arenaPick = { mode: "duako", tier: "thuong", count: 12, invincible: false, seed: 1285, sync: false };
+const fmtT = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+function votruong() {
+  if (save.camp < 3) return lockedCard("Võ trường", 3);
+  const A = save.arena || { medals: {}, best: {}, goldWeeks: [] }, week = isoWeekKey();
+  const medalOf = (node) => { const m = A.medals[node]; return m ? `<em class="medal ${m}">${MEDALS.find((x) => x.id === m).name}</em>` : ""; };
+  const board = (key, ko) => (A.best[key] || []).map((r, i) => `<li>${i + 1}. ${ko ? r.v + " KO" : fmtT(r.v)} <small>cấp ${r.lv} · R ${r.R}</small></li>`).join("") || `<li class="small">Chưa có lượt nào.</li>`;
+  const sk = arenaPick.sync ? "dongbo" : "tudo";
+  const card = (id, body) => `<button class="amode ${arenaPick.mode === id ? "on" : ""}" data-amode="${id}"><b>${ARENA_MODES[id].name}</b><span>${ARENA_MODES[id].text}</span>${body || ""}</button>`;
+  const P1 = arenaPick;
+  return `
+  <section class="card"><h3>Võ trường · Doanh trại cấp 3</h3>
+    <p class="small">Thưởng lần đầu đạt mỗi mức ở một nút: Đồng 5 · Bạc 10 · Vàng 15 Tinh thiết. Vàng Seed tuần ở 4 tuần khác nhau: binh khí bậc Danh (${A.goldWeeks.length}/4). Chơi lại: EXP và Tiền theo thời lượng (×0,1–0,6).</p>
+    <div class="amodes">${card("luyentap")}${card("duako", medalOf("duako"))}${card("thoigian", medalOf("thoigian"))}${card("seedtuan", `<small>Tuần ${week}</small>${medalOf("tuan:" + week)}`)}</div>
+  </section>
+  <section class="grid2">
+    <div class="card"><h3>Thiết lập</h3>
+      ${P1.mode === "luyentap" ? `
+        <label class="field">Bậc địch <select data-ap="tier">${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${P1.tier === k ? "selected" : ""}>${t.name}</option>`).join("")}</select></label>
+        <label class="field">Số lượng (sĩ quan tối đa 3) <input type="range" min="1" max="30" value="${P1.count}" data-ap="count"><b>${P1.count}</b></label>
+        <label class="field">Bất tử <input type="checkbox" data-ap="invincible" ${P1.invincible ? "checked" : ""}></label>` : ""}
+      ${P1.mode === "thoigian" ? `<label class="field">Seed <input type="number" value="${P1.seed}" data-ap="seed" style="width:120px"><button data-rseed>Ngẫu nhiên</button></label>` : ""}
+      ${P1.mode !== "luyentap" ? `<label class="field">Đồng bộ cấp: cấp = R, binh khí E(R), không Khắc, quân đoàn cấp 3 <input type="checkbox" data-ap="sync" ${P1.sync ? "checked" : ""}></label>` : ""}
+      <label class="field">Cấp địch R <select data-ap="R">${save.ladder.unlocked.map((r) => `<option value="${r}" ${pick.R === r ? "selected" : ""}>R ${r}</option>`).join("")}</select></label>
+      <p class="small">Độ khó theo thẻ Xuất trận: ${DIFFICULTY.find((d) => d.id === pick.difficulty).name}.</p>
+      <button class="primary go" data-arena-go>VÀO VÕ TRƯỜNG</button>
+    </div>
+    <div class="card"><h3>Bảng điểm cục bộ · ${P1.sync ? "Đồng bộ cấp" : "Tự do"}</h3>
+      ${P1.mode === "duako" ? `<ol class="board">${board("duako|" + sk, true)}</ol>` : ""}
+      ${P1.mode === "thoigian" ? `<p class="small">Seed ${P1.seed}</p><ol class="board">${board("seed:" + P1.seed + "|" + sk)}</ol>` : ""}
+      ${P1.mode === "seedtuan" ? `<p class="small">Tuần ${week}</p><ol class="board">${board("tuan:" + week + "|" + sk)}</ol>` : ""}
+      ${P1.mode === "luyentap" ? `<p class="small">Luyện tập không ghi điểm.</p>` : ""}
     </div>
   </section>`;
 }
@@ -116,7 +160,7 @@ function nodeBtn(nd) {
   const owned = save.hero.nodes.includes(nd.id), c = P.canBuy(save, nd.id);
   const cls = owned ? "owned" : c.ok ? "avail" : "lock";
   return `<button class="node ${cls}" data-node="${nd.id}" title="${esc(owned ? "Đã học" : c.why || "Học nút này")}">
-    <b>${nd.name}</b><span>${nd.text}</span>${nd.kind ? `<em>${nd.kind}</em>` : ""}${nd.inert ? `<em class="inert">Kế Sách chưa có ở bản thử</em>` : ""}
+    <b>${nd.name}</b><span>${nd.text}</span>${nd.kind ? `<em>${nd.kind}</em>` : ""}${nd.inert ? `<em class="inert">${nd.inertWhy || "chưa có ở bản thử"}</em>` : ""}
     ${!owned && !c.ok ? `<small>${esc(c.why)}</small>` : ""}</button>`;
 }
 
@@ -205,8 +249,20 @@ function lockedCard(name, lv) {
 
 // ---- gắn sự kiện ------------------------------------------------------------------------------
 const bind = {
+  votruong() {
+    app.querySelector("[data-tab-go]")?.addEventListener("click", () => { tab = "doanhtrai"; render(); });
+    app.querySelectorAll("[data-amode]").forEach((b) => (b.onclick = () => { arenaPick.mode = b.dataset.amode; render(); }));
+    app.querySelectorAll("[data-ap]").forEach((el) => (el.onchange = () => {
+      const k = el.dataset.ap, v = el.type === "checkbox" ? el.checked : el.type === "range" || el.type === "number" ? Number(el.value) : el.value;
+      if (k === "R") pick.R = Number(v); else arenaPick[k] = v;
+      render();
+    }));
+    app.querySelector("[data-rseed]")?.addEventListener("click", () => { arenaPick.seed = Math.floor(Math.random() * 999999); render(); });
+    app.querySelector("[data-arena-go]")?.addEventListener("click", startArena);
+  },
   xuattran() {
     app.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => { pick.R = Number(b.dataset.r); render(); }));
+    app.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { save.settings.mode = b.dataset.mode; persist(); render(); }));
     app.querySelectorAll("[data-diff]").forEach((b) => (b.onclick = () => { pick.difficulty = b.dataset.diff; save.settings.difficulty = pick.difficulty; persist(); render(); }));
     app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
     app.querySelector("[data-go]").onclick = startBattle;
@@ -244,18 +300,49 @@ async function startBattle() {
   app.style.display = "none";
   let res;
   try {
-    res = await runBattle({ container: stage, save, R: pick.R, difficulty: pick.difficulty, onSettings: () => persist() });
+    res = await runBattle({ container: stage, save, R: pick.R, difficulty: pick.difficulty, mode: save.settings.mode || "nhanh", music, onSettings: () => persist() });
   } catch (err) {
     console.error(err);
     res = null;
     toast("Lỗi khi chạy trận: " + err.message, true);
   }
   stage.remove(); app.style.display = "";
+  if (!res?.won) music.play("hub");
   if (!res) { render(); return; }
   showResults(res);
 }
 
 const EVENT_WORD = { wait: "chưa xảy ra", run: "còn dang dở khi trận kết thúc", skip: "bỏ qua (tướng đã rút)", win: "giữ được", lose: "thất bại" };
+
+async function startArena() {
+  const week = isoWeekKey();
+  const opts = { ...arenaPick, week, seed: arenaPick.mode === "seedtuan" ? seedFromKey(week) : arenaPick.seed };
+  app.innerHTML = `<div class="loading"><h2>Võ trường</h2><p>${ARENA_MODES[opts.mode].text}</p><div class="spin"></div></div>`;
+  await new Promise((r) => setTimeout(r, 60));
+  const { runArena } = await import("./battle/arena.js");
+  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
+  app.style.display = "none";
+  let res = null;
+  try { res = await runArena({ container: stage, save, R: pick.R, difficulty: pick.difficulty, music, opts, onSettings: () => persist() }); }
+  catch (err) { console.error(err); toast("Lỗi Võ trường: " + err.message, true); }
+  stage.remove(); app.style.display = ""; music.play("hub");
+  if (!res) { render(); return; }
+  const rw = arenaRewards(save, res);
+  applyArena(save, res, rw); const lv = P.addExp(save, rw.exp); persist();
+  const medal = res.medal ? MEDALS.find((m) => m.id === res.medal) : null;
+  const line = res.mode === "duako" ? `${res.ko} KO trong 180 s` : res.cleared ? `Hạ hết 5 đợt trong ${fmtT(res.clearSec)}` : esc(res.why || "");
+  app.innerHTML = `<div class="results ${medal ? "win" : "lose"}">
+    <div class="rank-seal medal-${res.medal || "none"}">${medal ? medal.name : "–"}</div>
+    <h1>Võ trường · ${ARENA_MODES[res.mode].name}</h1><p>${line}${res.sync ? " · Đồng bộ cấp" : ""}</p>
+    <div class="card"><table class="stat">
+      ${rw.newMedals.length ? `<tr><td>Huy chương mới</td><td>${rw.newMedals.map((m) => MEDALS.find((x) => x.id === m).name).join(", ")}</td></tr>` : ""}
+      <tr><td>Tinh thiết</td><td>+${rw.tt}</td></tr><tr><td>EXP</td><td>+${n(rw.exp)}${lv ? ` · lên cấp ${save.hero.level}` : ""}</td></tr><tr><td>Tiền</td><td>+${n(rw.tien)}</td></tr>
+      ${rw.drops.map((d) => `<tr><td>Binh khí</td><td><b>${WEAPON_NAMES[d.tier]}</b> · ${esc(d.why)}</td></tr>`).join("")}
+    </table></div>
+    <div class="row center"><button class="primary" data-back>Về Doanh trại</button><button data-again>Chơi lại</button></div></div>`;
+  app.querySelector("[data-back]").onclick = () => { tab = "votruong"; render(); };
+  app.querySelector("[data-again]").onclick = () => startArena();
+}
 
 function showResults(res) {
   const score = res.won ? P.scoreBattle(res) : { diem: 0, rank: "-", rankMult: 0, parts: {} };
@@ -273,9 +360,10 @@ function showResults(res) {
     <h1>${res.won ? "Thắng trận Hàm Tử" : "Thua trận"}</h1><p>${esc(res.why)}</p>
     ${res.won ? `<div class="card"><h3>Điểm ${score.diem} / 100</h3><table class="stat">
       <tr><td>Nhiệm vụ (35)</td><td>${pct(parts.M)} · chính ${res.mainDone}/4, phụ ${res.sideDone}/2</td></tr>
-      <tr><td>Thời gian (15)</td><td>${pct(parts.T)} · ${Math.floor(res.timeSec / 60)}:${String(Math.floor(res.timeSec % 60)).padStart(2, "0")} (par 10:00)</td></tr>
+      <tr><td>Thời gian (15)</td><td>${pct(parts.T)} · ${Math.floor(res.timeSec / 60)}:${String(Math.floor(res.timeSec % 60)).padStart(2, "0")} (par ${MODES[res.mode].par / 60}:00)</td></tr>
       <tr><td>Quân ta còn (20)</td><td>${pct(parts.Q)}</td></tr><tr><td>Cứ Điểm (20)</td><td>${pct(parts.C)}</td></tr>
-      <tr><td>KO (10)</td><td>${pct(parts.K)} · ${res.ko} KO (par 400)</td></tr></table></div>` : ""}
+      <tr><td>Kế Sách (10)</td><td>${pct(parts.K)} · ${(res.keSachList || []).map((k) => `${k.name}: ${k.word.toLowerCase()}`).join(", ")}</td></tr>
+      <tr><td>KO</td><td>${res.ko} (par ${MODES[res.mode].koPar})</td></tr></table></div>` : ""}
     <div class="grid2">
       <div class="card"><h3>Phần thưởng</h3><table class="stat">
         <tr><td>EXP</td><td>+${n(rw.exp)}${applied.levelsGained ? ` · <b>lên cấp ${save.hero.level}</b> (từ ${lvBefore})` : ""}</td></tr>
@@ -288,6 +376,7 @@ function showResults(res) {
       <div class="card"><h3>Quân ta và Hào Khí</h3><table class="stat">
         <tr><td>Hào Khí gốc</td><td>${Math.round(res.hkRaw)} · nguồn tùy chọn ${res.hkRaw ? Math.round((res.hkOptional / res.hkRaw) * 100) : 0}%</td></tr>
         <tr><td>Tổng Phản Công</td><td>${res.tpcCount} lần</td></tr><tr><td>Mệnh Lệnh</td><td>${res.orders}</td></tr>
+        <tr><td>Kế Sách thành công</td><td>${res.keSachOk} / ${(res.keSachList || []).length}</td></tr>
         <tr><td>Sĩ Khí TB</td><td>${Math.round(res.avgSK)}</td></tr>
         ${Object.entries(res.events || {}).map(([k, v]) => `<tr><td>${k === "counterA1" ? "Cứ Điểm bị phản công" : "Tướng ta bị vây"}</td><td>${esc(EVENT_WORD[v] || v)}</td></tr>`).join("")}
       </table><details><summary>Hào Khí theo nguồn</summary><table class="stat">${hkRows}</table></details></div>

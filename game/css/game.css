@@ -134,6 +134,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-events { position: absolute; right: 12px; top: 250px; display: flex; flex-direction: column; gap: 4px; }
 .ev { background: rgba(120,30,20,.8); border: 1px solid var(--bad); border-radius: 6px; padding: 5px 10px; display: flex; gap: 10px; font-size: .8rem; animation: pulse2 1s infinite alternate; }
 @keyframes pulse2 { to { background: rgba(160,40,25,.85); } }
+.hud-ks { position: absolute; right: 12px; top: 330px; width: 244px; display: flex; flex-direction: column; gap: 4px; }
+.ks { background: rgba(21,18,16,.8); border: 1px solid #6b4f2e; border-left: 3px solid var(--vang); border-radius: 6px; padding: 5px 9px; font-size: .74rem; display: flex; flex-direction: column; }
+.ks b { font-family: var(--serif); color: var(--vang2); font-size: .8rem; } .ks i { font-style: normal; color: var(--muted); } .ks i em { font-style: normal; color: #cfe3b8; }
+.ks.sansang { border-color: #ffd27a; box-shadow: 0 0 12px rgba(255,210,122,.5); animation: pulse 0.8s infinite alternate; }
+.ks.thanhcong { border-left-color: var(--good); } .ks.thatbai { border-left-color: var(--bad); }
 .hud-target { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: 360px; opacity: 0; transition: opacity .2s; }
 .hud-target.on { opacity: 1; } .tname { text-align: center; font-family: var(--serif); color: #ffb09a; font-size: .9rem; }
 .bar.thp > div { background: linear-gradient(#c0392b, #7e2419); } .bar.tpo { height: 6px; } .bar.tpo > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
@@ -191,3 +196,30 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
   .hud-phase { display: none; } .hud-msgs { width: 260px; top: 70px; } .hud-map { transform: scale(.7); transform-origin: top right; }
   .bars { width: 200px; } .hud-events { top: 180px; }
 }
+
+/* ---- Võ trường ---- */
+.amodes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.amode { text-align: left; display: flex; flex-direction: column; gap: 4px; min-height: 104px; }
+.amode.on { border-color: var(--vang); background: #3a2a1c; } .amode b { font-family: var(--serif); color: var(--vang2); } .amode span { font-size: .78rem; }
+.medal { font-style: normal; font-weight: 700; font-size: .75rem; padding: 1px 6px; border-radius: 4px; align-self: flex-start; }
+.medal.vang, .arena-medals .vang.got { background: #8a6a1a; color: #ffe7a0; } .medal.bac, .arena-medals .bac.got { background: #5d6770; color: #eef3f6; } .medal.dong, .arena-medals .dong.got { background: #6e4424; color: #f4d2b0; }
+.board { padding-left: 20px; } .board li { margin: 4px 0; }
+.rank-seal.medal-vang { background: #8a6a1a; font-size: 2.2rem; } .rank-seal.medal-bac { background: #5d6770; font-size: 2.2rem; } .rank-seal.medal-dong { background: #6e4424; font-size: 2.2rem; } .rank-seal.medal-none { background: #2e2620; font-size: 3rem; }
+.arena-top { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); text-align: center; background: rgba(21,18,16,.75); border: 1px solid #6b4f2e; border-radius: 10px; padding: 6px 18px; min-width: 260px; }
+.arena-top b { font-family: var(--serif); color: var(--vang2); font-size: .8rem; letter-spacing: .1em; }
+.arena-big { font-family: var(--serif); font-size: 2rem; color: var(--trung); line-height: 1.1; } .arena-top span { font-size: .85rem; }
+.arena-medals { display: flex; gap: 6px; justify-content: center; margin-top: 4px; } .arena-medals span { font-size: .7rem; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.4); color: var(--muted); }
+.arena-mode .touch [data-b=kesach], .arena-mode .touch [data-b=cmd], .arena-mode .touch [data-b=tpc] { display: none; }
+@media (max-width: 860px) { .amodes { grid-template-columns: 1fr 1fr; } }
+
+/* ảnh Higgsfield trên HUD: mặt trống đồng */
+.hk { position: relative; padding-left: 46px; }
+.hk::before { content: ""; position: absolute; left: 6px; top: 50%; width: 36px; height: 36px; transform: translateY(-50%); background: url(../assets/fx/seal.webp) center/contain no-repeat; opacity: .9; }
+.hk:has(.hk-bar.ready)::before, .hk:has(.hk-bar.tpc)::before { animation: sealspin 6s linear infinite; filter: drop-shadow(0 0 6px rgba(255,210,122,.9)); }
+@keyframes sealspin { to { transform: translateY(-50%) rotate(360deg); } }
+.cine::before { content: ""; position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; transform: translate(-50%, -50%); background: url(../assets/fx/seal.webp) center/contain no-repeat; opacity: .55; z-index: -1; }
+.cine.on::before { animation: cineseal 1.7s ease-out; }
+@keyframes cineseal { from { transform: translate(-50%, -50%) rotate(-40deg) scale(.6); } to { transform: translate(-50%, -50%) rotate(20deg) scale(1.15); } }
+.brand h1 { padding-left: 52px; position: relative; } .brand h1::before { content: ""; position: absolute; left: 0; top: 50%; width: 44px; height: 44px; transform: translateY(-50%); background: url(../assets/fx/seal.webp) center/contain no-repeat; }
+.loading h2::before { content: ""; display: block; width: 120px; height: 120px; margin: 0 auto 12px; background: url(../assets/fx/seal.webp) center/contain no-repeat; animation: sealspin2 8s linear infinite; }
+@keyframes sealspin2 { to { transform: rotate(360deg); } }

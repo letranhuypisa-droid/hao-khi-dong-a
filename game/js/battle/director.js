@@ -3,7 +3,8 @@
 
 import * as THREE from "three";
 import { FRONTS, BASES, BASE_RING, PHASES, EVENTS, ALLY_GENERALS, MAP, lineToX, ENEMY_MIX } from "../data/battle-b15.js";
-import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS } from "../data/tuning.js";
+import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS, MODES } from "../data/tuning.js";
+import { KeSachManager } from "./kesach.js";
 import { PICKUPS, DROPS } from "../data/progression.js";
 import { simTick, issueOrder, triggerTPC, totalQ, snapshot as simSnapshot } from "../sim/front.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
@@ -32,6 +33,8 @@ export class Director {
     this.lastFront = "A"; this.hqLostT = 0;
     this.selectedFront = "A";
     this.generals = {};
+    this.mode = ctx.mode || "nhanh"; this.M = MODES[this.mode];
+    this.keSach = new KeSachManager(ctx, this.mode);
     for (const id in ctx.sim.bases) ctx.world.setBaseOwner(id, ctx.sim.bases[id].owner);
     for (const fid in FRONTS) { this.prevQ[fid] = { ta: totalQ(ctx.sim.fronts[fid], "ta"), dich: totalQ(ctx.sim.fronts[fid], "dich") }; this.actorLossAcc[fid] = { ta: 0, dich: 0 }; }
     this.spawnGenerals();
@@ -83,9 +86,10 @@ export class Director {
     this.updatePickups(dt);
     this.updateFlags(dt);
     if (this.phase === 3) this.updateBossPhase(dt);
+    this.keSach.update(dt);
     if (this.winAt && this.time >= this.winAt) this.win();
     if (this.guardDue?.length && this.time >= this.guardDue[0]) { this.guardDue.shift(); this.spawnGuards(); }
-    if (this.time >= QUICK.timeout) this.lose("Quá 30 phút — quân Nguyên giữ được bến Hàm Tử.");
+    if (this.time >= this.M.timeout) this.lose("Quá 30 phút — quân Nguyên giữ được bến Hàm Tử.");
     for (const m of this.msgs) m.t += dt;
     this.msgs = this.msgs.filter((m) => m.t < m.T);
   }
@@ -297,6 +301,7 @@ export class Director {
 
   onBaseTaken(id, by) {
     const ctx = this.ctx, d = baseDef(id), sim = ctx.sim;
+    this.keSach.onBaseTaken(id);
     const optional = id === "B2";
     this.hk(d.hk[0], "chiếm:" + id, optional);
     ctx.fx.banner(`CHIẾM ${d.name.toUpperCase()}`, "#f1d98a", 1.4); ctx.audio.play("capture");
@@ -333,6 +338,7 @@ export class Director {
     const f = ctx.sim.fronts[d.front]; f.sk.ta = Math.min(100, f.sk.ta + 15);
     ctx.fx.banner(`PHÁ ${d.name.toUpperCase()}`, "#f1d98a", 1.5); ctx.audio.play("gateBreak"); ctx.fx.shake(0.8);
     ctx.fx.dust(g.x, g.z, 3);
+    for (const dz of [-5, 0, 5]) ctx.fx.fire(g.x - 0.5, heightAt(g.x, g.z + dz), g.z + dz, 30, 3 + Math.abs(dz) * 0.1);
     this.drop("colenh", g.x - 4, g.z);
     if (first && this.phase === 2) this.completeMain(2);
     if (this.gatesOpen() === 2 && !this.side.S_GATES) { this.side.S_GATES = true; this.hk(HAO_KHI.src.sideMission, "nhiệm vụ phụ", true); this.say("Nhiệm vụ phụ: đã mở cả hai cổng.", 4, "good"); }
@@ -393,7 +399,7 @@ export class Director {
 
   startCounterA1() {
     const ctx = this.ctx, E = EVENTS.counterA1, p = this.basePos("A1"), ev = this.events.counterA1;
-    ev.state = "run"; ev.left = E.limit;
+    ev.state = "run"; ev.left = E.limit * this.M.eventMult;
     const sx = p.x + 50, sz = p.z;
     for (let i = 0; i < E.squad; i++) {
       ctx.crowd.spawn({ side: "dich", unit: i % 3 === 2 ? "CUNGKY_NG" : "KHIEN_NG", role: "squad", src: "counterA1",
@@ -408,7 +414,7 @@ export class Director {
   startSurrounded() {
     const ctx = this.ctx, E = EVENTS.surrounded, ev = this.events.surrounded, gen = this.generals.H40;
     if (!gen || !gen.alive || gen.dead) { ev.state = "skip"; return; }
-    ev.state = "run"; ev.left = E.limit;
+    ev.state = "run"; ev.left = E.limit * this.M.eventMult;
     const p = this.basePos("B2"), gx = p.x - 16, gz = p.z + 6;
     gen.x = gx; gen.z = gz; gen.post = { x: gx, z: gz }; gen.inEvent = true;
     for (let i = 0; i < E.squad; i++) {
@@ -655,7 +661,7 @@ export class Director {
       sim: simSnapshot(ctx.sim), hk: clone(ctx.hk), main: [...this.main], side: { ...this.side },
       hero: { hp: h.hp, ki: h.ki, revives: h.revives, x: h.x, z: h.z }, ko: this.ko, koMs: this.koMs,
       openGates: { ...ctx.openGates }, events: clone(Object.fromEntries(Object.entries(this.events).map(([k, v]) => [k, { state: v.state === "run" ? "wait" : v.state }]))),
-      chestCoins: this.chestCoins, counterBoss: this.counterBoss,
+      chestCoins: this.chestCoins, counterBoss: this.counterBoss, keSach: this.keSach.snapshot(),
     };
   }
   restoreCheckpoint() {
@@ -677,6 +683,7 @@ export class Director {
     this.over = false; this.result = null; this.retries = (this.retries || 0) + 1;
     this.spawnGenerals(); this.spawnGuards(); this.fillActors(true);
     if (this.phase === 3) this.startBossPhase();
+    this.keSach.restore(c.keSach);
     this.say(`Tải lại đầu pha ${PHASES[this.phase].id}.`, 3);
   }
 
@@ -706,7 +713,8 @@ export class Director {
       avgSK: this.skSamples ? this.skSum / this.skSamples : 50, bossDefeated: !!this.bossDown,
       tpcCount: ctx.hk.tpcCount, chestCoins: this.chestCoins, extraTT: this.extraTT,
       events: Object.fromEntries(Object.entries(this.events).map(([k, v]) => [k, v.how || v.state])),
-      orders: this.orders || 0, items: this.itemsUsed || 0, mainDone, sideDone,
+      orders: this.orders || 0, items: this.itemsUsed || 0, mainDone, sideDone, mode: this.mode,
+      keSach: this.keSach.ratio(), keSachOk: this.keSach.successCount(), keSachList: this.keSach.hud().map((k) => ({ name: k.name, word: k.word, got: k.got, hk: k.hk })),
     };
   }
 }
