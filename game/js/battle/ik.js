@@ -119,6 +119,54 @@ export function rope(pts, n, ax, ay, az, seg, dt, opts = {}) {
   return pts;
 }
 
+// ---- tay hai khúc 3D (tay trái nắm chuôi đại kiếm, rig-motion.js) ------------------------------------
+// Khung như rig (models.js, anim.js): cánh tay buông dọc −y từ khớp vai; vai xoay Euler thứ tự "YXZ" (R = Ry·Rx·Rz);
+// khuỷu chỉ gập quanh trục x của nó, góc âm = cẳng tay gập về +z của khung cánh tay (el*x < 0 = gập khuỷu).
+// Vào: (tx, ty, tz) cổ tay đích so với khớp vai, (px, py, pz) hướng gợi ý cho khuỷu (pole, cùng khung cha của vai),
+// L1 cánh tay, L2 cẳng tay. Ra: out = [shx, shy, shz, elx]. Khuỷu nằm trong mặt phẳng (vai, đích, pole), lệch về phía
+// pole; điểm ngoài tầm với thì tay duỗi hết cỡ về phía điểm đó, quá gần thì co tối đa. Không cấp phát.
+export function armIK(tx, ty, tz, px, py, pz, L1, L2, out = [0, 0, 0, 0]) {
+  const reach = (L1 + L2) * 0.9995, dMin = Math.max(Math.abs(L1 - L2) + 1e-3, (L1 + L2) * 0.15);
+  let d = Math.sqrt(tx * tx + ty * ty + tz * tz);
+  if (!(d > 1e-6)) { tx = 0; ty = -1; tz = 0; d = 1; }
+  const ux = tx / d, uy = ty / d, uz = tz / d;
+  d = clamp(d, dMin, reach);
+  const ca = clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1), sa = Math.sqrt(1 - ca * ca);
+  const bend = Math.PI - Math.acos(clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -1, 1));
+  // pole vuông góc với hướng tới đích; suy biến (pole song song) thì lấy trục x hoặc z vuông góc
+  let pd = px * ux + py * uy + pz * uz, nx = px - pd * ux, ny = py - pd * uy, nz = pz - pd * uz;
+  let nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  if (nl < 1e-6) {
+    const fx = Math.abs(ux) < 0.9 ? 1 : 0, fz = 1 - fx;
+    pd = fx * ux + fz * uz; nx = fx - pd * ux; ny = -pd * uy; nz = fz - pd * uz; nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  }
+  nx /= nl; ny /= nl; nz /= nl;
+  // khung cánh tay: −y = hướng cánh tay a (xoay từ u về phía pole một góc α), +z = phía cẳng tay gập về, x = y × z
+  const ax = ca * ux + sa * nx, ay = ca * uy + sa * ny, az = ca * uz + sa * nz;
+  const zx = sa * ux - ca * nx, zy = sa * uy - ca * ny, zz = sa * uz - ca * nz;
+  const yx = -ax, yy = -ay, yz = -az;
+  const xx = yy * zz - yz * zy, xy = yz * zx - yx * zz, xz = yx * zy - yy * zx;
+  // ma trận cột [x y z] → Euler YXZ (như THREE.Euler.setFromRotationMatrix)
+  out[0] = Math.asin(-clamp(zy, -1, 1));
+  if (Math.abs(zy) < 0.9999999) { out[1] = Math.atan2(zx, zz); out[2] = Math.atan2(xy, yy); }
+  else { out[1] = Math.atan2(-xz, xx); out[2] = 0; }
+  out[3] = -bend;
+  return out;
+}
+// Vị trí khuỷu, cổ tay (so với khớp vai) theo góc vai YXZ, góc khuỷu: out = [ex, ey, ez, wx, wy, wz]. Để kiểm thử armIK và
+// đo tầm với.
+export function armFK(shx, shy, shz, elx, L1, L2, out = [0, 0, 0, 0, 0, 0]) {
+  const cx = Math.cos(shx), sx = Math.sin(shx), cy = Math.cos(shy), sy = Math.sin(shy), cz = Math.cos(shz), sz = Math.sin(shz);
+  // R = Ry·Rx·Rz; cột y và z của R
+  const r01 = cy * -sz + sy * sx * cz, r11 = cx * cz, r21 = -sy * -sz + cy * sx * cz;          // R·(0,1,0)
+  const r02 = sy * cx, r12 = -sx, r22 = cy * cx;                                                // R·(0,0,1)
+  const ce = Math.cos(elx), se = Math.sin(elx);
+  out[0] = -L1 * r01; out[1] = -L1 * r11; out[2] = -L1 * r21;
+  // cẳng tay trong khung cánh tay: Rx(elx)·(0, −L2, 0) = (0, −L2·cos, −L2·sin)
+  out[3] = out[0] - L2 * (ce * r01 + se * r02); out[4] = out[1] - L2 * (ce * r11 + se * r12); out[5] = out[2] - L2 * (ce * r21 + se * r22);
+  return out;
+}
+
 // Góc Euler (thứ tự "XYZ" với y = 0 thì chỉ còn x rồi z) để một khúc treo dọc −y trong khung cha
 // chĩa theo hướng (dx, dy, dz) đã đổi về khung cha. Trả out = [rx, rz]. Dùng cho khúc treo đơn giản
 // (vạt, tua) khi không muốn dựng quaternion.

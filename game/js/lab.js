@@ -6,6 +6,8 @@
 //   ?view=rigs&m=run&us=.3 tướng, sĩ quan, boss, tướng đồng minh cạnh nhau (&rigs=tuong,H33 để lọc); m như trên
 //                          cộng sweep, heavy, roar, shoot, ult (Tuyệt Kỹ boss), broken (Vỡ Thế 3,5 s); nhiều u
 //                          (&us=0,.25,.5) = mỗi rig một dải
+//   &hero=H31              tướng H31 (rig RIGS.H31, bộ đòn WC01 anim-wc01.js) thay H35 ở view=hero; m nhận thêm hich, binhThu,
+//                          ult; ở view=rigs thì H31 chỉ hiện khi ghi rõ (&rigs=H31) và dùng tư thế WC01
 //   &play                  chạy thời gian thật thay vì khung đứng
 //   &cols=8&sp=1.8         số cột, khoảng cách hình (m): dải khung hình một hàng khi xem chu kỳ bước
 // window.__lab.set(opts) đổi cảnh không cần tải lại (dùng khi chụp màn bằng script).
@@ -19,6 +21,14 @@ import { HERO_ANIM, HERO_MOVE_LIST } from "./battle/hero-anim.js";
 import { RIGS } from "./battle/models.js";
 import { RigMotion } from "./battle/rig-motion.js";
 import { MOVES } from "./data/tuning.js";
+import { ANIMS } from "./battle/hero-anim.js";
+import * as W1 from "./battle/anim-wc01.js";
+import { MOVES_WC01 } from "./data/moves-wc01.js";
+
+// Tướng dùng lớp WC01 (đại kiếm): bảng đòn, tư thế ngoài đòn, thời lượng clip
+const WC01_RIGS = { H31: 1 };
+const WC01_POSE = { idle: (u, t) => W1.idle(t), block: () => W1.block(), hit: (u) => W1.hitReact(u), dodge: (u) => W1.dodgeRoll(u), down: (u) => W1.knockdown(u) };
+const WC01_DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };
 
 const canvas = document.querySelector("canvas"), bar = document.querySelector(".bar");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -89,7 +99,7 @@ const params = new URLSearchParams(location.search);
 let opts = { view: params.get("view") || "kit", kit: params.get("kit") || "NG_DAO", s: params.get("s") || "strike", m: params.get("m") || "N1",
   play: params.has("play"), only: params.get("only"), us: params.get("us"), kits: params.get("kits"), yaw: Number(params.get("yaw") ?? 0.6), t: Number(params.get("t") ?? 0),
   ground: params.get("ground") || "flat", cols: Number(params.get("cols")) || 0, sp: Number(params.get("sp")) || 0,
-  dir: params.has("dir") ? Number(params.get("dir")) : 90 };
+  dir: params.has("dir") ? Number(params.get("dir")) : 90, hero: params.get("hero") || null };
 
 let items = [], labels = [];
 const mats = lambert();
@@ -112,10 +122,11 @@ function build() {
   else if (opts.view === "cycle") list = Object.keys(KITS).map((k) => ({ kit: k, s: "cycle" }));
   else if (opts.view === "hero") {
     const us = opts.us ? String(opts.us).split(",").map(Number) : [0, 0.15, 0.3, 0.36, 0.42, 0.5, 0.62, 0.8];
-    for (const u of us) list.push({ hero: true, key: "hero", m: opts.m, u });
+    const key = opts.hero && RIGS[opts.hero] ? opts.hero : "hero";
+    for (const u of us) list.push({ hero: true, key, m: opts.m, u });
   } else if (opts.view === "rigs") {
     const us = opts.us ? String(opts.us).split(",").map(Number) : [0.3];      // nhiều u: mỗi rig một dải khung
-    for (const key of String(opts.rigs ?? params.get("rigs") ?? Object.keys(RIGS).join(",")).split(","))
+    for (const key of String(opts.rigs ?? params.get("rigs") ?? Object.keys(RIGS).filter((k) => !WC01_RIGS[k]).join(",")).split(","))
       if (RIGS[key]) for (const u of us) list.push({ hero: true, key, m: opts.m, u });
   }
   const rigView = opts.view === "hero" || opts.view === "rigs";
@@ -129,7 +140,7 @@ function build() {
     if (o.hero) {
       it.rig = makeRig(RIGS[o.key]); it.motion = new RigMotion(it.rig); it.yaw = Math.PI - opts.yaw;
       scene.add(it.rig.root); it.rig.root.position.set(it.x, labGround(it.x, it.z), it.z); it.rig.root.rotation.y = it.yaw;
-      it.pose = A.idle(0); it.phase = 0; it.dist = 0; it.settled = false;
+      it.pose = WC01_RIGS[o.key] ? W1.idle(0) : A.idle(0); it.phase = 0; it.dist = 0; it.settled = false;
     } else {
       const K = KITS[o.kit];
       it.K = K; it.pose = new Float32Array(NCH); it.settled = false;
@@ -159,7 +170,8 @@ function drawBar() {
   for (const k of Object.keys(KITS)) b(KITS[k].name, opts.view === "kit" && opts.kit === k, () => set({ view: "kit", kit: k }));
   b("chu kỳ đòn", opts.view === "cycle", () => set({ view: "cycle", play: true }));
   for (const s of ["strike", "windup", "hit", "dead2b"]) b(STATES[s].label, opts.view === "state" && opts.s === s, () => set({ view: "state", s }));
-  for (const m of HERO_MOVE_LIST) b(m, opts.view === "hero" && opts.m === m, () => set({ view: "hero", m }));
+  const heroMoves = opts.hero && WC01_RIGS[opts.hero] ? [...Object.keys(ANIMS.WC01), "idle", "run", "block", "blockwalk", "hit", "dodge", "down"] : HERO_MOVE_LIST;
+  for (const m of heroMoves) b(m, opts.view === "hero" && opts.m === m, () => set({ view: "hero", m }));
   for (const m of ["idle", "run", "strafe", "blockwalk", "sweep", "heavy", "broken", "ult"]) b("tướng/sĩ quan: " + m, opts.view === "rigs" && opts.m === m, () => set({ view: "rigs", m }));
   for (const g of Object.keys(GROUNDS)) b("đất: " + g, opts.ground === g, () => set({ ground: g }));
   b(opts.play ? "dừng" : "chạy", opts.play, () => set({ play: !opts.play }));
@@ -175,12 +187,13 @@ const RIG_ANIM = {
   broken: (u, t, it) => A.stagger(u * 3.5, longWpn(it)),                                      // Vỡ Thế (BigUnit.broken)
   ult: (u) => (u < 0.45 ? A.heavyChop(u / 0.45 * 0.5, 0.9) : A.spin((u - 0.45) / 0.55, 2)),     // Tuyệt Kỹ Toa Đô
 };
-const rigDur = (m) => MOVES[m]?.dur ?? (m === "ult" ? 1.9 : m === "dodge" ? 0.32 : m === "broken" ? 3.5 : 0.95);
+const rigDur = (m, it) => (it && WC01_RIGS[it.key] ? MOVES_WC01[m]?.dur ?? WC01_DUR[m] : null)
+  ?? MOVES[m]?.dur ?? (m === "ult" ? 1.9 : m === "dodge" ? 0.32 : m === "broken" ? 3.5 : 0.95);
 const longWpn = (it) => ["giao", "dadao"].includes(RIGS[it.key].weapon);          // như BigUnit.longWeapon
 window.__lab.camera = camera;          // kịch bản chụp màn đặt camera cận cảnh (bàn chân, vạt áo)
 window.__lab.items = () => items;
 const WALKS = { run: 1, strafe: 1, blockwalk: 1 };
-const rigSpeed = (it) => (it.m === "strafe" ? 1.5 : it.m === "blockwalk" ? 2 : it.key === "hero" ? 6.75 : 4.2);
+const rigSpeed = (it) => (it.m === "strafe" ? 1.5 : it.m === "blockwalk" ? 2 : it.key === "hero" ? 6.75 : it.key === "H31" ? 6.0 : 4.2);
 // Nhịp bước theo kiểu đi: chạy (gait), đi ngang thăm dò (strafeGait), bước khi đỡ (stepGait, như Hero.updateBlock).
 const walkGait = (it, sp) => (it.m === "run" ? A.gait : it.m === "strafe" ? A.strafeGait : A.stepGait)(sp, it.rig.scale);
 // Một bước mô phỏng (dt giây): đi/chạy thì dời root theo hướng đi (run: trước mặt, strafe: sang phải, blockwalk:
@@ -192,9 +205,10 @@ function rigStep(it, dt, u, t) {
     const sp = rigSpeed(it), g = walkGait(it, sp);
     it.phase += dt * g.rate; it.dist += dt * sp;
     const dr = (opts.dir ?? 90) * Math.PI / 180, dx = m === "run" ? 0 : m === "strafe" ? 1 : Math.sin(dr), dz = m === "run" ? 1 : m === "strafe" ? 0 : Math.cos(dr);
-    if (m === "run") target = A.run(it.phase, 1, g.stride);
+    const wc01 = WC01_RIGS[it.key];
+    if (m === "run") target = wc01 ? W1.run(it.phase, 1, g.stride) : A.run(it.phase, 1, g.stride);
     else if (m === "strafe") target = A.strafe(it.phase, 1, g.stride);
-    else target = A.guardStep(A.BLOCK, it.phase, dx, dz, g.stride);
+    else target = A.guardStep(wc01 ? W1.BLOCK : A.BLOCK, it.phase, dx, dz, g.stride);
     const wpn = RIGS[it.key].weapon;
     if (m === "run" && (wpn === "giao" || wpn === "dadao")) A.carryLong(target, it.phase);    // như BigUnit.moveToward
     k = m === "run" ? 0.35 : m === "blockwalk" ? 0.8 : 0.5;          // như Hero (chạy, đỡ), BigUnit (đi ngang)
@@ -202,7 +216,8 @@ function rigStep(it, dt, u, t) {
     const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw);
     px += (dx * cy + dz * sy) * off; pz += (dz * cy - dx * sy) * off;
   } else {
-    target = (HERO_ANIM[m] || RIG_ANIM[m] || RIG_ANIM.idle)(u, t, it); k = m === "idle" ? 0.15 : m === "broken" ? 0.25 : 0.8;
+    const tbl = WC01_RIGS[it.key] ? ANIMS.WC01 : HERO_ANIM, pz0 = WC01_RIGS[it.key] ? WC01_POSE : RIG_ANIM;
+    target = (tbl[m] || pz0[m] || RIG_ANIM[m] || pz0.idle)(u, t, it); k = m === "idle" ? 0.15 : m === "broken" ? 0.25 : 0.8;
   }
   it.pose = A.blendPose(it.pose, target, k); A.applyPose(it.rig, it.pose);
   root.position.set(px, labGround(px, pz), pz); root.rotation.y = it.yaw;
@@ -211,7 +226,7 @@ function rigStep(it, dt, u, t) {
 function rigFrame(it, t) {
   if (opts.play) {
     const dt = Math.min(0.1, Math.max(0, t - (it.lastT ?? t))); it.lastT = t;
-    rigStep(it, dt, (t / rigDur(it.m)) % 1, t);
+    rigStep(it, dt, (t / rigDur(it.m, it)) % 1, t);
     return;
   }
   if (it.settled) return;
@@ -224,7 +239,7 @@ function rigFrame(it, t) {
     for (let n = 0; n < 90; n++) rigStep(it, h, 0, t);
   } else {
     for (let n = 0; n < 40; n++) rigStep(it, h, 0, t);
-    const steps = Math.max(1, Math.round(it.u * rigDur(it.m) / h));
+    const steps = Math.max(1, Math.round(it.u * rigDur(it.m, it) / h));
     for (let n = 1; n <= steps; n++) rigStep(it, h, it.u * n / steps, t + n * h);
   }
   it.settled = true;

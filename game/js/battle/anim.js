@@ -26,6 +26,9 @@ export function blendPose(a, b, t) {
   const bs = b.spin || 0, br = b.rootX || 0;
   p.spin = bs - wrapPi(bs - (a.spin || 0)) * (1 - t);
   p.rootX = br - wrapPi(br - (a.rootX || 0)) * (1 - t);
+  // kênh grip (0..1, tay trái nắm chuôi vũ khí hai tay — rig-motion.js): chỉ có khi một trong hai tư thế có (tư thế song
+  // đao của H35 không có kênh này nên kết quả trộn giữ nguyên như cũ); thiếu thì coi là 0
+  if (a.grip !== undefined || b.grip !== undefined) p.grip = (a.grip || 0) + ((b.grip || 0) - (a.grip || 0)) * t;
   return p;
 }
 
@@ -42,8 +45,8 @@ export function applyPose(rig, p) {
 }
 
 // ---- nhịp ------------------------------------------------------------------------------------
-const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
-const EASE = {
+export const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
+export const EASE = {
   lin: (t) => t,
   io: (t) => t * t * (3 - 2 * t),
   out: (t) => 1 - (1 - t) * (1 - t),
@@ -51,12 +54,13 @@ const EASE = {
   in: (t) => t * t,
   snap: (t) => 1 - (1 - t) ** 4,            // chém: gần như tức thì rồi hãm lại
 };
-const seg = (u, a, b) => clamp01((u - a) / (b - a));
+export const seg = (u, a, b) => clamp01((u - a) / (b - a));
 
+// Các hàm dựng dưới đây xuất ra cho bộ đòn lớp khác (anim-wc01.js) dùng chung; hành vi không đổi.
 // Dựng tư thế đầy đủ từ phần khác 0.
-function P(o) { const p = zeroPose(); for (const k in o) p[k] = o[k]; return p; }
+export function P(o) { const p = zeroPose(); for (const k in o) p[k] = o[k]; return p; }
 // Trộn dãy khung khoá [[u, tư thế, nhịp]] tại u.
-function keys(u, ks) {
+export function keys(u, ks) {
   if (u <= ks[0][0]) return { ...ks[0][1] };
   for (let i = 1; i < ks.length; i++) {
     const [u1, p1, e = "io"] = ks[i];
@@ -65,9 +69,9 @@ function keys(u, ks) {
   return { ...ks[ks.length - 1][1] };
 }
 // Cộng thêm (dùng cho thở, xoay tròn chồng lên khung khoá).
-function add(p, o) { for (const k in o) p[k] += o[k]; return p; }
+export function add(p, o) { for (const k in o) p[k] += o[k]; return p; }
 // Lật trái ↔ phải (đòn tay trái dùng lại khung của tay phải).
-function mirror(p) {
+export function mirror(p) {
   const q = { ...p };
   for (const [a, b] of [["shLx", "shRx"], ["elLx", "elRx"], ["handLx", "handRx"], ["hipLx", "hipRx"], ["kneeLx", "kneeRx"]]) { q[a] = p[b]; q[b] = p[a]; }
   q.shLy = -p.shRy; q.shRy = -p.shLy; q.shLz = -p.shRz; q.shRz = -p.shLz; q.handLz = -p.handRz; q.handRz = -p.handLz;
@@ -78,7 +82,7 @@ function mirror(p) {
 
 // ---- thế thủ, chạy -----------------------------------------------------------------------------
 // Song đao: đao phải chếch lên trước, đao trái cầm thấp chĩa xuống; chân trụ lệch, gối chùng.
-const GUARD = P({
+export const GUARD = P({
   torsoX: 0.1, torsoY: 0.18, hipsYaw: -0.18, hipsY: -0.08,
   shRx: -0.45, shRy: 0.15, shRz: 0.12, elRx: -1.05, handRx: 0.55,
   shLx: 0.05, shLy: -0.1, shLz: -0.28, elLx: -0.75, handLx: 0.95,
@@ -89,9 +93,10 @@ const RELAX = P({
   hipLx: -0.1, kneeLx: 0.12, hipRx: 0.08, kneeRx: 0.08, hipsY: -0.02,
 });
 
-export function idle(t, guard = true) {
+// base: thế đứng của lớp vũ khí khác (anim-wc01.js); bỏ trống = song đao như cũ.
+export function idle(t, guard = true, base = null) {
   const b = Math.sin(t * 2.1) * 0.025, s = Math.sin(t * 0.9) * 0.04;
-  return add({ ...(guard ? GUARD : RELAX) }, { torsoX: b, hipsY: b * 0.8, shRx: -b, shLx: b, torsoY: s, hipsYaw: -s * 0.5 });
+  return add({ ...(base || (guard ? GUARD : RELAX)) }, { torsoX: b, hipsY: b * 0.8, shRx: -b, shLx: b, torsoY: s, hipsYaw: -s * 0.5 });
 }
 
 // Nhịp chạy khớp tốc độ để bàn chân trụ không trượt: sp (m/s), scale = cỡ rig. Nhịp bước (bước/giây) tăng
@@ -130,7 +135,8 @@ function runLeg(psi, stride, kl, drive, out = _rl) {
   out[1] = 0.15 + (v < 1 ? kl * sstep(0, R.rise, v) * (1 - sstep(R.fall, 1, v)) : 0);
   return out;
 }
-export function run(phase, speed01 = 1, stride = 0.95 * speed01) {
+// arms(p, phase, a): lớp vũ khí khác đặt lại tư thế tay (vd đại kiếm vác vai, anim-wc01.js); bỏ trống = ôm song đao như cũ.
+export function run(phase, speed01 = 1, stride = 0.95 * speed01, arms = null) {
   const s = Math.sin(phase), c = Math.cos(phase), a = speed01, R = RUN;
   const p = zeroPose();
   p.torsoX = 0.32 * a; p.torsoY = -0.16 * a * s; p.hipsYaw = 0.18 * a * s; p.headX = -0.2 * a;
@@ -141,6 +147,7 @@ export function run(phase, speed01 = 1, stride = 0.95 * speed01) {
   // chạy ôm đao: hai tay ngả ra sau, lưỡi đao kéo theo sau lưng
   p.shRx = 0.35 * a + 0.55 * a * s; p.shRz = 0.3; p.elRx = -0.55; p.handRx = 1.25;
   p.shLx = 0.35 * a - 0.55 * a * s; p.shLz = -0.3; p.elLx = -0.55; p.handLx = 1.25;
+  if (arms) arms(p, phase, a);
   return p;
 }
 
@@ -281,11 +288,13 @@ export const BLOCK = Object.freeze(P({
 }));
 export function block() { return BLOCK; }
 
-// Trúng đòn: giật ngửa người, tay văng, lùi nửa bước.
-export function hitReact(u) {
+// Trúng đòn: giật ngửa người, tay văng, lùi nửa bước. base: thế thủ của lớp khác, react: tư thế giật của lớp khác (bỏ trống
+// = song đao như cũ).
+export const HIT = P({ torsoX: -0.5, torsoY: 0.25, headX: -0.4, hipsY: -0.12, shRx: 0.4, shRz: 0.6, elRx: -0.6, handRx: 0.5,
+  shLx: 0.4, shLz: -0.6, elLx: -0.6, handLx: 0.5, hipLx: 0.3, kneeLx: 0.3, hipRx: -0.2, kneeRx: 0.5, rootX: -0.1 });
+export function hitReact(u, base = GUARD, react = HIT) {
   const k = Math.sin(clamp01(u) * Math.PI) ** 0.7;
-  return blendPose(GUARD, P({ torsoX: -0.5, torsoY: 0.25, headX: -0.4, hipsY: -0.12, shRx: 0.4, shRz: 0.6, elRx: -0.6, handRx: 0.5,
-    shLx: 0.4, shLz: -0.6, elLx: -0.6, handLx: 0.5, hipLx: 0.3, kneeLx: 0.3, hipRx: -0.2, kneeRx: 0.5, rootX: -0.1 }), k);
+  return blendPose(base, react, k);
 }
 
 // Né: lộn một vòng về trước, co tròn người. Khớp hông là tâm quay (rootX) nên lúc lộn ngược nâng hông lên (sin² theo
@@ -315,10 +324,12 @@ const REEL = P({ rootX: -0.22, hipsY: -0.16, torsoX: -0.35, headX: -0.3, shRx: 0
   shLx: 0.35, shLz: -0.45, elLx: -0.5, handLx: 0.5, hipLx: 0.25, kneeLx: 0.45, hipRx: -0.3, kneeRx: 0.45 });
 const SLUMP = P({ rootX: 0.05, hipsY: -0.3, torsoX: 0.5, torsoY: 0.12, headX: 0.45, shRx: 0.05, shRz: 0.2, elRx: -0.35, handRx: 0.85,
   shLx: 0.15, shLz: -0.25, elLx: -0.45, handLx: 0.6, hipLx: -0.55, hipLz: -0.08, kneeLx: 1.0, hipRx: 0.35, hipRz: 0.1, kneeRx: 1.05 });
-export function stagger(t, long = false) {
+// style(p, t, w): lớp vũ khí khác đặt lại tay (vd đại kiếm chống mũi gươm xuống đất); bỏ trống = như cũ.
+export function stagger(t, long = false, style = null) {
   const p = keys(seg(t, 0.15, 0.7), [[0, REEL], [1, SLUMP, "io"]]);
   const b = Math.sin(t * 4.5), w = seg(t, 0.4, 1);
   if (long) p.handRx = 0.35 + (0.85 - 0.35) * (1 - w);          // cán dài: mũi chống đất phía trước
+  if (style) style(p, t, w);
   return add(p, { torsoX: 0.05 * b * w, headX: 0.04 * b * w, shRx: -0.03 * b * w, hipsY: 0.012 * b * w,
     torsoZ: 0.05 * Math.sin(t * 1.6) * w, hipsYaw: 0.04 * Math.sin(t * 1.1) * w });
 }

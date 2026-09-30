@@ -1,7 +1,8 @@
-// battle/hero-anim.js — bảng hoạt ảnh đòn của H35 (WC03 Song đao): khoá đòn → hàm tư thế theo
+// battle/hero-anim.js — bảng hoạt ảnh đòn của H35 (WC03 Song đao; WC01 Đại kiếm ở anim-wc01.js): khoá đòn → hàm tư thế theo
 // tiến độ clip u ∈ [0,1]. Tách khỏi hero.js để lab.html xem được từng khung.
 
 import * as A from "./anim.js";
+import { HERO_ANIM_WC01 } from "./anim-wc01.js";
 
 // Chuỗi N: ngang phải → ngang trái → hất lên → bổ xuống (tay trái) → kéo chéo hai lưỡi → xoay.
 // C4 = xoay một vòng rồi bổ hai đao xuống đất (sóng xung kích lúc 0,55).
@@ -13,3 +14,6 @@ export const HERO_ANIM = {
   DN: (u) => A.dash(u), DC: (u) => A.dash(u), DQ: (u) => A.doubleChop(u), CT: (u) => A.slash(u, 1, 0),
 };
 export const HERO_MOVE_LIST = Object.keys(HERO_ANIM);
+
+// Bảng hoạt ảnh theo lớp vũ khí (lõi chọn theo HEROES[id].anim, data/heroes.js). WC03 giữ nguyên HERO_ANIM ở trên.
+export const ANIMS = { WC03: HERO_ANIM, WC01: HERO_ANIM_WC01 };

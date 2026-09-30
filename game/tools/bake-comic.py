@@ -1,6 +1,8 @@
 # tools/bake-comic.py — nướng comic một Chương cho game (GDD 22.3, 22.4).
 #
 #   python -X utf8 hao-khi-viet/game/tools/bake-comic.py B15-ham-tu --variant VS --renders <thư mục renders>
+#   python -X utf8 hao-khi-viet/game/tools/bake-comic.py B20-bach-dang --avif-q 49 --renders <thư mục renders>
+#     (B20 không khai variants: tự suy thứ tự từ pages, có phần decree + council; q 49 để 15 khung ≤ 3 MB AVIF)
 #
 # Đọc hao-khi-viet/comic/<chương>/panels.json (kịch bản, lời dẫn, bóng thoại, chữ trên cờ, quiz) và ảnh gốc 2K
 # trong renders/ (ảnh gốc nằm ngoài git, xem comic/.gitignore). Mỗi khung của biến thể được:
@@ -85,6 +87,18 @@ def xmp(chapter, pid, src_sha):
 KEEP = ("id", "part", "aspect", "caption", "capPos", "capW", "bubbles", "signs", "imageLabel", "insert")
 
 
+def derive_variant(d):
+    # panels.json không khai variants (B20): thứ tự đọc lấy theo trang (pages), rồi theo mảng panels; khung có trường
+    # insert là khung chèn giữa trận. Phần "decree" (Chủ soái quyết) đọc sau Quyết sách; có khối council thì Chương có
+    # Hiến kế (§12.6). B15 khai variants nên không đi qua nhánh này — đầu ra B15 giữ nguyên từng byte.
+    order = [pid for pg in d["pages"] for r in pg["rows"] for pid in r]
+    order += [p["id"] for p in d["panels"] if p["id"] not in order]
+    byid = {p["id"]: p for p in d["panels"]}
+    part = lambda name: [pid for pid in order if byid[pid]["part"] == name and "insert" not in byid[pid]]
+    return {"open": part("open"), "decree": part("decree"), "insert": [pid for pid in order if "insert" in byid[pid]],
+            "close": part("close"), "council": "council" in d}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("chapter"); ap.add_argument("--variant", default="VS"); ap.add_argument("--renders")
@@ -94,8 +108,8 @@ def main():
     src = os.path.join(COMIC, o.chapter)
     d = json.load(open(os.path.join(src, "panels.json"), encoding="utf-8"))
     cid = d["chapter"]["id"]
-    var = d["variants"][o.variant]
-    ids = var["open"] + var.get("insert", []) + var["close"]
+    var = d.get("variants", {}).get(o.variant) or derive_variant(d)
+    ids = var["open"] + var.get("decree", []) + var.get("insert", []) + var["close"]
     renders = o.renders or os.path.join(src, "renders")
     out_dir = os.path.join(GAME, "assets", "comic", cid)
     os.makedirs(out_dir, exist_ok=True)
@@ -129,6 +143,12 @@ def main():
         "pages": var.get("pages") or d["pages"], "panels": panels, "quiz": d.get("quiz", []),
         "provenance": "Ảnh AI (Higgsfield nano_banana_pro 2K), lọc lacquer v1 bằng tools/bake-comic.py; nguồn và ảnh bị loại: comic/" + o.chapter + "/NGUON-GOC.md",
     }
+    # Chương có Hiến kế: phần Chủ soái quyết (đọc sau Quyết sách) và dữ liệu Hiến kế cho ui/council.js. Chỉ thêm khóa khi
+    # có, để Chương không có (B15 bản VS) sinh ra đúng như cũ.
+    if var.get("decree"):
+        items = list(data.items()); at = [k for k, _ in items].index("open") + 1       # "decree" đứng ngay sau "open"
+        data = dict(items[:at] + [("decree", var["decree"])] + items[at:])
+    if var.get("council") and "council" in d: data["council"] = d["council"]
     js = os.path.join(GAME, "js", "data", f"comic-{cid.lower()}.js")
     with open(js, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"// Sinh bởi tools/bake-comic.py từ comic/{o.chapter}/panels.json (biến thể {o.variant}) — đừng sửa tay.\n")

@@ -7,7 +7,8 @@
 //   · áo choàng sĩ quan: 3 khúc bản lề (xương, lưới bọc da liền mặt), mỗi khúc một lò xo, khúc dưới trễ theo khúc
 //     trên (nâng, bay phần phật khi chạy, rủ khi đứng, uốn cong khi xoay/xoắn người), không xuyên cạp áo, vạt sau,
 //     đùi, cẳng chân;
-//   · cờ sau lưng tướng: vải xoay quanh cán (lò xo theo tốc độ, gió), nằm ngang khi ngã.
+//   · cờ sau lưng tướng: vải xoay quanh cán (lò xo theo tốc độ, gió), nằm ngang khi ngã;
+//   · tay trái nắm chuôi vũ khí hai tay (đại kiếm WC01, rig có dyn.grip): IK tay hai khúc tới điểm nắm trên chuôi.
 // Mỗi rig một thể hiện. Gọi update(dt, pose, ground) SAU khi đã đặt root (vị trí, yaw) và tư thế (applyPose):
 // dt là bước mô phỏng của Hero.update / BigUnit.update (1/60 s; hit-stop không có bước nào nên vải cũng đứng
 // yên), dt = 0 chỉ dựng lại hình, không chạy động lực. pose là tư thế đang trộn (anim.js): chân và hông dựng lại
@@ -46,7 +47,14 @@ const K = {
   bladeMax: 1.0,          // gập cổ tay tối đa để lưỡi vũ khí khỏi cắm đất (rad)
   wristLo: -0.5, wristHi: 1.6,   // góc cổ tay (hand*x) sau khi gập vẫn trong tầm tự nhiên: quá 1,6 lưỡi gập ngược vào người
   jump: 0.8,              // root dời quá chừng này trong một lượt = dịch chuyển tức thời (dời cả dây, xoá vận tốc)
+  // tay trái nắm chuôi (gripIK): hướng gợi ý khuỷu trong khung thân (ra ngoài bên trái, chúc xuống, hơi ra sau); trọng số
+  // giảm dần khi điểm nắm xa quá tầm với (tỉ lệ khoảng cách / dài tay từ gripFar0 tới gripFar1) — hơi quá tầm (nhát chém
+  // nhanh, 1–3 khung) thì tay vẫn duỗi thẳng về phía chuôi thay vì buông về tư thế gốc
+  gripPole: [-1, -0.7, -0.25], gripFar0: 1.3, gripFar1: 2.0,
 };
+// Tay rig (models.js): vai → khuỷu 0,34 (dọc −y); khuỷu → cổ tay (0, −0,36, 0,02): dài L2, lệch góc off quanh trục x.
+const ARM = { L1: 0.34, L2: Math.hypot(0.36, 0.02), off: Math.atan2(0.02, 0.36) };
+const _arm = [0, 0, 0, 0], _e = new THREE.Euler(0, 0, 0, "YXZ");
 
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3();
 const _f = new THREE.Vector3(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3();
@@ -110,6 +118,7 @@ export class RigMotion {
       tr: new Tracker(), obs: new Float32Array(4 * 16), nObs: 0 } : null;
     this.flag = d.flag ? { j: d.flag, cloth: rig.p.flagCloth, st: new Float32Array(4), pole: new Float32Array(4), tr: new Tracker() } : null;
     this.blades = d.blades || [];
+    this.grip = d.grip || null;             // { j: khớp cầm vũ khí, local: điểm tay trái nắm (khung khớp đó) }
     const P = rig.p;
     this.legs = [
       { hip: P.hipL, knee: P.kneeL, ankle: P.ankleL, key: "L", d: 0, c: 0, pw: 0, pa: 0, roll: 0, rollA: 0, gx: 0, gz: 0, g: 0 },
@@ -152,6 +161,7 @@ export class RigMotion {
     // ---- 2. ma trận phần trên (hông đã hạ) để lấy điểm neo; lưỡi vũ khí không cắm đất ----
     for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
     if (this.blades.length) this.fixBlades(pose, ground);
+    if (this.grip) this.gripIK(pose);          // sau fixBlades: cổ tay phải gập thì chuôi đổi chỗ
     // ---- 3. vạt áo, áo choàng, cờ, dây ----
     this.updateFlaps(dt, first, fresh);
     if (this.cape) this.updateCape(dt, first, fresh);
@@ -297,6 +307,27 @@ export class RigMotion {
       j.rotation.x = a0 + clamp(dl, lo, hi);
       j.updateWorldMatrix(false, false);
     }
+  }
+
+  // ---- tay trái nắm chuôi (vũ khí hai tay) ------------------------------------------------------------
+  // Tư thế đại kiếm (anim-wc01.js) chỉ cần đặt tay phải; tay trái giải IK hai khúc (ik.js armIK) cho cổ tay tới điểm nắm
+  // trên chuôi (dyn.grip, khung tay phải — đã gồm phần fixBlades gập cổ tay), trộn với tay trái của pose theo kênh grip
+  // (0 = buông, vd lúc chỉ gươm một tay, ngã, lộn né) và theo tầm với. Vai trộn bằng quaternion (slerp), khuỷu tuyến tính.
+  // Tay trái dựng lại từ pose mỗi lượt nên không cộng dồn. Không xoay bàn tay trái (không có mảnh nào gắn vào nó).
+  gripIK(pose) {
+    const P = this.rig.p, G = this.grip, w0 = clamp(pose.grip || 0, 0, 1);
+    P.shL.rotation.set(pose.shLx, pose.shLy, pose.shLz); P.elL.rotation.x = pose.elLx;
+    if (w0 < 1e-3) return;
+    _v.copy(G.local).applyMatrix4(G.j.matrixWorld);                     // điểm nắm (thế giới)
+    _v.applyMatrix4(_inv.copy(P.torso.matrixWorld).invert());           // về khung thân (đơn vị rig)
+    const sh = P.shL.position, tx = _v.x - sh.x, ty = _v.y - sh.y, tz = _v.z - sh.z, pl = K.gripPole;
+    IK.armIK(tx, ty, tz, pl[0], pl[1], pl[2], ARM.L1, ARM.L2, _arm);
+    const w = w0 * (1 - smooth(K.gripFar0, K.gripFar1, Math.sqrt(tx * tx + ty * ty + tz * tz) / (ARM.L1 + ARM.L2)));
+    if (w < 1e-3) return;
+    _q.setFromEuler(P.shL.rotation);
+    _q2.setFromEuler(_e.set(_arm[0], _arm[1], _arm[2], "YXZ"));
+    P.shL.quaternion.copy(_q.slerp(_q2, w));
+    P.elL.rotation.x = pose.elLx + (_arm[3] + ARM.off - pose.elLx) * w;
   }
 
   // ---- vạt áo ------------------------------------------------------------------------------------

@@ -1,0 +1,129 @@
+/* council.css — màn Quyết sách / Hiến kế (ui/council.js, systems §12.6). Cùng từ vựng với comic (story.css): nền then
+   ánh son, thẻ giấy dó viền mực như hộp lời dẫn, bóng thoại chữ viết tay, chip nhãn sử liệu. */
+
+.council { position: fixed; inset: 0; z-index: 58; display: grid; grid-template-rows: auto 1fr; overflow: hidden; color: #f4ead4;
+  background: radial-gradient(ellipse at 50% -10%, #3a1d12, transparent 62%), #140c08; animation: cfade .25s ease both; user-select: none; -webkit-user-select: none; }
+.council.out { animation: cfade .22s ease reverse both; }
+.cc-bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(16px) brightness(.42) saturate(.8); pointer-events: none; }
+.council::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(10,6,4,.7)); }
+.cc-bar { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 8px 14px; padding-top: max(8px, env(safe-area-inset-top));
+  background: rgba(20,12,8,.85); border-bottom: 1px solid #4a3020; }
+.cc-title { margin-right: auto; font-family: var(--serif); color: var(--vang2); font-weight: 700; font-size: .98rem; letter-spacing: .02em; }
+.cc-bar button { padding: 5px 12px; font-size: .85rem; }
+.cc-main { position: relative; z-index: 1; overflow: auto; min-height: 0; -webkit-overflow-scrolling: touch; display: grid; }
+.cc-in { width: 100%; max-width: 1100px; margin: auto; padding: 18px 22px 22px; padding-bottom: max(22px, env(safe-area-inset-bottom)); }
+
+.cc-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.cc-head .seal { width: 52px; height: 52px; font-size: 1.25rem; flex: none; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+.cc-prompt { margin: 0; font-family: var(--serif); font-size: 1.28rem; line-height: 1.45; color: #f4ead4; text-shadow: 0 1px 2px #000; }
+
+/* ba thẻ kế: giấy dó, viền mực, bóng lệch như hộp lời dẫn comic */
+.cc-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cc-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; min-height: 168px;
+  padding: 16px 16px 14px 18px; background: #f4ead4; color: #120d0a; border: 2px solid #120d0a; border-radius: 4px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.45), inset 0 0 0 1px rgba(155,45,32,.18), inset 0 0 40px rgba(120,80,40,.18);
+  font: 500 1.02rem/1.5 var(--sans); cursor: pointer; transition: transform .15s, box-shadow .15s, opacity .3s, filter .3s; }
+.cc-card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; background: var(--son); border-radius: 0 2px 2px 0; }
+.cc-card:hover:not(:disabled), .cc-card.focus { transform: translateY(-3px); box-shadow: 5px 7px 0 rgba(0,0,0,.45), 0 0 0 3px var(--vang), inset 0 0 40px rgba(120,80,40,.18); color: #120d0a; border-color: #120d0a; }
+.cc-card:disabled { opacity: 1; cursor: default; }
+.cc-n { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--son); color: var(--vang2); border: 2px solid #120d0a;
+  font: 900 .95rem/1 var(--serif); flex: none; }
+.cc-text { flex: 1; }
+.cc-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; }
+.cc-tags:empty { display: none; }
+.cc-tags .clabel { margin-left: 0; font-size: .74rem; padding: 1px 7px; }
+.cc-old { font: 700 .74rem/1.6 var(--sans); padding: 0 8px; border-radius: 3px; background: #120d0a; color: var(--vang2); border: 1px solid var(--vang); }
+.cc-you { font: 700 .74rem/1.6 var(--sans); padding: 0 8px; border-radius: 3px; background: var(--son); color: #fff; }
+.cc-card.sel { box-shadow: 4px 4px 0 rgba(0,0,0,.45), 0 0 0 3px var(--vang), 0 0 26px rgba(241,217,138,.35); }
+.cc-card.dim { opacity: .5; filter: saturate(.5); }
+.council.enter .cc-card { animation: ccin .45s cubic-bezier(.2,.8,.3,1) both; animation-delay: calc(var(--i) * 90ms + 80ms); }
+@keyframes ccin { from { opacity: 0; transform: translateY(18px) rotate(-1deg); } }
+
+/* lời đáp của chủ soái: bóng thoại như comic, đuôi chỉ lên thẻ đã chọn */
+.cc-reply { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 22px; }
+.cc-bub { position: relative; max-width: 640px; background: #fff; color: #120d0a; border: 2px solid #120d0a; border-radius: 20px; padding: .5em 1em .6em;
+  font: 400 1.35rem/1.3 "Patrick Hand", var(--sans); box-shadow: 3px 3px 0 rgba(0,0,0,.35); }
+.cc-bub .who { display: block; font: 700 .7rem/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: #b8321f; margin-bottom: 3px; }
+.cc-bub::after { content: ""; position: absolute; left: 50%; top: -9px; width: 14px; height: 14px; background: #fff; border: 2px solid #120d0a; border-right: 0; border-bottom: 0; transform: translateX(-50%) rotate(45deg); }
+.cc-fmark { font-size: .74rem; padding: 1px 8px; border-radius: 3px; background: rgba(106,90,74,.9); color: #fff; }
+.council.s-reply .cc-reply { animation: ccpop .35s ease both; }
+/* ba thẻ một hàng: bóng thoại đứng dưới thẻ đã chọn, đuôi chỉ lên thẻ ấy */
+@media (min-width: 701px) {
+  .cc-reply.at0 { align-items: flex-start; padding-left: 3%; }
+  .cc-reply.at2 { align-items: flex-end; padding-right: 3%; }
+  .cc-reply.at0 .cc-bub::after { left: 24%; }
+  .cc-reply.at2 .cc-bub::after { left: 76%; }
+}
+/* đã chọn: thẻ gọn lại để lời đáp và lệnh vừa một màn */
+.council.s-reply .cc-card, .council.s-decree .cc-card { min-height: 0; }
+@keyframes ccpop { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+
+/* lệnh Chủ soái quyết: hộp giấy dó lớn, chip Chính sử, dòng kết quả Quyết sách */
+.cc-decree { margin: 16px auto 0; max-width: 760px; background: #f4ead4; color: #120d0a; border: 2px solid #120d0a; border-radius: 4px; padding: 14px 18px 12px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.45), inset 0 0 50px rgba(120,80,40,.2); }
+.cc-dh { font: 700 .78rem/1.4 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: #9b2d20; }
+.cc-dh .clabel { text-transform: none; letter-spacing: 0; }
+.cc-dtext { margin: 6px 0 10px; font: 700 1.3rem/1.4 var(--serif); color: #120d0a; }
+.cc-res { margin: 0 0 6px; font-size: .92rem; line-height: 1.55; padding-top: 8px; border-top: 1px solid rgba(18,13,10,.2); }
+.cc-res b { color: #7e2419; }
+.cc-same { margin: 0; font-size: .78rem; color: #5a4838; }
+.council.s-decree .cc-decree { animation: ccpop .4s ease both; }
+.council.s-decree .cc-reply { opacity: .8; margin-top: 16px; }
+.council.s-decree .cc-in { padding-top: 12px; }
+.council.s-decree .cc-head { margin-bottom: 12px; }
+
+.cc-nav { display: flex; justify-content: center; align-items: center; min-height: 44px; margin-top: 18px; }
+.cc-nav .small { color: #c8b8a0; text-shadow: 0 1px 2px #000; }
+.cc-nav button { padding: 10px 26px; font-size: 1.02rem; }
+
+/* thẻ hướng dẫn 1 màn hình (lần đầu gặp Quyết sách) */
+.cc-tut { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(10,6,4,.78); overflow: auto; }
+.cc-tcard { max-width: 620px; width: 100%; background: linear-gradient(var(--then2), #1b1613); border: 1px solid var(--vang); border-radius: 10px; padding: 18px 22px 8px;
+  box-shadow: 0 16px 50px rgba(0,0,0,.6); animation: ccpop .35s ease both; }
+.cc-thead { display: flex; align-items: center; gap: 14px; }
+.cc-thead .seal { width: 48px; height: 48px; font-size: 1.1rem; }
+.cc-thead h2 { margin: 0; font-size: 1.5rem; }
+.cc-tcard ol { margin: 14px 0 0; padding-left: 22px; line-height: 1.55; color: var(--trung); }
+.cc-tcard li { margin: 7px 0; }
+.cc-tcard li b { color: var(--vang2); }
+.council.nomotion *, .council.nomotion { animation: none !important; transition: none !important; }
+
+/* điện thoại dọc: thẻ xếp chồng, chữ vừa tay */
+@media (max-width: 700px) {
+  .cc-in { padding: 14px 14px 18px; }
+  .cc-head { gap: 10px; margin-bottom: 14px; }
+  .cc-head .seal { width: 42px; height: 42px; font-size: 1rem; }
+  .cc-prompt { font-size: 1.05rem; }
+  .cc-cards { grid-template-columns: 1fr; gap: 12px; }
+  .cc-card { flex-direction: row; flex-wrap: wrap; align-items: center; min-height: 0; padding: 12px 12px 12px 14px; font-size: .96rem; gap: 10px; }
+  .cc-text { flex: 1 1 0; min-width: 0; }
+  .cc-tags { flex-basis: 100%; padding-left: 40px; }
+  .cc-bub { font-size: 1.15rem; }
+  .cc-dtext { font-size: 1.1rem; }
+  .cc-title { font-size: .86rem; }
+}
+/* điện thoại ngang (thấp): tiêu đề gọn, ba thẻ vẫn một hàng, cuộn dọc khi hiện lời đáp và lệnh */
+@media (max-height: 500px) {
+  .cc-bar { padding: 4px 10px; }
+  .cc-title { font-size: .8rem; }
+  .cc-bar button { padding: 3px 8px; font-size: .74rem; }
+  .cc-in { padding: 10px 14px 14px; }
+  .cc-head { margin-bottom: 10px; }
+  .cc-head .seal { width: 36px; height: 36px; font-size: .9rem; }
+  .cc-prompt { font-size: .98rem; }
+  .cc-cards { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .cc-card { flex-direction: column; align-items: flex-start; min-height: 0; padding: 10px 10px 10px 13px; font-size: .86rem; line-height: 1.4; gap: 6px; }
+  .cc-n { width: 24px; height: 24px; font-size: .8rem; }
+  .cc-tags { flex-basis: auto; padding-left: 0; }
+  .cc-reply { margin-top: 12px; }
+  .cc-bub { font-size: 1.05rem; }
+  .cc-decree { margin-top: 12px; padding: 10px 14px 8px; }
+  .cc-dtext { font-size: 1rem; margin: 4px 0 6px; }
+  .cc-res { font-size: .8rem; }
+  .cc-nav { margin-top: 10px; min-height: 36px; }
+  .cc-nav button { padding: 7px 20px; font-size: .92rem; }
+  .cc-tcard { padding: 12px 16px 4px; }
+  .cc-tcard ol { font-size: .84rem; margin-top: 8px; }
+  .cc-tcard li { margin: 4px 0; }
+  .cc-tcard .row.center { margin: 10px 0; }
+}
