@@ -15,7 +15,7 @@ import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
 import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
-import { TIERS, UNITS, KITS, AI, MOVES, pickKit, g, heSoGiap } from "../data/tuning.js";
+import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, pickKit, g, heSoGiap } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
 const KIT_IDS = Object.keys(KITS);
@@ -73,6 +73,7 @@ export class Crowd {
       walk: this.ctx.rng.next() * TWO_PI, spd: 0, mvx: 0, mvz: 1, gx: NaN, gz: NaN, gy: 0, ready: false, poseInit: false, frontRow: false,
       slotAng: undefined, blockT: 0, blockCd: 0, evadeT: 0, evadedSwing: -1, chargeT: 0, chargeCd: 2 + this.ctx.rng.next() * 4, chargeHit: false, fleeT: 0,
       hitBy: 0, scale: tier.scale * (K.scale || 1), lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
+      foe: null, retT: 0, duel: false, _eng: 0, slot: undefined, pool: null, partner: null,
     });
     if (!a.pose) a.pose = new Float32Array(NCH);
     resetMotion(a);                  // lò xo vạt áo, dây tua, trọng số IK của lần dùng trước (pool)
@@ -90,23 +91,33 @@ export class Crowd {
 
   hittable(a) { return a.alive && a.state !== "dead" && HITTABLE.has(a.role); }
 
-  // Sát thương vào lính. src: 'hero' | agent | 'ally'. Trả về true nếu hạ.
+  // Sát thương vào lính. opt.by: 'hero' | 'ally' | 'enemy'; opt.src: lính ra đòn (để quay lại đánh trả). Trả về true nếu hạ.
   damage(a, dmg, opt = {}) {
     if (!this.hittable(a)) return false;
     const kx = opt.kx ?? 0, kz = opt.kz ?? 0;
     const hard = opt.launch || (opt.knock || 2.5) >= 5;
     a.hitFront = kx * Math.sin(a.yaw) + kz * Math.cos(a.yaw) <= 0 ? 1 : -1;   // bị đẩy về sau lưng = trúng trước mặt
-    // đỡ khiên: đòn N của tướng trúng trước mặt, lính không đang gồng đòn, không đang chạy tán loạn
-    const pb = AI.block[a.kit] || 0;
-    if (pb && opt.by === "hero" && !hard && a.hitFront > 0 && a.windup <= 0 && a.blockCd <= 0 && a.fleeT <= 0 && this.ctx.rng.chance(pb)) {
+    // bị lính phe kia đánh: quay sang đánh trả kẻ đó (lính địch đang giữ thẻ đánh tướng thì thôi)
+    const src = opt.src;
+    if (src && src.K && src.side !== a.side && this.hittable(src) && !(a.side === "dich" && a.token) && a.foe !== src && (!a.foe || this.ctx.rng.chance(0.5))) {
+      a.foe = src; a.retT = Math.max(a.retT, 1.2);
+    }
+    // đỡ khiên: đòn N của tướng (hoặc nhát của lính) trúng trước mặt, lính không đang gồng đòn, không đang chạy tán loạn
+    const pb = opt.by === "hero" ? AI.block[a.kit] || 0 : AI.block[a.kit] ? AI.duel.block : 0;
+    if (pb && !hard && a.hitFront > 0 && a.windup <= 0 && a.blockCd <= 0 && a.fleeT <= 0 && this.ctx.rng.chance(pb)) {
       a.hp -= dmg * AI.blockDmg; a.blockT = 0.32; a.blockCd = AI.blockCd; a.flinch = 0.12;
-      const fx = this.ctx.fx; fx?.spark(a.x - kx * 0.5, heightAt(a.x, a.z) + 1.3 * a.scale, a.z - kz * 0.5, false, 0xf1d98a);
+      if (this.nearHero(a, 30)) this.ctx.fx?.spark(a.x - kx * 0.5, heightAt(a.x, a.z) + 1.3 * a.scale, a.z - kz * 0.5, false, 0xf1d98a);
       this.ctx.audio?.play("block", a.x, a.z);
       a.x += kx * 0.25; a.z += kz * 0.25;
       if (a.hp <= 0) { this.kill(a, opt); return true; }
       return false;
     }
-    a.hp -= dmg; a.flash = 0.12; a.blockT = 0;
+    a.hp -= dmg; a.flash = opt.by === "hero" ? 0.16 : 0.1; a.blockT = 0;
+    // lính chém lính: tiếng, tia máu nhỏ (chỉ quanh tướng cho đỡ tốn)
+    if (opt.by !== "hero" && src && this.nearHero(a, 30)) {
+      this.ctx.audio?.play("hitSoft", a.x, a.z);
+      this.ctx.fx?.blood?.(a.x, heightAt(a.x, a.z) + 1.2 * a.scale, a.z, kx, kz, 0.5);
+    }
     if (opt.stun) a.stun = Math.max(a.stun, opt.stun);
     if (a.hp <= 0) { this.kill(a, opt); return true; }
     // lực sĩ trọng giáp: đòn thường chỉ làm khựng người, không cắt được đòn đang gồng
@@ -118,8 +129,11 @@ export class Crowd {
 
   kill(a, opt = {}) {
     a.launchDeath = a.state === "launch" || !!opt.launch;
-    a.state = "dead"; a.dieT = 0; a.hp = 0; a.token = false;
-    a.vx = (opt.kx ?? 0) * (opt.knock || 3); a.vz = (opt.kz ?? 0) * (opt.knock || 3);
+    a.state = "dead"; a.dieT = 0; a.hp = 0; a.token = false; a.foe = null;
+    // tướng chém ngã: xác văng xa hơn, đòn nặng hất bổng lên (cảm giác đòn chắc tay)
+    const kk = opt.by === "hero" ? IMPACT.killKnock : 1;
+    a.vx = (opt.kx ?? 0) * (opt.knock || 3) * kk; a.vz = (opt.kz ?? 0) * (opt.knock || 3) * kk;
+    if (opt.by === "hero" && !a.K.mounted) a.vy = Math.max(a.vy, opt.heavy || (opt.knock || 0) >= 5 ? IMPACT.killUpHeavy : IMPACT.killUp);
     if (opt.launch) a.vy = Math.max(a.vy, 5);
     a.chargeT = 0; a.fleeT = 0;
     this.ctx.director?.onSoldierKilled(a, opt);
@@ -167,16 +181,54 @@ export class Crowd {
     }
   }
 
-  // Thân binh, quân theo tướng: ưu tiên kẻ đang đánh tướng.
+  // Thân binh, quân theo tướng: ưu tiên kẻ đang đánh tướng; giữ đối thủ cũ trừ khi kẻ mới gần hơn hẳn.
   threatFor(a, enemies, maxD) {
     const hero = this.ctx.hero;
     let best = null, bs = maxD;
     for (const e of enemies) {
       const d = Math.hypot(e.x - a.x, e.z - a.z);
-      if (d > maxD) continue;
-      const s = d - (e.token || (e.windup > 0 && e.target === hero) ? 5 : 0);
+      if (d > maxD || !this.leashOk(a, e)) continue;
+      const s = d - (e.token || (e.windup > 0 && e.target === hero) ? 5 : 0) - (e === a.foe ? AI.duel.switchGain : 0) + e._eng * 0.8;
       if (s < bs) { bs = s; best = e; }
     }
+    return best;
+  }
+
+  nearHero(a, r) { const h = this.ctx.hero; return (a.x - h.x) ** 2 + (a.z - h.z) ** 2 < r * r; }
+
+  // Đối thủ còn đánh được: lính phe kia còn sống trong vùng chiến đấu, hoặc tướng đồng minh còn đứng.
+  validFoe(a, f) {
+    if (!f) return false;
+    if (f.isBig) return f.alive && !f.dead && f.side !== a.side;
+    return f.side !== a.side && this.hittable(f) && f.fleeT <= 0;
+  }
+
+  // Dây xích: quân đồn trú (có anchor) chỉ đánh trong vòng Cứ Điểm + leash m, thân binh / quân theo tướng không đuổi
+  // xa tướng quá leash m. Không có dây này thì cung kỵ đồn trú mải đấu với thân binh, hai bên kéo nhau ra xa 20 m, đồn
+  // còn lính nên không chiếm được (bot kẹt ở A2).
+  leashOk(a, f) {
+    const L = AI.duel.leash;
+    if (a.anchor && !a.anchor.target) return Math.hypot(f.x - a.anchor.x, f.z - a.anchor.z) <= (a.anchor.r ?? 3) + L;
+    if (a.role === "guard" || a.role === "follow") { const h = this.ctx.hero; return Math.hypot(f.x - h.x, f.z - h.z) <= L + 4; }
+    return true;
+  }
+
+  // Chọn đối thủ giáp lá cà: gần nhất nhưng tránh dồn quá maxOn người vào một lính (_eng: số người đang nhắm nó,
+  // đếm lại mỗi khung), giữ đối thủ cũ (switchGain), quân ta ưu tiên kẻ đang đánh tướng người chơi.
+  pickFoe(a, list, maxD) {
+    const hero = this.ctx.hero, D = AI.duel;
+    let best = null, bs = Infinity;
+    for (const b of list) {
+      const d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d > maxD || !this.leashOk(a, b)) continue;
+      const mine = a.foe === b, eng = b._eng - (mine ? 1 : 0);
+      if (eng >= (b.isBig ? D.maxOnBig : D.maxOn)) continue;
+      let s = d + eng * 1.5 - (mine ? D.switchGain : 0);
+      if (a.side === "ta" && (b.token || (b.windup > 0 && b.target === hero))) s -= 3;
+      if (b.foe === a) s -= 1.5;                          // đánh người đang đánh mình
+      if (s < bs) { bs = s; best = b; }
+    }
+    if (best !== a.foe) { if (a.foe) a.foe._eng = Math.max(0, a.foe._eng - 1); if (best) best._eng++; }
     return best;
   }
 
@@ -185,6 +237,13 @@ export class Crowd {
     const ctx = this.ctx, hero = ctx.hero, rng = ctx.rng;
     const enemies = [], allies = [];
     for (const a of this.agents) if (this.hittable(a)) (a.side === "dich" ? enemies : allies).push(a);
+    // đối thủ của địch: lính ta và tướng đồng minh; đếm lại số người đang nhắm mỗi đối thủ
+    const allyFoes = allies.slice();
+    for (const u of ctx.units) if (u.side === "ta" && u.alive && !u.dead) { u._eng = 0; allyFoes.push(u); }
+    for (const a of enemies) a._eng = 0;
+    for (const a of allies) a._eng = 0;
+    for (const a of enemies) if (a.foe && this.validFoe(a, a.foe) && this.leashOk(a, a.foe)) a.foe._eng++; else a.foe = null;
+    for (const a of allies) if (a.foe && this.validFoe(a, a.foe) && this.leashOk(a, a.foe)) a.foe._eng++; else a.foe = null;
     this.assignTokens(enemies);
     this.assignSlots(enemies);
     // tướng đang gồng đòn nặng (trước cú trúng đầu): lính gần có thể nhảy lùi né
@@ -201,7 +260,13 @@ export class Crowd {
       if (a.state === "dead") {
         a.dieT += dt;
         a.x += a.vx * dt; a.z += a.vz * dt; a.vx *= 0.9; a.vz *= 0.9;
-        if (a.vy > 0 || a.y > 0) { a.y += a.vy * dt; a.vy -= 16 * dt; if (a.y < 0) { a.y = 0; a.vy = 0; } }
+        if (a.vy > 0 || a.y > 0) {
+          a.y += a.vy * dt; a.vy -= 16 * dt;
+          if (a.y < 0) {                                  // xác rơi chạm đất: bụi, tiếng ngã (chỉ quanh tướng)
+            if (a.vy < -4 && this.nearHero(a, 25)) { this.ctx.fx?.dust(a.x, a.z, 0.5); this.ctx.audio?.play("fall", a.x, a.z); }
+            a.y = 0; a.vy = 0;
+          }
+        }
         if (a.dieT > 2.8) this.release(a);
         continue;
       }
@@ -260,10 +325,24 @@ export class Crowd {
       const range = ranged ? K.range * rangeMult(heightAt(a.x, a.z) - heightAt(rt.x, rt.z)) : 0;
 
       // ---- chọn mục tiêu ----
-      let tx, tz, target = null, wantDist = 2.0, slot = false, kiting = false, perch = null;
+      // Đối thủ giáp lá cà (a.foe) chọn lại theo nhịp retarget, không mỗi khung: đổi mục tiêu liên tục làm lính chạy
+      // qua chạy lại. Mất đối thủ (chết, bỏ chạy) thì tìm ngay.
+      let tx, tz, target = null, wantDist = 2.0, slot = false, kiting = false, perch = null, duel = false;
+      a.retT -= dt;
       if (a.side === "dich") {
         const aggro = a.role === "garrison" ? 20 : a.role === "squad" ? 14 : 60;
-        if (hero.alive && dH < aggro) {
+        const heroNear = hero.alive && dH < aggro;
+        const siege = a.anchor?.target && a.anchor.target.alive && !a.anchor.target.dead;     // toán vây tướng đồng minh
+        if (!(a.token && heroNear) && !siege && (a.retT <= 0 || !a.foe)) {
+          a.retT = rng.range(AI.duel.retarget[0], AI.duel.retarget[1]);
+          a.foe = this.pickFoe(a, allyFoes, ranged ? range : AI.duel.engageR + (a.foe ? 2 : 0));
+        }
+        if (a.foe && !(a.token && heroNear) && !siege) {
+          // giáp lá cà với lính ta / tướng đồng minh
+          const f = a.foe, fr = f.isBig ? f.radius : 0;
+          target = f; tx = f.x; tz = f.z; duel = true;
+          wantDist = ranged ? range * 0.6 : reach * 0.85 + fr;
+        } else if (heroNear) {
           target = hero; tx = hero.x; tz = hero.z;
           const ring = ranged ? range * 0.7 : a.token ? reach : 4.2 + (a.id % 5) * 0.6 + (reach - 1.7);
           // cung thủ bộ Nguyên ưa gò cao gần đó: lên đỉnh gò đứng bắn xuống, bị áp sát thì lùi ngả về phía gò
@@ -281,20 +360,22 @@ export class Crowd {
           const C = AI.charge;
           if (K.heavy && a.token && a.chargeCd <= 0 && a.windup <= 0 && dH > C.minD && dH < C.maxD) {
             a.chargeT = C.dur; a.chargeCd = C.cd; a.chargeX = hx / dH; a.chargeZ = hz / dH;
-            ctx.audio?.play("warn", a.x, a.z); continue;
+            ctx.audio?.play("warn", a.x, a.z); ctx.audio?.play("charge", a.x, a.z); continue;
           }
         } else if (a.anchor) {
           const at = a.anchor.target && a.anchor.target.alive && !a.anchor.target.dead ? a.anchor.target : null;
           target = at; tx = at ? at.x : a.anchor.x; tz = at ? at.z : a.anchor.z; wantDist = a.anchor.r ?? 3;
-        } else {
-          const al = nearest(a, allies, ranged ? range : 14);
-          if (al) { target = al; tx = al.x; tz = al.z; wantDist = ranged ? range * 0.6 : reach; }
-          else { tx = a.sx; tz = a.sz; wantDist = 1; }
-        }
+        } else { tx = a.sx; tz = a.sz; wantDist = 1; }
       } else {
         const guard = a.role === "guard" || a.role === "follow";
-        const en = guard ? this.threatFor(a, enemies, 9) : nearest(a, enemies, ranged ? range + 2 : 16);
-        if (en) { target = en; tx = en.x; tz = en.z; wantDist = ranged ? range * 0.7 : reach; }
+        if (a.retT <= 0 || !a.foe) {
+          a.retT = rng.range(AI.duel.retarget[0], AI.duel.retarget[1]);
+          const nf = guard ? this.threatFor(a, enemies, 9) : this.pickFoe(a, enemies, ranged ? range + 2 : 16);
+          if (guard && nf !== a.foe) { if (a.foe) a.foe._eng = Math.max(0, a.foe._eng - 1); if (nf) nf._eng++; }
+          a.foe = nf;
+        }
+        const en = a.foe;
+        if (en) { target = en; tx = en.x; tz = en.z; wantDist = ranged ? range * 0.7 : reach * 0.85; duel = !ranged; }
         else if (guard) {
           const k = a.id % 12, ang = hero.yaw + Math.PI + (k - 5.5) * 0.35, rr = a.role === "guard" ? 3 : 5.5;
           tx = hero.x + Math.sin(ang) * rr; tz = hero.z + Math.cos(ang) * rr; wantDist = 0.6;
@@ -316,13 +397,20 @@ export class Crowd {
             if (ox * mvx + oz * mvz > 0) { mvx += ox / ol; mvz += oz / ol; const l = Math.hypot(mvx, mvz) || 1; mvx /= l; mvz /= l; }
           }
         }
+        else if (duel) {
+          // giáp lá cà: áp tới tầm chém rồi đứng vững mà đánh; thỉnh thoảng nhích ngang nửa bước cho khỏi đứng như tượng
+          if (d > wantDist + 0.25) { const k = d > wantDist + 2 ? 1 : 0.55; mvx = dx / d * k; mvz = dz / d * k; }
+          else if (d < wantDist - 0.55 && !ranged) { mvx = -dx / d * 0.35; mvz = -dz / d * 0.35; }   // cung không lùi dần (kéo nhau đi xa)
+          else if (!ranged && Math.sin(ctx.clock * 0.8 + a.id * 1.7) > 0.85) { const s2 = (a.id % 2 ? 1 : -1) * 0.3; mvx = -dz / d * s2; mvz = dx / d * s2; }
+        }
         else if (slot) { const k = Math.min(1, d / 1.2); if (d > wantDist) { mvx = dx / d * k; mvz = dz / d * k; } }
         else if (d > wantDist + 0.4) { mvx = dx / d; mvz = dz / d; if (!target) a.yaw = turn(a.yaw, Math.atan2(dx, dz), dt * 6); }
         else if (d < wantDist - 0.6 && target === hero) { mvx = -dx / d * 0.6; mvz = -dz / d * 0.6; }
-        else if (target === hero && !a.token) {        // lượn vòng quanh tướng
-          const s2 = (a.id % 2 ? 1 : -1) * 0.45; mvx = -dz / d * s2; mvz = dx / d * s2;
+        else if (target === hero && !a.token) {        // lượn vòng chậm quanh tướng
+          const s2 = (a.id % 2 ? 1 : -1) * 0.2; mvx = -dz / d * s2; mvz = dx / d * s2;
         }
       }
+      a.duel = duel;
       // tách nhau
       let sx = 0, sz = 0;
       const pool = a.side === "dich" ? enemies : allies;
@@ -344,9 +432,10 @@ export class Crowd {
       a.atkCd -= dt;
       if (a.windup > 0) {
         a.windup -= dt;
-        if (a.windup <= 0) { a.atkT = 0; this.strike(a); a.atkCd = TIERS[a.tier].every * (0.85 + 0.3 * rng.next()); }
+        // nhịp nhanh ×every chỉ cho giáp lá cà cận chiến; cung, nỏ giữ nhịp bắn thường
+        if (a.windup <= 0) { a.atkT = 0; this.strike(a); a.atkCd = TIERS[a.tier].every * (a.duel && !ranged ? AI.duel.every : 1) * (0.85 + 0.3 * rng.next()); }
       } else if (!kiting) {
-        const canHit = target && (target === hero ? a.token : true) && dT <= (ranged ? range : reach + 0.9);
+        const canHit = target && (target === hero ? a.token : true) && dT <= (ranged ? range : reach + (duel ? 0.6 : 0.9) + (target.isBig ? target.radius : 0));
         if (canHit && a.atkCd <= 0) { a.windup = a.windupT = K.windup; a.fake = false; }
       }
     }
@@ -358,21 +447,27 @@ export class Crowd {
   // chu kỳ khớp dáng đi nên bàn chân chống không trượt (soldier-motion.js advanceStride).
   stride(a, px, pz, dt) { advanceStride(a, px, pz, dt); }
 
+  // Lính diễn ở tuyến: đứng đúng chỗ trong đội hình (director.fillActors giữ chỗ cố định, hàng sau bước lên lấp chỗ
+  // người ngã). Hàng đầu hai bên ghép cặp theo cột (a.partner) cách nhau ~1,9 m, thay nhau chém — người bị chém giơ
+  // khiên đỡ hoặc khựng người. Chỉ là diễn: không trừ máu; ai ngã do mô phỏng 1 Hz quyết (director.killActor).
   updateActor(a, dt) {
     const dx = a.sx - a.x, dz = a.sz - a.z, d = Math.hypot(dx, dz), px = a.x, pz = a.z;
-    const K = a.K, face = a.side === "ta" ? Math.PI / 2 : -Math.PI / 2;
+    const K = a.K, face = a.side === "ta" ? Math.PI / 2 : -Math.PI / 2, rng = this.ctx.rng;
+    const P = a.partner && a.partner.role === "actor" && a.partner.state !== "dead" && a.partner.alive ? a.partner : null;
     a.ready = a.frontRow || (K.ranged && d <= 0.3);
     if (d > 0.3) {
-      const sp = Math.min(a.speed * 0.8, d * 2);
+      const sp = Math.min(a.speed * (d > 3 ? 1 : 0.8), d * 2);
       a.x += dx / d * sp * dt; a.z += dz / d * sp * dt;
-      a.yaw = turn(a.yaw, Math.atan2(dx, dz), dt * 5);
+      a.yaw = turn(a.yaw, P && d < 2 ? Math.atan2(P.x - a.x, P.z - a.z) : Math.atan2(dx, dz), dt * 5);
     } else {
-      a.yaw = turn(a.yaw, face, dt * 3);
+      a.yaw = turn(a.yaw, P ? Math.atan2(P.x - a.x, P.z - a.z) : face, dt * 4);
       a.fakeCd -= dt;
-      // hàng đầu diễn chém; cung, nỏ ở hàng sau bắn tên cảnh (không trúng ai)
-      if (a.fakeCd <= 0 && a.windup <= 0 && (a.frontRow || K.ranged)) {
+      // hàng đầu chém đối thủ trước mặt; cung, nỏ ở hàng sau bắn tên cảnh (không trúng ai)
+      if (a.fakeCd <= 0 && a.windup <= 0 && P?.windup <= 0 && (a.frontRow || K.ranged)) {
         a.windup = a.windupT = K.windup; a.fake = true;
-        a.fakeCd = K.ranged ? 2.5 + this.ctx.rng.next() * 4 : 1.2 + this.ctx.rng.next() * 2.4;
+        a.fakeCd = K.ranged ? 2.5 + rng.next() * 4 : P ? 1.0 + rng.next() * 1.6 : 1.2 + rng.next() * 2.4;
+      } else if (a.fakeCd <= 0 && !P && a.windup <= 0 && (a.frontRow || K.ranged)) {
+        a.windup = a.windupT = K.windup; a.fake = true; a.fakeCd = 1.2 + rng.next() * 2.4;
       }
     }
     if (a.windup > 0) {
@@ -380,8 +475,18 @@ export class Crowd {
       if (a.windup <= 0) {
         a.atkT = 0;
         if (K.ranged && this.arrows.length < 90) {
-          const r = 14 + this.ctx.rng.next() * 12, s = this.ctx.rng.next() * 6 - 3;
+          const r = 14 + rng.next() * 12, s = rng.next() * 6 - 3;
           this.fireArrow(a, { x: a.x + Math.sin(face) * r + s, z: a.z + Math.cos(face) * r + s }, true);
+        } else if (P && Math.hypot(P.x - a.x, P.z - a.z) < 3.4) {
+          // đối thủ đỡ (có khiên thì giơ khiên) hoặc khựng người lùi nửa bước
+          const kx = (P.x - a.x), kz = (P.z - a.z), l = Math.hypot(kx, kz) || 1, near = this.nearHero(a, 35);
+          if (rng.chance(AI.block[P.kit] ? 0.55 : 0.3)) {
+            P.blockT = 0.32; P.flinch = 0.08;
+            if (near) { this.ctx.audio?.play("block", P.x, P.z); if (rng.chance(0.5)) this.ctx.fx?.spark(P.x - kx / l * 0.5, heightAt(P.x, P.z) + 1.3, P.z - kz / l * 0.5, false, 0xf1d98a); }
+          } else {
+            P.flinch = 0.18; P.flash = 0.06;
+            if (near) { this.ctx.audio?.play("hitSoft", P.x, P.z); this.ctx.fx?.blood?.(P.x, heightAt(P.x, P.z) + 1.2, P.z, kx / l, kz / l, 0.35); }
+          }
         }
       }
     }
@@ -396,8 +501,11 @@ export class Crowd {
     if (a.panicT > 0 && ctx.rng.next() < 0.3) { if (t === ctx.hero) ctx.fx.text(a.x, a.z, "trượt", "#b0a090"); return; }
     if (a.K.ranged) { this.fireArrow(a, t); return; }
     const dx = t.x - a.x, dz = t.z - a.z, d = Math.hypot(dx, dz);
-    if (d > (a.K.reach || 1.7) + 0.9) return;
-    if (a.K.heavy) { ctx.fx?.dust(a.x + Math.sin(a.yaw) * 1.6, a.z + Math.cos(a.yaw) * 1.6, 0.8); ctx.fx?.shake(0.12); }
+    if (d > (a.K.reach || 1.7) + 0.9 + (t.isBig ? t.radius : 0)) return;
+    // nhát chém có bước dồn tới (nhìn rõ là đang đánh, không vung vào không khí)
+    if (d > 1.1) { const l = Math.min(AI.duel.lunge, d - 1.1); a.x += dx / d * l; a.z += dz / d * l; }
+    if (a.K.heavy) { ctx.fx?.dust(a.x + Math.sin(a.yaw) * 1.6, a.z + Math.cos(a.yaw) * 1.6, 0.8); if (t === ctx.hero || this.nearHero(a, 12)) ctx.fx?.shake(0.12); }
+    if (t !== ctx.hero && this.nearHero(a, 30)) ctx.audio?.play(a.K.heavy ? "swingHeavy" : "swingSoft", a.x, a.z);
     if (t === ctx.hero) {
       const raw = a.cong * tier.mv * heSoGiap(ctx.hero.giap, ctx.R) * ctx.diff.dmg;
       // đòn lực sĩ là đòn nặng: cắt được đòn đang ra của tướng, phải né hoặc đỡ
@@ -407,8 +515,8 @@ export class Crowd {
       // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s
       t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * 0.2, x: a.x, z: a.z, src: a });
     } else if (t.alive) {
-      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t);
-      this.damage(t, dmg, { kx: dx / (d || 1), kz: dz / (d || 1), knock: 1.5, by: a.side === "ta" ? "ally" : "enemy" });
+      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t) * (a.duel ? AI.duel.dmg[a.side] : 1);
+      this.damage(t, dmg, { kx: dx / (d || 1), kz: dz / (d || 1), knock: a.K.heavy ? 3.5 : 1.5, by: a.side === "ta" ? "ally" : "enemy", src: a });
     }
   }
 
@@ -418,8 +526,8 @@ export class Crowd {
     const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + (fake ? 0 : 1.2);
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
     this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a,
-      side: fake ? "fx" : a.side, tgt: fake ? null : t, g0 });     // g0: chân người bắn lúc buông tên (thế đất cao)
-    if (!fake) this.ctx.audio?.play("bow", a.x, a.z);
+      side: fake ? "fx" : a.side, tgt: fake ? null : t, g0, duel: !!a.duel });     // g0: chân người bắn lúc buông tên (thế đất cao)
+    if (!fake) this.ctx.audio?.play(a.kit === "DV_NO" ? "crossbow" : "bow", a.x, a.z);
   }
 
   updateArrows(dt) {
@@ -433,8 +541,9 @@ export class Crowd {
         const g = r.tgt, a = r.src;
         if (g.K) {      // lính thường: tính như đòn cận chiến giữa hai đám lính
           const d = Math.hypot(g.x - r.x, g.z - r.z), v = Math.hypot(r.vx, r.vz) || 1;
-          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6) * heightDamageMult(r.g0 - heightAt(g.x, g.z)),
-            { kx: r.vx / v, kz: r.vz / v, knock: 1.2, by: r.side === "ta" ? "ally" : "enemy" });
+          // tên bắn trong giáp lá cà cũng nhân hệ số phe (không thì cung kỵ Nguyên — 40% quân — bắn gục quân ta gấp ba lần bị hạ)
+          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6) * heightDamageMult(r.g0 - heightAt(g.x, g.z)) * (r.duel ? AI.duel.dmg[r.side] : 1),
+            { kx: r.vx / v, kz: r.vz / v, knock: 1.2, by: r.side === "ta" ? "ally" : "enemy", src: a });
         } else if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
         done = true;
       }
@@ -460,7 +569,8 @@ export class Crowd {
       else if (isR(e)) heldR++; else held++;
     }
     if (!hero.alive) return;
-    const cand = enemies.filter((e) => !e.token).map((e) => [e, (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2]).sort((a, b) => a[1] - b[1]);
+    // lính đang giáp lá cà với quân ta được thẻ sau (xa thêm 5 m): quân ta cầm chân được địch, tướng bớt bị vây
+    const cand = enemies.filter((e) => !e.token).map((e) => [e, (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 + (e.foe ? 25 : 0)]).sort((a, b) => a[1] - b[1]);
     for (const [e, d2] of cand) {
       if (isR(e)) { if (heldR < NR && d2 < 22 * 22) { e.token = true; heldR++; } }
       else if (held < N && d2 < 81) { e.token = true; held++; }
@@ -539,11 +649,6 @@ export class Crowd {
   }
 }
 
-function nearest(a, list, maxD) {
-  let best = null, bd = maxD * maxD;
-  for (const b of list) { const d2 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2; if (d2 < bd) { bd = d2; best = b; } }
-  return best;
-}
 export function turn(cur, target, k) {
   let d = target - cur;
   while (d > Math.PI) d -= Math.PI * 2;

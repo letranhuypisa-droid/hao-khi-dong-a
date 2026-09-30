@@ -8,6 +8,8 @@ import { Music } from "./core/music.js";
 import { ARENA_MODES, MEDALS, isoWeekKey, seedFromKey, arenaRewards, applyArena } from "./meta/arena.js";
 import { TIERS } from "./data/tuning.js";
 import { HISTORY_NOTES, BOSS } from "./data/battle-b15.js";
+import { movesGuideHTML } from "./ui/guide.js";
+import { ICON } from "./data/moves-info.js";
 
 const app = document.getElementById("app");
 let save = loadSave();
@@ -30,7 +32,7 @@ const act = (r, okMsg) => { if (r.ok) { persist(); toast(okMsg); } else toast(r.
 function render() {
   const h = save.hero, w = save.wallet;
   const expPct = h.level >= LEVEL_CAP ? 100 : (h.exp / EXP_NEXT(h.level)) * 100;
-  const tabs = [["xuattran", "Xuất trận"], ["votruong", "Võ trường"], ["truongsoai", "Trướng soái"], ["loren", "Lò rèn"], ["luyenbinh", "Luyện binh"], ["doanhtrai", "Doanh trại"], ["hoso", "Hồ sơ"]];
+  const tabs = [["xuattran", "Xuất trận"], ["huanluyen", "Huấn luyện"], ["votruong", "Võ trường"], ["truongsoai", "Trướng soái"], ["loren", "Lò rèn"], ["luyenbinh", "Luyện binh"], ["doanhtrai", "Doanh trại"], ["hoso", "Hồ sơ"]];
   app.innerHTML = `
   <div class="hub">
     <header class="hub-head">
@@ -43,8 +45,8 @@ function render() {
       <div class="herochip"><b>Trần Quốc Toản</b><span>Cấp ${h.level}${h.level >= LEVEL_CAP ? " (trần R1)" : ""} · Doanh trại cấp ${save.camp}</span>
         <div class="exp"><div style="width:${expPct}%"></div></div><small>${h.level >= LEVEL_CAP ? "Đã đạt trần" : `${n(h.exp)} / ${n(EXP_NEXT(h.level))} EXP`}</small></div>
     </header>
-    <nav class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}${k === "truongsoai" && P.freePoints(save) > 0 ? ` <em>${P.freePoints(save)}</em>` : ""}</button>`).join("")}</nav>
-    <main class="hub-body">${{ xuattran, votruong, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
+    <nav class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}${k === "truongsoai" && P.freePoints(save) > 0 ? ` <em>${P.freePoints(save)}</em>` : ""}${k === "huanluyen" && !save.tutorial?.done ? ` <em>mới</em>` : ""}</button>`).join("")}</nav>
+    <main class="hub-body">${{ xuattran, huanluyen, votruong, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
   </div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); }));
   bind[tab]?.();
@@ -54,7 +56,7 @@ function render() {
 function xuattran() {
   const st = P.heroStats(save, pick.R);
   const diff = DIFFICULTY.find((d) => d.id === pick.difficulty);
-  return `
+  return `${save.tutorial?.done ? "" : tutorialBanner()}
   <section class="card battle">
     <div class="battle-art"><div class="seal">B15</div><div><h2>Trận Hàm Tử</h2><p>Tháng 4 năm Ất Dậu · 1285 · bến Hàm Tử, sông Hồng</p></div></div>
     <p class="lead">Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.</p>
@@ -88,6 +90,40 @@ function xuattran() {
       </div>
     </div>
   </section>`;
+}
+
+// ---- Huấn luyện (đợt 7) ------------------------------------------------------------------------
+// Màn huấn luyện có bài tập (chạy trên sân Võ trường, không cần Doanh trại cấp 3) và bảng đòn có icon.
+let guideDev = matchMedia("(pointer: coarse)").matches ? 1 : 0;
+function tutorialBanner() {
+  return `<section class="card tutbanner"><img src="${ICON("n")}" alt=""><div style="flex:1"><h3>Lần đầu ra trận?</h3>
+    <p class="small">11 bài tập ngắn ở Võ trường, chừng bốn phút: chuỗi đòn song đao, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ.</p></div>
+    <button class="primary" data-tutgo>Vào huấn luyện</button></section>`;
+}
+function huanluyen() {
+  const done = save.tutorial?.done;
+  return `<section class="card tutbanner"><img src="${ICON("ult")}" alt=""><div style="flex:1"><h3>Màn huấn luyện ${done ? "· đã xong" : ""}</h3>
+      <p>Tập từng thao tác trên sân Võ trường: mỗi bài có mục tiêu, làm được thì sang bài sau. Tướng không gục trong lúc tập.</p>
+      <p class="small">Có thể chơi lại bất cứ lúc nào. Không cần Doanh trại cấp 3.</p></div>
+      <button class="primary" data-tutgo>${done ? "Tập lại" : "Vào huấn luyện"}</button></section>
+    <section class="card"><div class="row" style="justify-content:space-between"><h3>Bảng đòn và điều khiển</h3>
+      <div class="row">${["Bàn phím", "Cảm ứng", "Tay cầm"].map((l, i) => `<button data-gdev="${i}" class="${guideDev === i ? "primary" : ""}">${l}</button>`).join("")}</div></div>
+      ${movesGuideHTML({ dev: guideDev })}</section>`;
+}
+
+async function startTutorial() {
+  app.innerHTML = `<div class="loading"><h2>Võ trường · Huấn luyện</h2><p>Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử.</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
+  await new Promise((r) => setTimeout(r, 60));
+  const { runArena } = await import("./battle/arena.js");
+  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
+  app.style.display = "none";
+  let res = null;
+  try { res = await runArena({ container: stage, save, R: Math.max(1, Math.min(...save.ladder.unlocked)), difficulty: "danbinh", music, opts: { mode: "huanluyen" }, onSettings: () => persist() }); }
+  catch (err) { console.error(err); toast("Lỗi màn huấn luyện: " + err.message, true); }
+  stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
+  if (res?.done) { save.tutorial = { done: true, at: Date.now() }; persist(); toast("Xong huấn luyện — sẵn sàng ra bến Hàm Tử!"); tab = "xuattran"; }
+  else if (res) toast(`Đã rời huấn luyện ở bài ${Math.max(1, res.reached)} / ${res.total}.`);
+  render();
 }
 
 // ---- Võ trường (13.5) -------------------------------------------------------------------------
@@ -249,6 +285,10 @@ function lockedCard(name, lv) {
 
 // ---- gắn sự kiện ------------------------------------------------------------------------------
 const bind = {
+  huanluyen() {
+    app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
+    app.querySelectorAll("[data-gdev]").forEach((b) => (b.onclick = () => { guideDev = Number(b.dataset.gdev); render(); }));
+  },
   votruong() {
     app.querySelector("[data-tab-go]")?.addEventListener("click", () => { tab = "doanhtrai"; render(); });
     app.querySelectorAll("[data-amode]").forEach((b) => (b.onclick = () => { arenaPick.mode = b.dataset.amode; render(); }));
@@ -266,6 +306,7 @@ const bind = {
     app.querySelectorAll("[data-diff]").forEach((b) => (b.onclick = () => { pick.difficulty = b.dataset.diff; save.settings.difficulty = pick.difficulty; persist(); render(); }));
     app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
     app.querySelector("[data-go]").onclick = startBattle;
+    app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
   },
   truongsoai() {
     app.querySelectorAll("[data-node]").forEach((b) => (b.onclick = () => act(P.buyNode(save, b.dataset.node), "Đã học nút kỹ năng.")));

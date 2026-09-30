@@ -21,6 +21,7 @@ import { makeRng } from "../core/rng.js";
 import { FRONTS, BASES, ENEMY_MIX, MAP } from "../data/battle-b15.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
 import { heroStats } from "../meta/progress.js";
+import { movesGuideHTML } from "../ui/guide.js";
 
 const STEP = 1 / 60;
 
@@ -102,6 +103,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       slowT = big ? 1.5 : 0.6; slowK = big ? 0.25 : 0.4; cam.pull = big ? 1 : 0.4;
       const gold = hudRoot.querySelector(".fx-gold"); gold.classList.remove("on"); void gold.offsetWidth; gold.classList.add("on");
     };
+    // chậm hình ngắn (Đòn Quyết, hạ sĩ quan): T giây giờ thật ở tốc k
+    ctx.slowmo = (T, k) => { if (slowT <= 0 || k <= slowK) { slowK = k; } slowT = Math.max(slowT, T); };
     const v3 = new THREE.Vector3();
     let W = 1, H = 1;
     ctx.project = (x, y, z) => { v3.set(x, y, z).project(camera); if (v3.z > 1) return null; return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; };
@@ -173,7 +176,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
 
     // ---- vòng lặp ------------------------------------------------------------------------
-    let hudAcc = 0, endShown = false, time = 0;
+    let hudAcc = 0, endShown = false, time = 0, bedT = 0;
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -189,7 +192,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       ctx.touch = inp.touch;
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
-      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z;
+      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;
 
       if (!d.over) {
         // vòng lệnh (giữ Tab)
@@ -258,8 +261,12 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const k = Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
       if (time < 0.2) { cam.x = cx; cam.y = cy; cam.z = cz; }
-      camera.position.set(cam.x + ctx.fx.shakeX, cam.y + ctx.fx.shakeY, cam.z);
-      camera.lookAt(tx, ty, tz);
+      // rung màn + giật theo hướng chém (fx.kick); nhìn theo cùng độ giật một nửa cho cú giật "đẩy" khung hình tới
+      const fxk = ctx.fx;
+      camera.position.set(cam.x + fxk.shakeX + fxk.kickX, cam.y + fxk.shakeY + fxk.kickY, cam.z + fxk.kickZ);
+      camera.lookAt(tx + fxk.kickX * 0.5, ty, tz + fxk.kickZ * 0.5);
+      const fov = 55 - fxk.fovPunch;
+      if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       ctx.world.fadeOccluders(camera.position, tx, tz, dt);
       const sun = ctx.world.sun, sd = ctx.atmo.sunDir; sun.position.set(h.x + sd.x * 120, sd.y * 120, h.z + sd.z * 120); sun.target.position.set(h.x, 0, h.z);
 
@@ -276,6 +283,15 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (ctx.hk.tpc && Math.random() < dt * 7) ctx.fx.embers(ctx.hero.x, ctx.hero.z);   // tàn lửa Tổng Phản Công
       // nắng, sương, trời theo pha; khói đống lửa tàn, cột khói, lửa, tàn lửa, đèn lửa (atmosphere.js)
       ctx.atmo.update(dt);
+      // nền tiếng giao chiến: càng gần tuyến, càng nhiều lính đang đánh nhau quanh tướng thì càng dày
+      bedT -= dt;
+      if (bedT <= 0) {
+        bedT = 0.3;
+        let dF = 999, fighting = 0;
+        for (const fid in FRONTS) { const F = FRONTS[fid], lx = F.x0 + ctx.sim.fronts[fid].x * (F.x1 - F.x0); dF = Math.min(dF, Math.hypot(Math.max(0, Math.abs(h.x - lx) - 6), Math.max(0, Math.abs(h.z - F.laneZ) - 20))); }
+        for (const a of ctx.crowd.agents) if ((a.windup > 0 || a.duel) && a.state !== "dead" && (a.x - h.x) ** 2 + (a.z - h.z) ** 2 < 900) fighting++;
+        ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), d.phase >= 2 ? 0.25 + 0.15 * (d.phase - 2) : 0);
+      }
       ctx.world.update(time);
       ctx.ambient.update(ctx.clock);   // tự lấy hiệu đồng hồ trận: hit-stop đứng hình, vòng lệnh chậm ×0,2
       ctx.crowd.render();
@@ -338,34 +354,28 @@ function pauseHTML(save) {
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
-    ${controlsHTML()}
+    ${controlsHTML(matchMedia("(pointer: coarse)").matches)}
   </div>`;
 }
 
-export function controlsHTML() {
-  return `<h3>Điều khiển</h3><table class="keys">
-    <tr><td>WASD</td><td>Di chuyển</td><td>Chuột / ← →</td><td>Xoay camera (bấm vào màn để khóa chuột)</td></tr>
-    <tr><td>Chuột trái / J</td><td>Đòn thường N (chuỗi N1–N6)</td><td>Chuột phải / K</td><td>Đòn mạnh C (sau N<sub>k</sub> ra C<sub>k+1</sub>)</td></tr>
-    <tr><td>Space</td><td>Né (i-frame 0,25 s); Né → N/C = Lướt</td><td>Shift / L</td><td>Đỡ (giữ); bấm đúng lúc đòn viền đỏ = Phản đòn</td></tr>
-    <tr><td>E</td><td>Phá Trận (3 lần lao)</td><td>R</td><td>Tuyệt Kỹ (1 vạch Khí Lực)</td></tr>
-    <tr><td>F</td><td>Tổng Phản Công (Hào Khí 100)</td><td>Q</td><td>Khóa mục tiêu</td></tr>
-    <tr><td>G</td><td>Lệnh Kế Sách (khi Sẵn sàng)</td><td></td><td></td></tr>
-    <tr><td>Tab (giữ)</td><td>Vòng Mệnh Lệnh; 1–4 ra lệnh, Z đổi mặt trận</td><td>M · Esc</td><td>Bản đồ lớn · Tạm dừng</td></tr>
-    <tr><td>Tay cầm</td><td colspan="3">X đòn N · Y đòn C · A né · RB đỡ · LB Phá Trận · B Tuyệt Kỹ · LT giữ = Mệnh Lệnh (D-pad chọn, LB đổi mặt trận) · D-pad lên = Tổng Phản Công · D-pad phải = Kế Sách</td></tr>
-  </table>`;
+// Bảng điều khiển trong bảng tạm dừng: dùng chung bảng hướng dẫn có icon (ui/guide.js), bản gọn.
+export function controlsHTML(touch = false) {
+  return `<h3>Điều khiển</h3>${movesGuideHTML({ dev: touch ? 1 : 0, compact: true })}`;
 }
 
+// nút cảm ứng có icon chiêu (nút C đổi icon theo đòn C kế tiếp, hud.js)
+const tb = (b, icon, label, cls = "") => `<button data-b="${b}" class="${cls}"><img src="./assets/icons/${icon}.webp" alt=""><em>${label}</em></button>`;
 export function buildTouch(root, input, ctx) {
   root.classList.add("on"); root.parentElement.classList.add("touchmode");
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
     <div class="camzone" data-t="cam"></div>
     <div class="tbtns">
-      <button data-b="n" class="big">N</button><button data-b="c" class="mid">C</button>
-      <button data-b="dodge">Né</button><button data-b="block">Đỡ</button>
-      <button data-b="skill">Phá<br>Trận</button><button data-b="ult">Tuyệt<br>Kỹ</button>
+      ${tb("n", "n", "N", "big")}${tb("c", "c1", "C", "mid")}
+      ${tb("dodge", "dodge", "Né")}${tb("block", "block", "Đỡ")}
+      ${tb("skill", "skill", "Phá Trận")}${tb("ult", "ult", "Tuyệt Kỹ")}
     </div>
-    <div class="tsys"><button data-b="kesach">Kế<br>Sách</button><button data-b="cmd">Lệnh</button><button data-b="tpc">Phản<br>Công</button><button data-b="lock">Khóa</button><button data-b="pause">II</button></div>`;
+    <div class="tsys">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div>`;
   root.querySelectorAll("[data-b]").forEach((b) => {
     const name = b.dataset.b;
     const down = (e) => { e.preventDefault(); ctx.audio.unlock(); if (name === "cmd") { input.touchButton("cmd", !input.touchHeld.cmd); return; } input.touchButton(name, true); b.classList.add("on"); };

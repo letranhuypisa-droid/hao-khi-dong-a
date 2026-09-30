@@ -69,6 +69,18 @@ export const MOVES = {
   DQ: { mv: 5.60, dur: 0.90, hits: [0.55], stop: 167, shape: "cone", range: 4.5, arc: 120, crit: true, step: 1.0 }, // Đòn Quyết (21.10: tạm 5,6)
   CT: { mv: 1.50, dur: 0.55, hits: [0.35], stop: 100, shape: "cone", range: 4.0, arc: 140, crit: true, poiseMult: 3, step: 0.8 }, // phản đòn
 };
+// ---- Cảm giác trúng đòn (ĐỀ XUẤT BẢN THỬ, đợt 7) ----------------------------------------------------------
+// Hit-stop = stop của đòn × stopMul + stopPerExtra ms mỗi người trúng thêm (trần stopCrowdCap) + stopCrit nếu chí mạng +
+// stopKill nếu hạ được ai, trần stopMax. shake: rung màn; kick: giật camera theo hướng chém (m); fov: thu góc nhìn (độ).
+// big = Đòn Quyết, phản đòn; heavy = đòn MV ≥ 2 (C4, C5, C6). Xác bị tướng chém văng xa ×killKnock, bay lên killUp m/s
+// (đòn nặng killUpHeavy).
+export const IMPACT = {
+  stopMul: 1.4, stopPerExtra: 6, stopCrowdCap: 30, stopCrit: 25, stopKill: 12, stopMax: 220,
+  shake: { light: 0.09, crit: 0.18, heavy: 0.32, big: 0.7 },
+  kick: { light: 0.13, heavy: 0.32, big: 0.55 },
+  fov: { light: 0.8, crit: 2, heavy: 3.5, big: 6 },
+  killKnock: 1.7, killUp: 1.6, killUpHeavy: 4.2,
+};
 export const POISE_PER_MV = 14;          // Phá Thế gây ra = 14 × MV × poiseMult (21.6: ~26/s ở H35)
 export const C_POISE_MULT = 1.5;         // đòn C (§2.4)
 
@@ -129,6 +141,15 @@ export const AI = {
   charge: { minD: 5, maxD: 11, speed: 2.6, dur: 0.9, cd: 8, dmg: 1.25 },   // dmg: hệ số sát thương cú húc, húc trúng thì tướng ngã
   rout: { officerR: 22, ultR: 12, kills: 6, window: 4, nearR: 10, dur: [2.5, 4.5] },
   slotSep: 0.9,        // hệ số giãn góc giữa các lính vây tướng (1 = chia đều vòng tròn)
+  // Giáp lá cà giữa lính với lính (đợt 7). Trước đây lính địch trong vùng chiến đấu chỉ nhắm tướng người chơi (97% thời
+  // gian, 0 nhát vào quân ta), quân ta đổi mục tiêu mỗi khung theo "người gần nhất" nên chạy qua chạy lại đuổi theo
+  // đám địch đang lượn quanh tướng. Giờ mỗi lính giữ một đối thủ: chọn lại mỗi retarget giây, chỉ đổi khi người mới
+  // gần hơn switchGain m; tối đa maxOn người đánh một lính (tướng đồng minh maxOnBig). Địch không có thẻ tấn công tướng
+  // thì đánh quân ta trong engageR m; bị lính đánh thì quay lại đánh trả. Hai bên đứng giáp mặt (không lượn) mà chém;
+  // nhịp chém giữa lính = tier.every × every, sát thương mỗi nhát × dmg[phe] (địch đông gấp rưỡi quân ta trong vùng chiến
+// đấu: 30 / 20, nên nhát của địch nhẹ hơn để giáp lá cà không nuốt quân ta quá nhanh); lính có khiên đỡ nhát của lính block.
+  duel: { engageR: 7, maxOn: 2, maxOnBig: 4, retarget: [0.6, 1.2], switchGain: 2, every: 0.6, dmg: { ta: 0.8, dich: 0.5 }, block: 0.3, lunge: 0.22,
+    leash: 10 },   // leash: quân đồn trú chỉ giáp lá cà trong vòng Cứ Điểm + 10 m; thân binh trong 14 m quanh tướng
 };
 export const KITS_OF =Object.fromEntries(Object.keys(UNITS).map((u) => [u, Object.keys(KITS).filter((k) => KITS[k].unit === u)]));
 // Chọn kiểu lính theo một số u ∈ [0,1) (thường là băm của id lính, để không ăn vào chuỗi rng).

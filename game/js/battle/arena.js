@@ -10,6 +10,8 @@ import { FX } from "./fx.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
 import { lerpAngle, buildTouch, controlsHTML, releaseGpu } from "./battle.js";
+import { HUD, skillBarHTML, updateAttackTiles } from "./hud.js";
+import { TutorialDirector } from "./tutorial.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, TIERS, E, g } from "../data/tuning.js";
@@ -143,7 +145,8 @@ class ArenaDirector {
 class ArenaHUD {
   constructor(root, ctx) {
     this.ctx = ctx; this.root = root; ctx.hud = this;
-    root.innerHTML = `<div class="fx-hurt"></div><div class="fx-gold"></div>
+    root.innerHTML = `<div class="fx-hurt"></div><div class="fx-gold"></div><div class="fx-flash"></div><div class="fx-speed" data-k="speed"></div>
+      <div class="hud-combo" data-k="combo"><b data-k="combon">0</b><span>ĐÒN LIÊN HOÀN</span></div>
       <div class="arena-top"><b data-k="mode"></b><div class="arena-big" data-k="big"></div><span data-k="sub"></span><div class="arena-medals" data-k="medals"></div></div>
       <div class="hud-hero"><div class="portrait"><span>H35</span><em data-k="lv"></em></div>
         <div class="bars"><div class="name">Trần Quốc Toản <small data-k="rev"></small></div>
@@ -153,10 +156,14 @@ class ArenaHUD {
       <div class="hud-msgs" data-k="msgs"></div>
       <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
-      <div class="hud-skills"><div class="sk" data-k="sk1"><b>E</b><span>Phá Trận</span><i data-k="sk1cd"></i></div><div class="sk" data-k="sk2"><b>R</b><span>Tuyệt Kỹ</span><i data-k="sk2cd"></i></div></div>
+      ${skillBarHTML(false)}
+      <div class="tut" data-k="tut" style="display:none"></div>
       <div class="cine" data-k="cine"></div><div class="lockmark" data-k="lockmark">◆</div>`;
     this.el = {}; root.querySelectorAll("[data-k]").forEach((n) => (this.el[n.dataset.k] = n));
+    this.lastCombo = 0; this.nextC = "";
   }
+  speedLines(T) { HUD.prototype.speedLines.call(this, T); }
+  combo(h, E) { HUD.prototype.combo.call(this, h, E); }
   hkPulse() {}
   setRing() {}
   cinematic(text) { const c = this.el.cine; c.textContent = text; c.classList.remove("on"); void c.offsetWidth; c.classList.add("on"); }
@@ -172,9 +179,11 @@ class ArenaHUD {
       E1.big.textContent = fmt1(d.clearSec ?? d.time);
       E1.sub.textContent = `Đợt ${Math.max(1, d.wave + 1)} / ${d.layout.waves.length}`;
       E1.medals.innerHTML = `<span class="vang ${d.time <= d.thresholds.vang ? "got" : ""}">Vàng ≤ ${fmt(d.thresholds.vang)}</span><span class="bac ${d.time <= d.thresholds.bac ? "got" : ""}">Bạc ≤ ${fmt(d.thresholds.bac)}</span><span class="dong got">Đồng: hạ hết</span>`;
-    } else {
+    } else if (d.mode !== "huanluyen") {
       E1.big.textContent = fmt(d.time); E1.sub.textContent = `${TIERS[o.tier].name} · ${d.ko} KO`; E1.medals.innerHTML = "";
     }
+    updateAttackTiles(h, E1, this); this.combo(h, E1);
+    d.tutorialHUD?.(E1);
     E1.lv.textContent = `Cấp ${ctx.stats.level}`;
     E1.hp.style.width = `${(h.hp / h.maxHp) * 100}%`; E1.hpt.textContent = `${Math.ceil(h.hp)} / ${Math.round(h.maxHp)}`;
     E1.hp.parentElement.classList.toggle("low", h.hp / h.maxHp < 0.3);
@@ -209,6 +218,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     } else stats = heroStats(save, R);
     container.innerHTML = `<canvas class="game"></canvas><div class="hud"></div><div class="overlay"></div><div class="touch"></div>`;
     container.classList.add("arena-mode");
+    if (opts.mode === "huanluyen") container.classList.add("tut-mode");
     const canvas = container.querySelector("canvas"), hudRoot = container.querySelector(".hud");
     const overlay = container.querySelector(".overlay"), touchRoot = container.querySelector(".touch");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
@@ -216,14 +226,14 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;   // r186 bỏ PCFSoft (xem battle.js)
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);   // núi xa đặt ngoài vòng 600–900 m
     const ctx = {
-      scene, camera, renderer, R, diff, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
+      scene, camera, renderer, R, diff: { ...diff }, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
       openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music,
     };
     ctx.world = buildArena(scene, { shadows: settings.shadows });
     ctx.hk = createHaoKhi({ quick: false });
     ctx.sim = { heroFront: null, fronts: {}, bases: {} };
     ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
-    music?.play(opts.mode === "luyentap" ? "hub" : "boss");
+    music?.play(opts.mode === "luyentap" || opts.mode === "huanluyen" ? "hub" : "boss");
     ctx.fx = new FX(scene, camera, hudRoot);
     ctx.crowd = new Crowd(scene, ctx);
     // khán giả trên khán đài: quân Trần đứng xem, reo hò khi tướng hạ địch (không đánh, không bị đánh)
@@ -234,12 +244,14 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     ctx.hero = new Hero(ctx, stats); ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI;
     const input = new Input(canvas);
     new ArenaHUD(hudRoot, ctx);
-    new ArenaDirector(ctx, opts);
-    if (location.search.includes("debug")) { window.__hk = ctx; ctx.input = input; }
+    if (opts.mode === "huanluyen") new TutorialDirector(ctx, opts); else new ArenaDirector(ctx, opts);
+    ctx.input = input;
+    if (location.search.includes("debug")) window.__hk = ctx;
     ctx.hitstopT = 0; ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
     const cam = ctx.cam = { yaw: Math.PI, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
     let slowT = 0, slowK = 1;
     ctx.cinematic = (text, unit, big) => { ctx.hud.cinematic(text); slowT = big ? 1.5 : 0.6; slowK = big ? 0.25 : 0.4; cam.pull = big ? 1 : 0.4; };
+    ctx.slowmo = (T, k) => { if (slowT <= 0 || k <= slowK) slowK = k; slowT = Math.max(slowT, T); };
     const v3 = new THREE.Vector3(); let W = 1, H = 1;
     ctx.project = (x, y, z) => { v3.set(x, y, z).project(camera); if (v3.z > 1) return null; return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; };
     const resize = () => {
@@ -255,7 +267,8 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     const pause = (on) => {
       if (finished) return;
       paused = on; overlay.classList.toggle("on", on);
-      overlay.innerHTML = on ? `<div class="panel pause"><h2>VÕ TRƯỜNG · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">Rời Võ trường</button></div>${controlsHTML()}</div>` : "";
+      const tut = opts.mode === "huanluyen";
+      overlay.innerHTML = on ? `<div class="panel pause"><h2>${tut ? "HUẤN LUYỆN" : "VÕ TRƯỜNG"} · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">${tut ? "Rời huấn luyện" : "Rời Võ trường"}</button></div>${controlsHTML(ctx.touch)}</div>` : "";
       if (on) {
         document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
         overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
@@ -288,13 +301,13 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       time += dt; ctx.touch = inp.touch;
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
-      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z;
+      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;
       if (!d.over) {
         if (inp.pressed.lock) ctx.hero.toggleLock();
         let scale = 1;
         if (slowT > 0) { slowT -= dt; scale *= slowK; }
         if (ctx.hitstopT > 0) { ctx.hitstopT -= dt; scale = 0; }
-        ctx.hero.intake(inp);
+        ctx.hero.intake(inp); d.intake?.(inp);
         acc += dt * scale; let steps = 0;
         while (acc >= STEP && steps < 4) {
           acc -= STEP; steps++; ctx.clock += STEP;
@@ -317,13 +330,15 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       const cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = Math.max(ty + dist * Math.sin(cam.pitch), heightAt(cx, cz) + 1.2);
       const k = time < 0.2 ? 1 : Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
-      camera.position.set(cam.x + ctx.fx.shakeX, cam.y + ctx.fx.shakeY, cam.z); camera.lookAt(tx, ty, tz);
+      const fxk = ctx.fx;            // rung + giật camera theo hướng chém, thu FOV (như battle.js)
+      camera.position.set(cam.x + fxk.shakeX + fxk.kickX, cam.y + fxk.shakeY + fxk.kickY, cam.z + fxk.kickZ); camera.lookAt(tx + fxk.kickX * 0.5, ty, tz + fxk.kickZ * 0.5);
+      const fov = 55 - fxk.fovPunch; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       ctx.world.fadeOccluders(camera.position, tx, tz, dt);
       ctx.world.sun.position.set(h.x - 40, 80, h.z + 30); ctx.world.sun.target.position.set(h.x, 0, h.z);
       ctx.world.update(time); ctx.crowd.render(); ctx.fx.update(dt, W, H); ctx.hud.update();
       if (draw) renderer.render(scene, camera);
       input.endFrame();
-      if (d.over && !endShown) { endShown = true; setTimeout(() => showEnd(d.result), 900); }
+      if (d.over && !endShown) { endShown = true; if (d.result?.tutorial) setTimeout(() => finish(d.result), 400); else setTimeout(() => showEnd(d.result), 900); }
     };
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => { for (let t = 0; t < sec && !finished; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); if (paused) break; } };
     const frame = (now) => { raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now; if (paused || finished) return; step(dt, input.poll(), true); };

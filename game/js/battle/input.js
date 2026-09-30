@@ -5,6 +5,7 @@ const KEYMAP = {
   KeyE: "skill", KeyU: "skill", KeyR: "ult", KeyI: "ult", KeyF: "tpc", KeyQ: "lock", KeyG: "kesach",
   Tab: "cmd", KeyM: "map", Escape: "pause", KeyP: "pause",
   Digit1: "cmd1", Digit2: "cmd2", Digit3: "cmd3", Digit4: "cmd4", KeyZ: "cmdSwap",
+  Enter: "next", NumpadEnter: "next",           // màn Huấn luyện: sang bài / bỏ qua
 };
 
 export class Input {

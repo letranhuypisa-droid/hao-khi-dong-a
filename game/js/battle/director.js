@@ -13,6 +13,9 @@ import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
 
 const baseDef = (id) => BASES.find((b) => b.id === id);
+// Đội hình lính diễn: 11 cột cách 4 m (rộng 40 m); hàng đầu cận chiến đứng cách tuyến 0,95 m nên hai hàng đầu cách
+// nhau 1,9 m — vừa tầm đao, giáo. Trước đây 2,2 m mỗi bên: hai hàng cách 4,4 m, vung đòn vào không khí.
+const ACTOR_COLS = 11, ACTOR_FRONT = 0.95;
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
 export class Director {
@@ -136,13 +139,16 @@ export class Director {
     for (const fid in FRONTS) {
       const F = FRONTS[fid], f = sim.fronts[fid], lx = lineToX(F, f.x);
       const w = fid === hf ? 0.34 : 0.16;
+      const front = {};           // cột → lính hàng đầu cận chiến, để ghép cặp hai bên
       for (const side of ["ta", "dich"]) {
         const zoneN = crowd.agents.filter((a) => a.front === fid && a.side === side && a.role === "zone" && a.state !== "dead").length;
         const want = Math.max(0, Math.min(Math.round(budget * w), Math.max(6, Math.round(totalQ(f, side) * this.visR())) - zoneN));
-        const actors = crowd.agents.filter((a) => a.role === "actor" && a.front === fid && a.side === side && a.state !== "dead");
+        let actors = crowd.agents.filter((a) => a.role === "actor" && a.front === fid && a.side === side && a.state !== "dead");
+        // bớt người thì bớt từ hàng sau cùng (chỗ số lớn), không bớt bừa
         if (actors.length > want) {
-          for (let i = 0; i < actors.length - want; i++) crowd.release(actors[actors.length - 1 - i]);
-          actors.length = want;
+          actors.sort((p, q) => (q.slot ?? 1e9) - (p.slot ?? 1e9));
+          for (let i = 0; i < actors.length - want; i++) crowd.release(actors[i]);
+          actors = actors.slice(actors.length - want);
         }
         for (let i = actors.length; i < want; i++) {
           const unit = side === "ta" ? "GIAO_DV" : (rng.next() < ENEMY_MIX.KHIEN_NG ? "KHIEN_NG" : "CUNGKY_NG");
@@ -151,24 +157,71 @@ export class Director {
             legionMult: ctx.stats.legionMult });
           actors.push(a);
         }
-        // xếp đội hình: hàng 5 m, rộng 44 m
-        const cols = 11, dir = side === "ta" ? -1 : 1;
-        actors.forEach((a, i) => {
-          const row = Math.floor(i / cols), col = i % cols;
-          const jitter = ((a.id * 7919) % 100) / 100 - 0.5;
-          a.sx = lx + dir * (2.2 + row * 2.6 + jitter * 0.8) + (a.K.mounted ? dir * 6 : a.K.ranged ? dir * 3.5 : 0);   // cung, nỏ đứng sau hàng chém
-          a.sz = F.laneZ - 20 + col * 4 + jitter * 1.4;
-          a.frontRow = row === 0;
-          if (instant) { a.x = a.sx; a.z = a.sz; }
-        });
+        front[side] = this.layoutActors(actors, F, lx, side, instant);
+      }
+      // hàng đầu hai bên cùng cột thành một cặp đánh nhau
+      for (let c = 0; c < ACTOR_COLS; c++) {
+        const p = front.ta[c] || null, q = front.dich[c] || null;
+        if (p) p.partner = q; if (q) q.partner = p;
       }
     }
   }
+
+  // Đội hình một phe ở một mặt trận: ba khối từ tuyến ra sau — cận chiến, cung/nỏ, cung kỵ. Mỗi lính giữ chỗ (a.slot)
+  // trong khối của mình qua các lần xếp. Trước đây chỗ đứng lấy theo thứ tự trong crowd.agents, mà mỗi lần có lính bị
+  // trả về pool (chết, rời vùng chiến đấu) thứ tự đó bị xáo (xoá kiểu hoán cuối) → cả đội hình đổi chỗ, lính chạy qua
+  // chạy lại mỗi giây. Giờ chỗ trống ở hàng trên thì người cùng cột ở hàng dưới bước lên lấp. Trả về hàng đầu cận
+  // chiến theo cột (để ghép cặp).
+  layoutActors(actors, F, lx, side, instant) {
+    const cols = ACTOR_COLS, dir = side === "ta" ? -1 : 1, pools = { m: [], r: [], k: [] };
+    for (const a of actors) {
+      const pk = a.K.mounted ? "k" : a.K.ranged ? "r" : "m";
+      if (a.pool !== pk) { a.pool = pk; a.slot = undefined; }
+      pools[pk].push(a);
+    }
+    const frontCols = [];
+    let depth = ACTOR_FRONT;                              // khoảng cách từ tuyến tới hàng đầu của khối
+    for (const pk of ["m", "r", "k"]) {
+      const list = pools[pk];
+      if (!list.length) continue;
+      const bySlot = new Map();
+      for (const a of list) { if (a.slot !== undefined && !bySlot.has(a.slot)) bySlot.set(a.slot, a); else a.slot = undefined; }
+      let free = 0;
+      for (const a of list) if (a.slot === undefined) { while (bySlot.has(free)) free++; a.slot = free; bySlot.set(free, a); }
+      // dồn lên: chỗ trống thì người cùng cột gần nhất ở hàng sau bước lên
+      let maxS = 0; for (const s of bySlot.keys()) maxS = Math.max(maxS, s);
+      for (let s = 0; s <= maxS; s++) {
+        if (bySlot.has(s)) continue;
+        for (let s2 = s + cols; s2 <= maxS; s2 += cols) if (bySlot.has(s2)) { const a = bySlot.get(s2); bySlot.delete(s2); a.slot = s; bySlot.set(s, a); break; }
+      }
+      const rowGap = pk === "k" ? 3.4 : 2.2;
+      let rows = 0;
+      for (const a of list) {
+        const row = Math.floor(a.slot / cols), col = a.slot % cols;
+        rows = Math.max(rows, row + 1);
+        const jitter = ((a.id * 7919) % 100) / 100 - 0.5;
+        a.sx = lx + dir * (depth + row * rowGap + (row ? jitter * 0.6 : 0));
+        a.sz = F.laneZ - 20 + col * 4 + jitter * 1.2;
+        a.frontRow = pk === "m" && row === 0;
+        if (a.frontRow) frontCols[col] = a;
+        if (instant) { a.x = a.sx; a.z = a.sz; }
+      }
+      depth += rows * rowGap + (pk === "m" ? 1.6 : 2.4);
+    }
+    for (const a of actors) if (!a.frontRow) a.partner = null;
+    return frontCols;
+  }
+
   killActor(fid, side) {
     const crowd = this.ctx.crowd;
     const list = crowd.agents.filter((a) => a.role === "actor" && a.front === fid && a.side === side && a.state !== "dead" && a.frontRow);
     const a = list.length ? list[Math.floor(this.ctx.rng.next() * list.length)] : null;
-    if (a) { a.state = "dead"; a.dieT = 0; a.vx = side === "ta" ? -1.5 : 1.5; a.vz = 0; }
+    if (!a) return;
+    // người ngã bị đối thủ trước mặt chém: đối thủ vung đòn, người ngã bật về sau
+    const P = a.partner && a.partner.state !== "dead" ? a.partner : null;
+    if (P) { P.windup = 0; P.atkT = 0; P.fakeCd = Math.max(P.fakeCd, 0.8); }
+    a.state = "dead"; a.dieT = 0; a.vx = side === "ta" ? -1.8 : 1.8; a.vz = 0; a.partner = null;
+    if (crowd.nearHero(a, 40)) this.ctx.audio.play("fall", a.x, a.z);
   }
 
   // ---- vùng chiến đấu quanh tướng -------------------------------------------------------------
@@ -550,6 +603,7 @@ export class Director {
     const pen = TIERS[u.tier].q;
     const hf = ctx.sim.heroFront; if (hf) ctx.sim.fronts[hf].pendingKills.dich += pen;
     ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1.2);
+    ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
     for (const k of DROPS[u.tier] || []) this.drop(k, u.x + ctx.rng.range(-1.5, 1.5), u.z + ctx.rng.range(-1.5, 1.5));
   }
   onBreak(u) { this.ctx.fx.banner("VỠ THẾ · ĐÒN MẠNH ĐỂ RA ĐÒN QUYẾT", "#ffd27a", 1.2); this.ctx.audio.play("parry", u.x, u.z); }

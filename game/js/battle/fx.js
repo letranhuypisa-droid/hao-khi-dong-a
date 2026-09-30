@@ -4,7 +4,8 @@
 import * as THREE from "three";
 import { heightAt } from "./world.js";
 
-const MAXP = 360;
+const MAXP = 600;
+const BLOOD_A = new THREE.Color(0x8a1d12), BLOOD_B = new THREE.Color(0xb3261a);
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
 
 // Ảnh hiệu ứng sinh bằng Higgsfield (assets/SOURCES.md). Nạp một lần, dùng chung mọi trận.
@@ -146,6 +147,7 @@ export class FX {
   constructor(scene, camera, overlay) {
     this.scene = scene; this.camera = camera; this.overlay = overlay;
     this.shakeAmt = 0; this.shakeX = 0; this.shakeY = 0;
+    this.kickX = 0; this.kickY = 0; this.kickZ = 0; this.fovPunch = 0;
     // hạt nhỏ (tàn lửa vụn) — instanced
     this.pm = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(0.09), new THREE.MeshBasicMaterial({ color: 0xffffff }), MAXP);
     this.pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 3), 3);
@@ -206,7 +208,7 @@ export class FX {
   }
 
   // Sprite (luôn quay về camera) hoặc tấm phẳng nằm trên đất, lấy từ pool theo ảnh.
-  sprite(name, x, y, z, { size = 1, T = 0.3, grow = 1, rise = 0, rot = 0, spin = 0, opacity = 1, flat = false, additive = false, follow = null, flicker = 0 } = {}) {
+  sprite(name, x, y, z, { size = 1, T = 0.3, grow = 1, rise = 0, rot = 0, spin = 0, opacity = 1, flat = false, additive = false, follow = null, flicker = 0, color = 0xffffff } = {}) {
     const key = name + (flat ? ":flat" : "") + (additive ? ":add" : "");
     const list = this.pool[key] || (this.pool[key] = []);
     let o = list.pop();
@@ -217,7 +219,7 @@ export class FX {
         : new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(name), transparent: true, depthWrite: false, blending }));
       o.userData.key = key; if (OVER.has(name)) o.renderOrder = R_OVER; this.scene.add(o);
     }
-    o.visible = true; o.position.set(x, y, z);
+    o.visible = true; o.position.set(x, y, z); o.material.color.setHex(color);
     if (flat) o.rotation.set(0, rot, 0); else o.material.rotation = rot;
     this.sprites.push({ o, t: 0, T, size, grow, rise, spin, opacity, flat, follow, flicker, rot });
     return o;
@@ -245,6 +247,45 @@ export class FX {
   trail(h) { if (Math.random() < 0.35) this.dust(h.x, h.z, 0.45); }
 
   shake(a) { this.shakeAmt = Math.min(1.2, Math.max(this.shakeAmt, a)); }
+
+  // ---- cảm giác trúng đòn (đợt 7) --------------------------------------------------------------------
+  // Giật camera theo hướng chém (m, tắt dần nhanh), thu FOV chớp nhoáng (độ), chớp sáng cả màn (0..1). battle.js
+  // cộng kick vào vị trí camera và fov vào camera.fov mỗi khung; chạy theo giờ thật nên vẫn giật trong hit-stop.
+  kick(dx, dz, a) {
+    const l = Math.hypot(dx, dz) || 1;
+    this.kickX += dx / l * a; this.kickZ += dz / l * a; this.kickY -= a * 0.35;
+    const m = Math.hypot(this.kickX, this.kickZ); if (m > 0.6) { this.kickX *= 0.6 / m; this.kickZ *= 0.6 / m; }
+  }
+  punch(deg) { this.fovPunch = Math.max(this.fovPunch, deg); }
+  flash(k, color = "255,244,214") {
+    const v = this.overlay.querySelector(".fx-flash");
+    if (!v) return;
+    v.style.background = `radial-gradient(ellipse at center, rgba(${color},${Math.min(0.9, k)}) 0%, rgba(${color},${Math.min(0.6, k * 0.5)}) 55%, transparent 100%)`;
+    v.style.transition = "none"; v.style.opacity = "1";
+    requestAnimationFrame(() => { v.style.transition = "opacity .18s ease-out"; v.style.opacity = "0"; });
+  }
+  // Tia máu kiểu mực son: giọt đỏ sẫm văng theo hướng đòn (kx, kz), rơi theo trọng lực. s: cỡ (lính chém lính 0,3–0,5).
+  blood(x, y, z, kx, kz, s = 1) {
+    const n = Math.round(3 + 7 * s);
+    for (let i = 0; i < n && this.parts.length < MAXP; i++) {
+      const sp = (2 + Math.random() * 4.5) * (0.6 + 0.4 * s), up = 1 + Math.random() * 3.2;
+      const jx = (Math.random() - 0.5) * 1.6, jz = (Math.random() - 0.5) * 1.6;
+      this.parts.push({ x, y, z, vx: (kx + jx) * sp, vy: up, vz: (kz + jz) * sp, t: 0, T: 0.35 + Math.random() * 0.35,
+        c: Math.random() < 0.5 ? BLOOD_A : BLOOD_B, s: (0.9 + Math.random() * 0.8) * (0.7 + 0.5 * s), grav: 1.4 });
+    }
+  }
+  // Nhát chém của tướng trúng một mục tiêu: chớp sáng tại chỗ trúng, vệt chém chéo ngắn, tia lửa, tia máu. full = false:
+  // chỉ tia lửa (từ mục tiêu thứ 5 trong cùng một đòn trở đi, cho khỏi ngập hạt).
+  impact(x, y, z, kx, kz, { heavy = false, crit = false, kill = false, full = true } = {}) {
+    if (!full) { this.spark(x, y, z, heavy); return; }
+    const hot = crit ? 0xffb070 : heavy ? 0xffd9a0 : 0xfff2d6;
+    this.sprite("spark", x, y, z, { size: heavy ? 3.4 : crit ? 3 : 2, T: heavy ? 0.16 : 0.1, grow: 1.5, rot: Math.random() * 6.28, additive: true, color: hot });
+    // vệt chém chéo: nét vàng ngắn cắt ngang người trúng đòn
+    this.sprite("slash", x, y + 0.1, z, { size: heavy ? 2.8 : 2, T: 0.13, grow: 1.25, rot: Math.random() * 6.28, additive: true, opacity: 0.9, color: crit ? 0xffc080 : 0xfff0c8 });
+    this.spark(x, y, z, heavy || crit);
+    this.blood(x, y, z, kx, kz, kill ? 1.2 : heavy ? 0.9 : 0.6);
+    if (kill && heavy) this.sprite("ring", x, heightAt(x, z) + 0.2, z, { size: 2.6, T: 0.25, grow: 1.6, flat: true, rot: Math.random() * 6.28, opacity: 0.6, additive: true });
+  }
 
   // Vòng lan trên đất: vàng (sóng xung kích) hoặc son (cảnh báo).
   ring(x, z, r, color, T, width = 0.5, y = null) {
@@ -369,6 +410,9 @@ export class FX {
       t.el.style.opacity = String(1 - t.t / t.T);
       t.el.style.display = v.z < 1 ? "" : "none";
     }
+    // giật camera, thu FOV: tắt dần theo giờ thật (lò xo tắt nhanh ~80 ms)
+    const kd = Math.exp(-dt * 16);
+    this.kickX *= kd; this.kickY *= kd; this.kickZ *= kd; this.fovPunch *= Math.exp(-dt * 10);
     // rung màn
     this.shakeAmt = Math.max(0, this.shakeAmt - dt * 2.8);
     const a = this.shakeAmt * this.shakeAmt * 0.6;

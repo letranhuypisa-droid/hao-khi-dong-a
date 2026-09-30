@@ -9,6 +9,7 @@ import { tpcReady } from "../sim/haokhi.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
 import { heroTerrain } from "../sim/terrain-rules.js";
 import { laneFeaturesOn } from "./ground.js";
+import { MOVE_INFO, ICON, nextHeavy } from "../data/moves-info.js";
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const ORDER_KEYS = ["tiencong", "giuvung", "theota", "tiepvien"];
@@ -29,7 +30,8 @@ export class HUD {
   constructor(root, ctx) {
     this.root = root; this.ctx = ctx; ctx.hud = this;
     root.innerHTML = `
-      <div class="fx-hurt"></div><div class="fx-gold"></div>
+      <div class="fx-hurt"></div><div class="fx-gold"></div><div class="fx-flash"></div><div class="fx-speed" data-k="speed"></div>
+      <div class="hud-combo" data-k="combo"><b data-k="combon">0</b><span>ĐÒN LIÊN HOÀN</span></div>
       <div class="hud-top">
         <div class="hud-phase"><b data-k="phase"></b><span data-k="goal"></span></div>
         <div class="hk">
@@ -59,15 +61,10 @@ export class HUD {
       <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
       <div class="hud-hint" data-k="hint"></div>
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
-      <div class="hud-skills">
-        <div class="sk" data-k="sk1"><b>E</b><span>Phá Trận</span><i data-k="sk1cd"></i></div>
-        <div class="sk" data-k="sk2"><b>R</b><span>Tuyệt Kỹ</span><i data-k="sk2cd"></i></div>
-        <div class="sk tpc" data-k="sk3"><b>F</b><span>Tổng Phản Công</span><i></i></div>
-        <div class="sk" data-k="sk4"><b>Tab</b><span>Mệnh Lệnh</span><i></i></div>
-      </div>
+      ${skillBarHTML(true)}
       <div class="ring" data-k="ring">
         <div class="ring-title">MỆNH LỆNH · <span data-k="ringfront"></span> <small>(Z / chạm để đổi mặt trận)</small></div>
-        <div class="ring-grid">${ORDER_KEYS.map((k, i) => `<button data-order="${k}"><b>${i + 1}</b><span>${ORDERS[k].name}</span><i data-k="cd_${k}"></i></button>`).join("")}</div>
+        <div class="ring-grid">${ORDER_KEYS.map((k, i) => `<button data-order="${k}"><img class="ric" src="${ICON(MOVE_INFO[k].icon)}" alt=""><b>${i + 1}</b><span>${ORDERS[k].name}</span><i data-k="cd_${k}"></i></button>`).join("")}</div>
         <div class="ring-foot" data-k="ringfoot"></div>
       </div>
       <div class="cine" data-k="cine"></div>
@@ -79,8 +76,10 @@ export class HUD {
     this.el.ringfront.addEventListener("pointerdown", () => this.swapFront());
     root.querySelectorAll("[data-order]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.issue(b.dataset.order); }));
     this.t = 0; this.pulse = 0;
-    this.ringOpen = false;
+    this.ringOpen = false; this.lastCombo = 0; this.nextC = "";
   }
+  // vệt tốc độ quanh mép màn (Phá Trận, Tuyệt Kỹ)
+  speedLines(T) { const e = this.el.speed; e.classList.remove("on"); void e.offsetWidth; e.style.animationDuration = `${T}s`; e.classList.add("on"); }
 
   swapFront() { this.ringFront = this.ringFront === "A" ? "B" : "A"; }
   issue(k) { this.ctx.director.order(this.ringFront, k); this.ctx.audio.play("ui"); }
@@ -123,6 +122,8 @@ export class HUD {
     E.buffs.textContent = buffs.join(" · ");
     this.terrainTags(hero, E);
     // kỹ năng
+    updateAttackTiles(hero, E, this);
+    this.combo(hero, E);
     const pt = hero.phaTran;
     E.sk1.classList.toggle("ready", pt.cd <= 0);
     E.sk1cd.textContent = pt.left > 0 ? `${pt.left} lần · ${Math.ceil(pt.window)}s` : pt.cd > 0 ? Math.ceil(pt.cd) : "";
@@ -205,6 +206,18 @@ export class HUD {
     const c = this.el.cine; c.textContent = text; c.classList.remove("on"); void c.offsetWidth; c.classList.add("on");
   }
 
+  // Bộ đếm đòn liên hoàn: nảy mỗi lần tăng, đổi màu ở 30 / 60 / 100 đòn, tắt khi chuỗi đứt (hero.comboT hết).
+  combo(hero, E) {
+    const n = hero.combo;
+    E.combo.classList.toggle("on", n >= 3);
+    if (n !== this.lastCombo) {
+      E.combon.textContent = n;
+      if (n > this.lastCombo) { E.combo.classList.remove("pop"); void E.combo.offsetWidth; E.combo.classList.add("pop"); }
+      E.combo.dataset.tier = n >= 100 ? 3 : n >= 60 ? 2 : n >= 30 ? 1 : 0;
+      this.lastCombo = n;
+    }
+  }
+
   drawMap() {
     const c = this.mapCtx, W = 240, H = 160, sx = W / 600, sz = H / 400;
     const X = (x) => x * sx, Z = (z) => (z + 200) * sz;
@@ -275,4 +288,33 @@ export class HUD {
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill(); c.stroke();
     c.restore();
   }
+}
+
+// ---- thanh chiêu có icon (dùng chung trận chính và Võ trường) ------------------------------------------------
+// Hàng trên: đòn N, đòn C kế tiếp (đổi icon theo chuỗi: N N → C báo "C3 Lốc đao"), Né, Đỡ. Hàng dưới: kỹ năng.
+export function skillBarHTML(full) {
+  const tile = (k, id, key, name, extra = "", cls = "") => `<div class="sk ${cls}" data-k="${k}"><img class="ico" src="${ICON(MOVE_INFO[id].icon)}" alt="" data-k="${k}ic"><b>${key}</b><span data-k="${k}nm">${name}</span><i data-k="${k}cd">${extra}</i></div>`;
+  return `<div class="hud-skills">
+    <div class="skrow atk">${tile("atkN", "N", "J", "Đòn N", "")}${tile("atkC", "C1", "K", "C1 Phá thế", "")}${tile("atkD", "dodge", "Space", "Né")}${tile("atkB", "block", "Shift", "Đỡ")}</div>
+    <div class="skrow">${tile("sk1", "skill", "E", "Phá Trận")}${tile("sk2", "ult", "R", "Tuyệt Kỹ")}${full ? tile("sk3", "tpc", "F", "Tổng Phản Công", "", "tpc") + tile("sk4", "cmd", "Tab", "Mệnh Lệnh") : ""}</div>
+  </div>`;
+}
+const PIPS = ["", "●○○○○○", "●●○○○○", "●●●○○○", "●●●●○○", "●●●●●○", "●●●●●●"];
+export function updateAttackTiles(hero, E, st) {
+  const chain = hero.state === "attack" && hero.move?.[0] === "N" ? Number(hero.move[1]) : hero.chainGrace > 0 ? hero.chain : 0;
+  E.atkNcd.textContent = PIPS[chain] || "";
+  E.atkN.classList.toggle("ready", chain > 0);
+  const nk = nextHeavy(hero);
+  if (nk !== st.nextC) {
+    st.nextC = nk;
+    const info = MOVE_INFO[nk];
+    E.atkCic.src = ICON(info.icon); E.atkCnm.textContent = nk === "D" ? "Lướt C" : nk === "DQ" ? "ĐÒN QUYẾT" : `${nk} ${info.name}`;
+    E.atkC.classList.toggle("hot", nk === "DQ");
+    st.touchC ??= document.querySelector(".touch [data-b=c] img");
+    if (st.touchC) st.touchC.src = ICON(info.icon);
+  }
+  E.atkC.classList.toggle("ready", nk !== "C1");
+  E.atkD.classList.toggle("ready", hero.dodgeCd <= 0);
+  E.atkD.classList.toggle("off", hero.dodgeCd > 0);
+  E.atkB.classList.toggle("ready", hero.state === "block");
 }

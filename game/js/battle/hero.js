@@ -8,7 +8,7 @@ import { makeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI, AI } from "../data/tuning.js";
+import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI, AI, IMPACT } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao (chỉ chạy thường, sát thương)
 import { HERO_ANIM as ANIM } from "./hero-anim.js";
@@ -78,7 +78,9 @@ export class Hero {
     if (this.lienHoanT > 0) { this.lienHoanT -= dt; if (this.lienHoanT <= 0) this.lienHoan = 0; }
     this.comboT -= dt; if (this.comboT <= 0) this.combo = 0;
     if (this.parryAt > 0 && ctx.clock - this.parryAt > this.parryWindow) { this.parryAt = -9; this.parryLock = ctx.clock + DEFENSE.counterLockout; }
-    if (this.buf && ctx.clock - this.buf.t > DEFENSE.inputBuffer && !(this.state === "attack" && this.buf.swing === this.swingId)) this.buf = null;
+    // phím N/C bấm giữa lúc lộn né được giữ tới khi né xong (ra Lướt chém) — trước đây hết hạn 0,15 s giữa chừng cú né 0,32 s
+    if (this.buf && ctx.clock - this.buf.t > DEFENSE.inputBuffer && !(this.state === "attack" && this.buf.swing === this.swingId)
+      && !(this.state === "dodge" && (this.buf.a === "n" || this.buf.a === "c"))) this.buf = null;
 
     // Khí Lực nạp khi giao chiến
     const engaged = this.nearestEnemy(12) !== null;
@@ -158,13 +160,16 @@ export class Hero {
     this.state = "attack"; this.move = key; this.st = 0; this.hitIdx = 0; this.swingId++;
     this.moveTarget = target;
     this.dur = m.dur / this.atkSpeed;
+    this.ctx.director.onHeroAction?.("move", key);
     if (key[0] === "C" || key === "DQ" || key === "CT") this.chain = 0;
     // tự nhắm: xoay về địch gần nhất theo hướng input
     const t = target || (this.lock?.alive ? this.lock : this.autoTarget());
     if (t) this.yaw = Math.atan2(t.x - this.x, t.z - this.z);
     else if (this.inputDir !== null) this.yaw = this.inputDir;
     this.stepLeft = (m.dash || m.step || 0);
-    this.ctx.audio.play(m.mv > 2 ? "whooshHeavy" : "whoosh", this.x, this.z);
+    this.ctx.audio.play(m.mv > 2 || key === "N6" || key[0] === "C" || key === "DC" ? "whooshHeavy" : "whoosh");
+    // tiếng thét khi ra đòn mạnh (không phải lần nào cũng thét cho khỏi nhàm)
+    if ((key[0] === "C" && key !== "CT") || key === "DQ" || key === "N6") { if (this.ctx.rng.chance(key === "DQ" ? 1 : 0.4)) this.ctx.audio.play("kiai"); }
   }
 
   updateAttack(dt) {
@@ -225,16 +230,18 @@ export class Hero {
       return t >= -0.5 && t <= reach + rad && perp <= (m.width || 2) / 2 + rad;
     };
     const mv = m.mv;
+    let nHit = 0, crit = false, kills = 0;
     // lính
-    for (const a of ctx.crowd.agents) {
+    for (const a of [...ctx.crowd.agents]) {
       if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
       if (!inShape(a.x, a.z, 0.4)) continue;
       const dx = a.x - this.x, dz = a.z - this.z, d = Math.hypot(dx, dz) || 1;
       const dmg = this.damageTo(a.giap, mv, m.crit, a);
       const stun = isC && this.mods.cStun && ctx.rng.chance(this.mods.cStun) ? 1.5 : 0;
-      ctx.crowd.damage(a, dmg, { by: "hero", swing: this.swingId, kx: dx / d, kz: dz / d, knock: m.knock || 2.2, launch: m.launch, stun });
-      ctx.fx.spark(a.x, heightAt(a.x, a.z) + 1.2, a.z, heavy);
-      hitAny = true; this.onLanded();
+      const died = ctx.crowd.damage(a, dmg, { by: "hero", swing: this.swingId, kx: dx / d, kz: dz / d, knock: m.knock || 2.2, launch: m.launch, stun, heavy });
+      ctx.fx.impact(a.x - dx / d * 0.25, heightAt(a.x, a.z) + 1.15 * a.scale, a.z - dz / d * 0.25, dx / d, dz / d, { heavy, crit: this.lastCrit, kill: died, full: nHit < 5 });
+      crit ||= this.lastCrit; if (died) kills++;
+      hitAny = true; nHit++; this.onLanded();
     }
     // đơn vị lớn
     for (const u of ctx.units) {
@@ -242,10 +249,13 @@ export class Hero {
       if (key === "DQ" && u !== this.moveTarget) continue;
       if (!inShape(u.x, u.z, u.radius)) continue;
       const dmg = this.damageTo(u.giap, mv, m.crit, u);
+      const uc = this.lastCrit;
       const r = u.takeHeroHit(dmg, POISE_PER_MV * mv * poiseMult, { knock: m.knock, launch: m.launch, by: "hero", finisher: key === "DQ" });
-      ctx.fx.spark(u.x, u.y + 1.6, u.z, true);
+      const ux = u.x - this.x, uz = u.z - this.z, ul = Math.hypot(ux, uz) || 1;
+      ctx.fx.impact(u.x - ux / ul * u.radius * 0.6, u.y + 1.6 * u.rig.scale, u.z - uz / ul * u.radius * 0.6, ux / ul, uz / ul, { heavy: true, crit: uc || r.broke, kill: r.killed });
       if (r.broke && this.mods.breakKi) this.addKi(this.mods.breakKi);
-      hitAny = true; this.onLanded();
+      crit ||= uc || !!r.broke; if (r.killed) kills += 3;
+      hitAny = true; nHit++; this.onLanded();
     }
     // cổng: Cong × MV / 3, bỏ qua giáp
     for (const id in ctx.world.gates) {
@@ -256,15 +266,26 @@ export class Hero {
       hitAny = true;
     }
     if (hitAny) {
-      const stop = last && m.stopLast ? m.stopLast : m.stop;
-      ctx.hitstop(stop);
-      ctx.audio.play(heavy ? "hitHeavy" : "hit", this.x, this.z);
-      if (heavy) ctx.fx.shake(key === "DQ" ? 0.6 : 0.25);
-      if (key === "DQ") { ctx.fx.banner("ĐÒN QUYẾT", "#f1d98a"); }
+      // Hit-stop dài hơn bản cũ, cộng thêm theo số người trúng, chí mạng, người ngã — đòn trúng đông "khựng" rõ (IMPACT).
+      const base = last && m.stopLast ? m.stopLast : m.stop, I = IMPACT;
+      ctx.hitstop(Math.min(I.stopMax, base * I.stopMul + Math.min(I.stopCrowdCap, (nHit - 1) * I.stopPerExtra) + (crit ? I.stopCrit : 0) + (kills ? I.stopKill : 0)));
+      ctx.audio.play(heavy ? "hitHeavy" : "hit", null, null, { gain: nHit > 2 ? 1.15 : 1 });
+      if (crit) ctx.audio.play("crit");
+      if (kills) ctx.audio.play("kill", this.x + fx * 2, this.z + fz * 2);
+      // rung + giật camera theo hướng chém + thu FOV; đòn nặng chớp sáng cả màn
+      const big = key === "DQ" || key === "CT";
+      ctx.fx.shake(big ? I.shake.big : heavy ? I.shake.heavy : crit ? I.shake.crit : I.shake.light);
+      ctx.fx.kick(fx, fz, big ? I.kick.big : heavy ? I.kick.heavy : I.kick.light);
+      ctx.fx.punch(big ? I.fov.big : heavy ? I.fov.heavy : crit ? I.fov.crit : I.fov.light);
+      if (big) ctx.fx.flash(0.55); else if (heavy && kills) ctx.fx.flash(0.28); else if (crit) ctx.fx.flash(0.16, "255,200,150");
+      if (key === "DQ") { ctx.fx.banner("ĐÒN QUYẾT", "#f1d98a"); ctx.slowmo?.(0.45, 0.3); }
     }
     if (m.shape === "ring" && (heavy || key === "N6")) ctx.fx.shockwave(this.x, this.z, m.range);
     // bổ xuống đất: tung bụi ở chỗ lưỡi chạm đất
-    if (last && (key === "C1" || key === "C4" || key === "C6" || key === "DQ")) ctx.fx.dust(this.x + Math.sin(this.yaw) * 1.6, this.z + Math.cos(this.yaw) * 1.6, 1.1);
+    if (last && (key === "C1" || key === "C4" || key === "C6" || key === "DQ")) {
+      ctx.fx.dust(this.x + Math.sin(this.yaw) * 1.6, this.z + Math.cos(this.yaw) * 1.6, 1.1);
+      if (key !== "C1") { ctx.audio.play("slam", this.x, this.z); ctx.fx.shake(0.3); }
+    }
     ctx.fx.slashArc(this, key, m);
   }
 
@@ -279,7 +300,8 @@ export class Hero {
     const ctx = this.ctx;
     const g = giap * (1 - this.mods.armorPen);
     let d = this.effCong() * mv * heSoGiap(g, this.stats.level);
-    if (sureCrit || ctx.rng.chance(this.stats.crit)) d *= CRIT_MULT;
+    this.lastCrit = !!(sureCrit || ctx.rng.chance(this.stats.crit));
+    if (this.lastCrit) d *= CRIT_MULT;
     if (this.inTPC) d *= TPC_HERO_MULT;
     return d * (0.95 + 0.1 * ctx.rng.next()) * (tgt ? hitMult(this, tgt) : 1);
   }
@@ -306,6 +328,7 @@ export class Hero {
     if (this.mods.afterimage) this.ctx.fx.afterimage(this.x, this.z, () => this.afterimageBurst(this._aiX, this._aiZ));
     this._aiX = this.x; this._aiZ = this.z;
     this.ctx.audio.play("dodge", this.x, this.z);
+    this.ctx.director.onHeroAction?.("dodge");
     return true;
   }
   afterimageBurst(x, z) {
@@ -319,7 +342,10 @@ export class Hero {
     const sp = DEFENSE.dodgeDist / DEFENSE.dodgeDur;
     this.x += Math.sin(this.dodgeYaw) * sp * dt; this.z += Math.cos(this.dodgeYaw) * sp * dt;
     this.setPose(A.dodgeRoll(Math.min(1, u)), 0.6);
-    if (u >= 1) { this.state = "free"; this.postDodge = 0.35; }
+    if (u >= 1) {
+      this.state = "free"; this.postDodge = 0.35;
+      if (this.buf && (this.buf.a === "n" || this.buf.a === "c")) this.buf.t = this.ctx.clock;   // phím bấm lúc lộn: làm mới hạn để ra Lướt chém
+    }
   }
 
   // ---- Đỡ ------------------------------------------------------------------------------------
@@ -355,6 +381,7 @@ export class Hero {
       this.parryAt = -9;
       ctx.fx.banner("PHẢN ĐÒN", "#f1d98a"); ctx.audio.play("parry", this.x, this.z); ctx.hitstop(120);
       this.yaw = angTo; this.state = "free"; this.startMove("CT", h.src);
+      ctx.director.onHeroAction?.("parry");
       if (h.src?.tier === "tuong") ctx.director.onCounterBoss();
       return "parried";
     }
@@ -363,12 +390,15 @@ export class Hero {
         ctx.fx.spark(this.x + Math.sin(angTo), heightAt(this.x, this.z) + 1.3, this.z + Math.cos(angTo), false, 0xf1d98a);
         ctx.audio.play("block", this.x, this.z);
         this.x -= Math.sin(angTo) * 0.25; this.z -= Math.cos(angTo) * 0.25;
+        ctx.director.onHeroAction?.("block");
         return "blocked";
       }
       h.dmg *= 0.6;   // đòn viền đỏ phá đỡ
     }
     this.hp -= h.dmg; this.addKi(2);
-    ctx.fx.hurt(); ctx.audio.play(h.heavy ? "hurtHeavy" : "hurt", this.x, this.z);
+    ctx.fx.hurt(); ctx.audio.play(h.heavy ? "hurtHeavy" : "hurt");
+    ctx.fx.blood(this.x, this.y + 1.2, this.z, -Math.sin(angTo), -Math.cos(angTo), h.heavy ? 0.8 : 0.4);
+    if (h.heavy || h.red) { ctx.fx.shake(h.red ? 0.45 : 0.25); ctx.fx.kick(-Math.sin(angTo), -Math.cos(angTo), 0.3); ctx.hitstop(h.red ? 90 : 50); }
     ctx.director.onHeroHit(h);
     if (this.hp <= 0) { this.onZeroHp(); return "hit"; }
     const armored = (this.state === "attack" || this.state === "skill") && !h.heavy && !h.red;
@@ -403,7 +433,8 @@ export class Hero {
     const t = this.lock?.alive ? this.lock : null;
     this.yaw = t ? Math.atan2(t.x - this.x, t.z - this.z) : (this.inputDir ?? this.yaw);
     this.dashLen = this.mods.phaTranLen; this.dashHit = new Set();
-    this.ctx.audio.play("whooshHeavy", this.x, this.z); this.ctx.fx.banner("PHÁ TRẬN", "#e6dcc3", 0.6);
+    this.ctx.director.onHeroAction?.("skill");
+    this.ctx.audio.play("dash"); this.ctx.fx.banner("PHÁ TRẬN", "#e6dcc3", 0.6); this.ctx.hud?.speedLines?.(0.5);
     return true;
   }
   updateSkill(dt) {
@@ -418,7 +449,9 @@ export class Hero {
       if (Math.hypot(a.x - this.x, a.z - this.z) > 2.2) continue;
       this.dashHit.add(a);
       const kx = Math.cos(this.yaw), kz = -Math.sin(this.yaw), side = ((a.x - this.x) * kx + (a.z - this.z) * kz) >= 0 ? 1 : -1;
-      ctx.crowd.damage(a, this.damageTo(a.giap, HERO.phaTran.mv, false, a), { by: "hero", swing: this.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
+      const died = ctx.crowd.damage(a, this.damageTo(a.giap, HERO.phaTran.mv, false, a), { by: "hero", swing: this.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
+      ctx.fx.impact(a.x, heightAt(a.x, a.z) + 1.15 * a.scale, a.z, kx * side, kz * side, { kill: died, full: this.dashHit.size < 6 });
+      ctx.director.onHeroAction?.("skillHit", 1);
       hit = true; this.onLanded();
     }
     for (const un of ctx.units) {
@@ -428,7 +461,7 @@ export class Hero {
       un.takeHeroHit(this.damageTo(un.giap, HERO.phaTran.mv, false, un), POISE_PER_MV * HERO.phaTran.mv * C_POISE_MULT, { by: "hero" });
       hit = true;
     }
-    if (hit) { ctx.hitstop(20); ctx.audio.play("hit", this.x, this.z); }
+    if (hit) { ctx.hitstop(35); ctx.audio.play("hit"); ctx.fx.shake(0.12); ctx.fx.kick(Math.sin(this.yaw), Math.cos(this.yaw), 0.18); }
     ctx.fx.trail(this);
     if (u >= 1) { this.state = "free"; this.swingId++; }
   }
@@ -451,7 +484,7 @@ export class Hero {
     this.ultR = hkUlt ? 3.5 * HAO_KHI.tpc.freeUlt.radius : 3.5;
     this.ctx.cinematic(hkUlt ? "TUYỆT KỸ HÀO KHÍ" : "BÓP NÁT QUÂN THÙ", this);
     this.ctx.audio.play("ult", this.x, this.z);
-    this.ctx.director.onUlt(hkUlt);
+    this.ctx.director.onUlt(hkUlt); this.ctx.director.onHeroAction?.("ult"); this.ctx.hud?.speedLines?.(0.8);
     return true;
   }
   updateUlt(dt) {
@@ -476,15 +509,17 @@ export class Hero {
         if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
         const dx = a.x - this.x, dz = a.z - this.z, dd = Math.hypot(dx, dz);
         if (dd > this.ultR) continue;
-        ctx.crowd.damage(a, this.damageTo(a.giap, this.ultMv, false, a), { by: "hero", swing: this.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: this.ultHits % 6 === 0 });
+        const died = ctx.crowd.damage(a, this.damageTo(a.giap, this.ultMv, false, a), { by: "hero", swing: this.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: this.ultHits % 6 === 0 });
+        if (Math.random() < 0.5) ctx.fx.impact(a.x, heightAt(a.x, a.z) + 1.15 * a.scale, a.z, dx / (dd || 1), dz / (dd || 1), { heavy: this.ultHits % 6 === 0, kill: died, full: Math.random() < 0.4 });
       }
       for (const un of ctx.units) {
         if (un.side !== "dich" || !un.alive || un.dead || un.retreating) continue;
         if (Math.hypot(un.x - this.x, un.z - this.z) > this.ultR + un.radius) continue;
         un.takeHeroHit(this.damageTo(un.giap, this.ultMv, false, un), POISE_PER_MV * this.ultMv, { by: "hero" });
       }
-      ctx.fx.shockwave(this.x, this.z, this.ultR * 0.8); ctx.audio.play("hit", this.x, this.z);
+      ctx.fx.shockwave(this.x, this.z, this.ultR * 0.8); ctx.audio.play(this.ultHits % 6 === 0 ? "hitHeavy" : "hit");
       if (this.ultHits % 4 === 0) ctx.fx.shake(0.2);
+      if (this.ultHits % 6 === 0) { ctx.fx.punch(3); ctx.fx.kick(Math.sin(this.yaw), Math.cos(this.yaw), 0.25); ctx.hitstop(45); }
     }
     if (this.st >= 4.2) {
       this.state = "free";

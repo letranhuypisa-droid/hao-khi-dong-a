@@ -578,5 +578,35 @@ console.log("Trời, nắng theo pha (battle/atmosphere.js)");
   });
 }
 
+console.log("Icon chiêu, SFX, bảng đòn (đợt 7)");
+{
+  const { existsSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const { MOVE_INFO, nextHeavy } = await import("../js/data/moves-info.js");
+  const { SFX_FILES } = await import("../js/battle/audio.js");
+  t("mọi icon trong bảng đòn có file assets/icons/*.webp", () => {
+    for (const [k, m] of Object.entries(MOVE_INFO)) assert.ok(existsSync(root + `assets/icons/${m.icon}.webp`), `${k}: thiếu ${m.icon}.webp`);
+  });
+  t("mọi mẫu SFX khai trong audio.js có file (đủ số biến thể), cả hai vòng nền", () => {
+    const EXT = { drumroll: "m4a", horn: "m4a", cheer: "m4a", volley: "m4a", gong: "m4a", gatebreak: "m4a" };
+    for (const [n, v] of Object.entries(SFX_FILES)) for (let i = 1; i <= v; i++) {
+      const f = `${n}${v > 1 ? "-" + i : ""}.${EXT[n] || "wav"}`;
+      assert.ok(existsSync(root + "assets/sfx/" + f), "thiếu " + f);
+    }
+    for (const f of ["ambience.m4a", "fire.m4a"]) assert.ok(existsSync(root + "assets/sfx/" + f), "thiếu " + f);
+  });
+  t("đòn C kế tiếp theo chuỗi: C1 khi rảnh, N2 đang chém → C3, vừa né → Lướt, sĩ quan Vỡ Thế → Đòn Quyết", () => {
+    const cKey = (k) => "C" + Math.min(4, k);
+    const h = (o) => ({ state: "free", move: null, chain: 0, chainGrace: 0, postDodge: 0, cKey, findBroken: () => null, ...o });
+    assert.equal(nextHeavy(h({})), "C1");
+    assert.equal(nextHeavy(h({ state: "attack", move: "N2", chain: 2 })), "C3");
+    assert.equal(nextHeavy(h({ chainGrace: 0.2, chain: 5 })), "C4");        // C5 chưa mở thì lùi về C4
+    assert.equal(nextHeavy(h({ state: "attack", move: "N6", chain: 6 })), "C1");
+    assert.equal(nextHeavy(h({ postDodge: 0.2 })), "D");
+    assert.equal(nextHeavy(h({ findBroken: () => ({}) })), "DQ");
+  });
+}
+
 console.log(`\n${pass} đạt, ${fail} trượt`);
 process.exit(fail ? 1 : 0);
