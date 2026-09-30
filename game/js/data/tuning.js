@@ -18,19 +18,24 @@ export const LEVEL_CAP = 35;                               // trần R1
 export const heSoGiap = (giapMucTieu, Lkecong) => 1 - giapMucTieu / (giapMucTieu + 120 * g(Lkecong));
 export const CRIT_BASE = 0.05, CRIT_MULT = 1.5, CRIT_CAP = 0.30;
 export const BROKEN_MULT = 1.5;        // mục tiêu Vỡ Thế
-export const TPC_HERO_MULT = 1.2;      // tướng người chơi trong Tổng Phản Công
+// Tướng người chơi trong Tổng Phản Công: Công +20% (§6.4) — nhân một lần trong hero.effCong (HAO_KHI.tpc.heroAtk). Trước
+// đợt 9 damageTo nhân thêm hằng số TPC_HERO_MULT 1,2 lần nữa (×1,44); hằng số đã bỏ.
 export const GATE_DIV = 3;             // tướng đánh cổng = Cong * MV / 3, bỏ qua giáp
 
 // ---- Độ khó (mục 10/§10; thẻ tấn công 21.6) ---------------------------------------------
 // tokens: số lính được đánh cùng lúc. dmg: hệ số doKho cho đòn của địch (ĐỀ XUẤT BẢN THỬ).
 // reward: hệ số EXP/Tiền (12.1 "Dân binh 0,8 … Truyền Kỳ 2,0"; bậc giữa là ĐỀ XUẤT).
 // qc: hệ số Quân công (12.10). revive: số lần Gượng dậy.
+// hp / poise / hk (đợt 9, bảng §10 canon): HP địch × (lính, sĩ quan, Toa Đô; không nhân cổng, thuyền), Phá Thế địch ×
+// (sĩ quan, Toa Đô — lính thường không có thanh Phá Thế),
+// Hào Khí nhận × (nhân nguồn tăng, sau hệ số Trận nhanh). Chưa theo canon: dmg (canon 0,5/1,0/1,6/2,4/3,5), revive
+// (canon Tướng quân 0 lần), cửa sổ phản đòn, báo trước viền đỏ, hạn giờ sự kiện, cấp địch R+3 — giữ như bản thử.
 export const DIFFICULTY = [
-  { id: "danbinh",   name: "Dân binh",   tokens: 2, dmg: 0.7, reward: 0.8,  qc: 0.8, revive: 2 },
-  { id: "quansi",    name: "Quân sĩ",    tokens: 3, dmg: 1.0, reward: 1.0,  qc: 1.0, revive: 1 },
-  { id: "tuongquan", name: "Tướng quân", tokens: 4, dmg: 1.3, reward: 1.3,  qc: 1.1, revive: 1 },
-  { id: "nguyensoai",name: "Nguyên soái",tokens: 6, dmg: 1.6, reward: 1.6,  qc: 1.2, revive: 0 },
-  { id: "truyenky",  name: "Truyền Kỳ",  tokens: 8, dmg: 2.0, reward: 2.0,  qc: 1.3, revive: 0 },
+  { id: "danbinh",   name: "Dân binh",   tokens: 2, dmg: 0.7, reward: 0.8,  qc: 0.8, revive: 2, hp: 0.7, poise: 0.7, hk: 1.3 },
+  { id: "quansi",    name: "Quân sĩ",    tokens: 3, dmg: 1.0, reward: 1.0,  qc: 1.0, revive: 1, hp: 1.0, poise: 1.0, hk: 1.0 },
+  { id: "tuongquan", name: "Tướng quân", tokens: 4, dmg: 1.3, reward: 1.3,  qc: 1.1, revive: 1, hp: 1.3, poise: 1.2, hk: 1.0 },
+  { id: "nguyensoai",name: "Nguyên soái",tokens: 6, dmg: 1.6, reward: 1.6,  qc: 1.2, revive: 0, hp: 1.7, poise: 1.4, hk: 0.9 },
+  { id: "truyenky",  name: "Truyền Kỳ",  tokens: 8, dmg: 2.0, reward: 2.0,  qc: 1.3, revive: 0, hp: 2.2, poise: 1.6, hk: 0.8 },
 ];
 
 // ---- Tướng H35 Trần Quốc Toản (21.6) -----------------------------------------------------
@@ -43,9 +48,29 @@ export const HERO = {
   aura: 16, auraAtk: 0.06, skMult: 1.2, cmdCd: 0.92, bodyguards: 10,   // Thống Suất 3
   kiLucBars: 2, kiLucPerBar: 100, kiLucRegen: 1.4,                      // nạp khi giao chiến
   revive: { hp: 0.5, invuln: 3 },
+  retryHp: 0.5,                           // tải lại checkpoint: Sinh lực ≥ 50% (ĐỀ XUẤT BẢN THỬ, đợt 9)
   phaTran: { cd: 20, dashes: 3, window: 6, len: 18, mv: 1.2, stun: 1 },  // PROTO ghi đè CD 20 s
-  tuyetKy: { cost: 100, invuln: 10, hits: 24, mvTotal: 20, qCost: 20, flagR: 20, flagAtk: 0.25, flagDur: 15 },
+  tuyetKy: { cost: 100, invuln: 10, hits: 24, mvTotal: 20, qCost: 20, flagR: 20, flagAtk: 0.25, flagDur: 15,
+    // ĐỀ XUẤT BẢN THỬ (đợt 9): đòn Tuyệt Kỹ (cả Tuyệt Kỹ Hào Khí) vào sĩ quan / Toa Đô × bigMult (sát thương lẫn Phá Thế),
+    // và lấy tối đa bigCap × Sinh lực tối đa của mỗi đơn vị trong bigCapWindow giây kể từ đòn Tuyệt Kỹ đầu tiên trúng nó
+    // (hai Tuyệt Kỹ thường liền nhau chung một trần). Tuyệt Kỹ Hào Khí có trần riêng bigCapHK, cửa sổ riêng: trước đây chung
+    // trần nên mở Tổng Phản Công bằng Tuyệt Kỹ Hào Khí là chạm 35% ngay, hai Tuyệt Kỹ thường (200 Khí Lực) sau đó 0 máu
+    // lên Toa Đô suốt 15 s. Lính thường không đổi (dọn đám đông như cũ).
+    // Trước: một Tuyệt Kỹ lấy 52–100% (trung vị ~87%) Sinh lực Phó tướng, 53–57% Toa Đô.
+    bigMult: 0.4, bigCap: 0.35, bigCapWindow: 15, bigCapHK: 0.2 },
 };
+
+// Sát thương thật một đòn Tuyệt Kỹ gây lên đơn vị lớn u (sĩ quan, Toa Đô): raw × bigMult, cắt theo phần trần còn lại
+// trong cửa sổ bigCapWindow. Tuyệt Kỹ thường: trần bigCap, u.ultCapT (lúc mở cửa sổ), u.ultCapDealt (máu đã mất trong cửa
+// sổ); Tuyệt Kỹ Hào Khí (hk = true): trần bigCapHK, u.ultCapHKT, u.ultCapHKDealt. Tính cả ×BROKEN_MULT khi u đang Vỡ Thế
+// (takeHeroHit nhân sau). Người gọi cộng máu thật đã mất bằng ultBigNote.
+export function ultBigDamage(u, raw, clock, hk = false) {
+  const T = HERO.tuyetKy, kT = hk ? "ultCapHKT" : "ultCapT", kD = hk ? "ultCapHKDealt" : "ultCapDealt";
+  if (!(clock - (u[kT] ?? -1e9) < T.bigCapWindow)) { u[kT] = clock; u[kD] = 0; }
+  const room = Math.max(0, (hk ? T.bigCapHK : T.bigCap) * u.maxHp - u[kD]);
+  return Math.min(raw * T.bigMult, room / (u.broken > 0 ? BROKEN_MULT : 1));
+}
+export function ultBigNote(u, lost, hk = false) { u[hk ? "ultCapHKDealt" : "ultCapDealt"] += Math.max(0, lost); }
 
 // ---- Bộ đòn WC03 (21.6: MV sau hệ số 0,7; hit-stop ms) ------------------------------------
 // dur: thời lượng ở Tốc đánh ×1,0 (giây) — ĐỀ XUẤT BẢN THỬ, chọn để DPS đơn mục tiêu ≈ 1,6 MV/s
@@ -95,11 +120,14 @@ export const DEFENSE = {
 // ---- Bậc địch, cấp 1, Quân sĩ (21.6) ------------------------------------------------------
 // hp/cong/giap ở R=1 cho giáo binh (rel 1,0). poise = thanh Phá Thế (0 = không có).
 // mv/every: đòn thường. red: MV đòn viền đỏ. q: Q trừ khi hạ (21.6 "Tướng người chơi trừ Q").
+// ĐỀ XUẤT BẢN THỬ (đợt 9, sau kiểm chứng): HP Phó tướng 1440 → 1584 (+10%; chuỗi N 8,4 → 9,2 s, canon ~10 s). Đo 10 seed
+// Quân sĩ: bot hạ Phó tướng 7,2–7,9 s ở 5/10 seed (mục tiêu 8–12). Toa Đô giữ 4200: chuỗi N đơn thuần đã 24,4 s (canon
+// 20–25 s); +14% thì 28 s.
 export const TIERS = {
   thuong:    { name: "Lính",       hp: 120,  cong: 40,  giap: 20, poise: 0,   mv: 1.0, every: 2.5, red: 0, q: 1,  scale: 1.0 },
   tinhnhue:  { name: "Tinh nhuệ",  hp: 360,  cong: 60,  giap: 30, poise: 0,   mv: 1.2, every: 2.0, red: 0, q: 1,  scale: 1.05 },
   doitruong: { name: "Đội trưởng", hp: 720,  cong: 80,  giap: 40, poise: 100, mv: 1.5, every: 2.0, red: 3, q: 10, scale: 1.2 },
-  photuong:  { name: "Phó tướng",  hp: 1440, cong: 120, giap: 60, poise: 300, mv: 1.2, every: 1.6, red: 4, q: 30, scale: 1.3 },
+  photuong:  { name: "Phó tướng",  hp: 1584, cong: 120, giap: 60, poise: 300, mv: 1.2, every: 1.6, red: 4, q: 30, scale: 1.3 },
   tuong:     { name: "Tướng",      hp: 4200, cong: 160, giap: 60, poise: 600, mv: 1.2, every: 1.6, red: 4, q: 60, scale: 1.45, ult: 8, ultTelegraph: 1.0 },
 };
 
@@ -123,7 +151,9 @@ export const KITS = {
   NG_CUNG: { unit: "KHIEN_NG", name: "Cung thủ",    w: 0.20, hp: 0.7, cong: 0.8, giap: 0.7, speed: 1.0,  ranged: true, range: 16, windup: 0.8 },
   NG_TANK: { unit: "KHIEN_NG", name: "Lực sĩ trọng giáp", w: 0.13, hp: 3.0, cong: 1.6, giap: 1.4, speed: 0.72, reach: 2.3, windup: 0.85,
              heavy: true, stable: true, scale: 1.3 },
-  NG_KY:   { unit: "CUNGKY_NG", name: "Cung kỵ",    w: 1.00, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  ranged: true, range: 20, windup: 0.7, mounted: true },
+  // cong 1,0 → 0,6 (đợt 9): mũi tên cung kỵ 28,8 → 17,3 lên H35 cấp 1 (tinh nhuệ 51,8 → 31,1), ngang tên cung thủ bộ
+  // (15,4); trước đây cung kỵ gây 57–90% sát thương tướng nhận. Đo: 0,75 → 38–69%, 0,65 → 35–62%, 0,55 → 21–52%.
+  NG_KY:   { unit: "CUNGKY_NG", name: "Cung kỵ",    w: 1.00, hp: 1.0, cong: 0.6, giap: 1.0, speed: 1.0,  ranged: true, range: 20, windup: 0.7, mounted: true },
   DV_GIAO: { unit: "GIAO_DV", name: "Giáo binh",    w: 0.50, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  reach: 2.4, windup: 0.5 },
   DV_DAO:  { unit: "GIAO_DV", name: "Đao khiên",    w: 0.30, hp: 1.15, cong: 0.95, giap: 1.1, speed: 1.0, reach: 1.7, windup: 0.42 },
   DV_NO:   { unit: "GIAO_DV", name: "Nỏ thủ",       w: 0.20, hp: 0.8, cong: 0.9, giap: 0.8, speed: 1.0,  ranged: true, range: 14, windup: 0.9 },
@@ -138,6 +168,10 @@ export const AI = {
   block: { NG_DAO: 0.3, DV_DAO: 0.3, NG_GIAO: 0.15 }, blockDmg: 0.25, blockCd: 1.4,
   evade: { thuong: 0.2, tinhnhue: 0.45 }, evadeDist: 2.2,
   kite: 0.4,
+  // Thẻ bắn tướng của lính bắn xa = max(1, round(thẻ cận chiến × rangedTok)) — Quân sĩ 1, Tướng quân 1, Nguyên soái 2
+  // (trước × 0,67: 2 / 3 / 4). stray: tên nhắm người khác chỉ trúng tướng khi đích của nó đứng trong stray.r m quanh tướng
+  // lúc buông tên, và chỉ gây stray.dmg sát thương (trước: mọi tên địch bay qua đều trúng đủ). ĐỀ XUẤT BẢN THỬ (đợt 9).
+  rangedTok: 0.34, stray: { r: 3, dmg: 0.5 },
   // ĐỀ XUẤT BẢN THỬ: quân đồn trú bắn cung chỉ đứng bắn / lùi giữ tầm trong vòng Cứ Điểm + kiteLeash m quanh tâm (A2: 13 + 10 m);
   // bị dồn tới mép thì thôi lùi mà bắn trả. Trước đây thả diều không giới hạn: một cung kỵ sót lại giữ Cứ Điểm mãi.
   kiteLeash: 10,
@@ -154,6 +188,12 @@ export const AI = {
   duel: { engageR: 7, maxOn: 2, maxOnBig: 4, retarget: [0.6, 1.2], switchGain: 2, every: 0.6, dmg: { ta: 0.8, dich: 0.5 }, block: 0.3, lunge: 0.22,
     leash: 10 },   // leash: quân đồn trú chỉ giáp lá cà trong vòng Cứ Điểm + 10 m; thân binh trong 14 m quanh tướng
 };
+// Hệ số sát thương lên tướng của một mũi tên địch, quyết lúc buông tên (đợt 9): nhắm tướng 1; nhắm người khác đang đứng
+// trong AI.stray.r m quanh tướng → AI.stray.dmg (tên lạc); còn lại 0 — bay qua người tướng cũng không trúng.
+export function arrowHeroMult(aimedAtHero, tgtDistToHero) {
+  if (aimedAtHero) return 1;
+  return tgtDistToHero < AI.stray.r ? AI.stray.dmg : 0;
+}
 export const KITS_OF =Object.fromEntries(Object.keys(UNITS).map((u) => [u, Object.keys(KITS).filter((k) => KITS[k].unit === u)]));
 // Chọn kiểu lính theo một số u ∈ [0,1) (thường là băm của id lính, để không ăn vào chuỗi rng).
 export function pickKit(unit, u) {

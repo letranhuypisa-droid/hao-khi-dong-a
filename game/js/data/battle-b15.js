@@ -31,14 +31,20 @@ export const xToLine = (f, wx) => (wx - f.x0) / (f.x1 - f.x0);
 // Cứ Điểm (21.2). lineX: vị trí trên tuyến. G: quân đồn trú. cap: giây chiếm.
 // hk: [Hào Khí khi ta chiếm, khi mất]. gate: độ bền gốc (nhân S(R)).
 // G của cổng là "quân giữ cổng" — ĐỀ XUẤT BẢN THỬ, GDD không đặt quân đồn trú cho cổng.
+// ĐỀ XUẤT BẢN THỬ (đợt 9, nhịp Trận nhanh 8–12 phút): A1 G 40 → 110, A2/B2 80 → 160, cổng 4000 → 8000. Trước đây bot
+// thắng Quân sĩ trong ~3,7 phút (mỗi pha 35–50% par pha). B1 là đồn của ta: G 40 giữ nguyên — mô phỏng vẫn bào G của nó
+// khi tuyến B lùi về đồn (front.js, "Cứ Điểm tại tuyến bị bào mòn") và lật về địch khi G hết.
+// Sau kiểm chứng: A1 80 → 110 kéo P1 (pha ít dao động nhất); nâng cổng (9500–12000) thì P3 phình 250–330 s ở các seed mà
+// quân giữ cổng và cánh A địch còn đông (bot bị kéo đi săn cung, dọn) — cổng giữ 8000. A2/B2 170–175 không đổi P2 (P2 do
+// tuyến mô phỏng và Kế Sách quyết).
 export const BASES = [
   { id: "HQ_TA", name: "Bản doanh ta", type: "ban_doanh", owner: "ta", front: null, x: 34, z: 0, r: 16 },
-  { id: "A1", name: "Đồn bến trên", type: "don", owner: "dich", front: "A", lineX: 0.30, G: 40, keeper: "doitruong", cap: 3, hk: [3, -5] },
-  { id: "A2", name: "Doanh trại trên bãi", type: "doanh_trai", owner: "dich", front: "A", lineX: 0.55, G: 80, keeper: "photuong", cap: 5, hk: [6, -10] },
-  { id: "A3", name: "Cổng bắc Hàm Tử quan", type: "cong", owner: "dich", front: "A", lineX: 0.80, gate: 4000, G: 30, hk: [5, 0] },
+  { id: "A1", name: "Đồn bến trên", type: "don", owner: "dich", front: "A", lineX: 0.30, G: 110, keeper: "doitruong", cap: 3, hk: [3, -5] },
+  { id: "A2", name: "Doanh trại trên bãi", type: "doanh_trai", owner: "dich", front: "A", lineX: 0.55, G: 160, keeper: "photuong", cap: 5, hk: [6, -10] },
+  { id: "A3", name: "Cổng bắc Hàm Tử quan", type: "cong", owner: "dich", front: "A", lineX: 0.80, gate: 8000, G: 30, hk: [5, 0] },
   { id: "B1", name: "Đồn bến dưới", type: "don", owner: "ta", front: "B", lineX: 0.30, G: 40, keeper: "doitruong", cap: 3, hk: [3, -5] },
-  { id: "B2", name: "Doanh trại bến dưới", type: "doanh_trai", owner: "dich", front: "B", lineX: 0.55, G: 80, keeper: "photuong", cap: 5, hk: [6, -10] },
-  { id: "B3", name: "Cổng nam Hàm Tử quan", type: "cong", owner: "dich", front: "B", lineX: 0.80, gate: 4000, G: 30, hk: [5, 0] },
+  { id: "B2", name: "Doanh trại bến dưới", type: "doanh_trai", owner: "dich", front: "B", lineX: 0.55, G: 160, keeper: "photuong", cap: 5, hk: [6, -10] },
+  { id: "B3", name: "Cổng nam Hàm Tử quan", type: "cong", owner: "dich", front: "B", lineX: 0.80, gate: 8000, G: 30, hk: [5, 0] },
 ];
 export const BASE_RING = { don: 10, doanh_trai: 13, cong: 7, ban_doanh: 16 };
 
@@ -50,7 +56,14 @@ export const PHASES = [
     tip: "Hai mặt trận cùng cần bạn. Mở vòng Mệnh Lệnh (Tab) để giao việc cho quân." },
   { id: "P3", name: "Hàm Tử quan", goal: "Phá Cổng bắc (A3) hoặc Cổng nam (B3)", par: 3,
     tip: "Cổng bắc gần hơn. Cổng nam xa hơn, nhưng mở được thì cánh B +15 Sĩ Khí." },
-  { id: "P4", name: "Toa Đô", goal: "Đánh lui Toa Đô", par: 2,
+  // hkFloor: kịch bản đảm bảo Hào Khí ≥ 90 ở pha boss (canon VS, systems.md §12 "dạy Tổng Phản Công") — đặt thẳng lúc vào
+  // P4, không nhân hệ số, không tính vào Hào Khí gốc (Quân công); đang Tổng Phản Công thì thôi.
+  // hkBoss — ĐỀ XUẤT BẢN THỬ (đợt 9, sửa sau kiểm chứng): P4 gần như không có nguồn tăng trước khi Toa Đô rút (phản đòn Toa
+  // Đô +1 × 3, mốc KO đã chạm trần), nên sàn 90 chỉ cho Tổng Phản Công đúng lúc hạ Toa Đô (6/6 trận đo) hoặc không bao giờ.
+  // Khi Toa Đô mất 30% Sinh lực lần đầu ("Toa Đô núng thế"), kịch bản nâng Hào Khí lên 100 — chỉ khi từ đầu P4 chưa kích
+  // Tổng Phản Công, không đang Tổng Phản Công, và Tổng Phản Công kích ở P3 không còn chạy lúc vào P4; đặt thẳng như hkFloor.
+  // Người chơi đã tự kiếm đủ 100 thì không đổi gì.
+  { id: "P4", name: "Toa Đô", goal: "Đánh lui Toa Đô", par: 2, hkFloor: 90, hkBoss: { hpBelow: 0.7, value: 100 },
     tip: "Quân Nguyên đổ bộ từ mép nước mỗi 30 giây. Đây là lúc hợp nhất để kích Tổng Phản Công." },
 ];
 
@@ -62,7 +75,10 @@ export const SIDE_MISSIONS = [
 
 // Sự kiện động (21.2, 21.6; hạn giờ Trận nhanh ×1,2 đã tính sẵn).
 export const EVENTS = {
-  counterA1: { name: "Cứ Điểm bị phản công", at: 30, limit: 72, base: "A1", squad: 22,
+  // drain: mỗi lính của toán đứng trong vòng A1 bào drain × G gốc của A1 mỗi giây (lệnh cho mặt trận A: × 0,5). Trước đợt 9
+  // là 0,05 G/s cố định với G gốc 40; đợt 9 nâng G gốc A1 lên 80 nên bỏ mặc toán phản công thì A1 mất ở giây 68/72 thay vì
+  // 33/72 (Trận chuẩn hạn 60 s: hết giờ mà G còn → tính là giữ được). Tính theo G gốc để giữ nhịp cũ. ĐỀ XUẤT BẢN THỬ.
+  counterA1: { name: "Cứ Điểm bị phản công", at: 30, limit: 72, base: "A1", squad: 22, drain: 0.05 / 40,
                win: { hk: 3 }, lose: { hk: -5 } },
   surrounded: { name: "Tướng ta bị vây", at: 75, limit: 90, general: "H40", base: "B2", squad: 24,
                 win: { hk: 6, sk: 15 }, lose: { hk: -5, sk: -25 } },

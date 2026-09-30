@@ -8,7 +8,7 @@ import { makeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI, AI, IMPACT } from "../data/tuning.js";
+import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, GATE_DIV, HAO_KHI, AI, IMPACT, ultBigDamage, ultBigNote } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao (chỉ chạy thường, sát thương)
 import { HERO_ANIM as ANIM } from "./hero-anim.js";
@@ -27,7 +27,10 @@ export class Hero {
     this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, dải khăn, cờ (rig-motion.js)
     ctx.scene.add(this.rig.root);
     this.trails = [new BladeTrail(ctx.scene, 0xd9b36a, 0.14), new BladeTrail(ctx.scene, 0xd9b36a, 0.14)];
-    this.x = 72; this.z = -32; this.yaw = Math.PI / 2;     // ngoài rào bản doanh, để camera không kẹt vào lều this.vx = 0; this.vz = 0; this.y = 0;
+    this.x = 72; this.z = -32; this.yaw = Math.PI / 2;     // ngoài rào bản doanh, để camera không kẹt vào lều
+    // vx/vz: vận tốc thật (m/s) đo mỗi bước — cung địch bắn đón theo đó (crowd.fireArrow). Trước đợt 9 dòng khởi tạo này
+    // nằm lọt trong chú thích ở dòng trên, không ai gán vx/vz nên tên địch luôn bắn vào chỗ tướng đang đứng.
+    this.vx = 0; this.vz = 0; this.y = 0;
     this.maxHp = stats.hp; this.hp = this.maxHp; this.giap = stats.giap;
     this.ki = 0; this.kiMax = HERO.kiLucBars * HERO.kiLucPerBar;
     this.revives = ctx.diff.revive; this.alive = true;
@@ -67,7 +70,7 @@ export class Hero {
   }
 
   update(dt, inp) {
-    const ctx = this.ctx;
+    const ctx = this.ctx, px = this.x, pz = this.z;
     this.animT += dt; this.inTouch = inp.touch;
     for (const tr of this.trails) tr.update(dt);
     this.invuln = Math.max(0, this.invuln - dt); this.dodgeCd = Math.max(0, this.dodgeCd - dt);
@@ -87,7 +90,7 @@ export class Hero {
     if (engaged) this.kiEngaged = 3; else this.kiEngaged -= dt;
     if (this.kiEngaged > 0 && this.state !== "ult") this.addKi(HERO.kiLucRegen * dt * (this.inTPC ? HAO_KHI.tpc.kiLucRegen : 1));
 
-    if (!this.alive) { this.setPose(A.knockdown(this.st += dt), 0.3); this.place(dt); return; }
+    if (!this.alive) { this.vx = this.vz = 0; this.setPose(A.knockdown(this.st += dt), 0.3); this.place(dt); return; }
 
     this.blocking = inp.block;     // phím cạnh đã vào bộ đệm qua intake()
 
@@ -109,6 +112,7 @@ export class Hero {
       case "ult": this.updateUlt(dt); break;
     }
     [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.5, ctx.openGates);
+    if (dt > 0) { this.vx = (this.x - px) / dt; this.vz = (this.z - pz) / dt; }
     this.place(dt);
   }
 
@@ -289,8 +293,9 @@ export class Hero {
     ctx.fx.slashArc(this, key, m);
   }
 
-  effCong() {
-    let c = this.stats.cong * (1 + this.buffs.atk + this.buffs.flag);
+  // big: đòn vào sĩ quan / Toa Đô — cờ Tuyệt Kỹ là cờ tập hợp quân (đợt 9): không cộng vào đòn của tướng lên đơn vị lớn
+  effCong(big = false) {
+    let c = this.stats.cong * (1 + this.buffs.atk + (big ? 0 : this.buffs.flag));
     if (this.inTPC) c *= 1 + HAO_KHI.tpc.heroAtk;
     return c;
   }
@@ -299,15 +304,14 @@ export class Hero {
   damageTo(giap, mv, sureCrit, tgt = null) {
     const ctx = this.ctx;
     const g = giap * (1 - this.mods.armorPen);
-    let d = this.effCong() * mv * heSoGiap(g, this.stats.level);
+    let d = this.effCong(!!tgt?.isBig) * mv * heSoGiap(g, this.stats.level);
     this.lastCrit = !!(sureCrit || ctx.rng.chance(this.stats.crit));
-    if (this.lastCrit) d *= CRIT_MULT;
-    if (this.inTPC) d *= TPC_HERO_MULT;
+    if (this.lastCrit) d *= CRIT_MULT;      // Tổng Phản Công +20% đã nhân trong effCong (trước đợt 9 nhân thêm ×1,2 ở đây)
     return d * (0.95 + 0.1 * ctx.rng.next()) * (tgt ? hitMult(this, tgt) : 1);
   }
 
   onLanded() {
-    this.addKi(0.35 * (1 + this.mods.kiPct));
+    this.addKi(0.35);          // kiPct nhân trong addKi (trước đợt 9 nhân hai lần: khắc "+10% Khí Lực" thành +21%)
     this.combo++; this.comboT = 2.2;
     // Liên hoàn (WC03): mỗi 10 đòn trúng liền mạch +4% tốc đánh 6 s, tối đa 3 tầng (ĐỀ XUẤT BẢN THỬ)
     if (this.combo % this.mods.comboEvery === 0) { this.lienHoan = Math.min(3, this.lienHoan + 1); this.lienHoanT = 6; }
@@ -478,7 +482,7 @@ export class Hero {
       this.ki -= T.cost;
       if (this.mods.ultRefund && this.ctx.rng.chance(this.mods.ultRefund)) { this.addKi(50); this.ctx.fx.text(this.x, this.z, "+50 Khí Lực", "#f1d98a"); }
     }
-    this.state = "ult"; this.st = 0; this.ultHits = 0; this.invuln = T.invuln;
+    this.state = "ult"; this.st = 0; this.ultHits = 0; this.invuln = T.invuln; this.ultId = (this.ultId || 0) + 1;
     this.ultHK = hkUlt;
     this.ultMv = hkUlt ? HAO_KHI.tpc.freeUlt.mv / T.hits : (T.mvTotal / T.hits) * (1 + this.mods.ultPct);
     this.ultR = hkUlt ? 3.5 * HAO_KHI.tpc.freeUlt.radius : 3.5;
@@ -515,7 +519,14 @@ export class Hero {
       for (const un of ctx.units) {
         if (un.side !== "dich" || !un.alive || un.dead || un.retreating) continue;
         if (Math.hypot(un.x - this.x, un.z - this.z) > this.ultR + un.radius) continue;
-        un.takeHeroHit(this.damageTo(un.giap, this.ultMv, false, un), POISE_PER_MV * this.ultMv, { by: "hero" });
+        // sĩ quan / Toa Đô: × bigMult (sát thương và Phá Thế); Tuyệt Kỹ lấy tối đa bigCap × Sinh lực tối đa của mỗi đơn vị
+        // trong bigCapWindow giây tính từ đòn Tuyệt Kỹ đầu tiên trúng nó (tính cả ×1,5 khi Vỡ Thế) — hai Tuyệt Kỹ thường liền
+        // nhau (2 vạch Khí Lực) chung một trần; Tuyệt Kỹ Hào Khí có trần riêng bigCapHK. Hết trần thì đòn vẫn trúng (khựng,
+        // Phá Thế) nhưng không trừ máu nữa — báo "trụ vững" một lần mỗi Tuyệt Kỹ trên đơn vị đó.
+        const hp0 = un.hp, dmg = ultBigDamage(un, this.damageTo(un.giap, this.ultMv, false, un), ctx.clock, this.ultHK);
+        un.takeHeroHit(dmg, POISE_PER_MV * this.ultMv * T.bigMult, { by: "hero" });
+        ultBigNote(un, hp0 - un.hp, this.ultHK);
+        if (dmg <= 0 && un.alive && un.ultCapSaid !== this.ultId) { un.ultCapSaid = this.ultId; ctx.fx.text(un.x, un.z, `${un.name || "Tướng địch"} trụ vững`, "#c9bfae"); }
       }
       ctx.fx.shockwave(this.x, this.z, this.ultR * 0.8); ctx.audio.play(this.ultHits % 6 === 0 ? "hitHeavy" : "hit");
       if (this.ultHits % 4 === 0) ctx.fx.shake(0.2);

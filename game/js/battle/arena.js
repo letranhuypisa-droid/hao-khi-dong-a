@@ -225,8 +225,11 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;   // r186 bỏ PCFSoft (xem battle.js)
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);   // núi xa đặt ngoài vòng 600–900 m
+    // Võ trường (cả Huấn luyện) giữ HP / Phá Thế địch ×1 ở mọi độ khó: ước lượng thời gian Vàng/Bạc (meta/arena.js
+    // estimateTime) và mốc Đua KO cố định tính theo HP gốc; hệ số §10 của đợt 9 chỉ dành cho trận (trước đây lọt sang đây,
+    // làm huy chương thời gian khó hơn ×1,7–2,2 ở Nguyên soái, Truyền Kỳ).
     const ctx = {
-      scene, camera, renderer, R, diff: { ...diff }, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
+      scene, camera, renderer, R, diff: { ...diff, hp: 1, poise: 1 }, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
       openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music,
     };
     ctx.world = buildArena(scene, { shadows: settings.shadows });

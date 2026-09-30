@@ -3,11 +3,11 @@
 
 import * as THREE from "three";
 import { FRONTS, BASES, BASE_RING, PHASES, EVENTS, ALLY_GENERALS, MAP, lineToX, ENEMY_MIX } from "../data/battle-b15.js";
-import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS, MODES } from "../data/tuning.js";
+import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS, MODES, HERO } from "../data/tuning.js";
 import { KeSachManager } from "./kesach.js";
 import { PICKUPS, DROPS } from "../data/progression.js";
 import { simTick, issueOrder, triggerTPC, totalQ, snapshot as simSnapshot } from "../sim/front.js";
-import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
+import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone, raiseTo as hkRaiseTo } from "../sim/haokhi.js";
 import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
@@ -280,7 +280,8 @@ export class Director {
       const have = crowd.agents.filter((a) => a.role === "garrison" && a.src === id && a.state !== "dead").length;
       const want = Math.min(Math.floor(b.G), 18) - have;
       for (let i = 0; i < want && enemies < ZONE.enemies + 6; i++) {
-        crowd.spawn({ side: "dich", unit: i % 3 === 0 ? "CUNGKY_NG" : "KHIEN_NG", tier: i % 6 === 0 ? "tinhnhue" : "thuong", role: "garrison", src: id,
+        // tinh nhuệ ở i % 6 === 1 (khiên binh): trước đợt 9 là i % 6 === 0 — mọi tinh nhuệ giữ cổng đều là cung kỵ (51,8 mỗi mũi tên)
+        crowd.spawn({ side: "dich", unit: i % 3 === 0 ? "CUNGKY_NG" : "KHIEN_NG", tier: i % 6 === 1 ? "tinhnhue" : "thuong", role: "garrison", src: id,
           x: g.x - rng.range(4, 14), z: g.z + rng.range(-10, 10), anchor: { x: g.x - 6, z: g.z, r: 8 } });
         enemies++;
       }
@@ -419,6 +420,9 @@ export class Director {
     this.say(P.tip, 7);
     if (this.phase === 1) this.events = { counterA1: { state: "wait" }, surrounded: { state: "wait" } };
     if (this.phase === 3) this.startBossPhase();
+    // kịch bản đảm bảo Hào Khí ở pha boss (P4 hkFloor = 90): đặt trước khi lưu checkpoint để tải lại P4 vẫn có
+    const hkAdd = P.hkFloor ? hkRaiseTo(ctx.hk, P.hkFloor, "kịch bản: pha " + P.id) : 0;
+    if (hkAdd > 0) ctx.hud?.hkPulse(hkAdd);
     this.saveCheckpoint();
   }
 
@@ -435,7 +439,7 @@ export class Director {
       const squad = crowd.agents.filter((a) => a.role === "squad" && a.src === "counterA1" && crowd.hittable(a));
       const inRing = squad.filter((a) => Math.hypot(a.x - p.x, a.z - p.z) < p.r + 2).length;
       const order = sim.fronts.A.order;
-      b.G = Math.max(0, b.G - inRing * 0.05 * dt * (order ? 0.5 : 1));
+      b.G = Math.max(0, b.G - inRing * EVENTS.counterA1.drain * b.G0 * dt * (order ? 0.5 : 1));   // theo G gốc (đợt 9)
       if (order && (E1.orderKill = (E1.orderKill || 0) + dt) > 2.5 && squad.length) { E1.orderKill = 0; crowd.kill(squad[0], { by: "ally" }); E1.delegated = true; }
       const offAlive = E1.officer && !E1.officer.dead && E1.officer.alive;
       if (b.owner !== "ta" || b.G <= 0) this.endEvent("counterA1", false);
@@ -498,7 +502,7 @@ export class Director {
     if (r.hk) this.hk(r.hk, "sự kiện:" + id, true);
     if (r.sk) { const f = ctx.sim.fronts[id === "surrounded" ? "B" : "A"]; f.sk.ta = Math.max(0, Math.min(100, f.sk.ta + r.sk)); }
     ev.how = ok ? (ev.delegated ? "giao cho quân" : "tự làm") : "thất bại";
-    if (!ok && id === "counterA1" && ctx.sim.bases.A1.owner === "ta") { ctx.sim.bases.A1.owner = "dich"; ctx.sim.bases.A1.G = 20; ctx.world.setBaseOwner("A1", "dich"); this.hk(baseDef("A1").hk[1], "mất:A1"); }
+    if (!ok && id === "counterA1" && ctx.sim.bases.A1.owner === "ta") { ctx.sim.bases.A1.owner = "dich"; ctx.sim.bases.A1.G = Math.round(ctx.sim.bases.A1.G0 * 0.5); ctx.world.setBaseOwner("A1", "dich"); this.hk(baseDef("A1").hk[1], "mất:A1"); }
     // lính còn lại của toán rút đi
     for (const a of ctx.crowd.agents) if (a.role === "squad" && a.src === id && a.state !== "dead") { a.role = "zone"; a.anchor = null; a.front = id === "surrounded" ? "B" : "A"; }
     if (id === "surrounded" && this.generals.H40) { this.generals.H40.inEvent = false; }
@@ -546,11 +550,24 @@ export class Director {
     const boss = new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", name: "Toa Đô", x: b.x + 10, z: b.z - 10, awake: false, aggro: 45 });
     boss.retreatTo = { x: 540, z: MAP.riverNorthZ - 6 };
     ctx.units.push(boss); this.boss = boss; this.bossSpawned = true; this.landT = 8;
+    // "Toa Đô núng thế" (PHASES[3].hkBoss): nhớ số lần Tổng Phản Công lúc vào P4 (cả khi tải lại checkpoint P4); Tổng Phản
+    // Công kích ở P3 còn chạy sang P4 thì coi như pha boss đã có Tổng Phản Công — kịch bản không bù lần hai
+    this.bossHk = { tpc0: ctx.hk.tpcCount, done: !!ctx.hk.tpc };
     this.say("Toa Đô ở bãi cát trong Hàm Tử quan. Đánh lui hắn để thắng trận.", 6);
   }
   updateBossPhase(dt) {
     const ctx = this.ctx;
     if (!this.boss || this.boss.retreating) return;
+    // kịch bản "Toa Đô núng thế": Toa Đô mất 30% Sinh lực lần đầu → Hào Khí lên 100 nếu từ đầu P4 chưa kích Tổng Phản Công
+    const B = PHASES[3].hkBoss, bh = this.bossHk;
+    if (B && bh && !bh.done && this.boss.hp < this.boss.maxHp * B.hpBelow) {
+      bh.done = true;
+      const add = !ctx.hk.tpc && ctx.hk.tpcCount === bh.tpc0 ? hkRaiseTo(ctx.hk, B.value, "kịch bản: Toa Đô núng thế") : 0;
+      if (add > 0) {
+        ctx.hud?.hkPulse(add); ctx.fx.banner("TOA ĐÔ NÚNG THẾ · HÀO KHÍ DÂNG ĐẦY", "#f1d98a", 1.6); ctx.audio.play("cheer");
+        this.say("Toa Đô núng thế! Hào Khí đã đầy — kích Tổng Phản Công.", 4, "good");
+      }
+    }
     this.landT -= dt;
     if (this.landT <= 0) {
       this.landT = 30;
@@ -742,7 +759,8 @@ export class Director {
     for (const id in ctx.openGates) ctx.openGates[id] = !!c.openGates[id];
     for (const id in ctx.world.gates) ctx.world.gates[id].broken = !!c.openGates[id];
     for (const id in ctx.sim.bases) ctx.world.setBaseOwner(id, ctx.sim.bases[id].owner);
-    h.alive = true; h.state = "free"; h.hp = c.hero.hp; h.ki = c.hero.ki; h.revives = c.hero.revives; h.x = c.hero.x; h.z = c.hero.z; h.invuln = 2; h.lock = null;
+    // Sinh lực tải lại ≥ 50% (đợt 9): trước đây lấy đúng máu lúc vào pha — vào P4 với 18 HP, 0 Gượng dậy thì thử lại mãi vẫn gục
+    h.alive = true; h.state = "free"; h.hp = Math.max(c.hero.hp, h.maxHp * HERO.retryHp); h.ki = c.hero.ki; h.revives = c.hero.revives; h.x = c.hero.x; h.z = c.hero.z; h.invuln = 2; h.lock = null;
     for (const fid in FRONTS) this.prevQ[fid] = { ta: totalQ(ctx.sim.fronts[fid], "ta"), dich: totalQ(ctx.sim.fronts[fid], "dich") };
     this.over = false; this.result = null; this.retries = (this.retries || 0) + 1;
     // checkpoint chỉ lưu trước khi Toa Đô xuất hiện nên luôn bossDown = false. Trước đây tải lại P4 trong 2,5 s sau khi Toa Đô
@@ -777,7 +795,9 @@ export class Director {
       won, why, R: ctx.R, difficulty: ctx.diff.id, timeSec: this.time,
       missions: (mainDone / 4) * 0.8 + (sideDone / 2) * 0.2,
       qRatio: q / q0, baseRatio: owned / nonHq.length, ko: this.ko,
-      hkRaw: ctx.hk.rawTotal, hkOptional: ctx.hk.optional, hkLog: { ...ctx.hk.log },
+      // hkLog: điểm gốc theo nguồn; dòng kịch bản (raiseTo) là điểm thanh, ghi rõ đơn vị để bảng cuối trận khỏi lẫn
+      hkRaw: ctx.hk.rawTotal, hkOptional: ctx.hk.optional,
+      hkLog: { ...ctx.hk.log, ...Object.fromEntries(Object.entries(ctx.hk.script || {}).map(([k, v]) => [`${k} (đặt thẳng, điểm thanh)`, v])) },
       avgSK: this.skSamples ? this.skSum / this.skSamples : 50, bossDefeated: !!this.bossDown,
       tpcCount: ctx.hk.tpcCount, chestCoins: this.chestCoins, extraTT: this.extraTT,
       events: Object.fromEntries(Object.entries(this.events).map(([k, v]) => [k, v.how || v.state])),

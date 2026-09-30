@@ -5,20 +5,22 @@
 //   - Không có nguồn tăng chủ động trong 45 s → −1 mỗi 5 s.
 //   - Chạm 100: khoá ở 100, không suy giảm tới khi kích. Phần vượt thành Hào Khí dư, tối đa 30;
 //     ôm quá 90 s thì ngừng tích.
-//   - Trận nhanh: chỉ nhân nguồn TĂNG ×1,3.
+//   - Trận nhanh: chỉ nhân nguồn TĂNG ×1,3; độ khó nhân thêm diffMult (§10: 1,3 / 1,0 / 1,0 / 0,9 / 0,8).
+//   - Kịch bản đặt mức sàn (raiseTo, vd "≥ 90 ở pha boss"): đặt thẳng, không nhân hệ số, không tính điểm gốc.
 //   - Tổng Phản Công 25 s; +1 s mỗi 3 điểm dư, kéo dài tổng ≤ +10 s (mọi nguồn).
 //   - Kết thúc: Hào Khí về 25 rồi cộng phần kiếm trong lúc TPC; dư về 0.
 //   - Tuyệt Kỹ không cộng Hào Khí (L6) — tầng trận không gọi gain() cho Tuyệt Kỹ.
 
 import { HAO_KHI } from "../data/tuning.js";
 
-export function createHaoKhi({ quick = true, start = 0, gainPct = 0, decayMult = 1, tpcExt = 0 } = {}) {
+export function createHaoKhi({ quick = true, start = 0, gainPct = 0, decayMult = 1, tpcExt = 0, diffMult = 1 } = {}) {
   return {
     value: Math.min(45, start), overflow: 0, floor: 0,
-    quick, gainPct, decayMult, tpcExt,
+    quick, gainPct, decayMult, tpcExt, diffMult,
     idle: 0, decayAcc: 0, atMaxFor: 0,
     tpc: false, tpcLeft: 0, tpcGained: 0, tpcCount: 0,
     log: {},            // tổng điểm GỐC theo nguồn (trước hệ số) — cho telemetry và Quân công
+    script: {},         // điểm THANH do kịch bản đặt thẳng (raiseTo) — không phải điểm gốc, ghi riêng khỏi log
     optional: 0,        // điểm gốc từ nguồn tùy chọn (21.6)
     rawTotal: 0,
   };
@@ -37,7 +39,7 @@ export function gain(hk, amount, source, { optional = false } = {}) {
   if (amount > 0) { hk.rawTotal += amount; if (optional) hk.optional += amount; }
   let real = amount;
   if (amount > 0) {
-    real = amount * (hk.quick ? HAO_KHI.quickMult : 1) * (1 + hk.gainPct);
+    real = amount * (hk.quick ? HAO_KHI.quickMult : 1) * (1 + hk.gainPct) * (hk.diffMult ?? 1);
     hk.idle = 0; hk.decayAcc = 0;
   }
   if (hk.tpc) { if (real > 0) hk.tpcGained += real; return real; }
@@ -56,6 +58,23 @@ export function gain(hk, amount, source, { optional = false } = {}) {
     if (hk.value < 100) hk.atMaxFor = 0;
   }
   return real;
+}
+
+// Kịch bản nâng Hào Khí lên ít nhất v (không nhân Trận nhanh / độ khó / kỹ năng, không vào rawTotal — không phải điểm
+// người chơi kiếm). Không hạ, không đụng khi đang Tổng Phản Công. Trả về phần đã nâng.
+// Phần nâng ghi vào hk.script (điểm thanh), không vào hk.log (điểm gốc): trước đây ghi chung log nên bảng "Hào Khí theo
+// nguồn" cuối trận trộn hai đơn vị. Nâng tính như một nguồn tăng: đặt lại đồng hồ suy giảm 45 s (trước đây không đặt lại —
+// vào P4 sau một quãng không có nguồn tăng thì 90 bắt đầu tụt ngay).
+export function raiseTo(hk, v, source = "kịch bản") {
+  if (hk.tpc || hk.value >= v) return 0;
+  const add = Math.min(100, v) - hk.value;
+  if (add <= 0) return 0;
+  hk.value += add;
+  hk.script = hk.script || {};
+  hk.script[source] = (hk.script[source] || 0) + add;
+  hk.floor = Math.max(hk.floor, milestoneFloor(hk.value));
+  hk.idle = 0; hk.decayAcc = 0;
+  return add;
 }
 
 function milestoneFloor(v) {

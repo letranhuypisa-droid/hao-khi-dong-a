@@ -22,8 +22,9 @@ export class BigUnit {
     const R = ctx.R;
     if (o.side === "dich") {
       const T = TIERS[o.tier];
-      this.maxHp = T.hp * S(R); this.cong = T.cong * g(R); this.giap = T.giap * g(R);
-      this.poiseMax = T.poise * S(R); this.T = T;
+      // HP địch ×, Phá Thế địch × theo độ khó (§10)
+      this.maxHp = T.hp * S(R) * (ctx.diff?.hp ?? 1); this.cong = T.cong * g(R); this.giap = T.giap * g(R);
+      this.poiseMax = T.poise * S(R) * (ctx.diff?.poise ?? 1); this.T = T;
     } else {
       this.maxHp = o.hp * g(R) * (1 + (ctx.stats?.mods.allyHpPct || 0)); this.cong = 110 * g(R); this.giap = 60 * g(R); this.poiseMax = 0;
       this.T = { mv: 1.5, every: 1.4, red: 0 };

@@ -82,7 +82,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     ctx.sim = createSim({ fronts: FRONTS, bases: BASES, enemyMix: ENEMY_MIX, R, mods: {
       unitSimC: stats.legionSimC, reinfAmt: stats.mods.reinfAmt, reinfCharges: stats.mods.reinfCharges,
       holdThu: stats.mods.holdThu, skPer5: stats.mods.skPer5, cmdCdMult: stats.mods.cmdCdMult, allyHpPct: stats.mods.allyHpPct } });
-    ctx.hk = createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt });
+    ctx.hk = createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt,
+      diffMult: diff.hk ?? 1 });   // Hào Khí nhận × theo độ khó (§10)
     ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
     music?.play("battle");
     ctx.fx = new FX(scene, camera, hudRoot);

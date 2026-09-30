@@ -115,7 +115,7 @@ export class HUD {
     E.rev.textContent = hero.revives > 0 ? `· Gượng dậy ×${hero.revives}` : "";
     const buffs = [];
     if (hero.buffs.atk) buffs.push(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
-    if (hero.buffs.flag) buffs.push("Dưới cờ +25%");
+    if (hero.buffs.flag) buffs.push(`Dưới cờ: đánh lính +${Math.round(hero.buffs.flag * 100)}%`);   // cờ Tuyệt Kỹ không cộng vào đòn lên sĩ quan, Toa Đô (đợt 9)
     if (hero.lienHoan) buffs.push(`Liên hoàn ×${hero.lienHoan}`);
     if (hero.invuln > 0 && hero.state === "ult") buffs.push("Bất tử");
     if (hero.combo > 4) buffs.push(`${hero.combo} đòn`);

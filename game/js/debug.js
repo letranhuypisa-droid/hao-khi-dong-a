@@ -20,6 +20,8 @@
 //   roll    đi xa thì lộn liên tiếp (nhanh hơn chạy ~40%, có khung bất tử)
 //   orders  Mệnh Lệnh: Tiến công / Giữ vững cho mặt trận có sự kiện (quân ta tự hạ toán phản công, toán vây tướng),
 //           Tiến công cho mặt trận đang đứng khi rảnh, Gọi tiếp viện ở P2
+//   kesach  bấm Lệnh Kế Sách (G) ngay khi có Kế Sách Sẵn sàng; mục tiêu { ks: true } (xem __objective) thì săn toán giữ bờ
+//           Kế Sách "Cờ áo Tống" (lính và Đội trưởng giữ bờ) cho thuyền quân Triệu Trung đi tiếp
 //   Số: reach (3,4 m tầm ra đòn), engage (30 m: xa mục tiêu hơn thì chỉ chạy, không dây dưa), healAt (0,5), ultHp (0,3),
 //   gateHunt (9 m: ở cổng chỉ đuổi cung thủ giữ cổng gần hơn thế, hoặc đang giữ thẻ bắn mình).
 //   Tay người: react (0,2 s — chỉ phản ứng khi đòn gồng / cú húc / mũi tên đã hiện ít nhất chừng ấy), miss (0,1 — xác suất
@@ -226,8 +228,9 @@ function smartBot(getTarget, opts) {
       }
     }
 
-    // ---- 3. Tổng Phản Công ---------------------------------------------------------------------------
+    // ---- 3. Tổng Phản Công, Kế Sách -----------------------------------------------------------------
     if (on("tpc") && !c.hk.tpc && c.hk.value >= 100) P.tpc = true;
+    if (on("kesach") && d.keSach.list.some((k) => k.state === "sansang")) P.kesach = true;
 
     // ---- 4. mục tiêu -----------------------------------------------------------------------------
     const obj = typeof getTarget === "function" ? getTarget(c) : getTarget;
@@ -247,6 +250,10 @@ function smartBot(getTarget, opts) {
     const garAll = src ? crowd.agents.some((a) => a.role === "garrison" && a.src === src && crowd.hittable(a)) : false;
     const ready = !!B && B.G < 1 && !garAll && !B.keeperAlive;
     const boss = obj.isBig ? obj : null;
+    // Kế Sách "Cờ áo Tống": toán giữ bờ (lính + Đội trưởng) chặn thuyền — mục tiêu { ks: true, ref } là người giữ bờ
+    // __objective đã chọn (toán tây nhất trước). Đánh đúng người đó, không đánh "người giữ bờ gần nhất": người gần nhất
+    // thường ở toán phía đông, bot chạy qua lại giữa hai toán (mục tiêu xa > 30 m thì chỉ chạy) mà không hạ được ai.
+    const ksRef = obj.ks && obj.ref && (obj.ref.isBig ? obj.ref.alive && !obj.ref.dead : crowd.hittable(obj.ref)) ? obj.ref : null;
 
     // ---- 5. cơ hội: Đòn Quyết, Tuyệt Kỹ ------------------------------------------------------------
     const broken = bigs.find((o) => o.u.broken > 0.15 && o.d < 10);
@@ -306,9 +313,19 @@ function smartBot(getTarget, opts) {
       // cung đang giữ thẻ bắn mình trong 11 m; cung của quân đồn trú mục tiêu trong 22 m (phải hạ hết mới chiếm được); ở cổng
       // thì cung giữ cổng đang bắn mình (có thẻ) hoặc ở gần — hai cung kỵ tinh nhuệ bắn ~50 sát thương/s nếu cứ đứng chém cổng
       const rangedTok = on("hunt") ? foes.filter((o) => hunting(o.a) && o.d < 22 && ((o.a.token && o.d < 11) || (src && o.a.role === "garrison" && o.a.src === src && (baseId || o.d < GATE_HUNT || o.a.token)))) : [];
-      if (offNear) { tgt = offNear.u; why = "đấu sĩ quan"; }
+      // đứng ở cổng: cứ chém cổng (C4 đòn vòng 5 m trúng cả cổng lẫn lính quanh mình); chỉ quay sang đánh riêng khi bị ≥ 3
+      // lính cận chiến áp sát hoặc cung đang giữ thẻ bắn mình trong gateHunt m. Trước đây (đợt 9 đo) tuyến A áp tới cổng
+      // thì vùng chiến đấu bù lính liên tục, bot "dọn" 100–400 s mà không chém cổng nhát nào.
+      const gp = gateId ? c.world.gates[gateId] : null, atGate = !!gp && Math.hypot(gp.x - 1.6 - h.x, gp.z - h.z) < 6;
+      if (atGate && !offNear) {
+        const rt = rangedTok.find((o) => o.a.token && o.d < GATE_HUNT);
+        if (adj.length >= 3) { tgt = adj[0].a; why = "cận chiến"; }
+        else if (rt) { tgt = rt.a; why = "săn cung"; }
+      }
+      else if (offNear) { tgt = offNear.u; why = "đấu sĩ quan"; }
       else if (adj.length) { tgt = adj[0].a; why = "cận chiến"; }
       else if (rangedTok.length) { tgt = rangedTok[0].a; why = "săn cung"; }
+      else if (ksRef) { tgt = ksRef; why = ksRef.isBig ? "Kế Sách: sĩ quan giữ bờ" : "Kế Sách: dọn bờ"; }
       else if (kAlive && (keeper.awake || dist(keeper) < 35)) { tgt = keeper; why = "trấn thủ"; }
       else if (on("hunt") && baseId && gar.length) {
         // quân đồn trú còn sót: cung kỵ trước (hay thả diều ngoài vòng), rồi người gần nhất
@@ -422,11 +439,12 @@ function faces(u, t, halfArc) {
 function skillReady(h) { return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
 
 // Tên của địch sẽ trúng tướng trong 0,3 s tới (giả sử tướng đứng yên): thời gian + vận tốc tên. Luật trúng như
-// crowd.updateArrows: cách ngang < 0,9 m, lệch cao < 1,3 m so với ngực.
+// crowd.updateArrows: cách ngang < 0,9 m, lệch cao < 1,3 m so với ngực, và tên phải trúng được tướng (heroMult > 0: nhắm
+// tướng hoặc tên lạc — đợt 9; tên nhắm người khác ở xa bay qua người tướng không trúng nên không né).
 function arrowThreat(crowd, h, react, notice) {
   let best = null;
   for (const r of crowd.arrows) {
-    if (r.side !== "dich" || r.t < react) continue;
+    if (r.side !== "dich" || r.t < react || !(r.heroMult > 0)) continue;
     let x = r.x, y = r.y, z = r.z, vy = r.vy, t = r.t;
     for (let k = 1; k <= 18; k++) {
       const dt = 1 / 60; t += dt; x += r.vx * dt; z += r.vz * dt; y += vy * dt; vy -= 9.8 * dt;
@@ -457,10 +475,30 @@ function pickOrder(c, reinfUsed) {
   return null;
 }
 
-// Mục tiêu theo pha: P1 A1 → P2 A2 → P3 cổng bắc → P4 Toa Đô.
+// Mục tiêu theo pha: P1 A1 → P2 A2 → P3 cổng bắc → P4 Toa Đô. Việc phụ như người chơi thường làm (đợt 9):
+//   - P2–P3, Kế Sách "Cờ áo Tống" Khả dụng (chỉ lần thử đầu): dọn toán giữ bờ theo thứ tự thuyền gặp (tây → đông) để thuyền
+//     cập bến; bấm G khi Sẵn sàng là việc của bot (opts.kesach).
+//   - P2, B2 "rẻ": mô phỏng đã bào G của B2 xuống ≤ 30% G gốc và tướng còn ≥ 60% máu → sang chiếm B2 (đi rồi thì đi hẳn)
+//     (nhiệm vụ phụ, +6 +4 Hào Khí gốc). Tắt: window.__objectiveOff.ks = true / .b2 = true.
+const OBJ_OFF = window.__objectiveOff = { ks: false, b2: false };
+const B2_TRIP = new WeakMap();     // director → đã quyết sang B2 (trạng thái của bot, không ghi lên director của trận)
 window.__objective = (c) => {
-  const d = c.director, w = c.world.bases;
+  const d = c.director, w = c.world.bases, sim = c.sim, h = c.hero;
   if (d.phase === 0) return w.A1;
+  if (d.phase === 1 || d.phase === 2) {
+    const ks = d.keSach.get("coAoTong");
+    if (!OBJ_OFF.ks && ks && ks.state === "khadung" && ks.attempts <= 1 && d.keSach.boats.some((b) => !b.dead && !b.landed)) {
+      // toán giữ bờ theo thứ tự thuyền gặp: neo tây nhất trước, cùng neo thì người gần tướng nhất
+      let best = null, bk = Infinity;
+      const consider = (o, ax) => { const k = ax * 1000 + Math.hypot(o.x - h.x, o.z - h.z); if (k < bk) { bk = k; best = o; } };
+      for (const a of c.crowd.agents) if (a.src === "coAoTong" && c.crowd.hittable(a)) consider(a, a.anchor.x);
+      for (const u of c.units) if (u.ksGroup !== undefined && u.alive && !u.dead) consider(u, u.home.x);
+      if (best) return { x: best.x, z: best.z, ks: true, ref: best };
+    }
+    const B2 = sim.bases.B2;
+    if (B2.owner !== "dich") B2_TRIP.delete(d);
+    else if (!OBJ_OFF.b2 && (B2_TRIP.get(d) || (d.phase === 1 && B2.G <= 0.3 * B2.G0 && h.hp >= 0.6 * h.maxHp))) { B2_TRIP.set(d, true); return w.B2; }
+  }
   if (d.phase === 1) return w.A2;
   if (d.phase === 2) return { x: w.A3.x - 2.5, z: w.A3.z, gate: true };
   return d.boss && d.boss.alive ? d.boss : { x: 528, z: -40 };

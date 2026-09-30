@@ -1,10 +1,10 @@
 // tests/run.mjs — kiểm thử phần thuần (mô phỏng, Hào Khí, tiến triển) trong Node.
 //   node hao-khi-viet/game/tests/run.mjs
 import assert from "node:assert/strict";
-import { heSoGiap, g, E, EXP_NEXT, MOVES, TIERS, HERO, HAO_KHI, UNITS, KITS, KITS_OF, pickKit } from "../js/data/tuning.js";
-import { FRONTS, BASES, ENEMY_MIX } from "../js/data/battle-b15.js";
+import { heSoGiap, g, E, EXP_NEXT, MOVES, TIERS, HERO, HAO_KHI, UNITS, KITS, KITS_OF, pickKit, DIFFICULTY, AI, ultBigDamage, ultBigNote, arrowHeroMult } from "../js/data/tuning.js";
+import { FRONTS, BASES, ENEMY_MIX, PHASES, EVENTS } from "../js/data/battle-b15.js";
 import { createSim, simTick, issueOrder, triggerTPC, totalQ, snapshot } from "../js/sim/front.js";
-import { createHaoKhi, gain, tick, activate, tpcReady } from "../js/sim/haokhi.js";
+import { createHaoKhi, gain, tick, activate, tpcReady, raiseTo } from "../js/sim/haokhi.js";
 import * as P from "../js/meta/progress.js";
 
 let pass = 0, fail = 0;
@@ -742,16 +742,122 @@ console.log("Icon chiêu, SFX, bảng đòn (đợt 7)");
 
 console.log("\nTổng Phản Công lật Cứ Điểm (sim/front.js triggerTPC)");
 {
-  // A2 ở lineX 0,55, G0 80 → lật khi G < 40. Mặt trận A là mặt trận đang đứng: tuyến +0,20 khi kích.
+  // A2 ở lineX 0,55, G0 160 (đợt 9; trước 80) → lật khi G < 80. Mặt trận A là mặt trận đang đứng: tuyến +0,20 khi kích.
   const tpcAt = (x, G) => { const s = mk(); s.fronts.A.x = x; s.bases.A2.G = G; const f = triggerTPC(s, "A", 25); return { s, f }; };
-  t("tuyến đang áp sát A2 (0,50), G 30 < 40 → A2 đổi chủ (trước đây xét sau khi đẩy tuyến tới 0,70 nên bỏ sót)", () => {
+  t("tuyến đang áp sát A2 (0,50), G 30 < 80 → A2 đổi chủ (trước đây xét sau khi đẩy tuyến tới 0,70 nên bỏ sót)", () => {
     const { s, f } = tpcAt(0.5, 30);
     assert.ok(f.includes("A2"), `lật: ${f}`); assert.equal(s.bases.A2.owner, "ta"); assert.equal(s.bases.A2.keeperAlive, false);
   });
   t("tuyến cách A2 0,20 (0,35) được đẩy tới đúng A2 → A2 đổi chủ (như cũ)", () => assert.ok(tpcAt(0.35, 30).f.includes("A2")));
-  t("tuyến quét qua A2 nhưng G ≥ 50% → không lật", () => assert.ok(!tpcAt(0.5, 40).f.includes("A2")));
+  t("tuyến quét qua A2 nhưng G ≥ 50% → không lật", () => assert.ok(!tpcAt(0.5, 0.5 * BASES.find((b) => b.id === "A2").G).f.includes("A2")));
   t("tuyến còn xa A2 (0,20 → 0,40) → không lật", () => assert.ok(!tpcAt(0.2, 10).f.includes("A2")));
   t("cổng không bao giờ bị Tổng Phản Công lật", () => { const s = mk(); s.fronts.A.x = 0.75; s.bases.A3.G = 0; assert.ok(!triggerTPC(s, "A", 25).includes("A3")); });
+}
+
+console.log("\nCân bằng đợt 9 (Tuyệt Kỹ vào sĩ quan, tên lạc, độ khó, Hào Khí pha boss)");
+{
+  // chuỗi N của H35 cấp 1 lên giáp 60 (Phó tướng, Toa Đô): ~172/s — như kiểm thử Toa Đô ở đầu file
+  const dps = HERO.cong1 * 1.6 * HERO.atkSpeed * heSoGiap(60, 1);
+  const T = HERO.tuyetKy, rawHit = HERO.cong1 * (T.mvTotal / T.hits) * heSoGiap(60, 1);
+  // một lần Tuyệt Kỹ 24 đòn (4 s) lên đơn vị u từ lúc t0; Vỡ Thế từ đòn thứ brokeAt (×1,5 như takeHeroHit). Trả phần máu đã mất.
+  // hk = true: Tuyệt Kỹ Hào Khí (MV tổng 35, trần riêng bigCapHK).
+  const ult = (u, t0, brokeAt = 99, hk = false) => {
+    const hp0 = u.hp, raw = hk ? HERO.cong1 * (HAO_KHI.tpc.freeUlt.mv / T.hits) * heSoGiap(60, 1) : rawHit;
+    for (let i = 0; i < T.hits; i++) {
+      if (i === brokeAt) u.broken = 3.5;
+      const d = ultBigDamage(u, raw, t0 + i * (4 / T.hits), hk), lost = Math.min(u.hp, d * (u.broken > 0 ? 1.5 : 1));
+      u.hp -= lost; ultBigNote(u, lost, hk);
+    }
+    return hp0 - u.hp;
+  };
+  const pt = () => ({ maxHp: TIERS.photuong.hp, hp: TIERS.photuong.hp, broken: 0 });
+  t("Tuyệt Kỹ vào sĩ quan: mỗi đòn × 0,4 khi chưa chạm trần", () => near(ultBigDamage(pt(), 100, 0), 100 * T.bigMult, 1e-9));
+  t("một Tuyệt Kỹ lấy ≤ 35% Sinh lực Phó tướng, kể cả khi Phó tướng Vỡ Thế giữa chừng (trước: 52–100%)", () => {
+    const a = pt(), b = pt(), la = ult(a, 0), lb = ult(b, 0, 8);
+    assert.ok(la <= T.bigCap * a.maxHp + 1e-6 && lb <= T.bigCap * b.maxHp + 1e-6, `${la} ${lb}`);
+    assert.ok(la / a.maxHp >= 0.3, `${(la / a.maxHp).toFixed(2)}`);
+  });
+  t("hai Tuyệt Kỹ liền nhau (trong 15 s) chung một trần; hết 15 s thì trần mở lại", () => {
+    const u = pt();
+    ult(u, 0); const second = ult(u, 5); assert.ok(second < 1e-6, `lần 2: ${second}`);
+    const third = ult(u, 5 + T.bigCapWindow); assert.ok(third > 0.3 * u.maxHp, `lần 3: ${third}`);
+  });
+  t("Tuyệt Kỹ Hào Khí có trần riêng: mở Tổng Phản Công bằng nó không làm hai Tuyệt Kỹ thường sau đó mất tác dụng", () => {
+    const u = { maxHp: TIERS.tuong.hp, hp: TIERS.tuong.hp, broken: 0 };
+    const a = ult(u, 0, 99, true), b = ult(u, 5), c = ult(u, 10);
+    assert.ok(a <= T.bigCapHK * u.maxHp + 1e-6 && a >= 0.9 * T.bigCapHK * u.maxHp, `Hào Khí ${(a / u.maxHp).toFixed(2)}`);
+    assert.ok(b >= 0.15 * u.maxHp, `Tuyệt Kỹ thường sau đó: ${(b / u.maxHp).toFixed(2)} (trước: 0)`);
+    assert.ok(b + c <= T.bigCap * u.maxHp + 1e-6, `hai Tuyệt Kỹ thường vẫn chung trần: ${((b + c) / u.maxHp).toFixed(2)}`);
+  });
+  t("Phó tướng: chuỗi N hạ trong 8–12 s (canon ~10 s)", () => { const ttk = TIERS.photuong.hp / dps; assert.ok(ttk >= 8 && ttk <= 12, `${ttk.toFixed(1)} s`); });
+  t("Toa Đô: một Tuyệt Kỹ (≤ 35%) + chuỗi N vẫn mất 18–25 s (canon 20–25 s; trước: 8–10 s nhờ Tuyệt Kỹ)", () => {
+    const u = { maxHp: TIERS.tuong.hp, hp: TIERS.tuong.hp, broken: 0 }, lost = ult(u, 0);
+    const ttk = 4.2 + (u.maxHp - lost) / dps;
+    assert.ok(ttk >= 18 && ttk <= 25, `${ttk.toFixed(1)} s`);
+  });
+  t("tên địch trúng tướng: nhắm tướng ×1; tên lạc (đích trong 3 m quanh tướng) ×0,5; xa hơn không trúng", () => {
+    assert.equal(arrowHeroMult(true, 99), 1);
+    assert.equal(arrowHeroMult(false, AI.stray.r - 0.5), AI.stray.dmg);
+    assert.equal(arrowHeroMult(false, AI.stray.r + 0.5), 0);
+    near(AI.stray.dmg, 0.5, 1e-9);
+  });
+  t("mũi tên cung kỵ lên H35 cấp 1 nhẹ hơn nhát đao thuẫn (trước 28,8 > 22,6)", () => {
+    const arrow = TIERS.thuong.cong * UNITS.CUNGKY_NG.rel[1] * KITS.NG_KY.cong * TIERS.thuong.mv * 0.85 * heSoGiap(HERO.giap1, 1);
+    const sword = TIERS.thuong.cong * UNITS.KHIEN_NG.rel[1] * KITS.NG_DAO.cong * TIERS.thuong.mv * heSoGiap(HERO.giap1, 1);
+    assert.ok(arrow < sword && arrow >= 12, `tên ${arrow.toFixed(1)} · đao ${sword.toFixed(1)}`);
+  });
+  t("thẻ bắn tướng của lính bắn xa: Quân sĩ 1, Nguyên soái 2 (trước 2 / 4)", () => {
+    const nr = (id) => Math.max(1, Math.round(DIFFICULTY.find((d) => d.id === id).tokens * AI.rangedTok));
+    assert.equal(nr("quansi"), 1); assert.equal(nr("nguyensoai"), 2);
+  });
+  t("độ khó khớp bảng §10: HP địch, Phá Thế địch, Hào Khí nhận", () => {
+    assert.deepEqual(DIFFICULTY.map((d) => d.hp), [0.7, 1.0, 1.3, 1.7, 2.2]);
+    assert.deepEqual(DIFFICULTY.map((d) => d.poise), [0.7, 1.0, 1.2, 1.4, 1.6]);
+    assert.deepEqual(DIFFICULTY.map((d) => d.hk), [1.3, 1.0, 1.0, 0.9, 0.8]);
+  });
+  t("Dân binh dễ hơn Quân sĩ ở mọi trục (máu, Phá Thế, công, thẻ, Gượng dậy, Hào Khí)", () => {
+    const [db, qs] = DIFFICULTY;
+    assert.ok(db.hp < qs.hp && db.poise < qs.poise && db.dmg < qs.dmg && db.tokens < qs.tokens && db.revive > qs.revive && db.hk > qs.hk);
+  });
+  t("Hào Khí nhận × độ khó, sau hệ số Trận nhanh; nguồn giảm không nhân", () => {
+    const hk = createHaoKhi({ quick: true, diffMult: 1.3 });
+    gain(hk, 10, "x"); near(hk.value, 16.9, 1e-9);
+    gain(hk, -5, "y"); near(hk.value, 11.9, 1e-9);
+  });
+  t("pha boss: kịch bản nâng Hào Khí lên 90 — đặt thẳng, không nhân, không tính điểm gốc, không hạ, bỏ qua khi đang TPC", () => {
+    assert.equal(PHASES[3].hkFloor, 90);
+    const hk = createHaoKhi({ quick: true, diffMult: 1.3 });
+    gain(hk, 40, "x"); const raw = hk.rawTotal;
+    assert.ok(raiseTo(hk, 90) > 0); near(hk.value, 90, 1e-9); assert.equal(hk.rawTotal, raw); assert.equal(hk.floor, 75);
+    assert.equal(raiseTo(hk, 80), 0); near(hk.value, 90, 1e-9);
+    gain(hk, 20, "y"); activate(hk); assert.equal(raiseTo(hk, 90), 0);
+  });
+  t("kịch bản nâng Hào Khí: ghi vào hk.script (điểm thanh), không vào hk.log (điểm gốc); đặt lại đồng hồ suy giảm", () => {
+    const hk = createHaoKhi({ quick: true });
+    gain(hk, 10, "x"); tick(hk, 60);                   // 60 s không có nguồn tăng: đã suy giảm 3 điểm
+    assert.ok(hk.idle >= 45);
+    const add = raiseTo(hk, 90, "kịch bản: pha P4");
+    assert.equal(hk.log["kịch bản: pha P4"], undefined); near(hk.script["kịch bản: pha P4"], add, 1e-9);
+    assert.equal(hk.idle, 0); tick(hk, 44); near(hk.value, 90, 1e-9);      // 44 s sau vẫn 90 (trước: tụt ngay)
+  });
+  t("pha boss: Toa Đô núng thế (mất 30% Sinh lực) → kịch bản nâng Hào Khí lên 100 (Tổng Phản Công sẵn sàng)", () => {
+    const B = PHASES[3].hkBoss;
+    assert.ok(B && B.hpBelow > 0.5 && B.hpBelow < 1 && B.value === 100);
+    const hk = createHaoKhi({ quick: false, diffMult: 0.8 });          // Trận chuẩn, Truyền Kỳ: nguồn P4 không đủ 10 điểm
+    raiseTo(hk, PHASES[3].hkFloor, "p4"); for (let i = 0; i < 3; i++) gain(hk, 1, "phản đòn Toa Đô");
+    assert.ok(!tpcReady(hk)); raiseTo(hk, B.value, "núng thế"); assert.ok(tpcReady(hk));
+  });
+  t("phản công A1: bỏ mặc thì G bào theo G gốc — A1 mất cùng nhịp với trước đợt 9 (G gốc 40, 0,05 G/s mỗi lính)", () => {
+    const G0 = BASES.find((b) => b.id === "A1").G, E = EVENTS.counterA1;
+    // 22 lính đứng trong vòng, không lệnh: số giây tới khi G gốc về 0 (không tính mô phỏng)
+    const tNow = G0 / (E.squad * E.drain * G0), tOld = 40 / (E.squad * 0.05);
+    near(tNow, tOld, 1e-9); assert.ok(tNow < 0.7 * E.limit / 1.2, `${tNow.toFixed(1)} s — trong 70% hạn Trận chuẩn (60 s)`);
+  });
+  t("nhịp Trận nhanh: Cứ Điểm và cổng nặng hơn (A1 G 110, A2/B2 G 160, cổng 8000)", () => {
+    const b = (id) => BASES.find((x) => x.id === id);
+    assert.equal(b("A1").G, 110); assert.equal(b("A2").G, 160); assert.equal(b("B2").G, 160);
+    assert.equal(b("A3").gate, 8000); assert.equal(b("B3").gate, 8000);
+  });
 }
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

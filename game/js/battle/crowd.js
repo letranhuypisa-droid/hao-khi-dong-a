@@ -15,7 +15,7 @@ import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
 import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
-import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, pickKit, g, heSoGiap } from "../data/tuning.js";
+import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
 const KIT_IDS = Object.keys(KITS);
@@ -58,6 +58,7 @@ export class Crowd {
     const tier = TIERS[o.tier || "thuong"], U = UNITS[o.unit];
     const R = this.ctx.R;
     const lvl = o.side === "dich" ? g(R) : g(R) * (o.legionMult || 1);
+    const hpDiff = o.side === "dich" ? (this.ctx.diff?.hp ?? 1) : 1;     // HP địch × theo độ khó (§10)
     // Kiểu lính chọn theo băm id (dãy tỉ lệ vàng, phủ đều tỉ lệ w) — không ăn vào chuỗi rng của trận.
     const id = NEXT_ID++;
     const kit = o.kit || pickKit(o.unit, (id * 0.6180339887) % 1), K = KITS[kit];
@@ -65,7 +66,7 @@ export class Crowd {
       id, alive: true, side: o.side, unit: o.unit, kit, K, tier: o.tier || "thuong", role: o.role || "zone",
       front: o.front ?? null, src: o.src ?? null,
       x: o.x, z: o.z, y: 0, vy: 0, yaw: o.yaw ?? (o.side === "ta" ? Math.PI / 2 : -Math.PI / 2), vx: 0, vz: 0,
-      maxHp: tier.hp * U.rel[0] * K.hp * lvl, cong: tier.cong * U.rel[1] * K.cong * lvl, giap: tier.giap * U.rel[2] * K.giap * lvl,
+      maxHp: tier.hp * U.rel[0] * K.hp * lvl * hpDiff, cong: tier.cong * U.rel[1] * K.cong * lvl, giap: tier.giap * U.rel[2] * K.giap * lvl,
       speed: (o.unit === "CUNGKY_NG" ? 5.2 : 3.1) * K.speed * (0.9 + 0.2 * this.ctx.rng.next()),
       state: "move", st: 0, atkCd: 1 + this.ctx.rng.next() * tier.every, windup: 0, windupT: K.windup, atkT: 9, fake: false,
       token: false, target: null, sx: o.sx ?? o.x, sz: o.sz ?? o.z, anchor: o.anchor || null,
@@ -526,9 +527,18 @@ export class Crowd {
       // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s
       t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * 0.2, x: a.x, z: a.z, src: a });
     } else if (t.alive) {
-      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t) * (a.duel ? AI.duel.dmg[a.side] : 1);
+      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t) * (a.duel ? AI.duel.dmg[a.side] : 1) * this.flagMult(a);
       this.damage(t, dmg, { kx: dx / (d || 1), kz: dz / (d || 1), knock: a.K.heavy ? 3.5 : 1.5, by: a.side === "ta" ? "ally" : "enemy", src: a });
     }
+  }
+
+  // Cờ Tuyệt Kỹ (director.plantFlag): lính ta đứng trong bán kính cờ Công +atk. Trước đợt 9 cờ chỉ tăng Công cho tướng người
+  // chơi (kể cả đòn vào Toa Đô), không lính nào được — ngược với mô tả "quân ta trong 20 m".
+  flagMult(a) {
+    const fl = a.side === "ta" ? this.ctx.director?.flags : null;
+    if (!fl || !fl.length) return 1;
+    for (const f of fl) if (Math.hypot(a.x - f.x, a.z - f.z) < f.r) return 1 + f.atk;
+    return 1;
   }
 
   // fake: tên cảnh của lính diễn — bay thật, không trúng ai, không phát tiếng.
@@ -536,8 +546,12 @@ export class Crowd {
     const g0 = heightAt(a.x, a.z), y0 = g0 + (a.K.mounted ? 2.2 : 1.45) * a.scale;
     const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + (fake ? 0 : 1.2);
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
+    // heroMult: tên địch trúng tướng được bao nhiêu (tuning.arrowHeroMult) — nhắm tướng 1, tên lạc (đích trong AI.stray.r m
+    // quanh tướng lúc buông) AI.stray.dmg, còn lại 0 (đợt 9; trước đây mọi tên địch bay qua người tướng đều trúng đủ)
+    const hero = this.ctx.hero;
+    const heroMult = fake || a.side !== "dich" || !hero?.alive ? 0 : arrowHeroMult(t === hero, Math.hypot(t.x - hero.x, t.z - hero.z));
     this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a,
-      side: fake ? "fx" : a.side, tgt: fake ? null : t, g0, duel: !!a.duel });     // g0: chân người bắn lúc buông tên (thế đất cao)
+      side: fake ? "fx" : a.side, tgt: fake ? null : t, g0, duel: !!a.duel, heroMult });     // g0: chân người bắn lúc buông tên (thế đất cao)
     if (!fake) this.ctx.audio?.play(a.kit === "DV_NO" ? "crossbow" : "bow", a.x, a.z);
   }
 
@@ -553,24 +567,26 @@ export class Crowd {
         if (g.K) {      // lính thường: tính như đòn cận chiến giữa hai đám lính
           const d = Math.hypot(g.x - r.x, g.z - r.z), v = Math.hypot(r.vx, r.vz) || 1;
           // tên bắn trong giáp lá cà cũng nhân hệ số phe (không thì cung kỵ Nguyên — 40% quân — bắn gục quân ta gấp ba lần bị hạ)
-          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6) * heightDamageMult(r.g0 - heightAt(g.x, g.z)) * (r.duel ? AI.duel.dmg[r.side] : 1),
+          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6) * heightDamageMult(r.g0 - heightAt(g.x, g.z)) * (r.duel ? AI.duel.dmg[r.side] : 1) * this.flagMult(a),
             { kx: r.vx / v, kz: r.vz / v, knock: 1.2, by: r.side === "ta" ? "ally" : "enemy", src: a });
         } else if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
         done = true;
       }
-      if (!done && r.side === "dich" && hero.alive && Math.hypot(hero.x - r.x, hero.z - r.z) < 0.9 && Math.abs(r.y - (hero.y + 1.1)) < 1.3) {
+      // tên trúng tướng: tên nhắm tướng (đủ sát thương) hoặc tên lạc (× AI.stray.dmg) — heroMult quyết lúc buông (fireArrow)
+      if (!done && r.side === "dich" && r.heroMult > 0 && hero.alive && Math.hypot(hero.x - r.x, hero.z - r.z) < 0.9 && Math.abs(r.y - (hero.y + 1.1)) < 1.3) {
         const a = r.src, tier = TIERS[a.tier];
-        hero.receiveHit({ dmg: a.cong * tier.mv * 0.85 * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * heightDamageMult(r.g0 - hero.y), x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
+        hero.receiveHit({ dmg: a.cong * tier.mv * 0.85 * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * heightDamageMult(r.g0 - hero.y) * r.heroMult,
+          x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
         done = true;
       }
       if (done) this.arrows.splice(i, 1);
     }
   }
 
-  // Thẻ tấn công: tối đa N lính cận chiến đánh tướng cùng lúc (21.6: 3 ở Quân sĩ). Cung kỵ có
-  // thẻ riêng ≈ 2/3 N (ĐỀ XUẤT BẢN THỬ) — không có thẻ thì 12 cung kỵ cùng bắn hạ tướng trong 12 s.
+  // Thẻ tấn công: tối đa N lính cận chiến đánh tướng cùng lúc (21.6: 3 ở Quân sĩ). Lính bắn xa có
+  // thẻ riêng = N × AI.rangedTok (ĐỀ XUẤT BẢN THỬ; đợt 9: 0,67 → 0,34) — không có thẻ thì 12 cung kỵ cùng bắn hạ tướng trong 12 s.
   assignTokens(enemies) {
-    const hero = this.ctx.hero, N = this.ctx.diff.tokens, NR = Math.max(1, Math.round(N * 0.67));
+    const hero = this.ctx.hero, N = this.ctx.diff.tokens, NR = Math.max(1, Math.round(N * AI.rangedTok));
     const isR = (e) => !!e.K.ranged;
     let held = 0, heldR = 0;
     for (const e of enemies) {
