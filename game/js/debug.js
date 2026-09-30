@@ -268,6 +268,12 @@ function smartBot(getTarget, opts) {
       }
       if (broken.u.broken > 0.6) { stick(u.x - h.x, u.z - h.z, 1); mode("tới Đòn Quyết", u); return; }
     }
+    // tướng không phải H35 (H31, ?debug&hero=H31): Hịch Tướng Sĩ khi quanh 8 m không có địch (đọc 3 s đứng yên), Binh Thư
+    // Yếu Lược khi có sĩ quan trong 20 m. H35 không vào nhánh này (bot B15 giữ y hệt).
+    if (h.def && h.def.skills?.sk1 !== "phaTran" && on("skill") && free) {
+      if (h.skillReady(1) && count(8) === 0 && !bigs.some((o) => o.d < 10)) { P.skill = true; dbg.skill++; mode("Hịch Tướng Sĩ"); return; }
+      if (h.skillReady(2) && bigs.length && bigs[0].d < 20) { P.skill2 = true; dbg.skill++; mode("Binh Thư", bigs[0].u); return; }
+    }
     if (on("ult") && free && h.state !== "ult") {
       const hk = h.inTPC && h.hkUltReady;
       if (h.ki >= 100 || hk) {
@@ -436,7 +442,8 @@ function faces(u, t, halfArc) {
   while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
   return Math.abs(da) <= halfArc;
 }
-function skillReady(h) { return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
+// Phá Trận sẵn sàng (H35). Tướng có ô 1 khác (H31 Hịch Tướng Sĩ — đứng đọc 3 s) không dùng các nhánh lao Phá Trận của bot.
+function skillReady(h) { if (h.def && h.def.skills?.sk1 !== "phaTran") return false; return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
 
 // Tên của địch sẽ trúng tướng trong 0,3 s tới (giả sử tướng đứng yên): thời gian + vận tốc tên. Luật trúng như
 // crowd.updateArrows: cách ngang < 0,9 m, lệch cao < 1,3 m so với ngực, và tên phải trúng được tướng (heroMult > 0: nhắm

@@ -3,6 +3,7 @@
 
 import { g, E, EXP_NEXT, LEVEL_CAP, HERO, DIFFICULTY, RANKS, MODES } from "../data/tuning.js";
 import { NODES, TREE_RULES, WEAPON_TIERS, FORGE, KHAC, LEGION, CAMP, R_LADDER } from "../data/progression.js";
+import { HEROES, SKILLS, kiLucBarsAt } from "../data/heroes.js";
 
 export const SAVE_VERSION = 1;
 
@@ -15,6 +16,7 @@ export function newSave() {
     legion: { giao: 1, guard: 1 },
     camp: 1,
     ladder: { unlocked: [1], best: {} },          // R → hạng tốt nhất
+    battles: { B20: { best: null, cleared: false } },   // trận ngoài thang R (đợt 9: B20 Bạch Đằng — hạng tốt nhất, đã qua)
     firsts: { tinh: false, bao: false, danh: false, rankS: {} },
     settings: { troops: "vua", difficulty: "quansi", renderScale: 1, shadows: true, volume: 0.7, touch: "auto" },
     stats: { battles: 0, wins: 0, tpc: 0, ko: 0, bestTime: null },
@@ -155,8 +157,13 @@ export function heroMods(save) {
 }
 
 // Chỉ số tướng trong một trận cấp R: cấp nâng tối thiểu R − 2, binh khí nâng tối thiểu E(R) − 0,10
-// (Quân giới cấp phát, 12.7).
-export function heroStats(save, R) {
+// (Quân giới cấp phát, 12.7). heroId: tướng ra trận (mặc định H35 — nhánh cũ, giữ nguyên từng số). Tướng khác (H31 ở B20):
+// chỉ số cấp 1 theo HEROES[id] (deriveStats), cấp = preset.level (B20: 25; không có preset thì HEROES[id].vsLevel — H31: 25,
+// dùng khi ?debug&hero=H31 ở B15 — rồi mới tới max(cấp, R − 2) như H35),
+// binh khí E(R) (bản VS đặt sẵn, không theo Lò rèn), không nhận cây kỹ năng / khắc của H35 (cây đó là của Toản), cộng nội tại
+// (Quốc Công Tiết Chế: ksWindow / ksEffect), số vạch Khí Lực theo cấp (kiLucBarsAt: 2 → 3 ở cấp 12 → 4 ở cấp 25).
+export function heroStats(save, R, heroId = "H35", preset = null) {
+  if (heroId !== "H35") return otherHeroStats(save, R, heroId, preset);
   const L = Math.max(save.hero.level, R - 2);
   const mods = heroMods(save);
   const wm = Math.max(weaponMult(save.weapon), E(R) - 0.10);
@@ -165,6 +172,25 @@ export function heroStats(save, R) {
     cong: Math.round(HERO.cong1 * g(L) * wm * (1 + mods.atkPct)),
     hp: Math.round(HERO.hp1 * g(L)), giap: Math.round(HERO.giap1 * g(L)),
     crit: Math.min(0.30, 0.05 + mods.crit), mods,
+    legionMult: 1 + 0.08 * (save.legion.giao - 1), legionSimC: 0.03 * (save.legion.giao - 1),
+    guardLevel: save.legion.guard,
+  };
+}
+
+function otherHeroStats(save, R, heroId, preset) {
+  const D = HEROES[heroId];
+  if (!D) throw new Error(`Không có tướng ${heroId}`);
+  const L = preset?.level ?? D.vsLevel ?? Math.max(save.hero.level, R - 2);
+  const mods = heroMods({ hero: { nodes: [] }, weapon: { khac: [] } });
+  const pas = SKILLS[D.skills?.passive];
+  if (pas) for (const k of ["ksWindow", "ksEffect"]) if (pas[k]) mods[k] += pas[k];
+  const wm = preset?.weaponMult ?? E(R);
+  return {
+    heroId, level: L, floorLifted: false, weaponMult: wm, weaponFloor: false,
+    cong: Math.round(D.cong1 * g(L) * wm * (1 + mods.atkPct)),
+    hp: Math.round(D.hp1 * g(L)), giap: Math.round(D.giap1 * g(L)),
+    crit: Math.min(0.30, 0.05 + mods.crit), mods,
+    kiBars: kiLucBarsAt(L, D.kiLucSteps),
     legionMult: 1 + 0.08 * (save.legion.giao - 1), legionSimC: 0.03 * (save.legion.giao - 1),
     guardLevel: save.legion.guard,
   };
@@ -241,6 +267,7 @@ export function migrate(raw) {
   const out = { ...base, ...raw };
   for (const k of ["hero", "weapon", "wallet", "legion", "ladder", "firsts", "settings", "stats"]) out[k] = { ...base[k], ...(raw[k] || {}) };
   out.firsts.rankS = { ...(raw.firsts?.rankS || {}) };
+  out.battles = { ...base.battles, ...(raw.battles || {}) };      // bản lưu trước đợt 9 chưa có (B20)
   out.v = SAVE_VERSION;
   return out;
 }

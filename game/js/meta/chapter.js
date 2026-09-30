@@ -4,7 +4,12 @@
 // save.chapters[id] = { opened, openSeen, closeSeen, insertSeen, seen[], cleared, quizRounds }
 // save.cards[id] = thời điểm mở; save.quiz = { done: số Chương đã xong, answered: {qid: {n, right, first}}, review: [{id, due, stage}] }
 
-import { CARDS } from "../data/suquan-b15.js";
+import { CARDS as CARDS_B15 } from "../data/suquan-b15.js";
+
+// Ngân hàng thẻ theo Chương (đợt 9: nhiều Chương). B15 có sẵn; Chương khác đăng ký khi nạp nội dung (main.js, lười).
+const BANKS = { B15: CARDS_B15 };
+export function registerCards(chapter, cards) { BANKS[chapter] = cards; }
+export const cardBank = (chapter) => BANKS[chapter] || [];
 
 export function chapterState(save, id) {
   save.chapters ||= {};
@@ -18,18 +23,19 @@ export function markSeen(save, chapter, ids) {
   return ch;
 }
 
-// Mở các thẻ có khóa mở nằm trong keys (vd "battleStart", "keSach:coAoTong"). Trả về id thẻ vừa mở.
-export function unlockCards(save, chapter, keys, now = Date.now()) {
+// Mở các thẻ có khóa mở nằm trong keys (vd "battleStart", "keSach:coAoTong"). Trả về id thẻ vừa mở. bank: thẻ của Chương
+// (mặc định ngân hàng đã đăng ký cho chapter; Chương chưa đăng ký thì không mở gì).
+export function unlockCards(save, chapter, keys, now = Date.now(), bank = cardBank(chapter)) {
   save.cards ||= {};
   const out = [];
-  for (const c of CARDS) {
+  for (const c of bank) {
     if (c.chapter !== chapter || save.cards[c.id] || !keys.includes(c.unlock)) continue;
     save.cards[c.id] = now; out.push(c.id);
   }
   return out;
 }
 
-// Khóa mở thẻ rút từ kết quả một trận B15 (director.buildResult).
+// Khóa mở thẻ rút từ kết quả một trận (director.buildResult; B20 dùng cùng khóa: bossMet, keSach:<id>, firstWin).
 export function battleUnlockKeys(res) {
   const keys = [];
   if (res.bossMet) keys.push("bossMet");

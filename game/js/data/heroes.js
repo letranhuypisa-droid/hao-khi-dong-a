@@ -1,11 +1,12 @@
 // data/heroes.js — danh sách tướng chơi được và công thức quy đổi chỉ số (systems.md §2.1).
-// Chỉ import tuning.js (thuần) nên chạy được trong Node để kiểm thử. Lõi (hero.js) CHƯA đọc file này: pha tái cấu trúc
-// sau sẽ nối HEROES vào lớp Hero (H35 giữ nguyên từng số, H31 dùng WC01).
+// Chỉ import file thuần (tuning.js, moves-wc01.js) nên chạy được trong Node để kiểm thử. Lõi (battle/hero.js) dựng lớp Hero
+// theo HEROES[id] (H35 giữ nguyên từng số của B15, H31 dùng WC01); bảng đòn theo MOVESETS, cờ đòn theo moveFlags().
 //
 // Nguồn: canon (canon-b20.json: H31, H34, H38) cho tên, danh hiệu, chỉ số thang 1–5, kỹ năng; systems.md §2.1 (quy đổi),
 // §4.1 (kỹ năng hiệu lệnh toàn quân), §4.5 (Tuyệt Kỹ toàn bản đồ). Số không có trong canon/systems ghi ĐỀ XUẤT BẢN THỬ.
 
-import { HERO } from "./tuning.js";
+import { HERO, MOVES } from "./tuning.js";
+import { MOVES_WC01, CHAIN_N as CHAIN_N_WC01 } from "./moves-wc01.js";
 
 // ---- §2.1 Quy đổi thang 1–5 → số thật (cấp 1; Công/Sinh lực/Giáp nhân g(L) ở progress.js) -----------------------------
 //   Cong = 60 + 20s · HP = 1200 + 200s · Giap = 30 + 10s · TocDiChuyen = 5,5 + 0,25s · TocDanh = 0,90 + 0,05s ·
@@ -83,6 +84,7 @@ export const HEROES = {
     aura: 20, auraAtk: 0.10, skMult: 1.4, cmdCd: 0.84, bodyguards: 14,
     // Khí Lực: 4 vạch ở cấp 25 (bản VS đặt sẵn cấp 25 cho B20, systems §12); 2 → 3 ở cấp 12 → 4 ở cấp 25 (§1)
     kiLucBars: 4, kiLucSteps: KI_LUC_STEPS, kiLucPerBar: HERO.kiLucPerBar, kiLucRegen: HERO.kiLucRegen,
+    vsLevel: 25,                                  // cấp đặt sẵn khi trận không cho preset (vd ?debug&hero=H31 ở B15) — progress.heroStats
     revive: { ...HERO.revive },
     skills: { sk1: "hichTuongSi", sk2: "binhThu", passive: "tietChe", ult: "bachDang" }, trait: "phuTu",
     flag: null,                                   // không cờ sau lưng; áo choàng son thay cờ (RIGS.H31)
@@ -99,3 +101,36 @@ export const HEROES = {
 };
 // Tướng wip: số cấp 1 suy từ thang (chưa tinh chỉnh riêng).
 for (const id of ["H34", "H38"]) HEROES[id] = { ...deriveStats(HEROES[id].stats), ...HEROES[id] };
+
+// ---- Bảng đòn theo lớp, cờ đòn -------------------------------------------------------------------------------------------
+// WC03 = MOVES của tuning.js (cùng một đối tượng: B15 và các kiểm thử cũ đọc thẳng MOVES), WC01 = moves-wc01.js.
+export const MOVESETS = { WC03: MOVES, WC01: MOVES_WC01 };
+export const CHAINS = { WC03: ["N1", "N2", "N3", "N4", "N5", "N6"], WC01: CHAIN_N_WC01 };
+export const movesetOf = (def) => MOVESETS[def.moves || def.cls || "WC03"];
+
+// Cờ của một đòn cho lõi (hero.js), crowd.js (lính né đòn nặng), HUD. Bảng đòn ghi cờ tường minh (moves-wc01.js) thì dùng
+// cờ đó; không ghi (MOVES của WC03) thì suy ĐÚNG như luật cũ theo tên đòn / MV của hero.js trước đợt 9 — H35 phải giống
+// hệt từng nhánh (kiểm ở tests/hero-def.test.mjs):
+//   heavy      MV ≥ 2 hoặc Đòn Quyết                 · heavyTell  N6, C1–C6, Lướt C, Đòn Quyết (HEAVY_MOVES cũ của crowd.js)
+//   whooshHeavy MV > 2, N6, đòn C (kể cả phản đòn), Lướt C · kiai  C1–C6, Đòn Quyết, N6 (xác suất 0,4; Đòn Quyết 1)
+//   slam       C1, C4, C6, Đòn Quyết (bụi ở nhát cuối) · slamSound  như slam trừ C1 (bảng WC01: mọi đòn slam đều chấn)
+//   ringFx     đòn vòng và (nặng hoặc N6)            · endsChain  N6 · chainN  đòn N nối tiếp được (N và không kết chuỗi)
+//   resetChain đòn C (kể cả phản đòn), Đòn Quyết     · isC  đòn C, Lướt C (Phá Thế ×1,5, choáng khắc C) · finisher  Đòn Quyết
+//   big        Đòn Quyết, phản đòn (rung, chớp lớn)
+//   armor [u0,u1] cửa sổ siêu giáp · charge, chargeU tụ lực · armorPen bỏ qua giáp · hold C3 giữ để kéo dài (chỉ WC01)
+export function moveFlags(key, m) {
+  const C = key[0] === "C", heavy = m.heavy ?? (m.mv >= 2 || key === "DQ");
+  const slam = m.slam ?? (key === "C1" || key === "C4" || key === "C6" || key === "DQ");
+  const endsChain = m.endsChain ?? key === "N6";
+  return {
+    heavy, slam, endsChain,
+    heavyTell: m.heavyTell ?? (key === "N6" || (C && key !== "CT") || key === "DC" || key === "DQ"),
+    whooshHeavy: m.whooshHeavy ?? (m.mv > 2 || key === "N6" || C || key === "DC"),
+    kiai: m.kiai ?? ((C && key !== "CT") || key === "DQ" || key === "N6"), kiaiP: key === "DQ" ? 1 : 0.4,
+    slamSound: m.slam !== undefined ? slam : slam && key !== "C1",
+    ringFx: m.ringFx ?? (m.shape === "ring" && (heavy || key === "N6")),
+    chainN: key[0] === "N" && !endsChain, resetChain: C || key === "DQ", isC: C || key === "DC",
+    finisher: key === "DQ", big: key === "DQ" || key === "CT", mirrorArc: m.mirrorArc ?? false,
+    armor: m.armor || null, charge: !!m.charge, chargeU: m.chargeU ?? 0.3, armorPen: m.armorPen || 0, hold: m.hold || null,
+  };
+}

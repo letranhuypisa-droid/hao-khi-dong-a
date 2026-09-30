@@ -1,6 +1,11 @@
 // battle/ground.js — độ cao mặt đất và vùng cảnh của bản đồ Hàm Tử, tách khỏi world.js để không
 // phụ thuộc three (kiểm thử được trong Node). world.js xuất lại mọi tên ở đây nên các module cũ
 // vẫn import heightAt… từ "./world.js" như trước.
+//
+// Nhiều trận (đợt 9, lõi): địa hình mặc định là Hàm Tử (và sân Võ trường qua setTerrain). Trận khác đặt địa hình của
+// nó bằng setBattleTerrain(T), boong thuyền bằng setDecks(deckSet), mặt nước bằng setWaterLevel(fn). heightAt, collide,
+// mudAt, waterDist là binding sống (export let): đặt địa hình thì THAY HÀM, không thêm phép thử vào lời gọi — khi T,
+// boong, nước đều null thì mọi hàm là đúng hàm của B15 như trước (không đổi một bit).
 
 import { MAP, FRONTS, VILLAGE } from "../data/battle-b15.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
@@ -8,7 +13,8 @@ import { LANE_TERRAIN } from "../data/terrain-b15.js";
 const FRONT_LIST = Object.values(FRONTS);           // heightAt gọi hàng nghìn lần mỗi khung: không cấp phát mảng mỗi lần
 export const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
-export function waterDist(x, z) { return Math.min(z - MAP.riverNorthZ, MAP.riverEastX - x); }
+function waterDistB15(x, z) { return Math.min(z - MAP.riverNorthZ, MAP.riverEastX - x); }
+export let waterDist = waterDistB15;          // binding sống: trận khác đổi qua setBattleTerrain
 
 // ---- nhiễu giá trị có seed (màu đất, rải đạo cụ) ------------------------------------------------
 const hash2 = (i, j) => { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -122,7 +128,9 @@ export function featureHeight(x, z) {
 }
 
 // Mức bùn lầy 0..1 tại (x, z): lòng hố ngập, hố đất, đáy hào. Dùng cho tốc chạy (hạng mục làn đánh).
-export function mudAt(x, z) {
+// Binding sống: trận có địa hình riêng thì mudAt = T.mud (hoặc 0).
+export let mudAt = mudB15;
+function mudB15(x, z) {
   if (!LANE_FEATURES) return 0;
   const cell = cellAt(x, z); if (!cell || !cell.length) return 0;
   let m = 0;
@@ -192,21 +200,56 @@ export function featureLook(x, z) {
 // Võ trường dùng mặt đất phẳng; bản đồ Hàm Tử dùng địa hình. Mọi module import heightAt nên
 // đổi địa hình bằng setTerrain() trước khi dựng cảnh.
 let TERRAIN = "map";
-export function setTerrain(t) { TERRAIN = t; MESH = null; }
+// Chọn địa hình dựng sẵn ("map" Hàm Tử, "arena" Võ trường); luôn bỏ địa hình / boong / nước của trận khác (buildWorld,
+// buildArena gọi hàm này trước tiên nên trận trước có vỡ giữa chừng cũng không để lại địa hình B20 cho Võ trường).
+export function setTerrain(t) { TERRAIN = t; MESH = null; if (BT || DECKS || WATER) { BT = null; DECKS = null; WATER = null; rebind(); } }
 export const ARENA_R = 46;
 
 // Độ cao mặt đất mọi module dùng (chân tướng/lính qua IK, đạo cụ, camera). Khi đã dựng lưới mịn (bật công
 // trình, laneGridData) thì trả ĐÚNG mặt tam giác đang vẽ: lưới mịn lệch hàm giải tích tới ~0,27 m trên mái
 // lũy/hào, ~0,2 m trong hố nên chân, đạo cụ, camera lơ lửng hoặc lún. Chưa dựng lưới, tắt công trình (bản đồ
 // mặc định lưới 5 m), ngoài lưới, Võ trường: hàm giải tích như cũ.
-export function heightAt(x, z) {
+function heightB15(x, z) {
   if (TERRAIN === "arena") return arenaHeight(x, z);
   return MESH !== null ? meshAt(MESH, x, z) : mapHeight(x, z, true);
 }
+export let heightAt = heightB15;              // binding sống: setBattleTerrain / setDecks thay hàm
 // Hàm giải tích (lũy, hào, hố tính liền mạch): dựng lưới địa hình từ đây, không từ heightAt.
-export function analyticHeightAt(x, z) { return TERRAIN === "arena" ? arenaHeight(x, z) : mapHeight(x, z, true); }
+export function analyticHeightAt(x, z) { if (BT) return (BT.exact || BT.height)(x, z); return TERRAIN === "arena" ? arenaHeight(x, z) : mapHeight(x, z, true); }
 // Mặt đất trước khi đắp lũy, đào hào/hố (cùng dốc chân tường thành như heightAt): mức nước hào, hố ngập.
-export function bareHeightAt(x, z) { return TERRAIN === "arena" ? arenaHeight(x, z) : mapHeight(x, z, false); }
+export function bareHeightAt(x, z) { if (BT) return (BT.bare || BT.height)(x, z); return TERRAIN === "arena" ? arenaHeight(x, z) : mapHeight(x, z, false); }
+
+// ---- địa hình của trận khác, boong thuyền, mặt nước (đợt 9 lõi) ----------------------------------------------------
+// T = { id, height(x, z), bare?(x, z), exact?(x, z), mud?(x, z), waterDist?(x, z), clamp: { x0, x1, z0, z1 },
+//       collideExtra?(x, z, r, o) → [x, z] mới | null } — o là vật đang di chuyển (tướng, lính, sĩ quan; có thể thiếu).
+// deckSet: { heightAt(x, z) → y | NaN } (deck.js DeckSet) — heightAt tra boong trước, NaN thì mặt đất.
+// Nước: fn(x?, z?) → cao độ mặt nước (m); waterLevel() = −Infinity khi chưa đặt (B15: mọi max(…, waterLevel()) giữ nguyên).
+let BT = null, DECKS = null, WATER = null, BT_COL = null;
+export function setBattleTerrain(T) {
+  BT = T || null; MESH = null;
+  if (BT) {
+    LANE_FEATURES = false;                                              // lũy, hào, hố là của Hàm Tử
+    const C = BT.clamp;
+    BT_COL = { x0: C.x0 - 16, z0: C.z0 - 16, nx: Math.ceil((C.x1 - C.x0 + 32) / COL_CELL), nz: Math.ceil((C.z1 - C.z0 + 32) / COL_CELL) };
+  }
+  rebind();
+}
+export function setDecks(deckSet) { DECKS = deckSet || null; rebind(); }
+export function setWaterLevel(fn) { WATER = fn || null; }
+export const battleTerrain = () => BT;
+export const decksOn = () => DECKS;
+export function waterLevel(x, z) { return WATER !== null ? WATER(x, z) : -Infinity; }
+// Mặt người, đồ đứng được: đất, boong hoặc mặt nước (cái nào cao hơn).
+export function surfaceY(x, z) { const h = heightAt(x, z), w = waterLevel(x, z); return h > w ? h : w; }
+function rebind() {
+  const base = BT ? BT.height : heightB15;
+  if (DECKS) { const D = DECKS; heightAt = (x, z) => { const y = D.heightAt(x, z); return y === y ? y : base(x, z); }; }
+  else heightAt = base;
+  const T = BT;
+  mudAt = T ? (T.mud ? (x, z) => T.mud(x, z) : () => 0) : mudB15;
+  waterDist = T ? (T.waterDist || (() => 999)) : waterDistB15;
+  collide = T ? collideBT : collideB15;
+}
 const arenaHeight = (x, z) => 0.3 + (Math.hypot(x, z) > ARENA_R + 4 ? Math.min(6, (Math.hypot(x, z) - ARENA_R - 4) * 0.4) : 0);
 
 function mapHeight(x, z, feat) {
@@ -223,7 +266,7 @@ function mapHeight(x, z, feat) {
   const pk = paddyK(x, z);
   if (pk > 0) h += (1.05 + 0.18 * Math.floor((z - ZONES.paddy.z0) / (ZONES.paddy.plotD * 2)) - h) * pk;   // ruộng bậc thềm
   if (feat) h += featureHeight(x, z);                                           // lũy, hào, hố, gò trên làn đánh
-  const d = waterDist(x, z);
+  const d = waterDistB15(x, z);
   if (d < 14) h = h * smooth(-2, 14, d) + (d < 0 ? Math.max(-3.2, d * 0.35) : 0.25) * (1 - smooth(-2, 14, d));
   return h;
 }
@@ -429,16 +472,17 @@ export function laneWaterData(grid) {
 // Lưới dựng lại khi số vật đổi (module khác push thêm sau buildWorld) hoặc mảng bị thay; ai dời vật đã có
 // thì đặt world.colGrid = null.
 const COL_CELL = 8, COL_R = 1.0, COL_MOVE = 3, COL_X0 = -48, COL_Z0 = -248, COL_NX = 92, COL_NZ = 62;
+const COL_B15 = { x0: COL_X0, z0: COL_Z0, nx: COL_NX, nz: COL_NZ };   // khung lưới Hàm Tử; trận khác theo clamp của T
 const NO_COL = new Int32Array(0);
-function colliderGrid(world) {
-  const cs = world.colliders, cells = Array.from({ length: COL_NX * COL_NZ }, () => []);
+function colliderGrid(world, S = COL_B15) {
+  const cs = world.colliders, NX = S.nx, cells = Array.from({ length: NX * S.nz }, () => []);
   for (let k = 0; k < cs.length; k++) {
     const c = cs[k], e = c.r + COL_R + COL_MOVE + 0.05;
-    const i0 = Math.max(0, Math.floor((Math.min(c.x0, c.x1) - e - COL_X0) / COL_CELL)), i1 = Math.min(COL_NX - 1, Math.floor((Math.max(c.x0, c.x1) + e - COL_X0) / COL_CELL));
-    const j0 = Math.max(0, Math.floor((Math.min(c.z0, c.z1) - e - COL_Z0) / COL_CELL)), j1 = Math.min(COL_NZ - 1, Math.floor((Math.max(c.z0, c.z1) + e - COL_Z0) / COL_CELL));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) cells[j * COL_NX + i].push(k);
+    const i0 = Math.max(0, Math.floor((Math.min(c.x0, c.x1) - e - S.x0) / COL_CELL)), i1 = Math.min(NX - 1, Math.floor((Math.max(c.x0, c.x1) + e - S.x0) / COL_CELL));
+    const j0 = Math.max(0, Math.floor((Math.min(c.z0, c.z1) - e - S.z0) / COL_CELL)), j1 = Math.min(S.nz - 1, Math.floor((Math.max(c.z0, c.z1) + e - S.z0) / COL_CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) cells[j * NX + i].push(k);
   }
-  return (world.colGrid = { arr: cs, n: cs.length, cells: cells.map((a) => (a.length ? Int32Array.from(a) : NO_COL)) });
+  return (world.colGrid = { arr: cs, n: cs.length, spec: S, cells: cells.map((a) => (a.length ? Int32Array.from(a) : NO_COL)) });
 }
 // đẩy (x, z) ra khỏi một vật (đoạn thẳng có bề dày); kết quả ở _cx, _cz, trả true nếu có đẩy
 let _cx = 0, _cz = 0;
@@ -452,15 +496,17 @@ function pushOut(c, x, z, radius) {
 }
 
 // Đẩy một điểm ra khỏi tường (đoạn thẳng có bề dày). Cổng đóng coi như tường. world: { arena?, colliders,
-// gates } — thuần, không three (world.js xuất lại hàm này).
-export function collide(world, x, z, radius, openGates) {
+// gates } — thuần, không three (world.js xuất lại hàm này). Tham số thứ 6 (o, vật đang di chuyển) chỉ địa hình của trận
+// khác dùng (T.collideExtra: lan can boong, nước sâu, thân thuyền). Binding sống: setBattleTerrain đổi sang collideBT.
+export let collide = collideB15;
+function collideB15(world, x, z, radius, openGates) {
   if (world.arena) {
     const d = Math.hypot(x, z), max = ARENA_R - radius;
     return d > max ? [x / d * max, z / d * max] : [x, z];
   }
   const cs = world.colliders;
   let g = world.colGrid;
-  if (!g || g.arr !== cs || g.n !== cs.length) g = colliderGrid(world);
+  if (!g || g.arr !== cs || g.n !== cs.length || g.spec !== COL_B15) g = colliderGrid(world);
   const ci = Math.floor((x - COL_X0) / COL_CELL), cj = Math.floor((z - COL_Z0) / COL_CELL);
   let fast = radius <= COL_R && ci >= 0 && cj >= 0 && ci < COL_NX && cj < COL_NZ;
   if (fast) {
@@ -481,5 +527,40 @@ export function collide(world, x, z, radius, openGates) {
   }
   x = Math.max(4, Math.min(MAP.riverEastX + 3, x));
   z = Math.max(MAP.riverNorthZ - 3, Math.min(196, z));
+  return [x, z];
+}
+
+// Va chạm trên địa hình của trận khác: như collideB15 (vật, cổng) với lưới theo clamp của T, rồi T.collideExtra, rồi kẹp
+// trong T.clamp.
+function collideBT(world, x, z, radius, openGates, o) {
+  if (world.arena) {
+    const d = Math.hypot(x, z), max = ARENA_R - radius;
+    return d > max ? [x / d * max, z / d * max] : [x, z];
+  }
+  const T = BT, S = BT_COL, cs = world.colliders;
+  let g = world.colGrid;
+  if (!g || g.arr !== cs || g.n !== cs.length || g.spec !== S) g = colliderGrid(world, S);
+  const ci = Math.floor((x - S.x0) / COL_CELL), cj = Math.floor((z - S.z0) / COL_CELL);
+  let fast = radius <= COL_R && ci >= 0 && cj >= 0 && ci < S.nx && cj < S.nz;
+  if (fast) {
+    const list = g.cells[cj * S.nx + ci];
+    let px = x, pz = z;
+    for (let q = 0; q < list.length; q++) {
+      if (!pushOut(cs[list[q]], px, pz, radius)) continue;
+      px = _cx; pz = _cz;
+      if ((px - x) * (px - x) + (pz - z) * (pz - z) > COL_MOVE * COL_MOVE) { fast = false; break; }
+    }
+    if (fast) { x = px; z = pz; }
+  }
+  if (!fast) for (const c of cs) if (pushOut(c, x, z, radius)) { x = _cx; z = _cz; }
+  for (const id in world.gates) {
+    const gt = world.gates[id];
+    if (openGates?.[id]) continue;
+    if (Math.abs(z - gt.z) < 5 && Math.abs(x - gt.x) < 1.6 + radius) x = x < gt.x ? gt.x - 1.6 - radius : gt.x + 1.6 + radius;
+  }
+  if (T.collideExtra) { const r = T.collideExtra(x, z, radius, o); if (r) { x = r[0]; z = r[1]; } }
+  const C = T.clamp;
+  x = Math.max(C.x0, Math.min(C.x1, x));
+  z = Math.max(C.z0, Math.min(C.z1, z));
   return [x, z];
 }

@@ -12,19 +12,41 @@ import { movesGuideHTML } from "./ui/guide.js";
 import { ICON } from "./data/moves-info.js";
 import { COMIC_B15 } from "./data/comic-b15.js";
 import { CARDS, CARD_GROUPS, CARD_BY_ID, QUIZ_B15 } from "./data/suquan-b15.js";
-import { chapterState, markSeen, unlockCards, battleUnlockKeys, pickQuiz, answerQuiz, completeChapter, syncLegacy } from "./meta/chapter.js";
+import { chapterState, markSeen, unlockCards, battleUnlockKeys, pickQuiz, answerQuiz, completeChapter, syncLegacy, registerCards } from "./meta/chapter.js";
 import { readComic } from "./ui/comic.js";
 import { runQuiz } from "./ui/quiz.js";
+import { BATTLES, BATTLE_ORDER, loadBattleDef, loadChapterMeta } from "./data/battles.js";
+import { HEROES } from "./data/heroes.js";
 
-// ?debug (bot, kịch bản kiểm thử) bỏ comic và khung chèn giữa trận; thêm &story để vẫn phát
-const STORY = !/[?&]debug\b/.test(location.search) || /[?&]story\b/.test(location.search);
+// ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
+const DEBUG = /[?&]debug\b/.test(location.search);
+const STORY = !DEBUG || /[?&]story\b/.test(location.search);
 const CH = "B15";
+// Chỉ khi ?debug: &battle=B20 chọn sẵn trận (nút VÀO TRẬN / __start vào trận đó), &hero=H31 thay tướng (kể cả ở B15)
+const QP = new URLSearchParams(location.search);
+const DEBUG_BATTLE = DEBUG && BATTLES[QP.get("battle")] ? QP.get("battle") : null;
+const DEBUG_HERO = DEBUG && HEROES[QP.get("hero")] ? QP.get("hero") : null;
 
 const app = document.getElementById("app");
 let save = loadSave();
 if (syncLegacy(save)) writeSave(save);
+save.battles ||= {};                               // trận ngoài thang R (B20): { best, cleared } — progress.js migrate cũng thêm
+for (const id of BATTLE_ORDER) if (!BATTLES[id].ladder) save.battles[id] ||= { best: null, cleared: false };
 let tab = "xuattran";
-let pick = { R: Math.max(...save.ladder.unlocked), difficulty: save.settings.difficulty };
+let pick = { R: Math.max(...save.ladder.unlocked), difficulty: save.settings.difficulty, battle: DEBUG_BATTLE || "B15", hero: {} };
+
+// ---- nội dung Chương (comic, thẻ, Quiz): B15 nạp sẵn, Chương khác nạp lười (data/battles.js) ----------------------
+const METAS = { B15: { id: "B15", comic: COMIC_B15, cards: CARDS, cardById: CARD_BY_ID, quiz: QUIZ_B15, groups: CARD_GROUPS } };
+const metaOf = (ch) => METAS[ch] || null;
+async function ensureMeta(ch) {
+  if (!METAS[ch]) { const m = await loadChapterMeta(ch); registerCards(ch, m.cards); METAS[ch] = m; }
+  return METAS[ch];
+}
+const cardOf = (id) => { for (const k in METAS) { const c = METAS[k].cardById[id]; if (c) return c; } return null; };
+const groupName = (c) => (CARD_GROUPS.find((g) => g.id === c.group) || { name: c.group }).name;
+const battleOfChapter = (ch) => BATTLE_ORDER.map((id) => BATTLES[id]).find((B) => B.chapter === ch) || BATTLES.B15;
+// tướng ra trận của một trận: ?debug&hero= trước, rồi tướng đã chọn trên thẻ, rồi tướng đầu tiên chơi được
+const heroFor = (B) => DEBUG_HERO || (B.playable.includes(pick.hero[B.id]) ? pick.hero[B.id] : B.playable[0]);
 const music = new Music(save.settings.music ?? 0.5);
 music.play("hub");
 const persist = () => writeSave(save);
@@ -64,40 +86,38 @@ function render() {
 }
 
 // ---- Xuất trận --------------------------------------------------------------------------------
+// Một thẻ mỗi trận trong danh mục (data/battles.js); bấm thẻ để chọn trận, phần thiết lập bên dưới theo trận đã chọn.
 function xuattran() {
-  const st = P.heroStats(save, pick.R);
+  const B = BATTLES[pick.battle] || BATTLES.B15, heroId = heroFor(B);
+  const R = B.fixedR ?? pick.R;
+  const st = B.ladder ? P.heroStats(save, pick.R) : P.heroStats(save, R, heroId, B.preset || null);
   const diff = DIFFICULTY.find((d) => d.id === pick.difficulty);
+  const modes = Object.values(MODES).filter((m) => B.modes.includes(m.id)), curMode = modeFor(B);
   return `${save.tutorial?.done ? "" : tutorialBanner()}
-  <section class="card battle">
-    <div class="battle-art"><div class="seal">B15</div><div><h2>Trận Hàm Tử</h2><p>Tháng 4 năm Ất Dậu · 1285 · bến Hàm Tử, sông Hồng</p></div></div>
-    <p class="lead">Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.</p>
-    <ul class="notes">${HISTORY_NOTES.map((x) => `<li><span class="label ${x.label === "Chính sử" ? "cs" : x.label === "Tương truyền" ? "tt" : "hc"}">${x.label}</span>${esc(x.text)}</li>`).join("")}</ul>
-    ${chapterState(save, CH).openSeen ? `<div class="row" style="margin-top:10px"><button data-comic="open">Xem comic mở chương</button>
-      <span class="small">Lần đầu vào trận, comic mở chương tự phát (bỏ qua được). Đọc lại mọi lúc ở Sử quán.</span></div>`
-      : `<p class="small" style="margin-top:10px">Trước trận đầu tiên có comic mở chương (6 khung, chừng 40 giây, bỏ qua được).</p>`}
-  </section>
-  ${chapterState(save, CH).cleared ? `<section class="card battle" style="opacity:.8"><div class="battle-art"><div class="seal" style="background:#2e2620">B20</div>
-    <div><h2>Chương kế: Bạch Đằng</h2><p>Ngày 8 tháng 3 năm Mậu Tý · 9/4/1288</p></div></div>
-    <p class="small">Trận quyết định của Quyển VI. Chương này còn đang dựng trong bản thử.</p></section>` : ""}
+  ${BATTLE_ORDER.map(battleCard).join("")}
   <section class="card">
-    <h3>Cấp trận R</h3>
+    ${B.ladder ? `<h3>Cấp trận R</h3>
     <div class="ladder">${R_LADDER.map((R) => {
       const open = save.ladder.unlocked.includes(R), best = save.ladder.best[R];
       return `<button data-r="${R}" class="${pick.R === R ? "on" : ""}" ${open ? "" : "disabled"}>R ${R}${best ? `<em class="rank r${best}">${best}</em>` : ""}${open ? "" : "<small>khóa</small>"}</button>`;
     }).join("")}</div>
-    <p class="small">Thắng một cấp thì mở cấp kế (+3, như R1: B12 = 1 … B20 = 25). Địch mạnh theo R; tướng được nâng tối thiểu lên cấp R − 2 và binh khí tối thiểu E(R) − 0,10 khi vào trận (12.1, 12.7).</p>
+    <p class="small">Thắng một cấp thì mở cấp kế (+3, như R1: B12 = 1 … B20 = 25). Địch mạnh theo R; tướng được nâng tối thiểu lên cấp R − 2 và binh khí tối thiểu E(R) − 0,10 khi vào trận (12.1, 12.7).</p>`
+    : `<h3>Cấp trận R ${R} · cố định</h3>
+    <p class="small">${B.title}: tướng dựng sẵn cấp ${B.preset?.level ?? R}, binh khí E(R), không dùng cây kỹ năng, Lò rèn của Trần Quốc Toản (bản VS).${save.battles?.[B.id]?.best ? ` Hạng tốt nhất: <b>${save.battles[B.id].best}</b>.` : ""}</p>`}
     <h3>Chế độ</h3>
-    <div class="ladder">${Object.values(MODES).map((m) => `<button data-mode="${m.id}" class="${(save.settings.mode || "nhanh") === m.id ? "on" : ""}">${m.name}<small>par ${m.par / 60} phút · ${m.id === "nhanh" ? "Hào Khí ×1,3 · thưởng ×0,6 · 1 Kế Sách" : "thưởng ×1 · 2 Kế Sách"}</small></button>`).join("")}</div>
+    <div class="ladder">${modes.map((m) => `<button data-mode="${m.id}" class="${curMode === m.id ? "on" : ""}">${m.name}<small>par ${Math.round((B.par?.[m.id] ?? m.par) / 60)} phút · ${m.id === "nhanh" ? `Hào Khí ×1,3 · thưởng ×0,6 · ${B.ladder ? "1 Kế Sách" : "3 Kế Sách"}` : "thưởng ×1 · 2 Kế Sách"}</small></button>`).join("")}</div>
     <h3>Độ khó</h3>
     <div class="ladder">${DIFFICULTY.map((d) => `<button data-diff="${d.id}" class="${pick.difficulty === d.id ? "on" : ""}">${d.name}<small>${d.tokens} lính đánh cùng lúc · thưởng ×${d.reward}</small></button>`).join("")}</div>
     <div class="grid2">
-      <div><h3>Vào trận với</h3><table class="stat">
+      <div><h3>Vào trận với${B.ladder ? "" : ` ${esc(HEROES[heroId].name)}`}</h3><table class="stat">
         <tr><td>Cấp</td><td>${st.level}${st.floorLifted ? ` <em class="lift">nâng từ ${save.hero.level}</em>` : ""}</td></tr>
         <tr><td>Công</td><td>${n(st.cong)}</td></tr><tr><td>Sinh lực</td><td>${n(st.hp)}</td></tr><tr><td>Giáp</td><td>${n(st.giap)}</td></tr>
         <tr><td>Hệ số binh khí</td><td>×${st.weaponMult.toFixed(2).replace(".", ",")}${st.weaponFloor ? ` <em class="lift">Quân giới cấp phát</em>` : ""}</td></tr>
         <tr><td>Chí mạng</td><td>${Math.round(st.crit * 100)}%</td></tr>
         <tr><td>Gượng dậy</td><td>${diff.revive} lần</td></tr>
-        <tr><td>Đòn mạnh</td><td>C1–C4${save.hero.level >= MOVES.C5.unlockLv || st.level >= 5 ? ", C5" : ""}${st.level >= MOVES.C6.unlockLv ? ", C6" : ""}</td></tr>
+        ${B.ladder ? `<tr><td>Đòn mạnh</td><td>C1–C4${save.hero.level >= MOVES.C5.unlockLv || st.level >= 5 ? ", C5" : ""}${st.level >= MOVES.C6.unlockLv ? ", C6" : ""}</td></tr>`
+          : `<tr><td>Binh khí</td><td>${esc(HEROES[heroId].weaponName || "")} <span class="label hc">${HEROES[heroId].weaponLabel || "Hư cấu"}</span></td></tr>
+        <tr><td>Khí Lực</td><td>${st.kiBars ?? HEROES[heroId].kiLucBars} vạch</td></tr>`}
       </table></div>
       <div><h3>Hiển thị</h3>
         <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => `<option value="${t.id}" ${t.id === save.settings.troops ? "selected" : ""}>${t.name} · ${t.N}</option>`).join("")}</select></label>
@@ -106,6 +126,34 @@ function xuattran() {
         <button class="primary go" data-go>VÀO TRẬN</button>
       </div>
     </div>
+  </section>`;
+}
+
+// chế độ chơi của trận: chế độ đang chọn nếu trận có, không thì chế độ đầu tiên của trận (B20 chỉ Trận nhanh)
+const modeFor = (B) => (B.modes.includes(save.settings.mode || "nhanh") ? save.settings.mode || "nhanh" : B.modes[0]);
+const labelCls = (l) => (l === "Chính sử" ? "cs" : l === "Tương truyền" ? "tt" : "hc");
+
+// Thẻ trận ở Xuất trận. B15 như trước đợt 9 (thêm viền chọn); trận đang dựng (wip) có nhãn "đang dựng — chơi thử" và
+// ô chọn tướng (tướng chưa làm hiện "sắp có").
+function battleCard(id) {
+  const B = BATTLES[id], ch = save.chapters?.[B.chapter], on = pick.battle === id ? " picked" : "";
+  if (id === "B15") return `<section class="card battle pickable${on}" data-bpick="B15">
+    <div class="battle-art"><div class="seal">B15</div><div><h2>Trận Hàm Tử</h2><p>Tháng 4 năm Ất Dậu · 1285 · bến Hàm Tử, sông Hồng</p></div></div>
+    <p class="lead">Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.</p>
+    <ul class="notes">${HISTORY_NOTES.map((x) => `<li><span class="label ${labelCls(x.label)}">${x.label}</span>${esc(x.text)}</li>`).join("")}</ul>
+    ${chapterState(save, CH).openSeen ? `<div class="row" style="margin-top:10px"><button data-comic="open" data-ch="B15">Xem comic mở chương</button>
+      <span class="small">Lần đầu vào trận, comic mở chương tự phát (bỏ qua được). Đọc lại mọi lúc ở Sử quán.</span></div>`
+      : `<p class="small" style="margin-top:10px">Trước trận đầu tiên có comic mở chương (6 khung, chừng 40 giây, bỏ qua được).</p>`}
+  </section>`;
+  const hero = heroFor(B);
+  return `<section class="card battle pickable${B.wip ? " wip" : ""}${on}" data-bpick="${id}">
+    <div class="battle-art"><div class="seal${B.wip ? " seal-wip" : ""}">${id}</div><div><h2>${esc(B.title)}${B.wip ? ` <em class="wiptag">đang dựng — chơi thử</em>` : ""}</h2><p>${esc(B.sub)}</p></div></div>
+    ${id === "B20" ? `<p class="lead">Dụ hạm đội Nguyên vào khúc sông đã đóng cọc lúc triều lên, giữ chân chúng tới khi nước ròng, rồi lên boong chiến thuyền mắc cạn. Sáu pha theo con nước.</p>` : ""}
+    <div class="heropick"><span class="small">Tướng</span>${B.heroes.map((h) => {
+      const H = HEROES[h], ok = B.playable.includes(h);
+      return `<button data-hero="${h}" data-hb="${id}" class="${ok && hero === h ? "on" : ""}" ${ok ? "" : "disabled"}><b>${esc(H?.name || h)}</b><small>${ok ? esc(H?.title?.split(" · ")[0] || "") : "sắp có"}</small></button>`;
+    }).join("")}</div>
+    <p class="small">${B.wip ? `Bản thử đợt 9: bản đồ khúc sông, nước triều và tướng ${esc(HEROES[B.playable[0]].name)} đã dựng; hạm đội, Con nước, Kế Sách đang làm — vào trận là bản đi thử bản đồ. ` : ""}R ${B.fixedR} cố định, tướng dựng sẵn cấp ${B.preset?.level}, ${B.modes.length === 1 ? MODES[B.modes[0]].name : "mọi chế độ"}.${ch?.openSeen ? " Comic mở chương đọc lại ở Sử quán." : ""}</p>
   </section>`;
 }
 
@@ -151,50 +199,67 @@ const TITLES = [
   { id: "giabinh", name: "Gia Binh Hoài Văn", how: "Hạng A trở lên ở trận Hàm Tử", ok: (s) => Object.values(s.ladder.best).some((r) => r === "A" || r === "S") },
   { id: "suquan", name: "Sử Quan Đông A", how: "Trả lời đúng hết câu Quiz của Quyển (tính cả lần ôn)", ok: (s) => QUIZ_B15.every((q) => s.quiz?.answered?.[q.id]?.right > 0) },
 ];
+// Mỗi Chương trong danh mục một khối: comic đã gặp (mở chương, [Chủ soái quyết], giữa trận, kết chương), Quiz chương,
+// thẻ sử liệu. Chương chưa nạp nội dung (nạp lười) thì hiện "đang nạp" rồi tự vẽ lại.
+const EMPTY_CH = { opened: false, openSeen: false, closeSeen: false, insertSeen: false, seen: [], cleared: false };
+const COMIC_INFO = {
+  B15: { open: "Tình thế, Chủ soái quyết", insert: "Áo Tống trên bến", insertLock: "Mở khi thuyền quân Triệu Trung cập bến" },
+  B20: { open: "Tình thế, hội quân", decree: "Chủ soái quyết" },
+};
 function suquan() {
-  const ch = chapterState(save, CH), cards = save.cards || {}, read = save.cardsRead || [];
-  const Q = save.quiz || { answered: {}, review: [] };
-  const met = QUIZ_B15.filter((q) => Q.answered[q.id]).length;
-  const cardBtn = (c) => cards[c.id]
-    ? `<button class="sq-card ${read.includes(c.id) ? "" : "new"}" data-card="${c.id}"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${read.includes(c.id) ? "" : "Mới mở"}</small></button>`
-    : `<div class="sq-card lock"><b>Thẻ chưa mở</b><small>${esc(c.hint)}</small></div>`;
   const s = save.settings;
   return `
   <section class="card"><h3>Sử quán</h3>
     <p class="small">Thư viện thẻ sử liệu, mở miễn phí theo tiến độ. Mỗi thẻ mang đúng một nhãn Chính sử, Tương truyền hoặc Hư cấu kèm nguồn. Bản thử: thẻ và câu hỏi chưa qua cố vấn sử duyệt.</p>
     <p class="small">Danh hiệu: ${TITLES.map((t) => `<span class="lift" style="${t.ok(save) ? "" : "opacity:.45"}" title="${esc(t.how)}">${t.name}</span>`).join(" ")}</p>
   </section>
-  <section class="grid2">
-    <div class="card"><h3>Comic · Quyển VI · Chương Hàm Tử</h3>
+  ${BATTLE_ORDER.map((id) => chapterBlock(BATTLES[id])).join("")}
+  <section class="card"><h3>Cài đặt đọc</h3>
+    <label class="field">Cỡ chữ lời dẫn, bóng thoại <input type="range" min="0.8" max="1.5" step="0.1" value="${Number(s.comicText) || 1}" data-rs="comicText"><b>${Math.round((Number(s.comicText) || 1) * 100)}%</b></label>
+    <label class="field">Rung và nháy (lia, phóng khung) <input type="checkbox" data-rs="motion" ${s.motion !== false ? "checked" : ""}></label>
+    <label class="field">Chế độ đọc <select data-rs="comicMode">${[["auto", "Tự chọn theo màn hình"], ["page", "Nguyên trang"], ["panel", "Từng khung"]].map(([v, l]) => `<option value="${v}" ${(s.comicMode || "auto") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+  </section>`;
+}
+function chapterBlock(B) {
+  const id = B.chapter, M = metaOf(id);
+  const head = `<h3>Chương ${esc(B.name)} · ${esc(B.date)}${B.wip ? ` <em class="wiptag">đang dựng</em>` : ""}</h3>`;
+  if (!M) return `<section class="card sq-chapter">${head}<p class="small">Đang nạp comic, thẻ và câu hỏi của Chương…</p></section>`;
+  const ch = save.chapters?.[id] || EMPTY_CH, cards = save.cards || {}, read = save.cardsRead || [], C = M.comic, info = COMIC_INFO[id] || {};
+  const Q = save.quiz || { answered: {}, review: [] };
+  const met = M.quiz.filter((q) => Q.answered[q.id]).length, due = (Q.review || []).filter((r) => M.quiz.some((q) => q.id === r.id)).length;
+  const cardBtn = (c) => cards[c.id]
+    ? `<button class="sq-card ${read.includes(c.id) ? "" : "new"}" data-card="${c.id}"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${read.includes(c.id) ? "" : "Mới mở"}</small></button>`
+    : `<div class="sq-card lock"><b>Thẻ chưa mở</b><small>${esc(c.hint)}</small></div>`;
+  const btn = (part, ok, title, sub) => `<button data-comic="${part}" data-ch="${id}" ${ok ? "" : "disabled"}><b>${title}</b><small>${sub}</small></button>`;
+  const got = M.cards.filter((c) => cards[c.id]).length;
+  return `<section class="card sq-chapter">${head}
+  <div class="grid2">
+    <div><h3>Comic · Quyển VI · Chương ${esc(B.name)}</h3>
       <div class="comic-row">
-        <button data-comic="open" ${ch.openSeen ? "" : "disabled"}><b>Mở chương</b><small>${ch.openSeen ? `${COMIC_B15.open.length} khung · Tình thế, Chủ soái quyết` : "Mở khi vào trận lần đầu"}</small></button>
-        <button data-comic="insert" ${ch.insertSeen ? "" : "disabled"}><b>Giữa trận</b><small>${ch.insertSeen ? "1 khung · Áo Tống trên bến" : "Mở khi thuyền quân Triệu Trung cập bến"}</small></button>
-        <button data-comic="close" ${ch.cleared || ch.closeSeen ? "" : "disabled"}><b>Kết chương</b><small>${ch.cleared || ch.closeSeen ? `${COMIC_B15.close.length} khung${ch.closeSeen ? "" : " · chưa đọc"}` : "Mở khi thắng trận"}</small></button>
+        ${btn("open", ch.openSeen, "Mở chương", ch.openSeen ? `${C.open.length} khung${info.open ? " · " + info.open : ""}` : "Mở khi vào trận lần đầu")}
+        ${C.decree?.length ? btn("decree", ch.decreeSeen, "Chủ soái quyết", ch.decreeSeen ? `${C.decree.length} khung · sau Hiến kế` : "Mở sau Hiến kế lần đầu") : ""}
+        ${C.insert?.length ? btn("insert", ch.insertSeen, "Giữa trận", ch.insertSeen ? `${C.insert.length} khung${info.insert ? " · " + info.insert : ""}` : info.insertLock || "Mở giữa trận") : ""}
+        ${btn("close", ch.cleared || ch.closeSeen, "Kết chương", ch.cleared || ch.closeSeen ? `${C.close.length} khung${ch.closeSeen ? "" : " · chưa đọc"}` : "Mở khi thắng trận")}
       </div>
-      <p class="small">Chương Bạch Đằng: đang dựng.</p>
-      <h3>Cài đặt đọc</h3>
-      <label class="field">Cỡ chữ lời dẫn, bóng thoại <input type="range" min="0.8" max="1.5" step="0.1" value="${Number(s.comicText) || 1}" data-rs="comicText"><b>${Math.round((Number(s.comicText) || 1) * 100)}%</b></label>
-      <label class="field">Rung và nháy (lia, phóng khung) <input type="checkbox" data-rs="motion" ${s.motion !== false ? "checked" : ""}></label>
-      <label class="field">Chế độ đọc <select data-rs="comicMode">${[["auto", "Tự chọn theo màn hình"], ["page", "Nguyên trang"], ["panel", "Từng khung"]].map(([v, l]) => `<option value="${v}" ${(s.comicMode || "auto") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     </div>
-    <div class="card"><h3>Quiz chương</h3>
+    <div><h3>Quiz chương</h3>
       <p class="small">Sử quan hỏi 3–5 câu về điều tướng quân đã gặp trong comic, trong trận và trong thẻ. Không tính giờ, không trừ gì; chỉ thưởng thẻ và danh hiệu.</p>
-      <p>Đã gặp ${met} / ${QUIZ_B15.length} câu của Chương${(Q.review || []).length ? ` · ${Q.review.length} câu chờ hỏi lại` : ""}.</p>
-      <button class="primary" data-quiz ${ch.cleared ? "" : "disabled"}>Hỏi sử quan</button>${ch.cleared ? "" : `<p class="small">Mở sau khi thắng trận Hàm Tử.</p>`}
+      <p>Đã gặp ${met} / ${M.quiz.length} câu của Chương${due ? ` · ${due} câu chờ hỏi lại` : ""}.</p>
+      <button class="primary" data-quiz="${id}" ${ch.cleared ? "" : "disabled"}>Hỏi sử quan</button>${ch.cleared ? "" : `<p class="small">Mở sau khi thắng ${esc(B.title.replace(/^Trận/, "trận"))}.</p>`}
     </div>
-  </section>
-  <section class="card"><h3>Thẻ sử liệu · ${Object.keys(cards).length} / ${CARDS.length}</h3>
-    ${CARD_GROUPS.map((g) => { const cs = CARDS.filter((c) => c.group === g.id); return cs.length ? `<div class="sq-group">${g.name}</div><div class="cards">${cs.map(cardBtn).join("")}</div>` : ""; }).join("")}
+  </div>
+  <h3>Thẻ sử liệu · ${got} / ${M.cards.length}</h3>
+    ${M.groups.map((g) => { const cs = M.cards.filter((c) => c.group === g.id); return cs.length ? `<div class="sq-group">${g.name}</div><div class="cards">${cs.map(cardBtn).join("")}</div>` : ""; }).join("")}
   </section>`;
 }
 
 function showCard(id, onClose = render) {
-  const c = CARD_BY_ID[id], ch = chapterState(save, c.chapter);
+  const c = cardOf(id), ch = chapterState(save, c.chapter), M = metaOf(c.chapter);
   save.cardsRead = [...new Set([...(save.cardsRead || []), id])]; persist();
   const seenPanels = c.panels.filter((p) => ch.seen.includes(p));
   document.activeElement?.blur?.();              // Enter không mở thêm một thẻ chồng lên
   const d = document.createElement("div"); d.className = "sq-detail";
-  d.innerHTML = `<div class="card"><p class="small">${CARD_GROUPS.find((g) => g.id === c.group).name} · Chương ${c.chapter}</p>
+  d.innerHTML = `<div class="card"><p class="small">${groupName(c)} · Chương ${c.chapter}</p>
     <h2>${esc(c.title)} <span class="label ${LCLS[c.label]}">${c.label}</span></h2>
     ${c.body.map((p) => `<p>${esc(p)}</p>`).join("")}
     ${seenPanels.length ? `<div class="row">${seenPanels.map((p) => `<button data-panel="${p}">Xem khung ${p}</button>`).join("")}</div>` : ""}
@@ -206,39 +271,62 @@ function showCard(id, onClose = render) {
   addEventListener("keydown", onKey);
   d.onclick = (e) => { if (e.target === d) close(); };
   d.querySelector("[data-close]").onclick = close;
-  d.querySelectorAll("[data-panel]").forEach((b) => (b.onclick = () => readComic(COMIC_B15, { ids: [b.dataset.panel], single: true, title: c.title, closeLabel: "Đóng", settings: save.settings, onSettings: persist })));
+  d.querySelectorAll("[data-panel]").forEach((b) => (b.onclick = () => readComic(M.comic, { ids: [b.dataset.panel], single: true, title: c.title, closeLabel: "Đóng", settings: save.settings, onSettings: persist })));
 }
 
-// Phát một phần comic của B15 (open | insert | close), ghi khung đã xem. Trả về { skipped, seen }.
-async function playComic(part, { title } = {}) {
-  const ids = COMIC_B15[part];
-  const names = { open: "Mở chương", insert: "Giữa trận", close: "Kết chương" };
-  const r = await readComic(COMIC_B15, {
-    ids, title: title || `Quyển VI · Chương Hàm Tử · ${names[part]}`, settings: save.settings, onSettings: persist,
-    onSeen: (s) => { markSeen(save, CH, s); persist(); },
+// Phát một phần comic của một Chương (open | decree | insert | close), ghi khung đã xem. Trả về { skipped, seen }.
+// comic: bản comic đã điền bóng thoại Hiến kế (applyCouncil) cho phần decree; mặc định comic của Chương (đã nạp).
+async function playComic(part, { title, ch: chId = CH, comic = null } = {}) {
+  const M = await ensureMeta(chId), C = comic || M.comic, B = battleOfChapter(chId);
+  const ids = C[part];
+  const names = { open: "Mở chương", decree: "Chủ soái quyết", insert: "Giữa trận", close: "Kết chương" };
+  const r = await readComic(C, {
+    ids, title: title || `Quyển VI · Chương ${B.name} · ${names[part]}`, settings: save.settings, onSettings: persist,
+    onSeen: (s) => { markSeen(save, chId, s); persist(); },
   });
-  const ch = chapterState(save, CH);
+  const ch = chapterState(save, chId);
   if (part === "open") { ch.openSeen = true; if (r.skipped) ch.openSkips = (ch.openSkips || 0) + 1; }
+  if (part === "decree") ch.decreeSeen = true;
   if (part === "close") { ch.closeSeen = true; if (r.skipped) ch.closeSkips = (ch.closeSkips || 0) + 1; }
   persist();
   return r;
 }
 
-async function startQuiz() {
-  const items = pickQuiz(save, QUIZ_B15, { chapter: CH, n: 4 });
+async function startQuiz(chId = CH) {
+  const M = await ensureMeta(chId);
+  const items = pickQuiz(save, M.quiz, { chapter: chId, n: 4 });
   if (!items.length) { toast("Sử quan chưa có câu nào để hỏi — hãy đọc comic hoặc mở thêm thẻ."); return; }
-  const ch = chapterState(save, CH);
+  const ch = chapterState(save, chId);
   await runQuiz({
-    items, comic: COMIC_B15, settings: save.settings, onSettings: persist,
-    onSeen: (s) => { markSeen(save, CH, s); persist(); },
+    items, comic: M.comic, settings: save.settings, onSettings: persist,
+    onSeen: (s) => { markSeen(save, chId, s); persist(); },
     onAnswer: (it, right) => { answerQuiz(save, it, right); persist(); },
     onFinish: () => {
       ch.quizRounds = (ch.quizRounds || 0) + 1;
-      const got = unlockCards(save, CH, ["firstQuiz"]); persist();
-      return got.map((id) => CARD_BY_ID[id]);
+      const got = unlockCards(save, chId, ["firstQuiz"]); persist();
+      return got.map((id) => cardOf(id));
     },
   });
   render();
+}
+
+// Hiến kế (Quyết sách, ui/council.js) khi comic của Chương có khối council: lần đầu có thẻ hướng dẫn; Chương đã thắng thì
+// thẻ lịch sử mang dấu "Người xưa chọn". Lần đầu vào Chương thì đọc tiếp phần "Chủ soái quyết" theo kế đã chọn.
+async function councilFlow(chId, M, first) {
+  const { runCouncil, applyCouncil } = await import("./ui/council.js");
+  const ch = chapterState(save, chId);
+  const r = await runCouncil({ council: M.comic.council, comic: M.comic, settings: save.settings, replay: !!ch.cleared,
+    tutorial: !save.councilSeen, onSettings: persist });
+  save.councilSeen = true; ch.council = { picked: r.picked, historical: !!r.historical }; persist();
+  if (first && M.comic.decree?.length) await playComic("decree", { ch: chId, comic: r.picked ? applyCouncil(M.comic, r.picked) : M.comic });
+  return ch.council;
+}
+// comic đã điền bóng thoại theo kế đã chọn lần trước (đọc lại "Chủ soái quyết" ở Sử quán); chưa chọn thì null
+async function decreeComic(chId) {
+  const M = await ensureMeta(chId), picked = save.chapters?.[chId]?.council?.picked;
+  if (!picked || !M.comic.council) return null;
+  const { applyCouncil } = await import("./ui/council.js");
+  return applyCouncil(M.comic, picked);
 }
 
 // ---- Võ trường (13.5) -------------------------------------------------------------------------
@@ -420,14 +508,21 @@ const bind = {
     app.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { save.settings.mode = b.dataset.mode; persist(); render(); }));
     app.querySelectorAll("[data-diff]").forEach((b) => (b.onclick = () => { pick.difficulty = b.dataset.diff; save.settings.difficulty = pick.difficulty; persist(); render(); }));
     app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
-    app.querySelector("[data-go]").onclick = startBattle;
+    app.querySelector("[data-go]").onclick = () => startBattle(pick.battle);
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
-    app.querySelector("[data-comic]")?.addEventListener("click", async () => { await playComic("open"); render(); });
+    app.querySelector("[data-comic]")?.addEventListener("click", async (e) => { e.stopPropagation(); await playComic("open", { ch: e.currentTarget.dataset.ch || CH }); render(); });
+    app.querySelectorAll("[data-bpick]").forEach((s) => s.addEventListener("click", () => { if (pick.battle !== s.dataset.bpick) { pick.battle = s.dataset.bpick; render(); } }));
+    app.querySelectorAll("[data-hero]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); pick.battle = b.dataset.hb; pick.hero[b.dataset.hb] = b.dataset.hero; render(); }));
   },
   suquan() {
     app.querySelectorAll("[data-card]").forEach((b) => (b.onclick = () => showCard(b.dataset.card)));
-    app.querySelectorAll("[data-comic]").forEach((b) => (b.onclick = async () => { await playComic(b.dataset.comic); render(); }));
-    app.querySelector("[data-quiz]")?.addEventListener("click", startQuiz);
+    app.querySelectorAll("[data-comic]").forEach((b) => (b.onclick = async () => {
+      const chId = b.dataset.ch || CH;
+      await playComic(b.dataset.comic, { ch: chId, comic: b.dataset.comic === "decree" ? await decreeComic(chId) : null }); render();
+    }));
+    app.querySelectorAll("[data-quiz]").forEach((b) => b.addEventListener("click", () => startQuiz(b.dataset.quiz || CH)));
+    // Chương nạp lười: nạp xong thì vẽ lại (chỉ khi vẫn đang ở Sử quán)
+    for (const id of BATTLE_ORDER) if (!metaOf(BATTLES[id].chapter)) ensureMeta(BATTLES[id].chapter).then(() => { if (tab === "suquan") render(); }, (e) => console.error(e));
     app.querySelectorAll("[data-rs]").forEach((el) => (el.onchange = () => {
       save.settings[el.dataset.rs] = el.type === "checkbox" ? el.checked : el.type === "range" ? Number(el.value) : el.value;
       persist(); render();
@@ -459,27 +554,33 @@ const bind = {
 // ---- vào trận, kết quả ------------------------------------------------------------------------
 // Luồng một Chương (22.2) ở bản VS: comic mở chương (lần đầu) → trận (khung chèn giữa trận) → cảnh kết ≤ 10 s →
 // xếp hạng → comic kết chương (lần thắng đầu) → thẻ Sử quán → Quiz chương (không bắt buộc) → Doanh trại.
-// B15 bản VS miễn Quyết sách (canon quyetSach.mien = ['VS']).
-async function startBattle() {
-  const ch = chapterState(save, CH);
-  ch.opened = true; unlockCards(save, CH, ["chapterOpen"]); persist();   // bỏ qua comic vẫn mở thẻ; mở trùng thì không làm gì
-  if (!ch.openSeen && STORY) { music.play("hub"); await playComic("open"); }
-  const met = unlockCards(save, CH, ["battleStart"]); persist();
-  const note = HISTORY_NOTES[Math.floor(Math.random() * HISTORY_NOTES.length)];
-  app.innerHTML = `<div class="loading"><h2>Bến Hàm Tử · 1285</h2><p><span class="label ${note.label === "Chính sử" ? "cs" : "hc"}">${note.label}</span> ${esc(note.text)}</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
+// B15 bản VS miễn Quyết sách (canon quyetSach.mien = ['VS']). Chương có khối council (B20): comic mở chương → Hiến kế →
+// "Chủ soái quyết" → trận. battleId: khóa trong data/battles.js (mặc định trận đang chọn ở thẻ Xuất trận).
+async function startBattle(battleId = pick.battle) {
+  const B = BATTLES[battleId] || BATTLES.B15, chId = B.chapter;
+  const M = await ensureMeta(chId);
+  const ch = chapterState(save, chId), first = !ch.openSeen;
+  ch.opened = true; unlockCards(save, chId, ["chapterOpen"]); persist();   // bỏ qua comic vẫn mở thẻ; mở trùng thì không làm gì
+  if (first && STORY) { music.play("hub"); await playComic("open", { ch: chId }); }
+  const quyetSach = STORY && M.comic.council ? await councilFlow(chId, M, first) : null;
+  const met = unlockCards(save, chId, ["battleStart"]); persist();
+  const notes = await B.notes();
+  const note = notes[Math.floor(Math.random() * notes.length)];
+  app.innerHTML = `<div class="loading"><h2>${esc(B.loading.title)}</h2><p><span class="label ${note.label === "Chính sử" ? "cs" : note.label === "Tương truyền" && B.id !== "B15" ? "tt" : "hc"}">${note.label}</span> ${esc(note.text)}</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const { runBattle } = await import("./battle/battle.js");
+  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id)]);
   const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
   app.style.display = "none";
   let res;
   try {
-    // khung chèn giữa trận (D2 khi thuyền quân Triệu Trung đầu tiên cập bến) chỉ tự phát lần đầu
-    const story = STORY && !ch.insertSeen ? {
-      comic: COMIC_B15, settings: save.settings, onSettings: persist,
-      onSeen: (s) => { markSeen(save, CH, s); persist(); },
+    // khung chèn giữa trận (B15: D2 khi thuyền quân Triệu Trung đầu tiên cập bến) chỉ tự phát lần đầu
+    const story = STORY && !ch.insertSeen && M.comic.insert?.length ? {
+      comic: M.comic, settings: save.settings, onSettings: persist,
+      onSeen: (s) => { markSeen(save, chId, s); persist(); },
       onDone: () => { ch.insertSeen = true; persist(); },
     } : null;
-    res = await runBattle({ container: stage, save, R: pick.R, difficulty: pick.difficulty, mode: save.settings.mode || "nhanh", music, story, onSettings: () => persist() });
+    res = await runBattle({ container: stage, save, R: B.fixedR ?? pick.R, difficulty: pick.difficulty, mode: modeFor(B), music, story, onSettings: () => persist(),
+      battle: def, heroId: heroFor(B), quyetSach });
   } catch (err) {
     console.error(err);
     res = null;
@@ -490,31 +591,35 @@ async function startBattle() {
   stage.remove(); stage.replaceChildren(); app.style.display = "";
   if (!res?.won) music.play("hub");
   if (!res) { render(); return; }
-  afterBattle(res, met);
+  if (res.stub) { toast(`${B.title} còn đang dựng — đã về Doanh trại.`); tab = "xuattran"; render(); return; }   // bản giữ chỗ: không chấm, không thưởng
+  afterBattle({ battle: B.id, ...res }, met);
 }
 
-// Sau trận: mở thẻ Sử quán theo kết quả, đánh dấu Chương xong (lần thắng đầu), rồi màn kết quả.
+// Sau trận: mở thẻ Sử quán theo kết quả, đánh dấu Chương xong (lần thắng đầu), rồi màn kết quả. res.battle: trận nào
+// (thiếu thì B15, như kết quả trước đợt 9).
 function afterBattle(res, met = []) {
-  const ch = chapterState(save, CH);
-  if (res.won) completeChapter(save, CH);
+  const B = BATTLES[res.battle] || BATTLES.B15, chId = B.chapter;
+  const ch = chapterState(save, chId);
+  if (res.won) completeChapter(save, chId);
   const firstClear = res.won && !ch.closeSeen;     // lần thắng đầu, hoặc thắng rồi mà comic kết chương chưa đọc
-  const cards = [...met, ...unlockCards(save, CH, battleUnlockKeys(res))];
+  const cards = [...met, ...unlockCards(save, chId, battleUnlockKeys(res))];
   persist();
   showResults(res, { cards, firstClear });
 }
 
 // Kết chương sau lần thắng đầu: comic kết → thẻ Sử quán vừa mở → mời Quiz → Doanh trại.
-async function endChapter(cards) {
-  if (STORY) await playComic("close");
-  const all = [...new Set(cards)].map((id) => CARD_BY_ID[id]);
+async function endChapter(cards, chId = CH) {
+  if (STORY) await playComic("close", { ch: chId });
+  const B = battleOfChapter(chId);
+  const all = [...new Set(cards)].map((id) => cardOf(id)).filter(Boolean);
   app.innerHTML = `<div class="results win"><h1>Sử quán mở thẻ</h1>
-    <p class="small">Thẻ sử liệu của Chương Hàm Tử, đọc ở thẻ Sử quán của Doanh trại.</p>
-    <div class="unlocked">${all.map((c) => `<button class="sq-card new" data-card="${c.id}"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${CARD_GROUPS.find((g) => g.id === c.group).name}</small></button>`).join("") || `<p class="small">Không có thẻ mới.</p>`}</div>
+    <p class="small">Thẻ sử liệu của Chương ${esc(B.name)}, đọc ở thẻ Sử quán của Doanh trại.</p>
+    <div class="unlocked">${all.map((c) => `<button class="sq-card new" data-card="${c.id}"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${groupName(c)}</small></button>`).join("") || `<p class="small">Không có thẻ mới.</p>`}</div>
     <div class="card"><h3>Sử quan xin hỏi tướng quân đôi câu</h3>
       <p>Ba, bốn câu về điều vừa gặp trong comic và trong trận, chừng một, hai phút. Không tính điểm, không trừ gì; làm xong lượt đầu mở thêm một thẻ "Chuyện bên lề".</p>
       <div class="row center"><button class="primary" data-q>Trả lời</button><button data-later>Để sau</button></div></div></div>`;
   app.querySelectorAll("[data-card]").forEach((b) => (b.onclick = () => showCard(b.dataset.card, () => {})));
-  app.querySelector("[data-q]").onclick = async () => { await startQuiz(); tab = "suquan"; render(); };
+  app.querySelector("[data-q]").onclick = async () => { await startQuiz(chId); tab = "suquan"; render(); };
   app.querySelector("[data-later]").onclick = () => { tab = "xuattran"; render(); };
 }
 
@@ -550,23 +655,43 @@ async function startArena() {
   app.querySelector("[data-again]").onclick = () => startArena();
 }
 
+// Trận ngoài thang R (B20, tướng dựng sẵn): chỉ Tiền / Tinh thiết / Quân công và thống kê; không EXP, không rơi binh khí,
+// không mở cấp R; hạng tốt nhất ghi ở save.battles[id]. (Phần thưởng riêng của B20 là việc của pha D.)
+function applyBattleRewards(save, B, full, rw) {
+  Object.assign(rw, { exp: 0, drops: [], skillPoint: false, unlockR: null });
+  save.wallet.tien += rw.tien; save.wallet.tt += rw.tt; save.wallet.qc += rw.qc;
+  const sb = (save.battles ||= {})[B.id] ||= { best: null, cleared: false };
+  if (full.won) {
+    const order = ["S", "A", "B", "C"];
+    if (!sb.best || order.indexOf(full.rank) < order.indexOf(sb.best)) sb.best = full.rank;
+    sb.cleared = true; save.stats.wins++;
+  }
+  save.stats.battles++; save.stats.tpc += full.tpcCount || 0; save.stats.ko += full.ko || 0;
+  save.log.unshift({ at: full.at || 0, R: full.R, battle: B.id, won: full.won, rank: full.rank || "-", diem: full.diem || 0, exp: 0, tien: rw.tien });
+  save.log = save.log.slice(0, 12);
+  return { levelsGained: 0 };
+}
+
 function showResults(res, { cards = [], firstClear = false } = {}) {
+  const B = BATTLES[res.battle] || BATTLES.B15, RD = B.result;
   const score = res.won ? P.scoreBattle(res) : { diem: 0, rank: "-", rankMult: 0, parts: {} };
   const full = { ...res, ...score, rank: score.rank, rankMult: score.rankMult, diem: score.diem, at: Date.now() };
   const lvBefore = save.hero.level;
   const rw = P.computeRewards(save, full);
-  const applied = P.applyRewards(save, full, rw);
+  const applied = B.ladder ? P.applyRewards(save, full, rw) : applyBattleRewards(save, B, full, rw);
   persist();
+  const evName = (k) => (res.eventNames || RD.eventNames)[k] ?? (B.id === "B15" ? "Tướng ta bị vây" : k);
+  const parSec = res.parSec ?? B.par?.[res.mode] ?? MODES[res.mode].par;
   const parts = score.parts;
   const pct = (v) => `${Math.round((v || 0) * 100)}%`;
   const hkRows = Object.entries(res.hkLog || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v > 0 ? "+" : ""}${Math.round(v)}</td></tr>`).join("");
   app.innerHTML = `
   <div class="results ${res.won ? "win" : "lose"}">
     <div class="rank-seal r${score.rank}">${res.won ? score.rank : "✕"}</div>
-    <h1>${res.won ? "Thắng trận Hàm Tử" : "Thua trận"}</h1><p>${esc(res.why)}</p>
+    <h1>${res.won ? esc(RD.title) : "Thua trận"}</h1><p>${esc(res.why)}</p>
     ${res.won ? `<div class="card"><h3>Điểm ${score.diem} / 100</h3><table class="stat">
-      <tr><td>Nhiệm vụ (35)</td><td>${pct(parts.M)} · chính ${res.mainDone}/4, phụ ${res.sideDone}/2</td></tr>
-      <tr><td>Thời gian (15)</td><td>${pct(parts.T)} · ${Math.floor(res.timeSec / 60)}:${String(Math.floor(res.timeSec % 60)).padStart(2, "0")} (par ${MODES[res.mode].par / 60}:00)</td></tr>
+      <tr><td>Nhiệm vụ (35)</td><td>${pct(parts.M)} · chính ${res.mainDone}/${res.missionsTotal ?? RD.missionsTotal}, phụ ${res.sideDone}/${res.sideTotal ?? RD.sideTotal}</td></tr>
+      <tr><td>Thời gian (15)</td><td>${pct(parts.T)} · ${Math.floor(res.timeSec / 60)}:${String(Math.floor(res.timeSec % 60)).padStart(2, "0")} (par ${Math.floor(parSec / 60)}:${String(Math.round(parSec % 60)).padStart(2, "0")})</td></tr>
       <tr><td>Quân ta còn (20)</td><td>${pct(parts.Q)}</td></tr><tr><td>Cứ Điểm (20)</td><td>${pct(parts.C)}</td></tr>
       <tr><td>Kế Sách (10)</td><td>${pct(parts.K)} · ${(res.keSachList || []).map((k) => `${k.name}: ${k.word.toLowerCase()}`).join(", ")}</td></tr>
       <tr><td>KO</td><td>${res.ko} (par ${MODES[res.mode].koPar})</td></tr></table></div>` : ""}
@@ -584,23 +709,25 @@ function showResults(res, { cards = [], firstClear = false } = {}) {
         <tr><td>Tổng Phản Công</td><td>${res.tpcCount} lần</td></tr><tr><td>Mệnh Lệnh</td><td>${res.orders}</td></tr>
         <tr><td>Kế Sách thành công</td><td>${res.keSachOk} / ${(res.keSachList || []).length}</td></tr>
         <tr><td>Sĩ Khí TB</td><td>${Math.round(res.avgSK)}</td></tr>
-        ${Object.entries(res.events || {}).map(([k, v]) => `<tr><td>${k === "counterA1" ? "Cứ Điểm bị phản công" : "Tướng ta bị vây"}</td><td>${esc(EVENT_WORD[v] || v)}</td></tr>`).join("")}
+        ${Object.entries(res.events || {}).map(([k, v]) => `<tr><td>${esc(evName(k))}</td><td>${esc(EVENT_WORD[v] || v)}</td></tr>`).join("")}
       </table><details><summary>Hào Khí theo nguồn</summary><table class="stat">${hkRows}</table></details></div>
     </div>
-    ${cards.length ? `<div class="card"><h3>Sử quán mở thẻ</h3><div class="unlocked" style="justify-content:flex-start">${cards.map((id) => CARD_BY_ID[id]).map((c) => `<div class="sq-card new"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${CARD_GROUPS.find((g) => g.id === c.group).name}</small></div>`).join("")}</div></div>` : ""}
+    ${cards.length ? `<div class="card"><h3>Sử quán mở thẻ</h3><div class="unlocked" style="justify-content:flex-start">${cards.map((id) => cardOf(id)).filter(Boolean).map((c) => `<div class="sq-card new"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${groupName(c)}</small></div>`).join("")}</div></div>` : ""}
     <div class="row center">${firstClear && STORY ? `<button class="primary" data-end>Tiếp: Kết chương ›</button>` : `<button class="primary" data-back>Về Doanh trại</button>`}
       <button data-again>Đánh lại</button><button data-sq>Sử quán</button></div>
   </div>`;
-  const nextR = () => { pick.R = Math.max(...save.ladder.unlocked.filter((r) => r <= Math.max(pick.R, rw.unlockR || 0))); };
+  const nextR = () => { if (B.ladder) pick.R = Math.max(...save.ladder.unlocked.filter((r) => r <= Math.max(pick.R, rw.unlockR || 0))); };
   app.querySelector("[data-back]")?.addEventListener("click", () => { tab = "xuattran"; nextR(); render(); });
-  app.querySelector("[data-end]")?.addEventListener("click", () => { nextR(); endChapter(cards); });
+  app.querySelector("[data-end]")?.addEventListener("click", () => { nextR(); endChapter(cards, B.chapter); });
   app.querySelector("[data-sq]").onclick = () => { tab = "suquan"; nextR(); render(); };
-  app.querySelector("[data-again]").onclick = () => startBattle();
+  app.querySelector("[data-again]").onclick = () => startBattle(B.id);
 }
 
 render();
 if (location.search.includes("debug")) {
   import("./debug.js");
   // kịch bản kiểm thử màn Chương (comic, kết quả, kết chương, Quiz) không cần đánh hết trận
-  window.__main = { afterBattle, showResults, endChapter, startQuiz, playComic, render, get save() { return save; }, set tab(v) { tab = v; } };
+  // startBattle(id), pick (trận / tướng đang chọn), ensureMeta(chương) cho kịch bản nhiều trận (đợt 9)
+  window.__main = { afterBattle, showResults, endChapter, startQuiz, playComic, render, startBattle, ensureMeta, pick,
+    get save() { return save; }, set tab(v) { tab = v; } };
 }

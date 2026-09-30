@@ -1,60 +1,52 @@
-// battle/battle.js — dựng một trận B15 PROTO, chạy vòng lặp, trả kết quả khi người chơi rời trận.
+// battle/battle.js — dựng một trận, chạy vòng lặp, trả kết quả khi người chơi rời trận.
 //
 // Vùng chiến đấu chạy bước cố định 1/60 s bằng bộ tích lũy, tối đa 4 bước mỗi khung rồi bỏ phần
 // dư (15.2). Hit-stop dừng đồng hồ trận; vòng Mệnh Lệnh làm chậm ×0,2.
+//
+// Nhiều trận, nhiều tướng (đợt 9 lõi): phần riêng của trận nằm sau các móc của BattleDef (battles/b15.js — danh sách
+// móc ở đầu file đó), tướng theo HEROES[heroId] (data/heroes.js). Mặc định B15 + H35: đúng thứ tự dựng, thứ tự rút
+// ctx.rng và từng phép tính như trước.
 
 import * as THREE from "three";
-import { buildWorld, heightAt } from "./world.js";
+import { heightAt, setBattleTerrain, setDecks, setWaterLevel, waterLevel } from "./ground.js";
 import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
-import { Director } from "./director.js";
 import { FX, releaseFxTextures } from "./fx.js";
 import * as Models from "./models.js";
 import { Atmosphere } from "./atmosphere.js";
-import { Ambient } from "./ambient.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
 import { HUD } from "./hud.js";
-import { createSim } from "../sim/front.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
-import { FRONTS, BASES, ENEMY_MIX, MAP, STORY_INSERTS } from "../data/battle-b15.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
+import { HEROES } from "../data/heroes.js";
 import { heroStats } from "../meta/progress.js";
 import { movesGuideHTML } from "../ui/guide.js";
 import { readComic } from "../ui/comic.js";
+import B15 from "../battles/b15.js";
 
 const STEP = 1 / 60;
 
-// Camera tránh tường Hàm Tử quan (chỉ hình ảnh): hw nửa bề dày hộp tường (lối đi trên tường rộng 3 m; tháp cổng
-// 3,2 m thì pad bù), pad khoảng chừa trước mặt tường cho mặt phẳng gần 0,3 m, minH cần ngang tối thiểu (dưới mức này
-// lookAt gần thẳng đứng thì xoay loạn), keep: cần bị kéo ngắn thì nâng camera cho cần dài ít nhất keep × dist.
-const CAM_WALL = { hw: 1.5, pad: 0.35, minH: 0.8, keep: 0.6 };
-// Hộp 2D che camera, dựng theo world.js (tường tây x = MAP.fortWallX từ bờ sông tới góc nam, tường nam z =
-// MAP.fortSouthZ; tháp cổng ±4,6..7,8 nằm trong đoạn tường). Mỗi cổng: nhịp cửa ±4,4 chỉ chắn khi cổng còn đóng
-// (gate, open false); cổng vỡ thì hai cánh lật vào trong (world.js buildGate, battle.js quay 1,5 rad) nằm dọc
-// z ≈ ±4,25 từ chân tường tới x + 4,4 (open true).
-function wallBoxes(world) {
-  const W = MAP.fortWallX, hw = CAM_WALL.hw, out = [];
-  const gates = Object.entries(world.gates || {}).sort((a, b) => a[1].z - b[1].z);
-  let z0 = MAP.riverNorthZ + 4 - hw;
-  for (const [id, g] of gates) {
-    out.push({ x0: W - hw, x1: W + hw, z0, z1: g.z - 4.4, gate: null, open: false });
-    out.push({ x0: W - hw, x1: W + hw, z0: g.z - 4.4, z1: g.z + 4.4, gate: id, open: false });
-    for (const s of [-1, 1]) out.push({ x0: W - 0.3, x1: W + 4.6, z0: g.z + s * 4.25 - 0.45, z1: g.z + s * 4.25 + 0.45, gate: id, open: true });
-    z0 = g.z + 4.4;
-  }
-  out.push({ x0: W - hw, x1: W + hw, z0, z1: MAP.fortSouthZ + hw, gate: null, open: false });
-  out.push({ x0: W - hw, x1: MAP.riverEastX, z0: MAP.fortSouthZ - hw, z1: MAP.fortSouthZ + hw, gate: null, open: false });
-  return out;
-}
+// Camera tránh tường thành (chỉ hình ảnh; hộp do BattleDef.camBoxes dựng — B15: tường Hàm Tử quan): pad khoảng chừa
+// trước mặt tường cho mặt phẳng gần 0,3 m, minH cần ngang tối thiểu (dưới mức này lookAt gần thẳng đứng thì xoay loạn),
+// keep: cần bị kéo ngắn thì nâng camera cho cần dài ít nhất keep × dist.
+const CAM_WALL = { pad: 0.35, minH: 0.8, keep: 0.6 };
 
-export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings }) {
-  return new Promise((resolve) => {
+// Trả mặt đất về địa hình dựng sẵn (bỏ địa hình / boong / nước của trận khác).
+function resetGround() { setBattleTerrain(null); setDecks(null); setWaterLevel(null); }
+
+// battle: BattleDef (mặc định B15), heroId: tướng (mặc định H35), quyetSach: kết quả Hiến kế { picked, historical } | null
+// (ctx.quyetSach, director của trận đọc). Dựng lỗi (vd trận chưa dựng) thì dọn GPU, trả mặt đất về mặc định rồi reject
+// để main.js báo lỗi và về Doanh trại.
+export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings, battle = B15, heroId = "H35", quyetSach = null }) {
+  return new Promise((resolve, reject) => {
+    const def = battle || B15;
+    const heroDef = HEROES[heroId] || HEROES.H35;
     const settings = save.settings;
     const diff = DIFFICULTY.find((d) => d.id === difficulty) || DIFFICULTY[1];
-    const stats = heroStats(save, R);
-    stats.guardBase = HERO.bodyguards + stats.mods.bodyguards;
+    const stats = heroStats(save, R, heroDef.id, def.preset || null);
+    stats.guardBase = (heroDef.bodyguards ?? HERO.bodyguards) + stats.mods.bodyguards;
 
     container.innerHTML = `<canvas class="game"></canvas><div class="hud"></div><div class="overlay"></div><div class="touch"></div>`;
     const canvas = container.querySelector("canvas"), hudRoot = container.querySelector(".hud");
@@ -66,39 +58,52 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // r186 bỏ PCFSoftShadowMap (tự lùi về PCF và cảnh báo mỗi lần vào trận): đặt thẳng PCF, hình không đổi
     renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.3, def.camFar ?? 1400);
 
     const seed = (Date.now() & 0xffff) ^ (R * 977);
     const ctx = {
       scene, camera, renderer, R, diff, stats, save,
-      rng: makeRng(seed), clock: 0, openGates: { A3: false, B3: false }, units: [],
+      rng: makeRng(seed), clock: 0, openGates: def.openGates ? def.openGates() : {}, units: [],
       troops: TROOP_LEVELS.find((t) => t.id === settings.troops) || TROOP_LEVELS[1],
-      touch: false, mode, music,
+      touch: false, mode, music, battle: def, heroDef, quyetSach,
     };
-    // Vật đổ bóng (mặt trời, tường, cổng, thuyền, cảnh) luôn dựng như khi bật bóng; nút "Bóng" chỉ bật/tắt
-    // renderer.shadowMap (tắt thì three bỏ hẳn lượt bóng, shader không lấy mẫu bóng: không tốn gì). Trước đây vào
-    // trận khi tắt bóng thì mặt trời, vật tĩnh dựng castShadow = false nên bật lại giữa trận không có bóng.
-    ctx.world = buildWorld(scene, { shadows: true });
-    ctx.sim = createSim({ fronts: FRONTS, bases: BASES, enemyMix: ENEMY_MIX, R, mods: {
-      unitSimC: stats.legionSimC, reinfAmt: stats.mods.reinfAmt, reinfCharges: stats.mods.reinfCharges,
-      holdThu: stats.mods.holdThu, skPer5: stats.mods.skPer5, cmdCdMult: stats.mods.cmdCdMult, allyHpPct: stats.mods.allyHpPct } });
-    ctx.hk = createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt,
-      diffMult: diff.hk ?? 1 });   // Hào Khí nhận × theo độ khó (§10)
-    ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
-    music?.play("battle");
-    ctx.fx = new FX(scene, camera, hudRoot);
-    ctx.crowd = new Crowd(scene, ctx);
-    ctx.hero = new Hero(ctx, stats);
-    const input = new Input(canvas);
-    ctx.hud = new HUD(hudRoot, ctx);
-    new Director(ctx);
-    ctx.atmo = new Atmosphere(ctx, new THREE.PointLight(0xff8a3c, 0, 30, 1.7));   // nắng, sương, khói lửa theo pha (atmosphere.js)
-    ctx.ambient = new Ambient(scene, ctx);   // cò, trâu, trẻ chăn trâu, quạ; theo đồng hồ trận (ambient.js)
+    let input = null, camBoxes = [];
+    try {
+      resetGround();
+      // Vật đổ bóng (mặt trời, tường, cổng, thuyền, cảnh) luôn dựng như khi bật bóng; nút "Bóng" chỉ bật/tắt
+      // renderer.shadowMap (tắt thì three bỏ hẳn lượt bóng, shader không lấy mẫu bóng: không tốn gì). Trước đây vào
+      // trận khi tắt bóng thì mặt trời, vật tĩnh dựng castShadow = false nên bật lại giữa trận không có bóng.
+      ctx.world = def.buildWorld(scene, { shadows: true, ctx });
+      ctx.sim = def.sim.create(ctx, stats, mode);
+      ctx.hk = def.createHaoKhi ? def.createHaoKhi(ctx, stats, diff, mode)
+        : createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt,
+          diffMult: diff.hk ?? 1 });   // Hào Khí nhận × theo độ khó (§10)
+      ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
+      music?.play("battle");
+      ctx.fx = new FX(scene, camera, hudRoot);
+      ctx.crowd = new Crowd(scene, ctx);
+      ctx.hero = new Hero(ctx, stats, heroDef);
+      // Hero chưa đọc chỗ xuất hiện của trận (lõi tướng chưa nhận def): đặt theo BattleDef, chỉ cho trận khác B15
+      const sp = def.heroSpawn;
+      if (sp && def !== B15 && !ctx.hero.def) { ctx.hero.x = sp.x; ctx.hero.z = sp.z; ctx.hero.yaw = sp.yaw ?? ctx.hero.yaw; }
+      input = new Input(canvas);
+      ctx.hud = new HUD(hudRoot, ctx);
+      new def.Director(ctx);
+      ctx.atmo = new Atmosphere(ctx, new THREE.PointLight(0xff8a3c, 0, 30, 1.7));   // nắng, sương, khói lửa theo pha (atmosphere.js)
+      ctx.ambient = def.ambient ? def.ambient(scene, ctx) : null;   // B15: cò, trâu, trẻ chăn trâu, quạ, dân; theo đồng hồ trận
+      camBoxes = def.camBoxes ? def.camBoxes(ctx.world) : [];
+    } catch (err) {
+      input?.dispose?.();
+      try { ctx.audio?.close(); } catch (_) { /* đã đóng */ }
+      try { releaseGpu(scene, renderer); } catch (_) { /* bỏ qua */ }
+      resetGround();
+      reject(err);
+      return;
+    }
     if (location.search.includes("debug")) { window.__hk = ctx; ctx.input = input; }   // chỉ để kiểm thử bằng script
     ctx.hitstopT = 0;
     ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
-    const cam = ctx.cam = { yaw: Math.PI / 2, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
-    const camBoxes = wallBoxes(ctx.world);
+    const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
     let slowT = 0, slowK = 1;
     ctx.cinematic = (text, unit, big) => {
       ctx.hud.cinematic(text);
@@ -174,16 +179,17 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       document.removeEventListener("visibilitychange", onVis);
       input.dispose(); ctx.audio.close();                      // đóng hẳn AudioContext (suspend thì mỗi trận rò một cái)
       releaseGpu(scene, renderer);
+      resetGround(); def.dispose?.(ctx);
       resolve(res);
     };
 
     // ---- khung comic chèn giữa trận (GDD 22.3: khung insert do engine phát giữa trận) ------------------------
-    // Sự kiện trận (vd "coAoTong:land") → khung trong STORY_INSERTS. Trận đứng hẳn (như tạm dừng, không hiện bảng
+    // Sự kiện trận (vd "coAoTong:land") → khung trong data.STORY_INSERTS của trận. Trận đứng hẳn (như tạm dừng, không hiện bảng
     // tạm dừng) tới khi đọc xong; mỗi khung chỉ phát một lần, và chỉ khi main.js truyền story (lần chơi đầu).
     let storyOpen = false;
     const played = new Set();
     ctx.storyEvent = (ev) => {
-      const id = STORY_INSERTS[ev];
+      const id = def.data?.STORY_INSERTS?.[ev];
       if (!story || !id || played.has(id) || storyOpen || finished || ctx.director.over || !story.comic.panels[id]) return;
       played.add(id); storyOpen = true; paused = true;
       document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
@@ -208,7 +214,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     container.addEventListener("pointerdown", () => { if (outroT > 0.6) outroTap = true; });   // chạm/nhấp bỏ qua cảnh kết
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      // dấu giờ rAF có thể sớm hơn last (đặt sau khi dựng trận xong): dt âm làm bộ tích lũy âm, trận đứng ~0,5 s đầu
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
       if (paused || finished) return;
       step(dt, input.poll(), true);
     };
@@ -230,13 +237,14 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
           if (inp.pressed.cmdSwap || inp.pressed.lock) ctx.hud.swapFront();
           ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
           inp.pressed.lock = false;
-        } else ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
+        } else if (ctx.hud.pickerOpen) ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.pick(i); });   // bảng chọn điểm đến (hud.picker)
+        else ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
         if (inp.pressed.tpc) d.tryTPC();
-        if (inp.pressed.kesach) d.keSach.trigger();
+        if (inp.pressed.kesach) d.keSach?.trigger();
         if (inp.pressed.lock) ctx.hero.toggleLock();
         if (inp.pressed.map) ctx.hud.root.classList.toggle("bigmap");
 
-        let scale = inp.cmdHeld ? 0.2 : 1;
+        let scale = inp.cmdHeld || ctx.hud.pickerOpen ? 0.2 : 1;
         if (slowT > 0) { slowT -= dt; scale *= slowK; }
         if (ctx.hitstopT > 0) { ctx.hitstopT -= dt; scale = 0; }
         ctx.hero.intake(inp);
@@ -290,7 +298,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
           cy = ty + Math.max(cy - ty, Math.sqrt(Math.max(0, keep * keep - flat * flat)));
         }
       }
-      cy = Math.max(cy, heightAt(cx, cz) + 1.2);
+      cy = Math.max(cy, Math.max(heightAt(cx, cz), waterLevel(cx, cz)) + 1.2);   // B15: waterLevel() = −∞
       const k = Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
       if (time < 0.2) { cam.x = cx; cam.y = cy; cam.z = cz; }
@@ -310,8 +318,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         else { g.lp.rotation.y = g.rp.rotation.y = 0; g.doors.rotation.z = 0; }
         if (g.shake > 0) { g.shake -= dt; g.doors.position.x = g.x + (Math.random() - 0.5) * 0.15; } else g.doors.position.x = g.x;
       }
-      for (const [id, v] of Object.entries(ctx.world.bases)) if (v.ring) v.ring.visible = ctx.sim.bases[id].type !== "cong" || !ctx.openGates[id];
-      for (const fid in FRONTS) ctx.world.setLine(fid, ctx.sim.fronts[fid].x);
+      def.frameVisuals?.(ctx, dt);   // B15: vòng Cứ Điểm, cờ tuyến hai mặt trận
 
       if (ctx.hk.tpc && Math.random() < dt * 7) ctx.fx.embers(ctx.hero.x, ctx.hero.z);   // tàn lửa Tổng Phản Công
       // nắng, sương, trời theo pha; khói đống lửa tàn, cột khói, lửa, tàn lửa, đèn lửa (atmosphere.js)
@@ -320,13 +327,13 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       bedT -= dt;
       if (bedT <= 0) {
         bedT = 0.3;
-        let dF = 999, fighting = 0;
-        for (const fid in FRONTS) { const F = FRONTS[fid], lx = F.x0 + ctx.sim.fronts[fid].x * (F.x1 - F.x0); dF = Math.min(dF, Math.hypot(Math.max(0, Math.abs(h.x - lx) - 6), Math.max(0, Math.abs(h.z - F.laneZ) - 20))); }
+        const { dF, fire } = def.bed(ctx);          // khoảng cách tới giao tranh, mức lửa trại (BattleDef)
+        let fighting = 0;
         for (const a of ctx.crowd.agents) if ((a.windup > 0 || a.duel) && a.state !== "dead" && (a.x - h.x) ** 2 + (a.z - h.z) ** 2 < 900) fighting++;
-        ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), d.phase >= 2 ? 0.25 + 0.15 * (d.phase - 2) : 0);
+        ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), fire);
       }
       ctx.world.update(time);
-      ctx.ambient.update(ctx.clock);   // tự lấy hiệu đồng hồ trận: hit-stop đứng hình, vòng lệnh chậm ×0,2
+      ctx.ambient?.update(ctx.clock);   // tự lấy hiệu đồng hồ trận: hit-stop đứng hình, vòng lệnh chậm ×0,2
       ctx.crowd.render();
       ctx.fx.update(dt, W, H);
       hudAcc += dt;
@@ -335,8 +342,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const anyKey = Object.keys(inp.pressed).length > 0;     // đọc trước endFrame (inp === input, endFrame xoá pressed)
       input.endFrame();
 
-      // nhạc: P4 và Tổng Phản Công đổi sang bài trận boss
-      if (!d.over && music) music.play(ctx.hk.tpc || d.phase === 3 ? "boss" : "battle", { fade: 2 });
+      // nhạc theo BattleDef (B15: P4 và Tổng Phản Công đổi sang bài trận boss)
+      if (!d.over && music) music.play(def.music(d, ctx.hk), { fade: 2 });
       if (d.over && !endShown && music) { if (d.result.won) music.play("victory", { loop: false, then: "hub" }); else music.stop(2); }
       if (d.over && !endShown) {
         endShown = true;
@@ -403,15 +410,19 @@ export function controlsHTML(touch = false) {
 
 // nút cảm ứng có icon chiêu (nút C đổi icon theo đòn C kế tiếp, hud.js)
 const tb = (b, icon, label, cls = "") => `<button data-b="${b}" class="${cls}"><img src="./assets/icons/${icon}.webp" alt=""><em>${label}</em></button>`;
+// Ô kỹ năng theo tướng (hero.skillSlots(), hero.ultInfo()): H35 đúng hai nút Phá Trận, Tuyệt Kỹ như cũ; tướng có ô thứ
+// hai (H31 Binh Thư) thêm nút skill2; trận có Tương tác (BattleDef.touch.interact) thêm nút interact.
 export function buildTouch(root, input, ctx) {
   root.classList.add("on"); root.parentElement.classList.add("touchmode");
+  const slots = ctx.hero?.skillSlots?.() || [], s1 = slots[0], s2 = slots[1], ult = ctx.hero?.ultInfo?.();
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
     <div class="camzone" data-t="cam"></div>
     <div class="tbtns">
       ${tb("n", "n", "N", "big")}${tb("c", "c1", "C", "mid")}
       ${tb("dodge", "dodge", "Né")}${tb("block", "block", "Đỡ")}
-      ${tb("skill", "skill", "Phá Trận")}${tb("ult", "ult", "Tuyệt Kỹ")}
+      ${tb("skill", s1?.icon ?? "skill", s1?.name ?? "Phá Trận")}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ")}${s2 ? tb("skill2", s2.icon ?? "skill", s2.name ?? s2.id) : ""}
+      ${ctx.battle?.touch?.interact ? tb("interact", "kesach", "Tương tác", "act") : ""}
     </div>
     <div class="tsys">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div>`;
   root.querySelectorAll("[data-b]").forEach((b) => {

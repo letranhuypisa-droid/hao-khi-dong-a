@@ -13,7 +13,10 @@
 // world.sun, HemisphereLight, vòm trời (lưới BackSide có màu đỉnh), núi xa + mây (MeshBasic không sương),
 // scene.fog, scene.background, renderer.toneMappingExposure. Đèn lửa PointLight do battle.js tạo rồi đưa vào.
 // Khói lửa vẽ bằng trường instanced của fx.js (mỗi ảnh một lượt vẽ).
-// TODO world.js: xuất world.sky / world.hemi / world.far để khỏi phải dò cảnh bằng traverse.
+// Nhiều trận (đợt 9 lõi): bảng pha và nguồn cháy lấy từ ctx.battle.atmo = { presets, tpc?, buildSources(world, smokes),
+// sourceWant(s, phase, cols, openGates, anyOpen), glowFrom? } — B15 (battles/b15.js) đưa đúng ATMO / buildSources /
+// sourceWant dưới đây; không có ctx.battle (lab, kiểm thử) thì dùng luôn bộ của B15. Chỉ số pha kẹp trong bảng (trận 6 pha
+// với bảng ngắn hơn không vỡ). World có world.hemi / world.far (B20) thì dùng thẳng, không thì dò cảnh như cũ.
 
 import { heightAt, ZONES } from "./ground.js";
 
@@ -138,10 +141,11 @@ export function sourceWant(s, phase, cols, openGates, anyOpen) {
 }
 
 // ---- khí quyển của một trận B15 ----------------------------------------------------------------------------
+export const ATMO_B15 = { presets: ATMO, tpc: ATMO_TPC, buildSources, sourceWant, glowFrom: 2 };
 export class Atmosphere {
   constructor(ctx, glow = null) {
     this.ctx = ctx;
-    const scene = ctx.scene, world = ctx.world;
+    const scene = ctx.scene, world = ctx.world, A = this.A = ctx.battle?.atmo || ATMO_B15;
     this.sun = world.sun; this.hemi = null; this.dome = null; this.far = [];
     scene.traverse((o) => {
       if (o.isHemisphereLight) { this.hemi = o; return; }
@@ -152,20 +156,23 @@ export class Atmosphere {
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
       if (o.geometry.boundingSphere.radius > 20 && !this.far.includes(m)) this.far.push(m);
     });
+    if (world.hemi) this.hemi = world.hemi;
+    if (Array.isArray(world.far)) this.far = world.far.slice();
     if (this.dome) {
       const pos = this.dome.geometry.attributes.position, r = this.dome.geometry.parameters?.radius || 900;
       this.domeY = new Float32Array(pos.count);
       for (let i = 0; i < pos.count; i++) this.domeY[i] = pos.getY(i) / r;
       this.domeCol = this.dome.geometry.attributes.color;
     }
-    this.P = ATMO.map((p) => presetVec(p));
-    this.tpcV = presetVec(ATMO_TPC);
+    this.P = A.presets.map((p) => presetVec(p));
+    this.tpcA = A.tpc || ATMO_TPC; this.tpcV = presetVec(this.tpcA);
+    this.want = A.sourceWant || (() => 0); this.glowFrom = A.glowFrom ?? 2;
     this.cur = new Float32Array(NV); this.from = new Float32Array(NV); this.fin = new Float32Array(NV);
     this.sunDir = { x: 0, y: 1, z: 0 };
     this.tpcS = 0; this.tpcW = 0; this.dirty = true;
     this.pits = (world.smokes || []).map((s) => ({ x: s.x, z: s.z, y: heightAt(s.x, s.z) + 1 }));
     this.pitT = 0; this.pitTick = 0;
-    this.srcs = buildSources(world, world.smokes || []);
+    this.srcs = A.buildSources ? A.buildSources(world, world.smokes || []) : [];
     this.glow = glow; this.glowI = 0; this.glowSrc = null;
     if (glow) { glow.intensity = 0; scene.add(glow); }
     for (const k of ["smoke", "fire", "embers"]) { const f = ctx.fx.field(k); f.windX = WIND.x; f.windZ = WIND.z; }
@@ -180,10 +187,13 @@ export class Atmosphere {
   snap() {
     const ph = this.ctx.director.phase, same = ph === this.phase;
     this.phase = ph;
-    this.cur.set(this.P[ph]); this.lerpT = 1; this.dirty = true;
+    this.cur.set(this.preset(ph)); this.lerpT = 1; this.dirty = true;
     if (!same) this.ctx.fx.clearFields();
     this.snapK = true; this.glowI = 0; this.glowSrc = null;
   }
+
+  // bảng của pha ph, kẹp trong số pha của bảng
+  preset(ph) { const P = this.P; return P[ph < 0 ? 0 : ph >= P.length ? P.length - 1 : ph]; }
 
   // dt: giờ thật của khung (chuyển pha, lớp TPC). Khói lửa lấy bước của đồng hồ trận (ctx.clock).
   update(dt) {
@@ -191,7 +201,7 @@ export class Atmosphere {
     const bdt = Math.min(0.25, Math.max(0, ctx.clock - this.clock)); this.clock = ctx.clock;
     if ((d.retries || 0) !== this.retries || d.phase < this.phase) { this.retries = d.retries || 0; this.snap(); }
     else if (d.phase !== this.phase) { this.phase = d.phase; this.from.set(this.cur); this.lerpT = 0; }
-    if (this.lerpT < 1) { this.lerpT = Math.min(1, this.lerpT + dt / LERP_T); mixVec(this.cur, this.from, this.P[this.phase], smooth01(this.lerpT)); this.dirty = true; }
+    if (this.lerpT < 1) { this.lerpT = Math.min(1, this.lerpT + dt / LERP_T); mixVec(this.cur, this.from, this.preset(this.phase), smooth01(this.lerpT)); this.dirty = true; }
     const w0 = this.tpcW;
     if (ctx.hk.tpc) { this.tpcS += dt; this.tpcW = tpcWeight(this.tpcS); } else { this.tpcS = 0; this.tpcW = Math.max(0, this.tpcW - dt * 0.5); }
     if (this.tpcW !== w0) this.dirty = true;
@@ -201,7 +211,7 @@ export class Atmosphere {
   }
 
   apply() {
-    const c = this.cur, f = this.fin, T = this.tpcV, w = this.tpcW, A = ATMO_TPC.add;
+    const c = this.cur, f = this.fin, T = this.tpcV, w = this.tpcW, A = this.tpcA.add;
     for (let i = 0; i < NV; i++) f[i] = T[i] === T[i] ? c[i] + (T[i] - c[i]) * w : c[i];      // T[i] NaN: giữ nguyên
     f[O.sunI] += A.sunI * w; f[O.hemiI] += A.hemiI * w; f[O.exposure] += A.exposure * w; f[O.fogNear] += A.fogNear * w; f[O.fogFar] += A.fogFar * w;
     const sun = this.sun, scene = this.ctx.scene;
@@ -237,7 +247,7 @@ export class Atmosphere {
     let anyOpen = false; for (const id in og) if (og[id]) anyOpen = true;
     let best = null, bd = GLOW_R;
     for (const s of this.srcs) {
-      const want = sourceWant(s, this.phase, cols, og, anyOpen);
+      const want = this.want(s, this.phase, cols, og, anyOpen);
       s.k = this.snapK ? want : s.k + Math.max(-bdt * 0.25, Math.min(bdt * 0.25, want - s.k));   // bén lửa dần trong ~4 s
       if (s.boat) { s.x = s.boat.position.x; s.z = s.boat.position.z; s.y = s.boat.position.y + 1.7; }
       if (s.k < 0.05 || bdt <= 0) continue;
@@ -253,7 +263,7 @@ export class Atmosphere {
         s.eacc += 0.14;
         fx.ember(s.x, s.y + 1, gate ? s.z + (Math.random() < 0.5 ? -GATE_LEAF_Z : GATE_LEAF_Z) : s.z);   // cổng: tàn lửa bên cánh cửa, giữa lối trống
       }
-      if (this.phase >= 2 && s.k > 0.3 && dist < bd) { bd = dist; best = s; }
+      if (this.phase >= this.glowFrom && s.k > 0.3 && dist < bd) { bd = dist; best = s; }
     }
     this.snapK = false;
     // đống lửa tàn ở trại Nguyên (chỉ những đống trong 150 m; xa hơn 70 m thì thưa gấp đôi). Pha càng về sau

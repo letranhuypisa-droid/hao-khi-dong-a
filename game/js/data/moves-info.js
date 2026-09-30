@@ -1,7 +1,12 @@
 // data/moves-info.js — tên, icon, phím và lời giải thích của từng đòn, kỹ năng, lệnh (đợt 7).
 // Dùng chung cho HUD (thanh kỹ năng, nút cảm ứng, vòng Mệnh Lệnh), màn Huấn luyện và bảng tra cứu ở Doanh trại.
 // Icon: assets/icons/<icon>.webp (GPT Image 2 qua Higgsfield, xem assets/SOURCES.md). Tên đòn C là Hư cấu của game.
-// File này KHÔNG import gì (chạy được trong Node để kiểm thử).
+// File này chỉ import moves-wc01.js (thuần, không import gì) nên chạy được trong Node để kiểm thử.
+//
+// Theo tướng (đợt 9, lõi nhiều tướng): moveInfoOf(def) — H35 (WC03) dùng MOVE_INFO như cũ; H31 (WC01) = MOVE_INFO đè bằng
+// MOVE_INFO_WC01 (tên đòn đại kiếm, Hịch Tướng Sĩ ở ô "skill", Binh Thư ở ô "skill2", Bạch Đằng Quyết Chiến ở "ult").
+
+import { MOVE_INFO_WC01 } from "./moves-wc01.js";
 
 export const ICON = (id) => `./assets/icons/${id}.webp`;
 
@@ -32,10 +37,18 @@ export const MOVE_INFO = {
   lock: { icon: "lock", name: "Khóa mục tiêu", keys: ["Q · chuột giữa", "nút Khóa", "RT"], text: "Khóa sĩ quan gần nhất: camera và đòn đánh bám theo hắn." },
 };
 
-// Đòn C sẽ ra nếu bấm C ngay bây giờ (HUD hiện icon đòn kế). hero: Hero; cKey: hàm chọn C theo cấp đã mở.
+// Bảng tên đòn / kỹ năng theo tướng (def: HEROES[id] hoặc id). Tướng WC01 thiếu mục nào thì lấy mục chung của MOVE_INFO.
+const BY_CLS = { WC03: MOVE_INFO, WC01: { ...MOVE_INFO, ...MOVE_INFO_WC01 } };
+export function moveInfoOf(def) {
+  const cls = typeof def === "string" ? ({ H31: "WC01", H34: "WC01" }[def] || "WC03") : (def?.moves || def?.cls || "WC03");
+  return BY_CLS[cls] || MOVE_INFO;
+}
+
+// Đòn C sẽ ra nếu bấm C ngay bây giờ (HUD hiện icon đòn kế). hero: Hero; cKey: hàm chọn C theo cấp đã mở. hero.F (cờ đòn,
+// data/heroes.js moveFlags): chainN = đòn N nối tiếp được — H35 đúng như luật cũ "N mà không phải N6".
 export function nextHeavy(hero) {
   if (hero.findBroken?.()) return "DQ";
   if (hero.postDodge > 0) return "D";
-  const inChain = (hero.state === "attack" && hero.move?.[0] === "N" && hero.move !== "N6") || hero.chainGrace > 0;
+  const inChain = (hero.state === "attack" && (hero.F ? !!hero.F[hero.move]?.chainN : hero.move?.[0] === "N" && hero.move !== "N6")) || hero.chainGrace > 0;
   return hero.cKey ? hero.cKey(inChain ? hero.chain + 1 : 1) : "C1";
 }

@@ -22,7 +22,7 @@ const KIT_IDS = Object.keys(KITS);
 const CAP = 900;                 // mỗi kiểu lính; lính diễn tối đa ~800 + vùng chiến đấu
 const TWO_PI = Math.PI * 2;
 const HITTABLE = new Set(["zone", "garrison", "squad", "landing", "guard", "follow"]);
-const HEAVY_MOVES = new Set(["N6", "C1", "C2", "C3", "C4", "C5", "C6", "DC", "DQ"]);     // đòn đáng né
+const HEAVY_MOVES = new Set(["N6", "C1", "C2", "C3", "C4", "C5", "C6", "DC", "DQ"]);     // đòn đáng né (dự phòng: tướng không có hero.F)
 const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 const _m = new THREE.Matrix4();
@@ -95,6 +95,8 @@ export class Crowd {
   // Sát thương vào lính. opt.by: 'hero' | 'ally' | 'enemy'; opt.src: lính ra đòn (để quay lại đánh trả). Trả về true nếu hạ.
   damage(a, dmg, opt = {}) {
     if (!this.hittable(a)) return false;
+    // dấu Binh Thư Yếu Lược (hero-skills.js): quân ta đánh lính bị đánh dấu × markMult tới giờ trận markT
+    if (a.markT > this.ctx.clock && opt.by !== "enemy") dmg *= a.markMult;
     const kx = opt.kx ?? 0, kz = opt.kz ?? 0;
     const hard = opt.launch || (opt.knock || 2.5) >= 5;
     a.hitFront = kx * Math.sin(a.yaw) + kz * Math.cos(a.yaw) <= 0 ? 1 : -1;   // bị đẩy về sau lưng = trúng trước mặt
@@ -248,7 +250,8 @@ export class Crowd {
     this.assignTokens(enemies);
     this.assignSlots(enemies);
     // tướng đang gồng đòn nặng (trước cú trúng đầu): lính gần có thể nhảy lùi né
-    const hm = hero.state === "attack" && HEAVY_MOVES.has(hero.move) ? MOVES[hero.move] : null;
+    // cờ đòn theo tướng (hero.F[move].heavyTell, data/heroes.js moveFlags — H35 suy ra đúng bộ HEAVY_MOVES cũ)
+    const hm = hero.state === "attack" && (hero.F ? hero.F[hero.move]?.heavyTell : HEAVY_MOVES.has(hero.move)) ? (hero.M || MOVES)[hero.move] : null;
     const heroHeavy = hm && hero.st / hero.dur < hm.hits[0] - 0.08 ? hm : null;
 
     this.cheerT = Math.max(0, this.cheerT - dt);

@@ -300,3 +300,38 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .tut-mode .tut, .tut-mode.touchmode .tut { top: 14px; }
 .touchmode .hud-combo { top: 340px; }
 .touchmode .hud-combo b { font-size: 2.6rem; }
+
+/* ---- đợt 9 lõi: nhiều trận, nhiều tướng (thêm, không sửa luật cũ) ---- */
+/* thẻ trận ở Xuất trận: bấm để chọn; trận đang dựng có nhãn "đang dựng — chơi thử" và ô chọn tướng */
+.card.battle.pickable { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.card.battle.pickable:hover { border-color: #6b4f2e; }
+.card.battle.picked { border-color: var(--vang); box-shadow: 0 0 0 1px var(--vang), inset 0 1px 0 rgba(241,217,138,.06); }
+.card.battle.wip:not(.picked) { opacity: .88; }
+.seal.seal-wip { background: #2e2620; }
+.wiptag { font-style: normal; font-family: var(--sans); font-size: .7rem; font-weight: 700; letter-spacing: .02em; color: #f7e3a8; background: #6a5320; border-radius: 3px; padding: 1px 7px; vertical-align: 3px; margin-left: 6px; }
+.heropick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 4px; }
+.heropick > .small { margin-right: 4px; }
+.heropick button { display: flex; flex-direction: column; align-items: flex-start; min-width: 150px; padding: 6px 12px; }
+.heropick button b { font-family: var(--serif); color: var(--vang2); font-size: .9rem; } .heropick button small { font-size: .68rem; color: var(--muted); }
+.heropick button.on { border-color: var(--vang); background: #3a2a1c; }
+/* Sử quán: mỗi Chương một khối */
+.sq-chapter > h3:first-child { font-size: 1.12rem; border-bottom: 1px solid #3e3228; padding-bottom: 6px; margin-bottom: 10px; }
+/* HUD: ô chung cho widget của trận (B15 không dùng) */
+.hk-widget { margin-top: 4px; font-size: .75rem; }
+.hk-widget[hidden], .hud-prompt[hidden], .hud-picker[hidden] { display: none; }
+.hud-panel { background: rgba(21,18,16,.8); border: 1px solid #6b4f2e; border-radius: 6px; padding: 5px 9px; font-size: .74rem; }
+.hud-prompt { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: rgba(21,18,16,.82);
+  border: 1px solid var(--vang); border-radius: 22px; padding: 4px 14px 4px 4px; font-size: .85rem; color: var(--vang2); white-space: nowrap; }
+.hud-prompt svg { width: 32px; height: 32px; transform: rotate(-90deg); }
+.hud-prompt circle { fill: none; stroke-width: 3.5; } .hud-prompt circle.bg { stroke: rgba(241,217,138,.2); }
+.hud-prompt circle.fg { stroke: var(--vang2); stroke-dasharray: 94.25; stroke-dashoffset: 94.25; stroke-linecap: round; }
+.hud-prompt.full { box-shadow: 0 0 14px rgba(255,210,122,.7); }
+.hud-picker { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 380px; background: rgba(21,18,16,.92); border: 2px solid var(--vang);
+  border-radius: 14px; padding: 10px 14px; pointer-events: auto; display: flex; flex-direction: column; gap: 6px; }
+.hud-picker .pk-title { font-family: var(--serif); color: var(--vang2); text-align: center; }
+.hud-picker button { display: grid; grid-template-columns: auto auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 6px 10px; }
+.hud-picker button img { grid-row: 1 / 3; width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.hud-picker button b { grid-row: 1 / 3; color: var(--vang2); font-size: 1rem; } .hud-picker button small { grid-column: 3; font-size: .7rem; color: var(--muted); }
+/* nút cảm ứng thêm cho tướng có ô kỹ năng thứ hai, trận có Tương tác */
+.touch [data-b=skill2] { width: 54px; height: 54px; right: 236px; bottom: 70px; }
+.touch [data-b=interact] { width: 64px; height: 64px; right: 96px; bottom: 170px; border-color: #ffd27a; }

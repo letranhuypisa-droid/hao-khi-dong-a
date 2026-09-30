@@ -253,7 +253,8 @@ export class BigUnit {
   takeHeroHit(dmg, poiseDmg, opt = {}) {
     if (!this.alive || this.dead || this.retreating || this.side !== "dich") return {};
     const ctx = this.ctx;
-    const mult = this.broken > 0 ? 1.5 : 1;
+    let mult = this.broken > 0 ? 1.5 : 1;
+    if (this.markT > ctx.clock) mult *= this.markMult;       // dấu Binh Thư Yếu Lược (hero-skills.js): +40% tới giờ markT
     this.hp -= dmg * mult; this.flash = 0.12; this.noHit = 0; this.awake = true;
     let broke = false;
     if (this.poiseMax > 0 && this.broken <= 0) {
