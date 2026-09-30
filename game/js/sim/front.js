@@ -172,18 +172,22 @@ export function issueOrder(st, frontId, id) {
 export function triggerTPC(st, heroFront, durSec) {
   const T = HAO_KHI.tpc;
   st.tpc.active = true; st.tpc.left = durSec;
-  const flipped = [];
+  const flipped = [], x0 = {};
   for (const id in st.fronts) {
     const f = st.fronts[id];
+    x0[id] = f.x;
     f.x = clamp(f.x + T.lineAll + (id === heroFront ? T.lineHere : 0), 0, 0.95);
     f.sk.dich = clamp(f.sk.dich + T.enemySK, 0, 100);
     f.sk.ta = Math.max(f.sk.ta, T.skFloor);
   }
-  // Cứ Điểm địch tại tuyến có G < 50% đổi chủ
+  // Cứ Điểm địch tại tuyến có G < 50% đổi chủ. "Tại tuyến" = trong đoạn tuyến quét qua khi bị đẩy (±0,08 hai đầu).
+  // Trước đây chỉ xét tuyến SAU khi đẩy: tuyến đang áp sát Cứ Điểm (A2 0,55: tuyến bị chặn ở ≤ 0,52) bị đẩy vọt tới
+  // 0,70 nên Cứ Điểm không lật, tuyến lại vượt qua nó; chỉ tuyến còn cách 0,12–0,28 mới lật được.
   for (const id in st.bases) {
     const b = st.bases[id], f = st.fronts[b.front];
     if (!f || b.owner !== "dich" || b.type === "cong") continue;
-    if (Math.abs(f.x - b.lineX) < 0.08 && b.G < b.G0 * T.flipBaseG) {
+    const lo = Math.min(x0[b.front], f.x) - 0.08, hi = Math.max(x0[b.front], f.x) + 0.08;
+    if (b.lineX > lo && b.lineX < hi && b.G < b.G0 * T.flipBaseG) {
       b.owner = "ta"; b.G = Math.round(b.G0 * 0.5); b.keeperAlive = false;
       flipped.push(b.id);
     }

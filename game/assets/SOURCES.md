@@ -28,8 +28,16 @@ Sinh bằng Higgsfield CLI, lệnh và prompt trong `../tools/render-assets-2.sh
 
 Đợt đầu của `hitheavy`, `fall`, `warn`, một bản `bow` ra tiếng ù kéo dài hoặc lên chậm, đã sinh lại với prompt "một tiếng rồi im" (phần `sfx2` của kịch bản); `hurt` không dùng. Số dư tài khoản giảm khoảng 84 credit cho cả đợt (258,8 → 174,4), gồm cả bản thử chất lượng và các lần sinh lại.
 
-Icon Tuyệt Kỹ vẽ bàn tay bóp quả cam: gợi chuyện Trần Quốc Toản bóp nát quả cam ở hội nghị Bình Than (Tương truyền, chép trong sử cũ); hình vẽ là Hư cấu.
+Icon Tuyệt Kỹ vẽ bàn tay bóp quả cam: gợi chuyện Trần Quốc Toản bóp nát quả cam ở hội nghị Bình Than (Chính sử, Toàn thư q.5 — như comic B15 khung O2 và canon H35); hình vẽ là Hư cấu.
 
 Hậu kỳ đợt đầu: ảnh thu nhỏ bằng Pillow (LANCZOS) rồi lưu WebP q88. Nhạc mã hóa lại AAC 96 kbps bằng ffmpeg, fade vào 1,2 s và fade ra 2 s để lặp không bị giật.
 
 Mặt trống đồng là hình vẽ gợi Đông Sơn, không chép hoa văn của một hiện vật cụ thể (nhãn Hư cấu).
+
+## Comic B15 trong game (đợt 8)
+
+| Thư mục | Nguồn | Ghi chú |
+| --- | --- | --- |
+| `comic/B15/*.avif`, `*.webp` (13 khung của biến thể VS: O1–O5, D2, D3, K1–K6) | Nano Banana Pro 2K qua Higgsfield CLI, sinh ngày 29/09/2026 cho comic chương mẫu (xem `hao-khi-viet/comic/B15-ham-tu/NGUON-GOC.md`: prompt, ảnh bị loại, ảnh chỉnh tay) | `tools/bake-comic.py`: cắt 2,5% mỗi cạnh (viền khung AI tự vẽ), cắt đúng tỉ lệ khung, thu về cạnh dài 1552 px, lọc lacquer v1 (bản numpy của bộ lọc SVG trong viewer mẫu + lớp giấy dó), AVIF q52 (2,79 MB cả Chương) + WebP q76 dự phòng. Mỗi ảnh có XMP `DigitalSourceType = compositeWithTrainedAlgorithmicMedia` và mô tả nguồn (sha256 ảnh gốc) — dấu nhận biết nội dung AI máy đọc được (GDD 22.7) |
+
+Ảnh không có chữ. Lời dẫn, bóng thoại, nhãn sử liệu và sáu chữ 破強敵報皇恩 trên cờ do engine vẽ đè từ dữ liệu. Khung K1 thêm chữ trên cờ ngày 30/09/2026 (trước chỉ có sáu ô vàng trống): cờ nghiêng, hai ô cuối khuất sau đầu người lính nên chỉ vẽ bốn chữ đầu.

@@ -167,6 +167,7 @@ export class KeSachManager {
     this.reward(k, def.perBoat);
     ctx.director.say(`${b.name} cập bến: quân Tống lên bãi (+${def.effect.qTa} quân cho cánh A).`, 4, "good");
     ctx.audio.play("capture", b.x, b.z);
+    ctx.storyEvent?.("coAoTong:land");             // khung comic D2 "Áo Tống trên bến" (lần chơi đầu, battle.js)
   }
 
   // ---- Mũi tên thư ------------------------------------------------------------------------------
@@ -335,7 +336,7 @@ export class KeSachManager {
       if (k.def.id === "muiTenThu" && k.state === "khadung") detail = this.carried >= 3 ? "mang tới Nguyễn Khoái" : `bó tên ${this.carried}/3`;
       if (k.state === "sansang") detail = `bấm G · còn ${Math.ceil(k.left)} s`;
       if (k.state === "thatbai" && Number.isFinite(k.retryT)) detail = `dựng lại sau ${Math.ceil(k.retryT)} s`;
-      return { name: k.def.name, quyMo: k.def.quyMo === "lon" ? "Lớn" : "Nhỏ", hk: k.def.hk, got: k.got, state: k.state, word: STATE_WORD[k.state], detail, label: k.def.label };
+      return { id: k.def.id, name: k.def.name, quyMo: k.def.quyMo === "lon" ? "Lớn" : "Nhỏ", hk: k.def.hk, got: k.got, state: k.state, word: STATE_WORD[k.state], detail, label: k.def.label };
     });
   }
 }

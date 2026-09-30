@@ -330,21 +330,27 @@ export class Director {
 
   updateBases(dt) {
     const ctx = this.ctx, sim = ctx.sim, hero = ctx.hero;
+    // Dòng nhắc gom qua cả vòng lặp, gán một lần ở cuối. Trước đây gán trong vòng lặp: Cứ Điểm địch đứng sau (B2) ghi đè
+    // null lên nhắc của A1/A2, nên "Hạ quân đồn trú: còn N" không bao giờ hiện ở hai pha đầu.
+    let hint = null;
     for (const id in sim.bases) {
       const b = sim.bases[id], d = baseDef(id);
       if (b.type === "cong" || b.type === "ban_doanh") continue;
       if (b.owner !== "dich") { ctx.world.setBaseProgress(id, 0); this.capT[id] = 0; continue; }
       const p = this.basePos(id);
       const inRing = hero.alive && Math.hypot(hero.x - p.x, hero.z - p.z) < p.r;
-      const garrisonAlive = ctx.crowd.agents.some((a) => a.role === "garrison" && a.src === id && ctx.crowd.hittable(a));
+      let garrisonAlive = 0;
+      for (const a of ctx.crowd.agents) if (a.role === "garrison" && a.src === id && ctx.crowd.hittable(a)) garrisonAlive++;
       const ready = b.G < 1 && !garrisonAlive && !b.keeperAlive;
       if (inRing && ready) {
         if (this.capPause <= 0) this.capT[id] = (this.capT[id] || 0) + dt * (1 + ctx.stats.mods.capSpeed);
         if (this.capT[id] >= d.cap) this.captureBase(id);
       } else if (!inRing) this.capT[id] = Math.max(0, (this.capT[id] || 0) - dt);
       ctx.world.setBaseProgress(id, (this.capT[id] || 0) / d.cap);
-      this.baseHint = inRing && !ready ? (b.keeperAlive ? `Hạ ${TIERS[d.keeper].name} trấn thủ` : `Hạ quân đồn trú: còn ${Math.ceil(b.G)}`) : null;
+      // "còn N" lấy số lớn hơn giữa G và lính đồn trú còn đứng: mô phỏng bào mòn G về 0 mà lính còn sống thì trước đây ghi "còn 0"
+      if (inRing && !ready) hint = b.keeperAlive ? `Hạ ${TIERS[d.keeper].name} trấn thủ` : `Hạ quân đồn trú: còn ${Math.max(Math.ceil(b.G), garrisonAlive)}`;
     }
+    this.baseHint = hint;
   }
 
   captureBase(id) {
@@ -776,7 +782,8 @@ export class Director {
       tpcCount: ctx.hk.tpcCount, chestCoins: this.chestCoins, extraTT: this.extraTT,
       events: Object.fromEntries(Object.entries(this.events).map(([k, v]) => [k, v.how || v.state])),
       orders: this.orders || 0, items: this.itemsUsed || 0, mainDone, sideDone, mode: this.mode,
-      keSach: this.keSach.ratio(), keSachOk: this.keSach.successCount(), keSachList: this.keSach.hud().map((k) => ({ name: k.name, word: k.word, got: k.got, hk: k.hk })),
+      keSach: this.keSach.ratio(), keSachOk: this.keSach.successCount(), keSachList: this.keSach.hud().map((k) => ({ id: k.id, state: k.state, name: k.name, word: k.word, got: k.got, hk: k.hk })),
+      bossMet: !!this.bossSpawned,
     };
   }
 }

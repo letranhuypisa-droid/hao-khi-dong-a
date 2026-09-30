@@ -460,11 +460,21 @@ window.COMIC = {
      "label": "Chính sử"
     }
    ],
+   "signs": [
+    {
+     "text": "破強敵報",
+     "x": 51.8,
+     "y": 29.2,
+     "size": 3.6,
+     "vertical": true,
+     "rotate": 25
+    }
+   ],
    "imageLabel": {
     "vi": "Triệu Trung dẫn đội, khăn xanh ngọc, cờ hiệu: Hư cấu (quy ước game)",
     "en": "Zhao Zhong leading, jade scarves and pennants: fiction (game convention)"
    },
-   "note": "Toàn thư q.5: 官軍與元人交戰于鹹子關，諸軍咸在。惟昭文王日燏軍有宋人，衣宋衣執弓矢以戰。元人見之，皆驚曰：『有宋人來助！』因此敗北. Câu hô của quân Nguyên (canon cũ nhầm với lời Thượng hoàng). 有宋人來助 dịch sát 'có người Tống đến giúp', không thêm 'them'."
+   "note": "Toàn thư q.5: 官軍與元人交戰于鹹子關，諸軍咸在。惟昭文王日燏軍有宋人，衣宋衣執弓矢以戰。元人見之，皆驚曰：『有宋人來助！』因此敗北. Câu hô của quân Nguyên (canon cũ nhầm với lời Thượng hoàng). 有宋人來助 dịch sát 'có người Tống đến giúp', không thêm 'them'. signs (30/09/2026): cờ nghiêng ~25°, chỉ 4 ô lộ ra (2 ô cuối khuất sau đầu người lính) nên vẽ 4 chữ đầu."
   },
   {
    "id": "K2",

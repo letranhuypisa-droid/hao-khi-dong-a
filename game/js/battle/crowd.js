@@ -410,6 +410,17 @@ export class Crowd {
           const s2 = (a.id % 2 ? 1 : -1) * 0.2; mvx = -dz / d * s2; mvz = dx / d * s2;
         }
       }
+      // Quân đồn trú bắn cung (có anchor, không phải toán vây tướng đồng minh) chỉ đứng bắn, lùi giữ tầm trong vòng Cứ Điểm
+      // + AI.kiteLeash m quanh tâm: tới mép thì bỏ phần bước ra ngoài (trượt dọc mép); đang lùi mà bị chặn thì thôi lùi, bắn
+      // trả. Trước đây thả diều không giới hạn: kéo tướng ra xa, một con sót lại giữ Cứ Điểm mãi (không chiếm được).
+      if (ranged && target === hero && a.anchor && !a.anchor.target) {
+        const lim = (a.anchor.r ?? 3) + AI.kiteLeash, ox = a.x - a.anchor.x, oz = a.z - a.anchor.z, od = Math.hypot(ox, oz);
+        if (od > lim - 0.5) {
+          const nx = ox / od, nz = oz / od, out = mvx * nx + mvz * nz;
+          if (out > 0) { mvx -= out * nx; mvz -= out * nz; kiting = false; }
+          if (od > lim) { mvx -= nx * 0.6; mvz -= nz * 0.6; }
+        }
+      }
       a.duel = duel;
       // tách nhau
       let sx = 0, sz = 0;

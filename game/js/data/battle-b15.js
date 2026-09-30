@@ -80,7 +80,8 @@ export const BOSS = {
 
 // Thẻ sử liệu hiện ở màn nạp trận. Nhãn theo canon GDD (Trụ cột 2).
 export const HISTORY_NOTES = [
-  { label: "Chính sử", text: "Tháng 4 năm Ất Dậu (1285), quân Trần đánh quân Toa Đô ở bến Hàm Tử. Trần Nhật Duật cầm quân, có Trần Quốc Toản và Nguyễn Khoái cùng đánh." },
+  { label: "Chính sử", text: "Tháng 4 năm Ất Dậu (1285), vua sai Chiêu Thành vương, Trần Quốc Toản và Nguyễn Khoái đón đánh quân Nguyên ở Tây Kết; quan quân giao chiến ở Hàm Tử quan, có cả quân của Chiêu Văn vương Trần Nhật Duật." },
+  { label: "Hư cấu", text: "Vai chỉ huy chung của Trần Nhật Duật và việc Toa Đô có mặt ở Hàm Tử là của game: Toàn thư không ghi ai chỉ huy chung, cũng không nêu tên tướng Nguyên ở trận này." },
   { label: "Chính sử", text: "Trần Quốc Toản dựng cờ đề sáu chữ \"Phá cường địch, báo hoàng ân\", tập hợp gia binh hơn nghìn người đi đánh giặc." },
   { label: "Hư cấu", text: "Bố cục đồn, doanh trại, cổng của trận này dựng để thử lối chơi, không phải bố cục thật của bến Hàm Tử." },
   { label: "Hư cấu", text: "Song đao của Trần Quốc Toản là chi tiết hư cấu của game." },
@@ -113,3 +114,6 @@ export const KE_SACH = {
   },
 };
 export const VILLAGE = { x: 172, z: 144, r: 26 };   // làng hư cấu cho "Mũi tên thư"
+
+// Khung comic chèn giữa trận (comic-b15.js, trường insert của khung): sự kiện trận → id khung. Chỉ phát lần đầu.
+export const STORY_INSERTS = { "coAoTong:land": "D2" };

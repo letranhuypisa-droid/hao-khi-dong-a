@@ -138,6 +138,9 @@ export const AI = {
   block: { NG_DAO: 0.3, DV_DAO: 0.3, NG_GIAO: 0.15 }, blockDmg: 0.25, blockCd: 1.4,
   evade: { thuong: 0.2, tinhnhue: 0.45 }, evadeDist: 2.2,
   kite: 0.4,
+  // ĐỀ XUẤT BẢN THỬ: quân đồn trú bắn cung chỉ đứng bắn / lùi giữ tầm trong vòng Cứ Điểm + kiteLeash m quanh tâm (A2: 13 + 10 m);
+  // bị dồn tới mép thì thôi lùi mà bắn trả. Trước đây thả diều không giới hạn: một cung kỵ sót lại giữ Cứ Điểm mãi.
+  kiteLeash: 10,
   charge: { minD: 5, maxD: 11, speed: 2.6, dur: 0.9, cd: 8, dmg: 1.25 },   // dmg: hệ số sát thương cú húc, húc trúng thì tướng ngã
   rout: { officerR: 22, ultR: 12, kills: 6, window: 4, nearR: 10, dur: [2.5, 4.5] },
   slotSep: 0.9,        // hệ số giãn góc giữa các lính vây tướng (1 = chia đều vòng tròn)

@@ -608,5 +608,151 @@ console.log("Icon chiêu, SFX, bảng đòn (đợt 7)");
   });
 }
 
+// ---- đợt 8: comic trong game, thẻ Sử quán, Quiz chương (GDD 22.2, 22.3, 22.6, 12.11) ----------------
+{
+  console.log("\nComic, Sử quán, Quiz (đợt 8)");
+  const { existsSync, statSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const { COMIC_B15 } = await import("../js/data/comic-b15.js");
+  const { CARDS, CARD_BY_ID, QUIZ_B15 } = await import("../js/data/suquan-b15.js");
+  const C = await import("../js/meta/chapter.js");
+  const { pagesFor, panelSyllables, readSeconds } = await import("../js/ui/comic.js");
+  const { STORY_INSERTS } = await import("../js/data/battle-b15.js");
+  const fresh = () => ({ ...P.newSave() });
+  const seq = (...v) => { let i = 0; return () => v[i++ % v.length]; };
+
+  t("comic B15 bản VS: 6 khung mở ≤ 40 s đọc, 6 khung kết, 1 khung chèn; đủ ảnh AVIF + WebP; tổng AVIF ≤ 3 MB", () => {
+    assert.equal(COMIC_B15.variant, "VS");
+    assert.equal(COMIC_B15.open.length, 6); assert.equal(COMIC_B15.close.length, 6); assert.deepEqual(COMIC_B15.insert, ["D2"]);
+    const openSec = COMIC_B15.open.reduce((s, id) => s + readSeconds(COMIC_B15.panels[id]), 0);
+    assert.ok(openSec <= 40, `mở chương ${openSec.toFixed(1)} s`);
+    let bytes = 0;
+    for (const id of [...COMIC_B15.open, ...COMIC_B15.insert, ...COMIC_B15.close]) {
+      for (const ext of ["avif", "webp"]) assert.ok(existsSync(root + `assets/comic/B15/${id}.${ext}`), `thiếu ${id}.${ext}`);
+      bytes += statSync(root + `assets/comic/B15/${id}.avif`).size;
+    }
+    assert.ok(bytes <= 3 * 1024 * 1024, `AVIF ${(bytes / 1048576).toFixed(2)} MB`);
+  });
+  t("mỗi khung ≤ 35 âm tiết, lời dẫn ≤ 25, ≤ 3 bóng; lời dẫn luôn có nhãn (22.3)", () => {
+    for (const [id, p] of Object.entries(COMIC_B15.panels)) {
+      assert.ok(panelSyllables(p) <= 35, `${id}: ${panelSyllables(p)} âm tiết`);
+      if (p.caption) { assert.ok(p.caption.vi.split(/\s+/).length <= 25, `${id}: lời dẫn dài`); assert.ok(["Chính sử", "Tương truyền", "Hư cấu"].includes(p.caption.label), id); }
+      assert.ok((p.bubbles || []).length <= 3, id);
+    }
+  });
+  t("chia trang theo pages của dữ liệu, giữ thứ tự đọc; khung lẻ thành trang riêng", () => {
+    const pg = pagesFor(COMIC_B15, COMIC_B15.open);
+    assert.deepEqual(pg.flat(2), COMIC_B15.open);
+    assert.deepEqual(pagesFor(COMIC_B15, ["D2"]), [[["D2"]]]);
+    assert.deepEqual(pagesFor(COMIC_B15, ["K4", "K5", "K6"]), [[["K4", "K5"]], [["K6"]]]);   // trang VS: K4 + K5 cùng hàng
+  });
+  t("khung chèn giữa trận nằm trong comic và có trường insert", () => {
+    for (const id of Object.values(STORY_INSERTS)) { assert.ok(COMIC_B15.panels[id], id); assert.ok(COMIC_B15.panels[id].insert, id); }
+  });
+  t("ngân hàng Quiz B15 qua kiểm tra pipeline 22.6 (schema, đáp án ở 0, không trùng, khung + seenRef tồn tại, nhãn)", () => {
+    const errs = C.lintQuiz(QUIZ_B15, { panels: COMIC_B15.panels, cards: CARD_BY_ID });
+    assert.deepEqual(errs, []);
+    assert.ok(QUIZ_B15.length >= 10 && QUIZ_B15.length <= 15, `${QUIZ_B15.length} câu (10–15 mỗi Chương)`);
+  });
+  t("pipeline bắt lỗi: đáp án không ở 0, seenRef duy nhất là thẻ Chuyện bên lề", () => {
+    const bad = { ...QUIZ_B15[0], id: "X1", answer: 2 };
+    const bl = { ...QUIZ_B15[1], id: "X2", seenRef: ["card:B15-bl-co"] };
+    const errs = C.lintQuiz([bad, bl], { panels: COMIC_B15.panels, cards: CARD_BY_ID });
+    assert.ok(errs.some((e) => e.startsWith("X1")) && errs.some((e) => e.startsWith("X2")), errs.join("; "));
+  });
+  t("thẻ Sử quán: mỗi thẻ đúng một nhãn, có nguồn, khóa mở hợp lệ", () => {
+    const KEYS = ["chapterOpen", "battleStart", "bossMet", "firstWin", "firstQuiz", "keSach:coAoTong", "keSach:muiTenThu"];
+    for (const c of CARDS) {
+      assert.ok(["Chính sử", "Tương truyền", "Hư cấu"].includes(c.label), c.id);
+      assert.ok(c.src.length && c.body.length && KEYS.includes(c.unlock), c.id);
+      for (const p of c.panels) assert.ok(COMIC_B15.panels[p], `${c.id}: khung ${p}`);
+    }
+  });
+  t("mở thẻ theo kết quả trận: gặp Toa Đô, Kế Sách thành hay bại, thắng lần đầu; không mở hai lần", () => {
+    const s = fresh();
+    const res = { won: true, bossMet: true, keSachList: [{ id: "coAoTong", state: "thatbai" }, { id: "muiTenThu", state: "khoa" }] };
+    const got = C.unlockCards(s, "B15", C.battleUnlockKeys(res), 1);
+    assert.deepEqual(got.sort(), ["B15-coaotong", "B15-tran", "X19"]);
+    assert.deepEqual(C.unlockCards(s, "B15", C.battleUnlockKeys(res), 2), []);
+  });
+  t("Quiz chỉ rút câu đã gặp (khung đã xem hoặc thẻ đã mở), không hai câu cùng khung, 3–5 câu", () => {
+    const s = fresh();
+    assert.equal(C.pickQuiz(s, QUIZ_B15, { chapter: "B15", rng: seq(0.3, 0.7, 0.1) }).length, 0);
+    C.markSeen(s, "B15", ["O2", "O3"]);
+    const a = C.pickQuiz(s, QUIZ_B15, { chapter: "B15", rng: seq(0.3, 0.7, 0.1) });
+    assert.ok(a.length >= 1 && a.every((q) => q.seenRef.some((r) => r === "panel:O2" || r === "panel:O3")), a.map((q) => q.id).join());
+    assert.equal(new Set(a.map((q) => q.panel)).size, a.length);
+    C.markSeen(s, "B15", [...COMIC_B15.open, ...COMIC_B15.close, "D2"]);
+    C.unlockCards(s, "B15", ["chapterOpen", "battleStart", "bossMet", "firstWin"]);
+    const b = C.pickQuiz(s, QUIZ_B15, { chapter: "B15", rng: seq(0.9, 0.2, 0.5, 0.05) });
+    assert.equal(b.length, 4);
+    assert.equal(new Set(b.map((q) => q.panel)).size, 4);
+  });
+  t("ôn ngắt quãng: sai → hỏi lại sau 1 Chương; đúng khi ôn → lại sau 3 Chương rồi rời hàng ôn", () => {
+    const s = fresh(), q = QUIZ_B15[0];
+    C.completeChapter(s, "B15");                          // xong B15: done = 1
+    C.answerQuiz(s, q, false);
+    assert.deepEqual(s.quiz.review, [{ id: q.id, due: 2, stage: 1 }]);
+    s.quiz.done = 2;                                      // xong Chương kế
+    C.markSeen(s, "B15", ["O2"]);
+    assert.ok(C.pickQuiz(s, QUIZ_B15, { chapter: "B15", rng: seq(0.5) }).some((x) => x.id === q.id));
+    C.answerQuiz(s, q, true);
+    assert.deepEqual(s.quiz.review, [{ id: q.id, due: 5, stage: 2 }]);
+    s.quiz.done = 5; C.answerQuiz(s, q, true);
+    assert.deepEqual(s.quiz.review, []);
+    assert.equal(s.quiz.answered[q.id].first, false);
+  });
+  t("câu sai chưa tới hạn không bị hỏi lại sớm; câu ôn tới hạn của Chương khác vẫn quay lại (tối đa 2)", () => {
+    const s = fresh();
+    C.markSeen(s, "B15", [...COMIC_B15.open, ...COMIC_B15.close, "D2"]);
+    C.completeChapter(s, "B15");
+    const wrong = QUIZ_B15.slice(0, 3);
+    for (const q of QUIZ_B15) C.answerQuiz(s, q, !wrong.includes(q));
+    for (let i = 0; i < 20; i++) {
+      const r = C.pickQuiz(s, QUIZ_B15, { chapter: "B15", rng: Math.random });
+      assert.ok(!r.some((q) => wrong.includes(q)), "hỏi lại câu sai trước hạn");
+    }
+    s.quiz.done = 2;                                      // xong Chương kế (B20): câu B15 tới hạn vào Quiz của B20
+    const bank = [...QUIZ_B15, { ...QUIZ_B15[3], id: "B20-Q01", chapter: "B20", seenRef: ["card:B15-tran"] }];
+    C.unlockCards(s, "B15", ["firstWin"]);
+    const r = C.pickQuiz(s, bank, { chapter: "B20", rng: seq(0.2, 0.8, 0.5) });
+    assert.equal(r.filter((q) => q.chapter === "B15").length, 2);
+    assert.ok(r.some((q) => q.id === "B20-Q01"));
+  });
+  t("bản lưu cũ đã thắng trận: Chương B15 coi như xong, mở thẻ, Quiz không bị khóa", () => {
+    const s = P.migrate({ stats: { battles: 3, wins: 1, tpc: 0, ko: 0, bestTime: null } });
+    assert.equal(C.syncLegacy(s), true);
+    assert.equal(C.chapterState(s, "B15").cleared, true);
+    assert.ok(s.cards["B15-tran"] && s.cards.H35);
+    assert.equal(C.syncLegacy(s), false);
+    assert.equal(C.syncLegacy(P.migrate({})), false);
+  });
+  t("đúng/sai giữ thứ tự Đúng, Sai; trắc nghiệm được xáo", () => {
+    const tf = QUIZ_B15.find((q) => q.type === "truefalse"), mc = QUIZ_B15.find((q) => q.type === "mcq4");
+    assert.deepEqual(C.optionOrder(tf, seq(0.9, 0.1)), [0, 1]);
+    assert.notDeepEqual(C.optionOrder(mc, seq(0.1, 0.1, 0.1)), [0, 1, 2, 3]);
+  });
+  t("bản lưu cũ (chưa có chapters/cards/quiz) nạp được và tạo trạng thái Chương khi cần", () => {
+    const old = P.migrate({ hero: { level: 3, exp: 0, nodes: [] } });
+    const ch = C.chapterState(old, "B15");
+    assert.equal(ch.openSeen, false); assert.deepEqual(ch.seen, []);
+  });
+}
+
+console.log("\nTổng Phản Công lật Cứ Điểm (sim/front.js triggerTPC)");
+{
+  // A2 ở lineX 0,55, G0 80 → lật khi G < 40. Mặt trận A là mặt trận đang đứng: tuyến +0,20 khi kích.
+  const tpcAt = (x, G) => { const s = mk(); s.fronts.A.x = x; s.bases.A2.G = G; const f = triggerTPC(s, "A", 25); return { s, f }; };
+  t("tuyến đang áp sát A2 (0,50), G 30 < 40 → A2 đổi chủ (trước đây xét sau khi đẩy tuyến tới 0,70 nên bỏ sót)", () => {
+    const { s, f } = tpcAt(0.5, 30);
+    assert.ok(f.includes("A2"), `lật: ${f}`); assert.equal(s.bases.A2.owner, "ta"); assert.equal(s.bases.A2.keeperAlive, false);
+  });
+  t("tuyến cách A2 0,20 (0,35) được đẩy tới đúng A2 → A2 đổi chủ (như cũ)", () => assert.ok(tpcAt(0.35, 30).f.includes("A2")));
+  t("tuyến quét qua A2 nhưng G ≥ 50% → không lật", () => assert.ok(!tpcAt(0.5, 40).f.includes("A2")));
+  t("tuyến còn xa A2 (0,20 → 0,40) → không lật", () => assert.ok(!tpcAt(0.2, 10).f.includes("A2")));
+  t("cổng không bao giờ bị Tổng Phản Công lật", () => { const s = mk(); s.fronts.A.x = 0.75; s.bases.A3.G = 0; assert.ok(!triggerTPC(s, "A", 25).includes("A3")); });
+}
+
 console.log(`\n${pass} đạt, ${fail} trượt`);
 process.exit(fail ? 1 : 0);

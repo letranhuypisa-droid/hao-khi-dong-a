@@ -18,10 +18,11 @@ import { HUD } from "./hud.js";
 import { createSim } from "../sim/front.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
-import { FRONTS, BASES, ENEMY_MIX, MAP } from "../data/battle-b15.js";
+import { FRONTS, BASES, ENEMY_MIX, MAP, STORY_INSERTS } from "../data/battle-b15.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
 import { heroStats } from "../meta/progress.js";
 import { movesGuideHTML } from "../ui/guide.js";
+import { readComic } from "../ui/comic.js";
 
 const STEP = 1 / 60;
 
@@ -48,7 +49,7 @@ function wallBoxes(world) {
   return out;
 }
 
-export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, onSettings }) {
+export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings }) {
   return new Promise((resolve) => {
     const settings = save.settings;
     const diff = DIFFICULTY.find((d) => d.id === difficulty) || DIFFICULTY[1];
@@ -175,8 +176,35 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       resolve(res);
     };
 
+    // ---- khung comic chèn giữa trận (GDD 22.3: khung insert do engine phát giữa trận) ------------------------
+    // Sự kiện trận (vd "coAoTong:land") → khung trong STORY_INSERTS. Trận đứng hẳn (như tạm dừng, không hiện bảng
+    // tạm dừng) tới khi đọc xong; mỗi khung chỉ phát một lần, và chỉ khi main.js truyền story (lần chơi đầu).
+    let storyOpen = false;
+    const played = new Set();
+    ctx.storyEvent = (ev) => {
+      const id = STORY_INSERTS[ev];
+      if (!story || !id || played.has(id) || storyOpen || finished || ctx.director.over || !story.comic.panels[id]) return;
+      played.add(id); storyOpen = true; paused = true;
+      document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
+      readComic(story.comic, { ids: [id], single: true, title: "Giữa trận · " + (story.comic.panels[id].insert?.phase || ""),
+        settings: story.settings, onSettings: story.onSettings, onSeen: story.onSeen })
+        .then((r) => story.onDone?.(r), (err) => console.error(err))
+        .finally(() => {
+          storyOpen = false; if (finished) return;
+          paused = false; ctx.audio.unlock(); music?.resume(); last = performance.now();
+          // nút tay cầm dùng để đóng comic không thành cạnh bấm mới (né, tạm dừng) ở khung đầu: đồng bộ padPrev rồi xoá
+          input.poll(); input.endFrame();
+          // cú bấm đóng comic còn trong cửa sổ user activation: khoá chuột lại luôn, khỏi mất một cú bấm
+          if (!ctx.touch && navigator.userActivation?.isActive) try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch (_) { /* trình duyệt từ chối thì thôi */ }
+        });
+    };
+
     // ---- vòng lặp ------------------------------------------------------------------------
-    let hudAcc = 0, endShown = false, time = 0, bedT = 0;
+    // Thắng: cảnh kết trong engine (22.2 bước 6, ≤ 10 s): camera kéo xa, nâng cao thấy cả bến, rồi mới hiện bảng
+    // THẮNG TRẬN; bấm phím / chạm bất kỳ để bỏ qua. Thua giữ như cũ (1,8 s).
+    const OUTRO = { sec: 5, pull: 3.4, pitch: 0.66 };
+    let hudAcc = 0, endShown = false, time = 0, bedT = 0, outroT = -1, outroTap = false;
+    container.addEventListener("pointerdown", () => { if (outroT > 0.6) outroTap = true; });   // chạm/nhấp bỏ qua cảnh kết
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -185,7 +213,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
     // Tua trận bằng script (chỉ khi ?debug): chạy logic không cần requestAnimationFrame.
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => {
-      for (let t = 0; t < sec && !finished; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); if (paused) break; }
+      for (let t = 0; t < sec && !finished && !paused; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); }
     };
     const step = (dt, inp, draw) => {
       time += dt;
@@ -232,6 +260,10 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (h.lock?.alive && !h.lock.dead) cam.yaw = lerpAngle(cam.yaw, Math.atan2(h.lock.x - h.x, h.lock.z - h.z), Math.min(1, dt * 3));
       else if (cam.idle > 1.2 && h.state === "free" && h.inputMag > 0.3) cam.yaw = lerpAngle(cam.yaw, h.yaw, Math.min(1, dt * 0.8 * h.inputMag));
       cam.pull = Math.max(0, cam.pull - dt * 0.6);
+      if (outroT >= 0) {
+        outroT += dt; const k = Math.min(1, outroT / 3.2), e = k * k * (3 - 2 * k);
+        cam.pull = Math.max(cam.pull, OUTRO.pull * e); cam.pitch += (OUTRO.pitch - cam.pitch) * Math.min(1, dt * 1.2); cam.yaw += dt * 0.05;
+      }
       const dist = cam.dist + cam.pull * 5, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
       const tx = h.x, ty = h.y + 1.6, tz = h.z;
       let cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = ty + dist * Math.sin(cam.pitch);
@@ -299,13 +331,18 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       hudAcc += dt;
       if (hudAcc > 0.05) { ctx.hud.update(hudAcc, W, H); hudAcc = 0; }
       if (draw) renderer.render(scene, camera);
+      const anyKey = Object.keys(inp.pressed).length > 0;     // đọc trước endFrame (inp === input, endFrame xoá pressed)
       input.endFrame();
 
       // nhạc: P4 và Tổng Phản Công đổi sang bài trận boss
       if (!d.over && music) music.play(ctx.hk.tpc || d.phase === 3 ? "boss" : "battle", { fade: 2 });
       if (d.over && !endShown && music) { if (d.result.won) music.play("victory", { loop: false, then: "hub" }); else music.stop(2); }
-      if (d.over && !endShown) { endShown = true; setTimeout(() => showEnd(d.result), d.result.won ? 1200 : 1800); }
-      if (!d.over) endShown = false;
+      if (d.over && !endShown) {
+        endShown = true;
+        if (d.result.won) { outroT = 0; outroTap = false; container.classList.add("outro-mode"); } else setTimeout(() => showEnd(d.result), 1800);
+      }
+      if (outroT >= 0 && d.over && (outroT >= OUTRO.sec || (outroT > 0.6 && (anyKey || outroTap)))) { outroT = -1; container.classList.remove("outro-mode"); showEnd(d.result); }
+      if (!d.over) { endShown = false; outroT = -1; container.classList.remove("outro-mode"); }
     };
     raf = requestAnimationFrame(frame);
   });

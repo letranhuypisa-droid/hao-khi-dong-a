@@ -1,12 +1,43 @@
 // debug.js — công cụ kiểm thử trận bằng script. Chỉ nạp khi URL có ?debug.
-//   __start(opts)        vào trận từ Doanh trại
-//   __hk.advance(s, bot) tua s giây logic trận (không cần requestAnimationFrame)
-//   __bot(target)        bot đơn giản: đi tới mục tiêu, gặp địch thì chém
-//   __state()            ảnh chụp gọn trạng thái trận
+//   __start()               vào trận từ Doanh trại
+//   __hk.advance(s, bot)    tua s giây logic trận (không cần requestAnimationFrame)
+//   __bot(target, opts)     bot chơi thay người (xem dưới); target là điểm {x, z} hoặc hàm (ctx) → điểm
+//   __objective(ctx)        mục tiêu theo pha: A1 → A2 → cổng bắc → Toa Đô
+//   __state()               ảnh chụp gọn trạng thái trận
+//   __botDbg                bot đang chạy: việc đang làm (mode), mục tiêu (tgt), bộ đếm phản đòn / đỡ / né / Tuyệt Kỹ…,
+//                           time: giây trận dồn theo "pha + việc" (biết bot tốn thời gian ở đâu)
+//
+// Bot chơi như người chơi khá (mặc định). Mọi tính năng bật sẵn, tắt từng cái bằng opts.<tên> = false:
+//   parry   phản đòn viền đỏ (bấm Đỡ ~0,15 s trước lúc bổ); hết lượt phản (đang khóa) thì lộn né
+//   block   giữ Đỡ khi sĩ quan vung đòn thường, khi đứng giữ vòng chiếm; khóa mục tiêu vào sĩ quan để thế đỡ quay đúng
+//   dodge   né cú húc / đòn nặng của lực sĩ, né tên sắp trúng, lộn tránh Tuyệt Kỹ Toa Đô
+//   finisher Đòn Quyết (C) khi sĩ quan Vỡ Thế
+//   ult     Tuyệt Kỹ khi sĩ quan trong tầm, khi bị vây đông, hoặc khi máu thấp (10 s bất tử); cả Tuyệt Kỹ Hào Khí
+//   skill   Phá Trận để đuổi cung thủ / cung kỵ đang thả diều, hoặc lao thoát vòng vây khi máu thấp
+//   tpc     Tổng Phản Công khi Hào Khí đủ 100
+//   heal    máu dưới healAt (0,5) thì đi nhặt Cơm nắm / Rượu thuốc (≤ 60 m; dưới 0,35 thì ≤ 140 m); máu cao thì đi vòng tránh
+//   hunt    săn quân đồn trú còn sót (cung kỵ thả diều ngoài vòng Cứ Điểm) và cung thủ đang giữ thẻ bắn tướng
+//   roll    đi xa thì lộn liên tiếp (nhanh hơn chạy ~40%, có khung bất tử)
+//   orders  Mệnh Lệnh: Tiến công / Giữ vững cho mặt trận có sự kiện (quân ta tự hạ toán phản công, toán vây tướng),
+//           Tiến công cho mặt trận đang đứng khi rảnh, Gọi tiếp viện ở P2
+//   Số: reach (3,4 m tầm ra đòn), engage (30 m: xa mục tiêu hơn thì chỉ chạy, không dây dưa), healAt (0,5), ultHp (0,3),
+//   gateHunt (9 m: ở cổng chỉ đuổi cung thủ giữ cổng gần hơn thế, hoặc đang giữ thẻ bắn mình).
+//   Tay người: react (0,2 s — chỉ phản ứng khi đòn gồng / cú húc / mũi tên đã hiện ít nhất chừng ấy), miss (0,1 — xác suất
+//   không để ý một đòn), seed (PRNG riêng của bot, trận vẫn xác định). { react: 0, miss: 0 } = tay máy (phản xạ hoàn hảo).
+// opts.smart = false: bot cũ (đi tới mục tiêu, gặp địch thì chém; parry/ult/skill/tpc phải bật tay như trước).
+//
+// Vì sao bot cũ thua ở A2: không phải vì Phó tướng (bị hạ trong mọi lần chạy, gây 70–200 sát thương) mà vì quân đồn
+// trú còn sót là cung kỵ đứng thả diều ở 0,7 × tầm bắn ≈ 14 m, ngay ngoài vòng 13 m. Bot cũ chỉ đánh địch trong 12 m nên
+// đứng giữa vòng chờ chiếm (không chiếm được khi còn quân đồn trú) và bị bắn tới chết: 0–416 s đứng yên mỗi trận.
+// Phía game đã sửa: dòng nhắc "Hạ quân đồn trú: còn N" nay hiện (director.updateBases), cung đồn trú không thả diều quá
+// vòng + AI.kiteLeash. Bot cũ vẫn kẹt vì con cung cuối đứng cách tướng ~14 m (trong dây) mà bot chỉ nhìn 12 m.
 
 window.__start = () => document.querySelector("[data-go]")?.click();
 
-window.__bot = (getTarget, opts = {}) => {
+window.__bot = (getTarget, opts = {}) => (opts.smart === false ? legacyBot(getTarget, opts) : smartBot(getTarget, opts));
+
+// ---- bot cũ (giữ để so sánh) ------------------------------------------------------------------------
+function legacyBot(getTarget, opts) {
   let t = 0;
   return (c) => {
     t += 1 / 30;
@@ -17,7 +48,6 @@ window.__bot = (getTarget, opts = {}) => {
     if (opts.ult && h.ki >= 100 && h.nearestEnemy(5)) inp.pressed.ult = true;
     if (opts.skill && h.phaTran.cd <= 0 && h.nearestEnemy(10)) inp.pressed.skill = true;
     if (opts.tpc && c.hk.value >= 100) inp.pressed.tpc = true;
-    // phản đòn đòn viền đỏ (bấm Đỡ ~0,08 s trước lúc bổ), né Tuyệt Kỹ của boss
     for (const u of c.units) {
       if (u.side !== "dich" || !u.alive || u.dead) continue;
       const du = Math.hypot(u.x - h.x, u.z - h.z);
@@ -37,7 +67,7 @@ window.__bot = (getTarget, opts = {}) => {
       return;
     }
     const dx = tg.x - h.x, dz = tg.z - h.z, L = Math.hypot(dx, dz);
-    if (tg.gate && L < 4) {       // đứng trước cổng: chém cổng
+    if (tg.gate && L < 4) {
       inp.setStick(0, 0); h.yaw = Math.atan2(dx + 2.5, dz);
       if (Math.floor(t * 30) % 4 === 0) inp.pressed[Math.floor(t * 3) % 3 === 2 ? "c" : "n"] = true;
       return;
@@ -46,7 +76,386 @@ window.__bot = (getTarget, opts = {}) => {
     if (e2 && L < (opts.engage ?? 30)) { steer(e2.x - h.x, e2.z - h.z); return; }
     if (L > 1.2) steer(dx, dz); else inp.setStick(0, 0);
   };
-};
+}
+
+// ---- bot chơi như người -----------------------------------------------------------------------------
+// Số đọc từ luật trận (units.js, hero.js, crowd.js): đòn viền đỏ bổ ở 0,6 s; đòn thường sĩ quan trúng ở 0,5 × 0,95 s;
+// Né bất tử 0,25 s đầu; phản đòn cửa sổ 0,2 s (cảm ứng) + 0,02.
+const RED_LEAD = 0.15;                 // bấm Đỡ khi còn ≤ 0,15 s tới lúc bổ
+const OFF_HIT = 0.475;                 // đòn thường sĩ quan trúng ở st = 0,475 s
+const HEAL_KINDS = new Set(["comnam", "ruouthuoc"]);
+const CHAIN_N = new Set(["N1", "N2", "N3", "N4", "N5"]);
+const CMD_KEY = { tiencong: "cmd1", giuvung: "cmd2", theota: "cmd3", tiepvien: "cmd4" };
+
+function smartBot(getTarget, opts) {
+  const on = (k) => opts[k] !== false;
+  const REACH = opts.reach ?? 3.4, ENGAGE = opts.engage ?? 30, HEAL_AT = opts.healAt ?? 0.5, ULT_HP = opts.ultHp ?? 0.3;
+  const GATE_HUNT = opts.gateHunt ?? 9;       // ở cổng chỉ đuổi cung thủ giữ cổng trong 9 m (cổng không cần hạ hết quân giữ)
+  // Tay người: chỉ phản ứng khi dấu hiệu (đòn gồng, cú húc, mũi tên) đã hiện ≥ react giây, và mỗi đòn có xác suất miss
+  // không để ý (gieo một lần cho mỗi đòn, PRNG riêng theo opts.seed nên trận vẫn xác định). react 0 + miss 0 = tay máy.
+  const REACT = opts.react ?? 0.2, MISS = opts.miss ?? 0.1;
+  let rs = (opts.seed ?? 1) >>> 0;
+  const rnd = () => { rs = (rs + 0x6d2b79f5) >>> 0; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const rolls = new WeakMap();
+  const notice = (obj, key) => { const r = rolls.get(obj); if (r && r.key === key) return r.ok; const ok = rnd() >= MISS; rolls.set(obj, { key, ok }); if (!ok) dbg.missed++; return ok; };
+  const seenRed = new WeakMap();       // mỗi đòn viền đỏ xử lý một lần (khóa theo impactAt của đòn)
+  let lastArrowDodge = -9, lastOrder = -9, reinfUsed = 0, lastSkill = -9, lastNow = -1;
+  let stuck = { x: 0, z: 0, t: 0 }, unstickT = 0, unstickSide = 1;
+  const seenAtk = new WeakMap();       // đòn thường sĩ quan đã đỡ (khóa theo u.combo) — chỉ để đếm
+  let healTrip = null;
+  // bộ đếm: parry (bấm phản đòn), dodgeRed (né đòn đỏ khi đang khóa phản), block (đòn thường sĩ quan đã giữ Đỡ), dodgeArrow,
+  // dodgeHeavy (né húc / đòn nặng lực sĩ), ult, skill (lần bấm Phá Trận), orders, heal (lần đi nhặt thuốc), unstick;
+  // time: giây trận theo "pha + việc"
+  const dbg = window.__botDbg = { mode: "", tgt: "", parry: 0, dodgeRed: 0, block: 0, dodgeArrow: 0, dodgeHeavy: 0, ult: 0, skill: 0,
+    orders: 0, heal: 0, unstick: 0, missed: 0, time: {} };
+
+  return (c) => {
+    const h = c.hero, inp = c.input, d = c.director, crowd = c.crowd, sim = c.sim, now = c.clock, P = inp.pressed;
+    inp.touchHeld.block = false; inp.touchHeld.cmd = false;
+    if (!h.alive || d.over) { inp.setStick(0, 0); return; }
+
+    // ---- tiện ích --------------------------------------------------------------------------------
+    const cy = c.cam.yaw, fx = Math.sin(cy), fz = Math.cos(cy);
+    const stick = (dx, dz, m = 1) => {
+      const L = Math.hypot(dx, dz);
+      if (L < 1e-6 || m <= 0) { inp.setStick(0, 0); return; }
+      inp.setStick(m * ((dx / L) * -fz + (dz / L) * fx), m * ((dx / L) * fx + (dz / L) * fz));
+    };
+    const dist = (o) => Math.hypot(o.x - h.x, o.z - h.z);
+    const hpF = h.hp / h.maxHp;
+    const free = h.state === "free" || h.state === "block";
+    const mode = (m, t = null) => { dbg.mode = m; dbg.tgt = t ? (t.isBig ? t.tier : t.kit + "@" + t.role) + ":" + dist(t).toFixed(1) : ""; };
+    // thời gian trận dành cho từng việc (theo đồng hồ trận): biết bot tốn thời gian ở đâu
+    if (dbg.mode && lastNow >= 0) { const k = "P" + (d.phase + 1) + " " + dbg.mode.replace(/ \(.*\)$/, ""); dbg.time[k] = (dbg.time[k] || 0) + (now - lastNow); }
+    lastNow = now;
+
+    const foes = [];
+    for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a)) { const dd = dist(a); if (dd < 70) foes.push({ a, d: dd }); }
+    foes.sort((p, q) => p.d - q.d);
+    const bigs = [];
+    for (const u of c.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating) bigs.push({ u, d: dist(u) });
+    bigs.sort((p, q) => p.d - q.d);
+    const count = (r, f) => { let n = 0; for (const o of foes) { if (o.d >= r) break; if (!f || f(o.a)) n++; } return n; };
+
+    // ---- khóa mục tiêu: chỉ khóa sĩ quan đang đấu; sĩ quan chết / xa thì bỏ khóa ----------------
+    let lockUsed = false;
+    const lk = h.lock;
+    if (lk && (lk.dead || !lk.alive || lk.retreating || dist(lk) > 22)) { P.lock = true; lockUsed = true; }
+    const wantLock = (u) => {
+      if (lockUsed || h.lock === u) return;
+      if (h.lock) { P.lock = true; lockUsed = true; return; }                 // bỏ khóa cũ, khung sau khóa lại
+      if (bigs.length && bigs[0].u === u) { P.lock = true; lockUsed = true; }   // toggleLock chọn đơn vị lớn gần nhất
+    };
+    const dropLock = () => { if (h.lock && !lockUsed) { P.lock = true; lockUsed = true; } };
+    const countBlock = (u) => { if (seenAtk.get(u) !== u.combo) { seenAtk.set(u, u.combo); dbg.block++; } };
+
+    // ---- 1. phòng thủ -----------------------------------------------------------------------------
+    // (a) Tuyệt Kỹ Toa Đô: không đỡ được — Tuyệt Kỹ của mình (bất tử) hoặc chạy khỏi 7 m, lộn né lúc sắp nổ
+    for (const { u, d: du } of bigs) {
+      if (u.state !== "ult" || du > 9) continue;
+      const hitAt = (u.T.ultTelegraph ?? 1) + 0.3;
+      if (on("ult") && h.state !== "ult" && (h.ki >= 100 || (h.inTPC && h.hkUltReady)) && u.st < hitAt - 0.12 && free) { P.ult = true; dbg.ult++; mode("Tuyệt Kỹ chặn Tuyệt Kỹ", u); return; }
+      stick(h.x - u.x, h.z - u.z, 1);
+      if (on("dodge") && du < 7.6 && (u.st > hitAt - 0.26 || h.state === "attack")) P.dodge = true;
+      mode("tránh Tuyệt Kỹ", u); return;
+    }
+    // (b) đòn viền đỏ: phản đòn (không đỡ được); đang khóa phản thì lộn né; ngoài tầm thì lùi ra
+    for (const { u, d: du } of bigs) {
+      if (u.state !== "red" || du > 6.5 || seenRed.get(u) === u.impactAt || !notice(u, "r" + u.impactAt)) continue;
+      const tImp = u.impactAt - now;
+      if (du > 4.4) { stick(h.x - u.x, h.z - u.z, 1); mode("lùi khỏi đòn đỏ", u); return; }
+      wantLock(u);
+      if (tImp <= RED_LEAD) {
+        seenRed.set(u, u.impactAt);
+        if (on("parry") && now > h.parryLock) { P.block = true; dbg.parry++; }
+        else if (on("dodge") && free) { stick(h.x - u.x, h.z - u.z, 1); P.dodge = true; dbg.dodgeRed++; mode("né đòn đỏ", u); return; }
+      }
+      break;       // còn sớm: cứ đánh tiếp (phản đòn cắt ngang mọi trạng thái)
+    }
+    // (c) sĩ quan vung đòn thường (đòn nặng, cắt ngang đòn của tướng): giữ Đỡ nếu kịp vào thế đỡ, không thì lộn né
+    if (on("block")) for (const { u, d: du } of bigs) {
+      if (u.state !== "atk" || u.hitDone || du > 4.6 || !faces(u, h, 1.35) || u.st < REACT || !notice(u, "a" + u.combo)) continue;
+      const tImp = OFF_HIT - u.st;
+      if (tImp < -0.01) continue;
+      wantLock(u);
+      if (h.state === "attack") {
+        const rem = h.dur - h.st;
+        if (rem < tImp - 0.03) { inp.touchHeld.block = true; inp.setStick(0, 0); countBlock(u); mode("chờ đỡ", u); return; }
+        if (on("dodge") && h.dur * 0.7 - h.st < tImp - 0.03) { stick(h.x - u.x, h.z - u.z, 1); P.dodge = true; mode("né đòn thường", u); return; }
+        break;     // không kịp: chịu đòn
+      }
+      if (free || h.state === "hit" || h.state === "down") { inp.touchHeld.block = true; inp.setStick(0, 0); countBlock(u); mode("đỡ sĩ quan", u); return; }
+      break;
+    }
+    // (d) lực sĩ lao húc (trúng thì ngã) và đòn nặng sắp bổ vào mình: lộn né
+    if (on("dodge")) for (const { a, d: da } of foes) {
+      if (da > 7) break;
+      if (a.chargeT > 0 && 0.9 - a.chargeT >= REACT && notice(a, "c" + Math.round((now - 0.9 + a.chargeT) * 10))) {
+        const rx = h.x - a.x, rz = h.z - a.z, along = rx * a.chargeX + rz * a.chargeZ, perp = rx * a.chargeZ - rz * a.chargeX;
+        if (along > -0.5 && along < 6 && Math.abs(perp) < 1.8) {
+          if (free) { const s = perp >= 0 ? 1 : -1; stick(a.chargeZ * s, -a.chargeX * s, 1); P.dodge = true; dbg.dodgeHeavy++; mode("né cú húc", a); return; }
+          if (h.state === "attack") P.dodge = true;
+        }
+      }
+      if (a.K.heavy && a.windup > 0 && !a.fake && a.target === h && a.windup < 0.3 && da < (a.K.reach || 2.3) + 1.4
+        && a.windupT - a.windup >= REACT && notice(a, "w" + Math.round((now - a.windupT + a.windup) * 10))) {
+        if (free || (h.state === "attack" && h.dur * 0.7 - h.st < a.windup - 0.02)) { stick(h.x - a.x, h.z - a.z, 1); P.dodge = true; dbg.dodgeHeavy++; mode("né đòn nặng", a); return; }
+      }
+    }
+    // (e) tên sắp trúng (≤ 0,2 s) — chỉ khi rảnh tay và không đang đấu sĩ quan sát sườn
+    const duel = bigs.find((o) => o.d < 4.2 && o.u.awake);
+    if (on("dodge") && free && now - lastArrowDodge > 0.45 && h.dodgeCd <= 0 && (!duel || hpF < 0.4)) {
+      const th = arrowThreat(crowd, h, REACT, notice);
+      if (th && th.t >= 0.02 && th.t <= 0.2) {
+        // lộn vuông góc với đường tên, về phía có ít địch hơn
+        const px = -th.vz, pz = th.vx, L = Math.hypot(px, pz) || 1;
+        let s = 1, best = -1e9;
+        for (const sg of [1, -1]) { const tx = h.x + sg * px / L * 4, tz = h.z + sg * pz / L * 4; let sc = 0; for (const o of foes) { if (o.d > 10) break; sc -= 1 / (1 + Math.hypot(o.a.x - tx, o.a.z - tz)); } if (sc > best) { best = sc; s = sg; } }
+        stick(s * px, s * pz, 1); P.dodge = true; lastArrowDodge = now; dbg.dodgeArrow++; mode("né tên"); return;
+      }
+    }
+
+    // ---- 2. Mệnh Lệnh (một khung giữ vòng lệnh) ------------------------------------------------------
+    if (on("orders") && now - lastOrder > 1 && !lockUsed && free) {
+      const cmd = pickOrder(c, reinfUsed);
+      if (cmd) {
+        const hf = sim.heroFront || d.lastFront;
+        inp.touchHeld.cmd = true; if (cmd.front !== hf) P.cmdSwap = true; P[CMD_KEY[cmd.id]] = true;
+        if (cmd.id === "tiepvien") reinfUsed++;
+        lastOrder = now; dbg.orders++; inp.setStick(0, 0); mode("lệnh " + cmd.id + " → " + cmd.front); return;
+      }
+    }
+
+    // ---- 3. Tổng Phản Công ---------------------------------------------------------------------------
+    if (on("tpc") && !c.hk.tpc && c.hk.value >= 100) P.tpc = true;
+
+    // ---- 4. mục tiêu -----------------------------------------------------------------------------
+    const obj = typeof getTarget === "function" ? getTarget(c) : getTarget;
+    const L0 = Math.hypot(obj.x - h.x, obj.z - h.z);
+    let baseId = null, gateId = null;
+    for (const id in sim.bases) {
+      const b = sim.bases[id], p = c.world.bases[id];
+      if (!p || b.owner !== "dich" || b.type === "ban_doanh") continue;
+      if (b.type === "cong") { const g = c.world.gates[id]; if (obj.gate && g && Math.hypot(g.x - obj.x, g.z - obj.z) < 6) gateId = id; }
+      else if (Math.hypot(p.x - obj.x, p.z - obj.z) < 3) baseId = id;
+    }
+    const B = baseId ? sim.bases[baseId] : null, bp = baseId ? c.world.bases[baseId] : null;
+    const keeper = baseId ? d.keepers[baseId] : null;
+    const kAlive = !!(keeper && keeper.alive && !keeper.dead);
+    const src = baseId || gateId;
+    const gar = src ? foes.filter((o) => o.a.role === "garrison" && o.a.src === src) : [];
+    const garAll = src ? crowd.agents.some((a) => a.role === "garrison" && a.src === src && crowd.hittable(a)) : false;
+    const ready = !!B && B.G < 1 && !garAll && !B.keeperAlive;
+    const boss = obj.isBig ? obj : null;
+
+    // ---- 5. cơ hội: Đòn Quyết, Tuyệt Kỹ ------------------------------------------------------------
+    const broken = bigs.find((o) => o.u.broken > 0.15 && o.d < 10);
+    if (on("finisher") && broken) {
+      const u = broken.u;
+      wantLock(u);
+      if (broken.d < 4.2) {
+        stick(u.x - h.x, u.z - h.z, 0.2);
+        if (h.state === "attack" && CHAIN_N.has(h.move)) { mode("chờ ra Đòn Quyết", u); return; }   // C nối chuỗi N thành đòn C, không phải Đòn Quyết
+        if (!(h.state === "attack" && h.move === "DQ")) P.c = true;
+        mode("Đòn Quyết", u); return;
+      }
+      if (broken.u.broken > 0.6) { stick(u.x - h.x, u.z - h.z, 1); mode("tới Đòn Quyết", u); return; }
+    }
+    if (on("ult") && free && h.state !== "ult") {
+      const hk = h.inTPC && h.hkUltReady;
+      if (h.ki >= 100 || hk) {
+        const off = bigs.find((o) => o.u.awake && o.d < 2.4 + o.u.radius && o.u.hp > o.u.maxHp * 0.3 && o.u.roarT <= 0);
+        const crowdN = count(4.5, (a) => !a.K.ranged), officersLeft = kAlive || !!boss || bigs.some((o) => o.d < 30);
+        const shot = foes.some((o) => o.d < 22 && o.a.K.ranged && o.a.token);
+        // Khí Lực đầy (200) thì dùng thoáng tay hơn cho khỏi phí; máu thấp: 10 s bất tử để hạ kẻ đang bắn / vây mình
+        if (off || (crowdN >= (h.ki >= 200 ? 4 : 6) && (h.ki >= 200 || hk || !officersLeft)) || (hpF < ULT_HP && (count(6) >= 3 || shot))) {
+          P.ult = true; dbg.ult++; mode(off ? "Tuyệt Kỹ vào sĩ quan" : hpF < ULT_HP ? "Tuyệt Kỹ giữ mạng" : "Tuyệt Kỹ vào đám đông", off?.u); return;
+        }
+      }
+    }
+
+    // ---- 6. hồi máu --------------------------------------------------------------------------------
+    if (on("heal") && hpF < HEAL_AT && !duel) {
+      let best = null, bd = hpF < 0.35 ? 140 : 60;
+      for (const p of d.pickups) if (HEAL_KINDS.has(p.kind) && p.t > 2) { const pd = Math.hypot(p.x - h.x, p.z - h.z); if (pd < bd) { bd = pd; best = p; } }
+      if (best) { if (healTrip !== best) { healTrip = best; dbg.heal++; } dropLock(); travel(best.x, best.z, bd, true); mode("đi nhặt " + best.kind); return; }
+    }
+    // túi quân lương, cờ lệnh gần thì nhặt
+    if (on("heal") && free && !duel) for (const p of d.pickups) {
+      if ((p.kind === "tuiten" && h.ki < 130) || p.kind === "colenh") { const pd = Math.hypot(p.x - h.x, p.z - h.z); if (pd < 14) { travel(p.x, p.z, pd, false); mode("nhặt " + p.kind); return; } }
+    }
+
+    // ---- 7. chọn đối thủ ---------------------------------------------------------------------------
+    let tgt = null, why = "";
+    const adj = foes.filter((o) => o.d < 3.2 && !o.a.K.ranged);
+    const offNear = bigs.find((o) => o.u.awake && o.u.roarT <= 0 && o.d < 5.5);
+    const hunting = (a) => a.K.ranged && (a.fleeT || 0) <= 0;
+    // xa mục tiêu thì chỉ chạy — trừ khi quân đồn trú của chính mục tiêu đang ở quanh (cung kỵ thả diều kéo tướng ra
+    // ngoài 30 m: trước đây bot lượn qua lại ở mép 30 m, lúc săn lúc quay về, mất 10–20 s)
+    if (L0 > ENGAGE && !boss && !(gar.length && L0 < 75)) {
+      // đi đường: chỉ đánh khi bị kẹt giữa đám đông
+      if (adj.length >= 3) { tgt = adj[0].a; why = "mở đường"; }
+    } else if (boss) {
+      if (adj.length >= 3 && dist(boss) > 5) { tgt = adj[0].a; why = "dọn quanh"; }
+      else { tgt = boss; why = "đấu Toa Đô"; }
+    } else if (ready) {
+      // vòng đã sạch quân đồn trú và trấn thủ: chỉ chém kẻ áp sát, còn lại đứng giữ vòng
+      if (offNear) { tgt = offNear.u; why = "đấu sĩ quan"; }
+      else if (adj.length && Math.hypot(bp.x - h.x, bp.z - h.z) < bp.r - 1) { tgt = adj[0].a; why = "giữ vòng"; }
+    } else {
+      // cung đang giữ thẻ bắn mình trong 11 m; cung của quân đồn trú mục tiêu trong 22 m (phải hạ hết mới chiếm được); ở cổng
+      // thì cung giữ cổng đang bắn mình (có thẻ) hoặc ở gần — hai cung kỵ tinh nhuệ bắn ~50 sát thương/s nếu cứ đứng chém cổng
+      const rangedTok = on("hunt") ? foes.filter((o) => hunting(o.a) && o.d < 22 && ((o.a.token && o.d < 11) || (src && o.a.role === "garrison" && o.a.src === src && (baseId || o.d < GATE_HUNT || o.a.token)))) : [];
+      if (offNear) { tgt = offNear.u; why = "đấu sĩ quan"; }
+      else if (adj.length) { tgt = adj[0].a; why = "cận chiến"; }
+      else if (rangedTok.length) { tgt = rangedTok[0].a; why = "săn cung"; }
+      else if (kAlive && (keeper.awake || dist(keeper) < 35)) { tgt = keeper; why = "trấn thủ"; }
+      else if (on("hunt") && baseId && gar.length) {
+        // quân đồn trú còn sót: cung kỵ trước (hay thả diều ngoài vòng), rồi người gần nhất
+        const rg = gar.find((o) => o.a.K.ranged && o.d < 30);
+        tgt = (rg || gar[0]).a; why = "săn đồn trú";
+      }
+      else if (foes.length && foes[0].d < (gateId ? 6 : 9)) { tgt = foes[0].a; why = "dọn"; }
+    }
+
+    // ---- 8. hành động ------------------------------------------------------------------------------
+    if (tgt) {
+      const td = dist(tgt), reachT = REACH + (tgt.isBig ? tgt.radius : 0.25);
+      if (tgt.isBig) wantLock(tgt); else dropLock();
+      // bị vây đông, máu thấp: Phá Trận lao ra phía ít địch
+      if (on("skill") && hpF < 0.45 && count(3.5) >= 5 && skillReady(h) && free && now - lastSkill > 0.7) {
+        let ex = 0, ez = 0; for (const o of foes) { if (o.d > 5) break; ex += h.x - o.a.x; ez += h.z - o.a.z; }
+        dropLock(); stick(ex, ez, 1); P.skill = true; lastSkill = now; dbg.skill++; mode("lao thoát vây"); return;
+      }
+      if (td <= reachT) { strike(tgt); mode(why, tgt); return; }
+      if (h.state === "attack" && count(REACH + 0.3) > 0) { strike(null); mode(why + " (dứt chuỗi)", tgt); return; }
+      // đuổi cung thủ thả diều: Phá Trận lao qua (choáng 1 s), không thì lộn liên tiếp
+      if (!tgt.isBig && tgt.K.ranged && on("skill") && td > 5.5 && td < 16 && skillReady(h) && free && now - lastSkill > 0.7) {
+        dropLock(); stick(tgt.x - h.x, tgt.z - h.z, 1); P.skill = true; lastSkill = now; dbg.skill++; mode("Phá Trận đuổi cung", tgt); return;
+      }
+      // cung thủ lùi giữ tầm nhanh gần bằng tướng: lộn tới rồi Lướt chém (N ngay sau khi lộn → lao 4 m)
+      if (!tgt.isBig && tgt.K.ranged && td < 8.5) {
+        stick(tgt.x - h.x, tgt.z - h.z, 1);
+        if (h.postDodge > 0 && td < 7) P.n = true;
+        else if (on("roll") && free && h.dodgeCd <= 0 && td > reachT + 0.3) P.dodge = true;
+        mode(why + " (lộn tới)", tgt); return;
+      }
+      travel(tgt.x, tgt.z, td, !tgt.isBig && td > 6.5);
+      mode(why + " (tiếp cận)", tgt); return;
+    }
+    dropLock();
+    if (h.state === "attack" && count(REACH) > 0) { strike(null); mode("dứt chuỗi"); return; }
+
+    // cổng: đứng trước cổng mà chém (đòn vòng C4 luôn trúng cổng trong 8 m)
+    if (gateId && obj.gate) {
+      const g = c.world.gates[gateId], gd = Math.hypot(g.x - 1.6 - h.x, g.z - h.z);
+      if (gd < 4.5) { stick(g.x - h.x, g.z - h.z, 0.2); strike(null, true); mode("phá cổng"); return; }
+      travel(obj.x, obj.z, L0, L0 > 12); mode("tới cổng"); return;
+    }
+    // vòng Cứ Điểm đã sạch: đứng giữa vòng, giữ Đỡ cho khỏi ngắt đồng hồ chiếm
+    if (B && ready) {
+      const cd = Math.hypot(bp.x - h.x, bp.z - h.z);
+      if (cd > bp.r * 0.45) { travel(bp.x, bp.z, cd, cd > 10); mode("vào vòng chiếm"); return; }
+      inp.setStick(0, 0); if (on("block") && count(9) > 0) inp.touchHeld.block = true; mode("giữ vòng chiếm"); return;
+    }
+    if (L0 > 1.2) { travel(obj.x, obj.z, L0, L0 > 14); mode(B ? "tới Cứ Điểm" : "tới mục tiêu"); return; }
+    inp.setStick(0, 0); mode("chờ");
+
+    // ---- hàm hành động (dùng biến của khung này) ---------------------------------------------------
+    // Chuỗi N N N C (→ C4 đòn vòng 5 m, MV 2,1): DPS cao nhất của song đao cấp thấp, đòn vòng dẹp đám đông và trúng cổng.
+    function strike(t, gate = false) {
+      if (t) stick(t.x - h.x, t.z - h.z, 0.2); else if (!gate) inp.setStick(0, 0);
+      if (h.state === "attack") {
+        if (h.move === "N1" || h.move === "N2") P.n = true;
+        else if (h.move === "N3") P.c = true;
+      } else if (free) {
+        if (h.chainGrace > 0 && h.chain >= 1 && h.chain < 3) P.n = true;
+        else if (h.chainGrace > 0 && h.chain === 3) P.c = true;
+        else P.n = true;
+      }
+    }
+    // Đi tới (x, z): tránh nhặt thuốc khi máu còn cao, gỡ kẹt, lộn liên tiếp khi đi xa.
+    function travel(x, z, L, roll) {
+      // tường tây Hàm Tử quan: mục tiêu ở bên kia tường thì đi qua cổng đã mở gần nhất (trước đây bot đâm thẳng vào
+      // tường khi đuổi Toa Đô từ chỗ khác ngoài cổng, kẹt hơn 2 phút và mất một lần Gượng dậy)
+      const gs = c.world.gates;
+      let wall = null; for (const id in gs) { wall = gs[id].x; break; }
+      if (wall !== null && (h.x < wall) !== (x < wall)) {
+        let g = null, gd = 1e9;
+        for (const id in gs) if (c.openGates[id]) { const q = gs[id], dd = Math.abs(q.z - h.z) + Math.abs(q.z - z); if (dd < gd) { gd = dd; g = q; } }
+        if (g) {
+          const side = h.x < g.x ? -1 : 1;
+          if (Math.abs(h.z - g.z) > 2 && Math.abs(h.x - g.x) < 7) { x = g.x + side * 7; z = g.z; }   // sát tường: lùi ra trước cổng
+          else if (Math.abs(h.z - g.z) > 2) { x = g.x + side * 5; z = g.z; }                        // tới trước cổng
+          else { x = g.x - side * 6; z = g.z; }                                                       // đi qua cổng
+          L = Math.hypot(x - h.x, z - h.z);
+        }
+      }
+      let dx = x - h.x, dz = z - h.z;
+      const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+      if (on("heal") && hpF > 0.75) for (const p of d.pickups) {
+        if (!HEAL_KINDS.has(p.kind)) continue;
+        const px = p.x - h.x, pz = p.z - h.z, pd = Math.hypot(px, pz);
+        if (pd > 4.5 || px * dx + pz * dz <= 0 || Math.hypot(p.x - x, p.z - z) < 1) continue;
+        const side = px * dz - pz * dx >= 0 ? -1 : 1, k = 1.2 * (1 - pd / 4.5);   // lệch sang phía không có thuốc
+        const qx = dx + dz * side * k, qz = dz - dx * side * k, m = Math.hypot(qx, qz) || 1;
+        dx = qx / m; dz = qz / m;
+      }
+      // gỡ kẹt: 3 s không nhích được 1,5 m khi đang muốn đi xa
+      if (now - stuck.t > 3) {
+        if (L > 3 && Math.hypot(h.x - stuck.x, h.z - stuck.z) < 1.5 && free) { unstickT = now + 1.2; unstickSide = -unstickSide; dbg.unstick++; }
+        stuck = { x: h.x, z: h.z, t: now };
+      }
+      if (now < unstickT) { const sx = -dz * unstickSide, sz = dx * unstickSide; dx = dx * 0.3 + sx; dz = dz * 0.3 + sz; }
+      if (L < 0.8) { inp.setStick(0, 0); return; }
+      stick(dx, dz, 1);
+      if (on("roll") && roll && L > 6 && free && h.dodgeCd <= 0 && now >= unstickT) P.dodge = true;
+    }
+  };
+}
+
+function faces(u, t, halfArc) {
+  let da = Math.atan2(t.x - u.x, t.z - u.z) - u.yaw;
+  while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+  return Math.abs(da) <= halfArc;
+}
+function skillReady(h) { return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
+
+// Tên của địch sẽ trúng tướng trong 0,3 s tới (giả sử tướng đứng yên): thời gian + vận tốc tên. Luật trúng như
+// crowd.updateArrows: cách ngang < 0,9 m, lệch cao < 1,3 m so với ngực.
+function arrowThreat(crowd, h, react, notice) {
+  let best = null;
+  for (const r of crowd.arrows) {
+    if (r.side !== "dich" || r.t < react) continue;
+    let x = r.x, y = r.y, z = r.z, vy = r.vy, t = r.t;
+    for (let k = 1; k <= 18; k++) {
+      const dt = 1 / 60; t += dt; x += r.vx * dt; z += r.vz * dt; y += vy * dt; vy -= 9.8 * dt;
+      if (t > r.T) break;
+      if (Math.hypot(h.x - x, h.z - z) < 0.9 && Math.abs(y - (h.y + 1.1)) < 1.3) { if ((!best || k / 60 < best.t) && notice(r, 1)) best = { t: k / 60, vx: r.vx, vz: r.vz }; break; }
+    }
+  }
+  return best;
+}
+
+// Mệnh Lệnh: sự kiện đang chạy cần lệnh ở mặt trận của nó (quân ta hạ một lính của toán mỗi 2,5 s khi mặt trận có
+// lệnh); Gọi tiếp viện ở P2; rảnh thì Tiến công cho mặt trận đang đứng (khi không có sự kiện sắp tới cần giữ lệnh).
+function pickOrder(c, reinfUsed) {
+  const d = c.director, sim = c.sim, cd = sim.cooldowns, E = d.events || {};
+  for (const [ev, fr] of [["counterA1", "A"], ["surrounded", "B"]]) {
+    if (E[ev]?.state !== "run" || sim.fronts[fr].order) continue;
+    if (cd.tiencong <= 0) return { front: fr, id: "tiencong" };
+    if (cd.giuvung <= 0) return { front: fr, id: "giuvung" };
+  }
+  if (d.phase >= 1 && sim.reinf.charges > 0 && cd.tiepvien <= 0 && reinfUsed < 2) {
+    // mặt trận yếu hơn (tỉ lệ quân còn lại) nhận tiếp viện; lần đầu cho A (cánh chính)
+    const r = (f) => Object.values(sim.fronts[f].q.ta).reduce((a, b) => a + b, 0) / sim.fronts[f].q0.ta;
+    return { front: reinfUsed === 0 ? "A" : (r("A") <= r("B") ? "A" : "B"), id: "tiepvien" };
+  }
+  const pending = ["counterA1", "surrounded"].some((k) => E[k] && (E[k].state === "wait" || E[k].state === "run"));
+  const hf = sim.heroFront;
+  if (hf && !pending && !sim.fronts[hf].order && cd.tiencong <= 0) return { front: hf, id: "tiencong" };
+  return null;
+}
 
 // Mục tiêu theo pha: P1 A1 → P2 A2 → P3 cổng bắc → P4 Toa Đô.
 window.__objective = (c) => {
@@ -72,5 +481,6 @@ window.__state = () => {
     events: Object.fromEntries(Object.entries(d.events).map(([k, v]) => [k, v.state + (v.left ? ":" + Math.round(v.left) : "")])),
     msgs: d.msgs.map((m) => m.text).slice(-3), over: d.over, res: d.result && d.result.why,
     ks: d.keSach.hud().map((k) => `${k.name}:${k.state}:${k.got}${k.detail ? " (" + k.detail + ")" : ""}`),
+    bot: window.__botDbg ? window.__botDbg.mode : null,
   };
 };
