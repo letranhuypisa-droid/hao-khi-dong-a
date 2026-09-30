@@ -5,6 +5,7 @@
 //
 //   F_A[i]    = Q_A[i] * c[i] * khac(i,B) * m_SK * m_KS * m_lenh * m_TPC * (1 + min(0.3, 0.1 * soTuongAI_A))
 //   tonThat_A = SIM_LOSS_K * F_B * diaHinh_A * mThu_A
+//   diaHinh_A = công sự Hàm Tử quan × công sự làn đánh (sim/terrain-rules.js earthworkLossMult, khi st.earthworks)
 //   Q_A[i]   -= tonThat_A * Q_A[i] / Q_A * (bị khắc ? 1.25 : 1)
 //   hoiQuan_A = SIM_REGEN * Q0_A * min(2, soDoanhTrai_A) * m_luong_A
 //   x        += SIM_LINE_V * (F_ta - F_dich) / (F_ta + F_dich) * (TPC ? 3 : 1)
@@ -13,13 +14,18 @@
 //   Sụp đổ cánh: Q < 15% Q0 hoặc SK < 10 trong 15 s → mất Cứ Điểm gần nhất, tuyến lùi 0.1
 
 import { SIM, UNITS, khac, ORDERS, HAO_KHI, S, HERO } from "../data/tuning.js";
+import { earthworkLossMult } from "./terrain-rules.js";
+import { laneFeaturesOn } from "../battle/ground.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const sum = (o) => { let s = 0; for (const k in o) s += o[k]; return s; };
 
-export function createSim({ fronts, bases, enemyMix, R = 1, mods = {} }) {
+// earthworks: lũy, ụ đất trên làn đánh có tác dụng trong mô phỏng (mặc định theo công trình làn đánh đã bật khi
+// dựng trận — buildWorld chạy trước createSim; kiểm thử truyền thẳng true/false). Giữ trong st nên checkpoint
+// mang theo.
+export function createSim({ fronts, bases, enemyMix, R = 1, mods = {}, earthworks = laneFeaturesOn() }) {
   const st = {
-    t: 0, R,
+    t: 0, R, earthworks: !!earthworks,
     mods: {                           // từ cây kỹ năng, quân đoàn, trang bị (meta/progress.js)
       unitSimC: 0, reinfAmt: 0, reinfCharges: 0, holdThu: 0, skPer5: 0, cmdCdMult: 1,
       cmdCd: HERO.cmdCd, allyHpPct: 0, heroSkMult: HERO.skMult, ...mods,
@@ -224,8 +230,17 @@ export function simTick(st) {
     let mThuTa = o?.mThu ?? 1;
     if (f.order?.id === "giuvung") mThuTa -= st.mods.holdThu;
     const gatesClosed = Object.values(st.bases).some((b) => b.front === id && b.type === "cong" && b.owner === "dich" && !b.open);
-    const diaHinhDich = gatesClosed && f.x > 0.72 ? 0.6 : 1;     // công sự Hàm Tử quan
-    const lossTa = SIM.LOSS_K * Fd * mThuTa;
+    let diaHinhDich = gatesClosed && f.x > 0.72 ? 0.6 : 1;       // công sự Hàm Tử quan
+    let diaHinhTa = 1;
+    // công sự làn đánh (terrain-rules.js): quân ta đánh vào dải trước lũy Nguyên còn người giữ (doanh trại cánh
+    // này còn của địch) thì Nguyên mất ít quân; tuyến bị dồn về ụ đất quân ta thì quân ta mất ít quân
+    if (st.earthworks) {
+      let luyStands = false;
+      for (const bid in st.bases) { const b = st.bases[bid]; if (b.front === id && b.type === "doanh_trai" && b.owner === "dich") luyStands = true; }
+      diaHinhDich *= earthworkLossMult("dich", id, f.x, luyStands);
+      diaHinhTa = earthworkLossMult("ta", id, f.x, true);
+    }
+    const lossTa = SIM.LOSS_K * Fd * mThuTa * diaHinhTa;
     const lossD = SIM.LOSS_K * Fta * diaHinhDich;
     for (const [side, loss, opp] of [["ta", lossTa, "dich"], ["dich", lossD, "ta"]]) {
       const q = f.q[side], Q = sum(q);

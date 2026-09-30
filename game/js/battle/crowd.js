@@ -6,15 +6,17 @@
 //   - zone / garrison / squad / landing / guard / follow: lính thật trong vùng r 25 m quanh
 //     tướng người chơi — trúng đòn, gây đòn, KO của chúng trừ Q hoặc G.
 // Mỗi binh chủng chia thành vài kiểu lính (KITS: đao, thương, cung, lực sĩ, nỏ…) khác vũ khí, tầm
-// đánh và hoạt ảnh. Mỗi kiểu lính là một InstancedMesh skinned (soldiers.js): 10 khúc thân xoay
+// đánh và hoạt ảnh. Mỗi kiểu lính là một InstancedMesh skinned (soldiers.js): 15 khúc thân xoay
 // được theo khớp, ma trận khớp đọc từ texture, nên lính bước chân, vung đòn, ngã theo nhiều kiểu
-// mà cả đám đông chỉ tốn một lượt vẽ cho mỗi kiểu lính.
+// mà cả đám đông chỉ tốn một lượt vẽ cho mỗi kiểu lính. Lính gần tướng (LOD gần) còn có chân bám
+// đất, vạt áo đung đưa, tua giáo và đuôi ngựa treo theo trọng lực (soldierFrame, soldier-motion.js).
 
 import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
-import { skinnedKit, writeAffine, poseFor, jointMatrices, NCH, JOINT_NAMES, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
+import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
 import { TIERS, UNITS, KITS, AI, MOVES, pickKit, g, heSoGiap } from "../data/tuning.js";
+import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
 const KIT_IDS = Object.keys(KITS);
 const CAP = 900;                 // mỗi kiểu lính; lính diễn tối đa ~800 + vùng chiến đấu
@@ -27,8 +29,7 @@ const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const _c = new THREE.Color();
 const _pose = new Float32Array(NCH);
-const JOINT_INDEX = Object.fromEntries(JOINT_NAMES.map((j, i) => [j, i]));
-const LOD_FAR2 = 40 * 40;        // xa hơn 40 m: tính lại tư thế mỗi 3 khung, khung khác chép ma trận cũ
+const LOD_FAR2 = 40 * 40;        // xa hơn 40 m: tính lại tư thế mỗi 3 khung, khung khác chép ma trận cũ; không IK, không mô phỏng vạt/tua
 
 let NEXT_ID = 1;
 
@@ -43,11 +44,10 @@ export class Crowd {
       S.color = S.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3);
       scene.add(S.mesh); this.meshes[k] = S;
     }
-    this._mc = null; this.frame = 0;
-    this._setJoint = (name, mat4) => writeAffine(this._mc, JOINT_INDEX[name] * 12, mat4.elements);
+    this.frame = 0;
     this.blob = new THREE.InstancedMesh(blobGeometry(), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }), 2200);
     this.blob.frustumCulled = false; this.blob.count = 0; scene.add(this.blob);
-    this.arrows = []; this.heroKills = [];
+    this.arrows = []; this.heroKills = []; this.cheerT = 0;
     const ag = new THREE.CylinderGeometry(0.02, 0.02, 1.1, 3); ag.rotateX(Math.PI / 2);
     this.arrowMesh = new THREE.InstancedMesh(ag, new THREE.MeshBasicMaterial({ color: 0x2a2018 }), 200);
     this.arrowMesh.frustumCulled = false; this.arrowMesh.count = 0; scene.add(this.arrowMesh);
@@ -70,11 +70,12 @@ export class Crowd {
       state: "move", st: 0, atkCd: 1 + this.ctx.rng.next() * tier.every, windup: 0, windupT: K.windup, atkT: 9, fake: false,
       token: false, target: null, sx: o.sx ?? o.x, sz: o.sz ?? o.z, anchor: o.anchor || null,
       flash: 0, stun: 0, dieT: 0, flinch: 0, hitFront: 1, launchDeath: false, bob: this.ctx.rng.next() * 6.28, fakeCd: this.ctx.rng.next() * 3,
-      walk: this.ctx.rng.next() * TWO_PI, spd: 0, ready: false, poseInit: false, frontRow: false,
+      walk: this.ctx.rng.next() * TWO_PI, spd: 0, mvx: 0, mvz: 1, gx: NaN, gz: NaN, gy: 0, ready: false, poseInit: false, frontRow: false,
       slotAng: undefined, blockT: 0, blockCd: 0, evadeT: 0, evadedSwing: -1, chargeT: 0, chargeCd: 2 + this.ctx.rng.next() * 4, chargeHit: false, fleeT: 0,
       hitBy: 0, scale: tier.scale * (K.scale || 1), lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
     });
     if (!a.pose) a.pose = new Float32Array(NCH);
+    resetMotion(a);                  // lò xo vạt áo, dây tua, trọng số IK của lần dùng trước (pool)
     a.hp = a.maxHp;
     this.agents.push(a);
     return a;
@@ -124,6 +125,7 @@ export class Crowd {
     this.ctx.director?.onSoldierKilled(a, opt);
     // tướng chém ngã nhiều người trong chốc lát → lính yếu quanh đó hoảng, bỏ chạy
     if (opt.by === "hero" && a.side === "dich") {
+      this.cheerT = Math.min(2.5, this.cheerT + 1.2);                   // khán đài reo hò (Võ trường)
       const t = this.ctx.clock, R = AI.rout, hero = this.ctx.hero;
       this.heroKills.push(t);
       while (this.heroKills.length && t - this.heroKills[0] > R.window) this.heroKills.shift();
@@ -189,8 +191,10 @@ export class Crowd {
     const hm = hero.state === "attack" && HEAVY_MOVES.has(hero.move) ? MOVES[hero.move] : null;
     const heroHeavy = hm && hero.st / hero.dur < hm.hits[0] - 0.08 ? hm : null;
 
+    this.cheerT = Math.max(0, this.cheerT - dt);
     for (let i = this.agents.length - 1; i >= 0; i--) {
       const a = this.agents[i];
+      if (a.role === "spectator") { a.cheer = this.cheerT; a.atkT += dt; continue; }
       a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7; a.atkT += dt; a.flinch = Math.max(0, a.flinch - dt);
       a.blockT = Math.max(0, a.blockT - dt); a.blockCd -= dt; a.chargeCd -= dt;
       if (a.panicT > 0) a.panicT -= dt;
@@ -212,7 +216,9 @@ export class Crowd {
         if (a.st <= 0) a.state = "move";
         continue;
       }
-      if (a.stun > 0) { a.stun -= dt; continue; }
+      // choáng: đứng im, tốc độ tắt dần như nhánh trúng đòn (bỏ qua stride nên a.spd không tự về 0 — lực sĩ trúng
+      // Phá Trận đang chạy thì đứng co một chân giữa bước suốt 1–1,5 s)
+      if (a.stun > 0) { a.stun -= dt; a.spd *= Math.exp(-dt * 13); continue; }
 
       if (a.role === "actor") { this.updateActor(a, dt); continue; }
 
@@ -249,18 +255,27 @@ export class Crowd {
         if (rng.chance(AI.evade[a.tier] || 0)) { a.evadeT = 0.3; a.evadeX = -hx / dH; a.evadeZ = -hz / dH; continue; }
       }
 
+      // tầm bắn theo thế đất (terrain-rules.js): đứng cao hơn mục tiêu (của bước trước) thì bắn xa hơn
+      const rt = a.target || hero;
+      const range = ranged ? K.range * rangeMult(heightAt(a.x, a.z) - heightAt(rt.x, rt.z)) : 0;
+
       // ---- chọn mục tiêu ----
-      let tx, tz, target = null, wantDist = 2.0, slot = false, kiting = false;
+      let tx, tz, target = null, wantDist = 2.0, slot = false, kiting = false, perch = null;
       if (a.side === "dich") {
         const aggro = a.role === "garrison" ? 20 : a.role === "squad" ? 14 : 60;
         if (hero.alive && dH < aggro) {
           target = hero; tx = hero.x; tz = hero.z;
-          const ring = ranged ? K.range * 0.7 : a.token ? reach : 4.2 + (a.id % 5) * 0.6 + (reach - 1.7);
-          if (ranged && dH < K.range * AI.kite) { kiting = true; wantDist = K.range * 0.7; }
+          const ring = ranged ? range * 0.7 : a.token ? reach : 4.2 + (a.id % 5) * 0.6 + (reach - 1.7);
+          // cung thủ bộ Nguyên ưa gò cao gần đó: lên đỉnh gò đứng bắn xuống, bị áp sát thì lùi ngả về phía gò
+          if (ranged && !K.mounted) perch = perchNear(a.x, a.z, hero.x, hero.z, K.range);
+          if (ranged && dH < K.range * AI.kite) { kiting = true; wantDist = range * 0.7; }
           else if (!ranged && a.slotAng !== undefined && dH < 14) {
             // tới vị trí vây của mình; lính chờ trôi chậm quanh vòng
             if (!a.token) a.slotAng += (a.id % 2 ? 1 : -1) * 0.12 * dt;
             tx = hero.x + Math.sin(a.slotAng) * ring; tz = hero.z + Math.cos(a.slotAng) * ring; wantDist = 0.3; slot = true;
+          } else if (perch) {
+            const ang = a.id * 2.39996;               // mỗi người một chỗ quanh đỉnh gò (góc vàng theo id)
+            tx = perch.x + Math.sin(ang) * perch.r * 0.22; tz = perch.z + Math.cos(ang) * perch.r * 0.22; wantDist = 0.3; slot = true;
           } else wantDist = ring;
           // lực sĩ có thẻ tấn công, tướng cách 5–11 m: lao húc
           const C = AI.charge;
@@ -272,14 +287,14 @@ export class Crowd {
           const at = a.anchor.target && a.anchor.target.alive && !a.anchor.target.dead ? a.anchor.target : null;
           target = at; tx = at ? at.x : a.anchor.x; tz = at ? at.z : a.anchor.z; wantDist = a.anchor.r ?? 3;
         } else {
-          const al = nearest(a, allies, ranged ? K.range : 14);
-          if (al) { target = al; tx = al.x; tz = al.z; wantDist = ranged ? K.range * 0.6 : reach; }
+          const al = nearest(a, allies, ranged ? range : 14);
+          if (al) { target = al; tx = al.x; tz = al.z; wantDist = ranged ? range * 0.6 : reach; }
           else { tx = a.sx; tz = a.sz; wantDist = 1; }
         }
       } else {
         const guard = a.role === "guard" || a.role === "follow";
-        const en = guard ? this.threatFor(a, enemies, 9) : nearest(a, enemies, ranged ? K.range + 2 : 16);
-        if (en) { target = en; tx = en.x; tz = en.z; wantDist = ranged ? K.range * 0.7 : reach; }
+        const en = guard ? this.threatFor(a, enemies, 9) : nearest(a, enemies, ranged ? range + 2 : 16);
+        if (en) { target = en; tx = en.x; tz = en.z; wantDist = ranged ? range * 0.7 : reach; }
         else if (guard) {
           const k = a.id % 12, ang = hero.yaw + Math.PI + (k - 5.5) * 0.35, rr = a.role === "guard" ? 3 : 5.5;
           tx = hero.x + Math.sin(ang) * rr; tz = hero.z + Math.cos(ang) * rr; wantDist = 0.6;
@@ -290,11 +305,17 @@ export class Crowd {
       // ---- di chuyển ----
       const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz) || 1e-6;
       const dT = target === hero ? dH : target ? Math.hypot(target.x - a.x, target.z - a.z) : d;   // khoảng cách tới mục tiêu thật
-      a.ready = !!target && dT < (ranged ? K.range + 4 : 8);
+      a.ready = !!target && dT < (ranged ? range + 4 : 8);
       let mvx = 0, mvz = 0;
       if (target) a.yaw = turn(a.yaw, target === hero ? Math.atan2(hx, hz) : Math.atan2(dx, dz), dt * 8);
       if (a.windup <= 0) {
-        if (kiting) { mvx = -hx / dH; mvz = -hz / dH; }                      // cung thủ lùi giữ tầm
+        if (kiting) {                                                         // cung thủ lùi giữ tầm
+          mvx = -hx / dH; mvz = -hz / dH;
+          if (perch) {                                                        // gò ở phía lùi thì ngả về gò
+            const ox = perch.x - a.x, oz = perch.z - a.z, ol = Math.hypot(ox, oz) || 1;
+            if (ox * mvx + oz * mvz > 0) { mvx += ox / ol; mvz += oz / ol; const l = Math.hypot(mvx, mvz) || 1; mvx /= l; mvz /= l; }
+          }
+        }
         else if (slot) { const k = Math.min(1, d / 1.2); if (d > wantDist) { mvx = dx / d * k; mvz = dz / d * k; } }
         else if (d > wantDist + 0.4) { mvx = dx / d; mvz = dz / d; if (!target) a.yaw = turn(a.yaw, Math.atan2(dx, dz), dt * 6); }
         else if (d < wantDist - 0.6 && target === hero) { mvx = -dx / d * 0.6; mvz = -dz / d * 0.6; }
@@ -314,7 +335,8 @@ export class Crowd {
         const ox = a.x - hero.x, oz = a.z - hero.z, o = Math.hypot(ox, oz);
         if (o < 1.1 && o > 1e-6) { sx += ox / o * (1.1 - o) * 2; sz += oz / o * (1.1 - o) * 2; }
       }
-      a.x += (mvx * a.speed + sx * 4) * dt; a.z += (mvz * a.speed + sz * 4) * dt;
+      const tf = mvx !== 0 || mvz !== 0 ? speedFactor(a.x, a.z, mvx, mvz) : 1;    // lên dốc chậm, xuống dốc nhanh, bùn lầy
+      a.x += (mvx * a.speed * tf + sx * 4) * dt; a.z += (mvz * a.speed * tf + sz * 4) * dt;
       [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates);
       this.stride(a, px, pz, dt);
 
@@ -324,7 +346,7 @@ export class Crowd {
         a.windup -= dt;
         if (a.windup <= 0) { a.atkT = 0; this.strike(a); a.atkCd = TIERS[a.tier].every * (0.85 + 0.3 * rng.next()); }
       } else if (!kiting) {
-        const canHit = target && (target === hero ? a.token : true) && dT <= (ranged ? K.range : reach + 0.9);
+        const canHit = target && (target === hero ? a.token : true) && dT <= (ranged ? range : reach + 0.9);
         if (canHit && a.atkCd <= 0) { a.windup = a.windupT = K.windup; a.fake = false; }
       }
     }
@@ -332,12 +354,9 @@ export class Crowd {
     this.updateArrows(dt);
   }
 
-  // Tốc độ thật và pha bước chân lấy từ quãng đã đi (không trượt chân khi bị đẩy, khi đứng).
-  stride(a, px, pz, dt) {
-    const moved = Math.hypot(a.x - px, a.z - pz);
-    a.spd += (moved / dt - a.spd) * Math.min(1, dt * 10);
-    a.walk += moved * (TWO_PI / (a.K.mounted ? 3.4 : 1.7)) / a.scale;
-  }
+  // Tốc độ thật, hướng đi và pha bước chân lấy từ quãng đã đi (không bước khi bị đẩy, khi đứng); độ dài
+  // chu kỳ khớp dáng đi nên bàn chân chống không trượt (soldier-motion.js advanceStride).
+  stride(a, px, pz, dt) { advanceStride(a, px, pz, dt); }
 
   updateActor(a, dt) {
     const dx = a.sx - a.x, dz = a.sz - a.z, d = Math.hypot(dx, dz), px = a.x, pz = a.z;
@@ -382,24 +401,24 @@ export class Crowd {
     if (t === ctx.hero) {
       const raw = a.cong * tier.mv * heSoGiap(ctx.hero.giap, ctx.R) * ctx.diff.dmg;
       // đòn lực sĩ là đòn nặng: cắt được đòn đang ra của tướng, phải né hoặc đỡ
-      ctx.hero.receiveHit({ dmg: raw * (a.chargeHit ? AI.charge.dmg : 1) * (0.95 + 0.1 * ctx.rng.next()), x: a.x, z: a.z, red: false, src: a, heavy: !!a.K.heavy, knockdown: a.chargeHit });
+      ctx.hero.receiveHit({ dmg: raw * (a.chargeHit ? AI.charge.dmg : 1) * (0.95 + 0.1 * ctx.rng.next()) * hitMult(a, ctx.hero), x: a.x, z: a.z, red: false, src: a, heavy: !!a.K.heavy, knockdown: a.chargeHit });
       a.chargeHit = false;
     } else if (t.isBig) {
       // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s
       t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * 0.2, x: a.x, z: a.z, src: a });
     } else if (t.alive) {
-      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6);
+      const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t);
       this.damage(t, dmg, { kx: dx / (d || 1), kz: dz / (d || 1), knock: 1.5, by: a.side === "ta" ? "ally" : "enemy" });
     }
   }
 
   // fake: tên cảnh của lính diễn — bay thật, không trúng ai, không phát tiếng.
   fireArrow(a, t, fake = false) {
-    const y0 = heightAt(a.x, a.z) + (a.K.mounted ? 2.2 : 1.45) * a.scale;
+    const g0 = heightAt(a.x, a.z), y0 = g0 + (a.K.mounted ? 2.2 : 1.45) * a.scale;
     const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + (fake ? 0 : 1.2);
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
     this.arrows.push({ x: a.x, y: y0, z: a.z, vx: (tx - a.x) / T, vz: (tz - a.z) / T, vy: (ty - y0) / T + 4.9 * T, t: 0, T: T + 0.4, T0: T, src: a,
-      side: fake ? "fx" : a.side, tgt: fake ? null : t });
+      side: fake ? "fx" : a.side, tgt: fake ? null : t, g0 });     // g0: chân người bắn lúc buông tên (thế đất cao)
     if (!fake) this.ctx.audio?.play("bow", a.x, a.z);
   }
 
@@ -414,14 +433,14 @@ export class Crowd {
         const g = r.tgt, a = r.src;
         if (g.K) {      // lính thường: tính như đòn cận chiến giữa hai đám lính
           const d = Math.hypot(g.x - r.x, g.z - r.z), v = Math.hypot(r.vx, r.vz) || 1;
-          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6),
+          if (d < 1.6 && this.hittable(g)) this.damage(g, a.cong * TIERS[a.tier].mv * heSoGiap(g.giap, ctx.R) * (r.side === "ta" ? 0.8 : 0.6) * heightDamageMult(r.g0 - heightAt(g.x, g.z)),
             { kx: r.vx / v, kz: r.vz / v, knock: 1.2, by: r.side === "ta" ? "ally" : "enemy" });
         } else if (g.alive !== false && Math.hypot(g.x - r.x, g.z - r.z) < 3) g.receiveHit?.({ dmg: a.cong * TIERS[a.tier].mv * 0.85 * (g.arrowMult ?? 0.2), x: a.x, z: a.z, src: a, arrow: true });
         done = true;
       }
       if (!done && r.side === "dich" && hero.alive && Math.hypot(hero.x - r.x, hero.z - r.z) < 0.9 && Math.abs(r.y - (hero.y + 1.1)) < 1.3) {
         const a = r.src, tier = TIERS[a.tier];
-        hero.receiveHit({ dmg: a.cong * tier.mv * 0.85 * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
+        hero.receiveHit({ dmg: a.cong * tier.mv * 0.85 * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * heightDamageMult(r.g0 - hero.y), x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
         done = true;
       }
       if (done) this.arrows.splice(i, 1);
@@ -450,7 +469,8 @@ export class Crowd {
   }
 
   // ---- vẽ ----------------------------------------------------------------------------------
-  // Hoạt ảnh chạy theo đồng hồ trận (ctx.clock), nên hit-stop đóng băng cả đám lính.
+  // Hoạt ảnh chạy theo đồng hồ trận (ctx.clock), nên hit-stop đóng băng cả đám lính (kể cả lò xo vạt
+  // áo, dây tua: dtA = 0).
   render() {
     const clk = this.ctx.clock, dtA = Math.min(0.1, Math.max(0, clk - (this.lastClock ?? clk)));
     this.lastClock = clk;
@@ -462,7 +482,8 @@ export class Crowd {
       const M = this.meshes[a.kit], i = counts[a.kit];
       if (i >= CAP) continue;
       counts[a.kit]++;
-      const gy = heightAt(a.x, a.z);
+      if (a.gx !== a.x || a.gz !== a.z) { a.gy = heightAt(a.x, a.z); a.gx = a.x; a.gz = a.z; }   // đứng yên thì khỏi lấy lại
+      const gy = a.gy;
       const sink = a.state === "dead" && a.dieT > 1.8 ? (a.dieT - 1.8) * 1.0 : 0;
       const far = (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 > LOD_FAR2;
       if (!a.mc) a.mc = new Float32Array(BONE_FLOATS);
@@ -472,10 +493,10 @@ export class Crowd {
         if (!a.poseInit || far) { P.set(_pose); a.poseInit = true; }
         else {
           const k = a.atkT < 0.14 || a.state === "hit" ? kSnap : kSoft;
-          for (let c = 0; c < NCH; c++) P[c] += (_pose[c] - P[c]) * k;
+          smoothPose(P, _pose, k, Math.max(k, 1 - Math.exp(-dtA * legRate(a))));
         }
-        this._mc = a.mc;
-        jointMatrices(M.skel, a.x, gy + a.y - sink, a.z, a.yaw, a.scale, P, this._setJoint);
+        // tư thế → IK chân (bản nháp) → lò xo vạt → ma trận khớp → tua giáo/đuôi ngựa, thẳng vào a.mc
+        soldierFrame(a, M.skel, a.x, gy + a.y - sink, a.z, gy, P, dtA, heightAt, !far, a.mc);
       }
       M.data.set(a.mc, i * BONE_FLOATS);
 

@@ -227,5 +227,356 @@ t("Vàng Seed tuần ở 4 tuần khác nhau → binh khí Danh", () => {
   assert.equal(rw.drops[0]?.tier, 4);
 });
 
+console.log("Chân bám đất, chuyển động phụ (battle/ik.js)");
+{
+  const IK = await import("../js/battle/ik.js");
+  const L1 = 0.44, L2 = 0.44;
+  t("legIK tới đúng điểm trong tầm với, gối gập về trước", () => {
+    for (const [ty, tz] of [[-0.8, 0], [-0.6, 0.3], [-0.5, -0.25], [-0.4, 0.1]]) {
+      const [th, kn] = IK.legIK(ty, tz, L1, L2), [y, z] = IK.footPos(th, kn, L1, L2);
+      near(y, ty, 1e-6, "y"); near(z, tz, 1e-6, "z"); assert.ok(kn >= 0, "gối lật: " + kn);
+      assert.ok(IK.footPos(th, 0, L1, 0)[1] >= Math.min(0, tz) - 1e-9 || kn < 1e-6, "gối phải ở trước đường hông–bàn chân");
+    }
+  });
+  t("legIK ngoài tầm với: duỗi thẳng về phía điểm, không NaN", () => {
+    const [th, kn] = IK.legIK(-3, 0.5, L1, L2);
+    assert.ok(Number.isFinite(th) && Number.isFinite(kn)); assert.ok(kn < 0.1, "kn " + kn);
+    near(Math.atan2(-0.5, 3), th, 0.08, "hướng");
+    for (const v of IK.legIK(0, 0, L1, L2)) assert.ok(Number.isFinite(v));
+  });
+  t("legShift: nâng/hạ bàn chân đúng dy, giữ vị trí trước sau", () => {
+    const f0 = IK.footPos(-0.3, 0.9, L1, L2);
+    for (const dy of [0.15, -0.05, 0.3]) {
+      const [th, kn] = IK.legShift(-0.3, 0.9, L1, L2, dy), f1 = IK.footPos(th, kn, L1, L2);
+      near(f1[0] - f0[0], dy, 1e-6, "dy"); near(f1[1], f0[1], 1e-6, "z");
+    }
+  });
+  t("pelvisDrop chỉ hạ, không quá maxDrop", () => {
+    assert.equal(IK.pelvisDrop(0.2, 0.1, 0.3), 0); near(IK.pelvisDrop(-0.1, 0.2, 0.3), -0.1, 1e-12); near(IK.pelvisDrop(-0.8, 0, 0.3), -0.3, 1e-12);
+  });
+  t("slopePitch: đế giày song song dốc lên (mũi chân ngóc lên = góc âm)", () => {
+    const ground = (x, z) => 0.5 * z;                // dốc lên phía +z
+    near(IK.slopePitch(ground, 0, 0, 0, 1), -Math.atan(0.5), 1e-9); near(IK.slopePitch(() => 1, 0, 0, 0, 1), 0, 1e-12);
+  });
+  t("spring hội tụ về đích, ổn định với dt lớn, đứng yên khi dt = 0", () => {
+    const s = new Float32Array(2), k = 120, c = IK.damping(k, 0.5);
+    for (let i = 0; i < 300; i++) IK.spring(s, 0, 1, k, c, 1 / 60);
+    near(s[0], 1, 1e-3); IK.spring(s, 0, 0, k, c, 0); near(s[0], 1, 1e-3);
+    for (let i = 0; i < 20; i++) IK.spring(s, 0, -1, k, c, 0.5);
+    assert.ok(Number.isFinite(s[0]) && Math.abs(s[0] + 1) < 0.05, "s " + s[0]);
+  });
+  t("rope: buông thẳng khi đứng yên, giữ đúng độ dài, văng ngược khi neo chạy", () => {
+    const n = 3, seg = 0.1, p = new Float32Array(n * 6);
+    for (let i = 0; i < 240; i++) IK.rope(p, n, 0, 2, 0, seg, 1 / 60);
+    near(p[(n - 1) * 6 + 1], 2 - n * seg, 1e-3, "treo"); near(p[(n - 1) * 6], 0, 1e-3);
+    for (let i = 0; i < 20; i++) IK.rope(p, n, (i + 1) * 0.1, 2, 0, seg, 1 / 60);    // neo chạy +x 6 m/s
+    assert.ok(p[(n - 1) * 6] < 2.0, "đuôi phải tụt lại sau neo");
+    for (let k = 0; k < n; k++) { const o = k * 6, q = k ? (k - 1) * 6 : -1;
+      const px = q < 0 ? 2.0 : p[q], py = q < 0 ? 2 : p[q + 1], pz = q < 0 ? 0 : p[q + 2];
+      near(Math.hypot(p[o] - px, p[o + 1] - py, p[o + 2] - pz), seg, 1e-4, "đốt " + k); }
+    IK.rope(p, n, 500, 0, 0, seg, 1 / 60); near(p[1], -seg, 1e-6, "neo nhảy xa → đặt lại");
+    IK.rope(p, n, 500, 0, 0, seg, 0); assert.ok(p.every(Number.isFinite));
+  });
+  t("hangAngles dựng lại đúng hướng treo", () => {
+    for (const [dx, dy, dz] of [[0, -1, 0], [0.3, -1, 0.2], [-0.2, -0.8, -0.4]]) {
+      const [rx, rz] = IK.hangAngles(dx, dy, dz), L = Math.hypot(dx, dy, dz);
+      near(Math.sin(rz), dx / L, 1e-9); near(-Math.cos(rz) * Math.cos(rx), dy / L, 1e-9); near(-Math.cos(rz) * Math.sin(rx), dz / L, 1e-9);
+    }
+  });
+}
+
+console.log("Địa hình làn đánh (battle/ground.js, data/terrain-b15.js)");
+{
+  const G = await import("../js/battle/ground.js");
+  const { LANE_TERRAIN } = await import("../js/data/terrain-b15.js");
+  const withF = (on, fn) => { G.setLaneFeatures(on); try { return fn(); } finally { G.setLaneFeatures(false); } };
+  t("tắt công trình thì heightAt giữ nguyên như trước khi tách module", () => {
+    near(G.heightAt(72, -32), withF(false, () => G.heightAt(72, -32)), 0);
+    near(G.heightAt(300, -95), 0.70, 0.02, "chân lũy A khi chưa bật");
+  });
+  t("lũy Nguyên cao ~1,5 m, đoạn vỡ chỗ đường đi về mặt đất", () => {
+    const f = LANE_TERRAIN.berms.find((b) => b.id === "LUY_A"), t0 = 0.2, x = f.a[0] + (f.b[0] - f.a[0]) * t0, z = f.a[1] + (f.b[1] - f.a[1]) * t0;
+    withF(true, () => { assert.ok(G.featureHeight(x, z) > 1.3, "đỉnh " + G.featureHeight(x, z)); near(G.featureHeight(300, -75), 0, 0.05, "lối vỡ"); });
+  });
+  t("hào, hố trũng xuống và có bùn; gờ hố nhô lên; ngoài làn không đổi", () => withF(true, () => {
+    assert.ok(G.featureHeight(453, 0) < -1.0 && G.mudAt(453, 0) > 0.8, "hào thành");
+    near(G.featureHeight(453, -75), 0, 1e-9, "cầu đất trước cổng");
+    for (const p of LANE_TERRAIN.pits) {
+      assert.ok(G.featureHeight(p.x, p.z) < -0.7 * p.d, "lòng hố"); assert.ok(G.featureHeight(p.x + p.r, p.z) > 0.1 * p.d, "gờ hố");
+      assert.ok(G.mudAt(p.x, p.z) >= 0.45, "bùn hố");
+    }
+    near(G.featureHeight(34, 0), 0, 0); near(G.featureHeight(172, 144), 0, 0); near(G.mudAt(100, -75), 0, 0);
+  }));
+  t("gò cao hai bên làn, featureNear nhận ra công trình và bỏ qua lối vỡ", () => withF(true, () => {
+    for (const m of LANE_TERRAIN.mounds) near(G.featureHeight(m.x, m.z), m.h, 0.05);
+    assert.equal(G.featureNear(300, -95, 0.5)?.id, "LUY_A"); assert.equal(G.featureNear(300, -75, 0.2), null);
+  }));
+  t("công trình không lấn Cứ Điểm, bản doanh, làng, ruộng", () => {
+    const rings = BASES.filter((b) => b.front).map((b) => ({ x: 60 + b.lineX * 500, z: FRONTS[b.front].laneZ, r: b.type === "doanh_trai" ? 13 : b.type === "don" ? 10 : 7 }));
+    for (const f of G.TERRAIN_FEATURES) {
+      const pts = f.ax !== undefined ? [0, 0.25, 0.5, 0.75, 1].map((s) => [f.ax + f.dx * s, f.az + f.dz * s]) : [[f.x, f.z]];
+      for (const [x, z] of pts) {
+        for (const r of rings) assert.ok(Math.hypot(x - r.x, z - r.z) > r.r + f.reach * 0.5 || f.kind === "hao_thanh", `${f.id || f.type} lấn Cứ Điểm ở ${x},${z}`);
+        assert.ok(Math.hypot(x - 34, z) > 40 && !G.paddyAt(x, z), `${f.id || f.type} lấn bản doanh/ruộng`);
+      }
+    }
+  });
+}
+
+console.log("Va chạm có lưới tra, lối đi trên làn");
+{
+  const G = await import("../js/battle/ground.js");
+  const { LANE_TERRAIN } = await import("../js/data/terrain-b15.js");
+  const { MAP } = await import("../js/data/battle-b15.js");
+  // bản quét hết cũ của collide() (trước khi có lưới) — lưới phải cho kết quả trùng từng bit
+  const refCollide = (world, x, z, radius, openGates) => {
+    for (const c of world.colliders) {
+      const dx = c.x1 - c.x0, dz = c.z1 - c.z0, L2 = dx * dx + dz * dz;
+      let t = ((x - c.x0) * dx + (z - c.z0) * dz) / L2; t = Math.max(0, Math.min(1, t));
+      const px = c.x0 + dx * t, pz = c.z0 + dz * t;
+      const ox = x - px, oz = z - pz, d = Math.hypot(ox, oz), min = c.r + radius;
+      if (d < min && d > 1e-6) { x = px + (ox / d) * min; z = pz + (oz / d) * min; }
+    }
+    for (const id in world.gates) {
+      const g = world.gates[id];
+      if (openGates[id]) continue;
+      if (Math.abs(z - g.z) < 5 && Math.abs(x - g.x) < 1.6 + radius) x = x < g.x ? g.x - 1.6 - radius : g.x + 1.6 + radius;
+    }
+    x = Math.max(4, Math.min(MAP.riverEastX + 3, x)); z = Math.max(MAP.riverNorthZ - 3, Math.min(196, z));
+    return [x, z];
+  };
+  t("collide() có lưới tra trùng khớp bản quét hết (tường, cụm cọc dày, bán kính lớn, thêm va chạm sau)", () => {
+    let s = 12345; const rnd = () => ((s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296);
+    const W = MAP.fortWallX, cs = [{ x0: W, z0: -164, x1: W, z1: -80, r: 1.6 }, { x0: W, z0: -70, x1: W, z1: 70, r: 1.6 }, { x0: W, z0: 80, x1: W, z1: 150, r: 1.6 }];
+    for (let i = 0; i < 250; i++) { const x = 20 + rnd() * 560, z = -190 + rnd() * 380, seg = rnd() < 0.3; cs.push({ x0: x, z0: z, x1: seg ? x + rnd() * 12 - 6 : x + 0.01, z1: seg ? z + rnd() * 12 - 6 : z, r: 0.3 + rnd() * 1.2 }); }
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 6; j++) cs.push({ x0: 250 + i * 1.3, z0: -80 + j * 1.3, x1: 250.01 + i * 1.3, z1: -80 + j * 1.3, r: 0.9 });
+    const world = { colliders: cs, gates: { A3: { x: W, z: -75 }, B3: { x: W, z: 75 } } }, open = { A3: false, B3: true };
+    let bad = 0;
+    for (let k = 0; k < 60000; k++) {
+      const near = k % 3 === 0, c = cs[Math.floor(rnd() * cs.length)];
+      const x = near ? c.x0 + rnd() * 4 - 2 : rnd() * 600, z = near ? c.z0 + rnd() * 4 - 2 : -200 + rnd() * 400, r = [0.4, 0.5, 0.7, 1.5][k % 4];
+      const a = G.collide(world, x, z, r, open), b = refCollide(world, x, z, r, open);
+      if (a[0] !== b[0] || a[1] !== b[1]) bad++;
+      if (k === 30000) cs.push({ x0: 300, z0: -75, x1: 300.01, z1: -75, r: 1 });
+    }
+    assert.equal(bad, 0, bad + " lệch");
+    const p = G.collide(world, 300.3, -75, 0.4, open); assert.ok(Math.hypot(p[0] - 300, p[1] + 75) >= 1.4 - 1e-9, "va chạm thêm sau phải có hiệu lực");
+  });
+  const segHit = (ax, az, bx, bz, px, pz) => { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9; let t = ((px - ax) * dx + (pz - az) * dz) / L2; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - ax - dx * t, pz - az - dz * t); };
+  const cumaParts = () => LANE_TERRAIN.fences.filter((f) => f.kind === "cu_ma");
+  t("lối trước hai cổng thông: |z − laneZ| ≤ 4, x 430–452 không có cự mã, xác ngựa", () => {
+    for (const lz of [-75, 75]) for (let x = 430; x <= 452; x += 0.5) for (let z = lz - 4; z <= lz + 4; z += 0.5) {
+      for (const f of cumaParts()) assert.ok(segHit(f.a[0], f.a[1], f.b[0], f.b[1], x, z) > 0.6, `cự mã chắn cổng ở ${x},${z}`);
+      for (const h of LANE_TERRAIN.horses) assert.ok(Math.hypot(h.x - x, h.z - z) > 1.0, `xác ngựa chắn cổng ở ${x},${z}`);
+    }
+  });
+  t("lối vỡ chính của lũy Nguyên rộng ≥ 6 m, không vướng cự mã, xác ngựa (từ hào tới sau lũy 5 m)", () => {
+    for (const lz of [-75, 75]) for (let x = 292; x <= 306; x += 0.5) for (let z = lz - 3; z <= lz + 3; z += 0.5) {
+      for (const f of cumaParts()) assert.ok(segHit(f.a[0], f.a[1], f.b[0], f.b[1], x, z) > 0.6, `cự mã chắn lối vỡ ở ${x},${z}`);
+      for (const h of LANE_TERRAIN.horses) assert.ok(Math.hypot(h.x - x, h.z - z) > 1.2, `xác ngựa chắn lối vỡ ở ${x},${z}`);
+    }
+  });
+  t("xác ngựa cách hàng cự mã ≥ 2 m, không nằm giữa lòng hố", () => {
+    for (const h of LANE_TERRAIN.horses) {
+      for (const f of cumaParts()) assert.ok(segHit(f.a[0], f.a[1], f.b[0], f.b[1], h.x, h.z) >= 2, `ngựa (${h.x},${h.z}) đè cự mã`);
+      for (const p of LANE_TERRAIN.pits) assert.ok(Math.hypot(h.x - p.x, h.z - p.z) >= p.r, `ngựa (${h.x},${h.z}) trong hố`);
+    }
+  });
+  t("tắt công trình thì featureHeight, mudAt, featureNear về 0/null (giữ nguyên bản đồ mặc định)", () => {
+    G.setLaneFeatures(false);
+    assert.equal(G.featureHeight(300, -95), 0); assert.equal(G.mudAt(453, 0), 0); assert.equal(G.featureNear(300, -95, 1), null);
+  });
+}
+
+// ==== Luật địa hình: chỗ đất cao thấp, bùn, công sự (sim/terrain-rules.js) — BẮT ĐẦU ====================
+console.log("Luật địa hình (sim/terrain-rules.js)");
+{
+  const T = await import("../js/sim/terrain-rules.js");
+  const G = await import("../js/battle/ground.js");
+  const { TERRAIN } = await import("../js/data/tuning.js");
+  const { LANE_TERRAIN } = await import("../js/data/terrain-b15.js");
+  const { xToLine } = await import("../js/data/battle-b15.js");
+  const withF = (on, fn) => { G.setLaneFeatures(on); try { return fn(); } finally { G.setLaneFeatures(false); } };
+  const SL = TERRAIN.slope, HT = TERRAIN.height;
+  t("dốc: phẳng/dốc nhỏ ×1; lên dốc chậm dần, sàn ×0,6; xuống dốc nhanh hơn, trần ×1,12", () => {
+    assert.equal(T.slopeFactor(0), 1); assert.equal(T.slopeFactor(SL.dead * 0.9), 1); assert.equal(T.slopeFactor(-SL.dead * 0.9), 1);
+    near(T.slopeFactor(0.5), 1 - SL.up * (0.5 - SL.dead), 1e-12);
+    assert.equal(T.slopeFactor(5), SL.upFloor); assert.equal(T.slopeFactor(-5), SL.downCap);
+    let prev = 2; for (let gr = -2; gr <= 2; gr += 0.05) { const f = T.slopeFactor(gr); assert.ok(f <= prev + 1e-12, "không giảm dần ở " + gr); prev = f; }
+    near(T.slopeFactor(SL.dead + 1e-9), 1, 1e-6, "liền mạch ở mép vùng phẳng");
+  });
+  t("speedFactor dò dốc dọc hướng đi (không cần chuẩn hoá hướng), bùn ×(1 − 0,4·mud), sàn chung 0,4", () => {
+    const plane = (x) => 0.5 * x, dry = () => 0, wet = () => 1;
+    near(T.speedFactor(0, 0, 1, 0, plane, dry), T.slopeFactor(0.5), 1e-12, "lên");
+    near(T.speedFactor(0, 0, -3, 0, plane, dry), T.slopeFactor(-0.5), 1e-12, "xuống");
+    near(T.speedFactor(0, 0, 0, 0.2, plane, dry), 1, 1e-12, "đi ngang dốc");
+    assert.equal(T.speedFactor(0, 0, 0, 0, plane, dry), 1, "đứng yên");
+    near(T.speedFactor(0, 0, 0, 1, () => 0, wet), 1 - TERRAIN.mud, 1e-12, "bùn");
+    assert.equal(T.speedFactor(0, 0, 1, 0, (x) => 3 * x, wet), TERRAIN.minSpeed, "vách dốc + bùn");
+  });
+  t("thế đất cao: vùng chết ±0,4 m, +8%/m vượt, trần +20%, sàn −15%, liền mạch; tầm bắn chỉ cộng, trần +25%", () => {
+    assert.equal(T.heightDamageMult(0), 1); assert.equal(T.heightDamageMult(HT.dead), 1); assert.equal(T.heightDamageMult(-HT.dead), 1);
+    near(T.heightDamageMult(HT.dead + 1), 1 + HT.perM, 1e-12); near(T.heightDamageMult(-HT.dead - 1), 1 - HT.perM, 1e-12);
+    near(T.heightDamageMult(HT.dead + 1e-6), 1, 1e-6);
+    assert.equal(T.heightDamageMult(50), 1 + HT.cap); assert.equal(T.heightDamageMult(-50), 1 - HT.floor);
+    assert.equal(T.rangeMult(-3), 1); assert.equal(T.rangeMult(HT.dead), 1); assert.equal(T.rangeMult(50), 1 + HT.rangeCap);
+    near(T.rangeMult(HT.dead + 1), 1 + HT.rangePerM, 1e-12);
+  });
+  t("trên bản đồ có làn đánh: đứng gò Nguyên (320, −93) đánh xuống lính ở làn +10–15%, lính đánh lên −10–15%", () => withF(true, () => {
+    const top = { x: 320, z: -93 }, below = { x: 320, z: -84 };
+    const up = T.hitMult(top, below), down = T.hitMult(below, top);
+    assert.ok(up > 1.1 && up < 1.15, "trên gò " + up); assert.ok(down < 0.9 && down > 0.85, "dưới gò " + down);
+    assert.equal(withF(false, () => T.hitMult({ x: 100, z: -75 }, { x: 103, z: -75 })), 1, "làn phẳng");
+  }));
+  t("trên bản đồ có làn đánh: leo mái lũy, vách hố chậm; hố ngập, đáy hào có bùn; làn trống giữ nguyên", () => withF(true, () => {
+    assert.ok(T.speedFactor(297, -95, 1, 0) <= 0.75, "mái lũy " + T.speedFactor(297, -95, 1, 0));
+    assert.ok(T.speedFactor(303, -95, 1, 0) > 1.05, "xuống mái sau lũy");
+    assert.ok(T.speedFactor(271, -88, 0, 1) <= 1 - TERRAIN.mud * 0.99, "hố ngập");
+    assert.ok(T.speedFactor(453, 0, 0, 1) < 0.7, "hào thành");
+    near(T.speedFactor(100, -75, 1, 0), 1, 1e-9, "làn trống");
+  }));
+  t("vị trí công sự trên tuyến lấy từ data/terrain-b15.js: lũy Nguyên ~0,48, ụ ta A ~0,16, B ~0,35", () => {
+    const mid = (id) => { const b = LANE_TERRAIN.berms.find((q) => q.id === id); return (b.a[0] + b.b[0]) / 2; };
+    near(T.EARTHWORK_LINES.A.luy, xToLine(FRONTS.A, mid("LUY_A")), 1e-12); near(T.EARTHWORK_LINES.A.luy, 0.48, 0.005);
+    near(T.EARTHWORK_LINES.B.luy, 0.48, 0.005); near(T.EARTHWORK_LINES.A.uTa, 0.16, 0.01); near(T.EARTHWORK_LINES.B.uTa, 0.35, 0.005);
+  });
+  t("earthworkLossMult: chỉ trong dải, lũy chỉ tính khi doanh trại cánh đó còn của địch", () => {
+    const F = TERRAIN.front, L = T.EARTHWORK_LINES.A;
+    assert.equal(T.earthworkLossMult("dich", "A", L.luy, true), F.luyLoss);
+    assert.equal(T.earthworkLossMult("dich", "A", L.luy + F.luyBand[0] - 0.001, true), 1);
+    assert.equal(T.earthworkLossMult("dich", "A", L.luy + F.luyBand[1] + 0.001, true), 1);
+    assert.equal(T.earthworkLossMult("dich", "A", L.luy, false), 1, "lũy mất người giữ");
+    assert.equal(T.earthworkLossMult("ta", "A", L.uTa, true), F.uTaLoss); assert.equal(T.earthworkLossMult("ta", "A", L.uTa + F.uTaBand + 0.001, true), 1);
+    assert.equal(T.earthworkLossMult("ta", "A", L.luy, true), 1); assert.equal(T.earthworkLossMult("dich", "A", L.uTa, true), 1);
+  });
+  const mkE = (ew) => createSim({ fronts: FRONTS, bases: BASES, enemyMix: ENEMY_MIX, R: 1, earthworks: ew });
+  t("mô phỏng có công sự: mặc định theo công trình làn đánh; cùng input → trùng khớp tuyệt đối sau 900 tick", () => {
+    assert.equal(mk().earthworks, false); assert.equal(withF(true, () => mk().earthworks), true);
+    const a = mkE(true), b = mkE(true);
+    for (const s of [a, b]) { s.bases.A1.owner = "ta"; s.fronts.A.x = 0.40; }
+    for (let i = 0; i < 900; i++) {
+      if (i % 20 === 0) for (const s of [a, b]) { s.cooldowns.tiencong = 0; issueOrder(s, "A", "tiencong"); }
+      simTick(a); simTick(b);
+    }
+    assert.deepEqual(snapshot(a), snapshot(b));
+  });
+  t("tổn thất Nguyên ×0,75 chỉ khi tuyến ở dải trước lũy và doanh trại còn của địch; quân ta ×0,8 ở dải ụ đất", () => {
+    const one = (ew, x, front = "A", prep) => { const s = mkE(ew); s.fronts[front].x = x; prep?.(s); simTick(s); return s.fronts[front]; };
+    const qd = (f) => totalQ(f, "dich"), qt = (f) => totalQ(f, "ta");
+    const L = T.EARTHWORK_LINES.A;
+    assert.ok(qd(one(true, L.luy)) > qd(one(false, L.luy)) + 0.05, "trong dải lũy");
+    assert.equal(qd(one(true, 0.40)), qd(one(false, 0.40)), "ngoài dải");
+    const lost = (s) => { s.bases.A2.owner = "ta"; };
+    assert.equal(qd(one(true, L.luy, "A", lost)), qd(one(false, L.luy, "A", lost)), "mất doanh trại A2");
+    assert.ok(qt(one(true, L.uTa)) > qt(one(false, L.uTa)) + 0.05, "dải ụ đất A");
+    assert.ok(qt(one(true, T.EARTHWORK_LINES.B.uTa, "B")) > qt(one(false, T.EARTHWORK_LINES.B.uTa, "B")) + 0.05, "dải ụ đất B");
+    assert.equal(qt(one(true, 0.30)), qt(one(false, 0.30)), "ngoài dải ụ đất");
+  });
+  t("tuyến qua dải trước lũy Nguyên chậm hơn khi có công sự (Tiến công liên tục, đã chiếm A1)", () => {
+    const cross = (ew) => {
+      const s = mkE(ew); s.bases.A1.owner = "ta"; s.fronts.A.x = 0.40;
+      let tIn = -1;
+      for (let i = 0; i < 900; i++) {
+        if (i % 20 === 0) { s.cooldowns.tiencong = 0; issueOrder(s, "A", "tiencong"); }
+        simTick(s);
+        if (tIn < 0 && s.fronts.A.x >= T.EARTHWORK_LINES.A.luy + TERRAIN.front.luyBand[0]) tIn = i;
+        if (s.fronts.A.x >= T.EARTHWORK_LINES.A.luy + TERRAIN.front.luyBand[1]) return i - tIn;
+      }
+      return Infinity;
+    };
+    const off = cross(false), on = cross(true);
+    assert.ok(Number.isFinite(on) && on > off, `qua dải: có ${on} s, không ${off} s`);
+    assert.ok(on < off * 1.5, `không được kẹt tuyến: có ${on} s, không ${off} s`);
+  });
+  t("cung thủ tìm gò: gò trong 14 m, đỉnh cách tướng 7 m tới 0,9 tầm; tắt công trình thì không", () => withF(true, () => {
+    assert.equal(T.perchNear(322, -80, 314, -82, 16)?.x, 320);
+    assert.equal(T.perchNear(322, -80, 300, -75, 16), null, "đỉnh gò ngoài tầm bắn tới tướng");
+    assert.equal(T.perchNear(322, -80, 320, -90, 16), null, "tướng đứng ngay trên gò");
+    assert.equal(T.perchNear(200, -75, 214, -80, 16), null, "không có gò gần");
+    assert.equal(withF(false, () => T.perchNear(322, -80, 314, -82, 16)), null);
+  }));
+}
+// ==== Luật địa hình — HẾT =======================================================================================
+
+console.log("Hoạt ảnh lính (battle/soldier-motion.js)");
+{
+  const M = await import("../js/battle/soldier-motion.js");
+  const { KITS } = await import("../js/data/tuning.js");
+  // Chạy đường ống một lính (sải bước → tư thế → làm mượt → IK, vạt, tua) trên mặt đất cho trước.
+  const run = (kit, { v = 0, frames = 300, ground = () => 0, state = {}, dir = 0, cb = null } = {}) => {
+    const K = KITS[kit], horse = !!K.mounted, dt = 1 / 60, yaw = Math.PI / 2, mdx = Math.sin(yaw + dir), mdz = Math.cos(yaw + dir);
+    const a = { id: 7, kit, K, state: "move", st: 0, windup: 0, windupT: K.windup, atkT: 9, spd: v, walk: 0.3, ready: false, flinch: 0, hitFront: 1, dieT: 0,
+      panicT: 0, blockT: 0, evadeT: 0, fleeT: 0, chargeT: 0, scale: K.scale || 1, yaw, x: 0, z: 0, y: 0, role: "zone", ...state };
+    const T = new Float32Array(M.NCH), P = new Float32Array(M.NCH), out = new Float64Array(M.BONE_FLOATS);
+    for (let f = 0; f < frames; f++) {
+      const px = a.x, pz = a.z; a.x += mdx * v * dt; a.z += mdz * v * dt;
+      if (a.state === "dead") a.dieT += dt;
+      M.advanceStride(a, px, pz, dt); M.poseFor(a, kit, K, f * dt, T);
+      if (!f) P.set(T); else M.smoothPose(P, T, 1 - Math.exp(-dt * 18), 1 - Math.exp(-dt * M.legRate(a)));
+      const g0 = ground(a.x, a.z);
+      M.soldierFrame(a, horse ? "horse" : "human", a.x, g0, a.z, g0, P, dt, ground, true, out);
+      cb?.(f, out, a);
+    }
+    return out;
+  };
+  // đế giày (khung cổ chân ftL = 10, ftR = 11) → toạ độ thế giới
+  const sole = (out, j) => { const o = j * 12, lx = 0, ly = -0.085, lz = 0.05;
+    return [out[o] * lx + out[o + 1] * ly + out[o + 2] * lz + out[o + 3], out[o + 4] * lx + out[o + 5] * ly + out[o + 6] * lz + out[o + 7], out[o + 8] * lx + out[o + 9] * ly + out[o + 10] * lz + out[o + 11]]; };
+  const slope = (x, z) => 0.22 * z - 0.08 * x;
+  t("mọi kiểu lính × trạng thái × mặt dốc: ma trận khớp hữu hạn (15 khớp)", () => {
+    assert.equal(M.NJ, 15); assert.equal(M.BONE_FLOATS, 180);
+    const states = [{}, { ready: true }, { ready: true, windup: 0.2, windupT: 0.4 }, { ready: true, atkT: 0.1 }, { state: "hit", st: 0.2 }, { state: "launch", st: 0.2 },
+      { state: "down", st: 0.6 }, { state: "dead", dieT: 0 }, { blockT: 0.16, ready: true }, { fleeT: 2 }];
+    for (const kit of Object.keys(KITS)) for (const s of states) for (const g of [() => 0, slope]) for (const v of [0, 2.5]) {
+      const out = run(kit, { v, frames: 90, ground: g, state: s });
+      assert.ok(out.every(Number.isFinite), `${kit} ${JSON.stringify(s)} v=${v}`);
+    }
+  });
+  t("bàn chân chống không trượt: đi 1,5 m/s và chạy 3,1 m/s, tốc độ đế chạm đất < 12% tốc độ thân", () => {
+    for (const [kit, v] of [["DV_GIAO", 1.5], ["NG_DAO", 3.1], ["DV_NO", 2.2]]) {
+      let prev = null, n = 0, sum = 0;
+      run(kit, { v, frames: 600, cb: (f, out) => {
+        const cur = [sole(out, 10), sole(out, 11)];
+        if (prev && f > 240) for (let i = 0; i < 2; i++) if (cur[i][1] < 0.005) { n++; sum += Math.hypot(cur[i][0] - prev[i][0], cur[i][2] - prev[i][2]) * 60 / v; }
+        prev = cur;
+      } });
+      assert.ok(n > 50, kit + " ít khung chạm đất: " + n); assert.ok(sum / n < 0.12, `${kit} trượt ${(100 * sum / n).toFixed(1)}%`);
+    }
+  });
+  t("đứng trên dốc 0,22: IK đặt hai đế giày sát mặt đất (≤ 2 cm)", () => {
+    for (const kit of ["DV_GIAO", "NG_DAO", "NG_TANK"]) {
+      const out = run(kit, { frames: 120, ground: slope });
+      for (const j of [10, 11]) { const [x, y, z] = sole(out, j); assert.ok(Math.abs(y - slope(x, z)) <= 0.02, `${kit} khớp ${j} hở ${(y - slope(x, z)).toFixed(3)} m`); }
+    }
+  });
+  t("tua giáo buông thẳng xuống khi đứng yên (khung tas chĩa xuống dưới)", () => {
+    for (const kit of ["DV_GIAO", "NG_GIAO"]) {
+      const out = run(kit, { frames: 300 }), o = 14 * 12;
+      assert.ok(out[o + 5] > 0.9, `${kit}: trục −y của tua lệch khỏi phương đứng (${out[o + 5].toFixed(2)})`);    // cột y của trục y khung tas
+    }
+  });
+}
+
+console.log("Trời, nắng theo pha (battle/atmosphere.js)");
+{
+  const A = await import("../js/battle/atmosphere.js");
+  t("bốn pha: sương gần < xa, P4 sương gần hơn P1, mặt trời thấp dần P2 > P1 > P3 > P4", () => {
+    for (const p of A.ATMO) assert.ok(p.fogNear < p.fogFar, p.id);
+    assert.ok(A.ATMO[3].fogFar < A.ATMO[0].fogFar); assert.ok(A.ATMO[1].el > A.ATMO[0].el && A.ATMO[0].el > A.ATMO[2].el && A.ATMO[2].el > A.ATMO[3].el && A.ATMO[3].el < 20);
+    assert.equal(A.ATMO[3].smoke / A.ATMO[0].smoke, 3); assert.equal(A.ATMO[0].cols + A.ATMO[1].cols, 0);
+  });
+  t("sunDir là vectơ đơn vị, đúng hướng; khung bóng co khi nắng thấp; lớp vàng TPC trong [0,16; 0,5]", () => {
+    for (const [e, az] of [[13, 168], [52, 80], [90, 0]]) { const d = A.sunDir(e, az); near(Math.hypot(d.x, d.y, d.z), 1, 1e-9); }
+    near(A.sunDir(90, 0).y, 1, 1e-9); assert.ok(A.sunDir(30, 90).z > 0 && A.sunDir(30, 180).x < 0);
+    assert.equal(A.shadowHalf(60), 45); assert.ok(A.shadowHalf(13) >= 14 && A.shadowHalf(13) < 45);
+    for (let s = 0; s < 12; s += 0.25) { const w = A.tpcWeight(s); assert.ok(w <= 0.5 + 1e-12 && w >= 0.16 - 1e-12, "tpc " + s); }
+  });
+  t("vectơ thông số trộn đúng: đầu, cuối, giữa; màu tuyến tính", () => {
+    const a = A.presetVec(A.ATMO[0]), b = A.presetVec(A.ATMO[3]), o = new Float32Array(A.NV);
+    A.mixVec(o, a, b, 0); near(o[A.O.fogFar], A.ATMO[0].fogFar, 1e-3); A.mixVec(o, a, b, 1); near(o[A.O.fogFar], A.ATMO[3].fogFar, 1e-3);
+    near(A.srgbToLinear(0.5), 0.214, 1e-3); const w = A.hexLin(0xffffff, [0, 0, 0]); near(w[0] + w[1] + w[2], 3, 1e-9);
+  });
+}
+
 console.log(`\n${pass} đạt, ${fail} trượt`);
 process.exit(fail ? 1 : 0);

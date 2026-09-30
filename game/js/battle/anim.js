@@ -16,9 +16,16 @@ const K = ["torsoX", "torsoY", "torsoZ", "shLx", "shLy", "shLz", "elLx", "handLx
 
 export function zeroPose() { const p = {}; for (const k of K) p[k] = 0; return p; }
 
+// spin, rootX là góc quay cả người: trộn theo đường ngắn nhất (mod 2π). Trước đây xoay xong N6 (1,25 vòng),
+// C3 (3,5 vòng) hay lộn né (rootX 2π) rồi trộn về 0 thì người quay/lộn ngược lại đủ số vòng trong vài khung.
+const TAU = Math.PI * 2;
+const wrapPi = (x) => x - TAU * Math.round(x / TAU);
 export function blendPose(a, b, t) {
   const p = {};
   for (const k of K) p[k] = (a[k] || 0) + ((b[k] || 0) - (a[k] || 0)) * t;
+  const bs = b.spin || 0, br = b.rootX || 0;
+  p.spin = bs - wrapPi(bs - (a.spin || 0)) * (1 - t);
+  p.rootX = br - wrapPi(br - (a.rootX || 0)) * (1 - t);
   return p;
 }
 
@@ -87,16 +94,60 @@ export function idle(t, guard = true) {
   return add({ ...(guard ? GUARD : RELAX) }, { torsoX: b, hipsY: b * 0.8, shRx: -b, shLx: b, torsoY: s, hipsYaw: -s * 0.5 });
 }
 
-export function run(phase, speed01 = 1) {
-  const s = Math.sin(phase), c = Math.cos(phase), a = speed01;
+// Nhịp chạy khớp tốc độ để bàn chân trụ không trượt: sp (m/s), scale = cỡ rig. Nhịp bước (bước/giây) tăng
+// theo tốc độ, giảm theo cỡ người (tướng to bước chậm, ∝ 1/√cỡ như con lắc); biên độ đùi chọn sao cho lúc giữa
+// bước trụ bàn chân lùi so với hông nhanh ≈ 1,1 × tốc độ thân (chân hông → đế dài 0,927 × cỡ rig; 1,1 bù phần
+// setPose() trộn làm nhỏ biên độ). Trả về { rate: rad/s cho runPhase (2 bước mỗi 2π), stride: biên độ đùi cho
+// run() }. Nhịp: H35 hết cần (6,75 m/s) ≈ 2,9 bước/s, đùi ±0,8 rad (trước đây 2,5 bước/s, đùi ±0,93: sải quá dài,
+// trông như nhảy vọt); sĩ quan 4,2 m/s ≈ 2,4; Toa Đô ≈ 2,1. Đo (kịch bản): trượt chân trụ ≈ 8% tốc độ thân khi
+// chạy hết cần, 11% khi cần 0,3 hay sĩ quan về chỗ.
+const GAIT = { rate: 0, stride: 0 };
+export function gait(sp, scale = 1, out = GAIT) {
+  const steps = (RUN.cad0 + RUN.cad1 * sp) / Math.sqrt(scale);
+  out.rate = steps * Math.PI;
+  out.stride = Math.min(1.05, 1.1 * sp / (out.rate * 0.927 * scale));
+  return out;
+}
+
+// Chạy: speed01 = độ gắng sức (nghiêng người, vung tay, nhấc gối), stride = biên độ đùi (từ gait()). Mỗi chân một
+// pha ψ (phải: phase, trái: phase + π); trụ khi cos ψ > 0 (đùi quét từ trước ra sau theo sin: đúng tốc độ lúc
+// giữa bước), đưa khi cos ψ < 0. Cho dáng chạy dứt khoát (ĐỀ XUẤT BẢN THỬ, RUN):
+//   · gối gập trong một cửa sổ rộng hơn pha đưa: bắt đầu sớm lead (chân sau co gót ngay khi rời đất, không duỗi
+//     thẳng thành thế xoạc chân giữa không trung), kết thúc muộn tail (cẳng chân chỉ duỗi ra ngay trước khi đáp);
+//   · đưa gối (drive): nửa sau pha đưa đùi nâng cao thêm trong lúc gối còn gập.
+// Hông thấp nhất lúc giữa bước trụ, nhún lên lúc đổi chân (bob). Không hạ hông thêm (h0 < 0): chạy chậm thì bàn
+// chân đưa sượt đất, IK ép xuống, lê theo người (đo: trượt 40–60% ở cần 0,3).
+export const RUN = { cad0: 1.6, cad1: 0.215, h0: 0.02, bob: 0.05, knee: 1.5, kmin: 0.75,
+  lead: 0.6, tail: 0.75, rise: 0.3, fall: 0.62, drive: 0.4 };
+const _rl = [0, 0];
+const sstep = (e0, e1, x) => { const t = clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
+function runLeg(psi, stride, kl, drive, out = _rl) {
+  const R = RUN, sn = Math.sin(psi), cs = Math.cos(psi);
+  const sw = cs < 0 ? cs * cs * (1 - sn) * 0.843 : 0;                      // 0..1, đỉnh ở sin ψ = −1/3 (cuối pha đưa)
+  // cửa sổ gập gối: từ ψ = π/2 − lead (chân sau vừa rời đất) tới ψ = 3π/2 + tail (ngay trước khi đáp)
+  const a0 = Math.PI / 2 - R.lead, w = psi - a0 - TAU * Math.floor((psi - a0) / TAU), v = w / (Math.PI + R.lead + R.tail);
+  out[0] = stride * sn - 0.1 - drive * sw;
+  out[1] = 0.15 + (v < 1 ? kl * sstep(0, R.rise, v) * (1 - sstep(R.fall, 1, v)) : 0);
+  return out;
+}
+export function run(phase, speed01 = 1, stride = 0.95 * speed01) {
+  const s = Math.sin(phase), c = Math.cos(phase), a = speed01, R = RUN;
   const p = zeroPose();
   p.torsoX = 0.32 * a; p.torsoY = -0.16 * a * s; p.hipsYaw = 0.18 * a * s; p.headX = -0.2 * a;
-  p.hipsY = -0.04 + 0.07 * a * Math.abs(c) - 0.05 * a;
-  p.hipLx = -0.95 * a * s - 0.1; p.hipRx = 0.95 * a * s - 0.1;
-  p.kneeLx = 0.15 + 1.45 * a * Math.max(0, c); p.kneeRx = 0.15 + 1.45 * a * Math.max(0, -c);
+  p.hipsY = R.h0 + R.bob * a * (1 - c * c);
+  const kl = R.knee * Math.max(a, R.kmin), dr = R.drive * a;           // chạy chậm vẫn nhấc gối đủ để chân đưa không lê đất
+  runLeg(phase, stride, kl, dr); p.hipRx = _rl[0]; p.kneeRx = _rl[1];
+  runLeg(phase + Math.PI, stride, kl, dr); p.hipLx = _rl[0]; p.kneeLx = _rl[1];
   // chạy ôm đao: hai tay ngả ra sau, lưỡi đao kéo theo sau lưng
   p.shRx = 0.35 * a + 0.55 * a * s; p.shRz = 0.3; p.elRx = -0.55; p.handRx = 1.25;
   p.shLx = 0.35 * a - 0.55 * a * s; p.shLz = -0.3; p.elLx = -0.55; p.handLx = 1.25;
+  return p;
+}
+
+// Vũ khí cán dài (giáo, đại đao) khi chạy: tay phải dựng cán đứng, hơi ngả sau, thay cho thế "ôm đao" của run()
+// (cán dài 2–3 m kéo lê sau lưng thì lưỡi, đuôi cán cắm xuống đất và tua treo lê trên đất).
+export function carryLong(p, phase = 0, a = 1) {
+  p.shRx = -0.3 + 0.12 * a * Math.sin(phase); p.shRy = 0; p.shRz = 0.3; p.elRx = -1.2; p.handRx = -0.3; p.handRz = 0;
   return p;
 }
 
@@ -136,11 +187,17 @@ const SLASH_DOWN = [
 ];
 const SLASHES = [SLASH_H, SLASH_UP, SLASH_DOWN];
 
-// Chém: side = 1 tay phải, −1 tay trái. high 0 = ngang, 0,6 = hất lên, 1 = bổ xuống. u = 0..1.
-export function slash(u, side = 1, high = 0) {
+// Chém: side = 1 tay phải, −1 tay trái. high 0 = ngang, 0,6 = hất lên, 1 = bổ xuống. u = 0..1. legs = false: đòn tay
+// trái mà chân, hông xoay giữ như đòn tay phải (Tuyệt Kỹ nối chém ↔ xoay: thế thủ gốc lệch chân nên bản lật đầu, cuối
+// nhát chém đổi chân trong một khung).
+const LEG_KEYS = ["hipLx", "hipLz", "hipRx", "hipRz", "kneeLx", "kneeRx", "hipsYaw"];
+export function slash(u, side = 1, high = 0, legs = true) {
   const ks = SLASHES[high >= 0.9 ? 2 : high >= 0.45 ? 1 : 0];
   const p = keys(u, ks);
-  return side > 0 ? p : mirror(p);
+  if (side > 0) return p;
+  const q = mirror(p);
+  if (!legs) for (const k of LEG_KEYS) q[k] = p[k];
+  return q;
 }
 
 // Chém kéo hai tay (N5): dang cả hai lưỡi ra sau rồi quét chéo nhau trước ngực.
@@ -157,17 +214,19 @@ export function scissor(u) {
   ]);
 }
 
-// Hai đao cùng bổ (C1, Đòn Quyết): nhún, bật lên, giơ cao qua đầu, bổ xuống, khuỵu gối tiếp đất.
+// Hai đao cùng bổ (C1, C4, Đòn Quyết): nhún, bật lên, giơ cao qua đầu, bổ xuống, khuỵu gối tiếp đất. Lúc bổ tay dừng
+// gần ngang, mũi hai lưỡi chạm đất ≈ 1,7 m trước mặt (chỗ tung bụi); rig-motion.js gập cổ tay cho mũi dừng ở mặt đất.
+// Trước đây tay chúc xuống (shRx −0,35), lưỡi nối dài cánh tay: 0,85 m trong 0,97 m lưỡi cắm xuống đất.
 export function doubleChop(u) {
   return keys(u, [
     [0, GUARD],
-    [0.18, P({ torsoX: 0.45, hipsY: -0.32, shRx: 0.5, shLx: 0.5, shRz: 0.3, shLz: -0.3, elRx: -0.3, elLx: -0.3, handRx: 1.3, handLx: 1.3,
+    [0.18, P({ torsoX: 0.45, hipsY: -0.32, shRx: 0.5, shLx: 0.5, shRz: 0.3, shLz: -0.3, elRx: -0.3, elLx: -0.3, handRx: 0.85, handLx: 0.85,
       hipLx: -0.7, kneeLx: 1.1, hipRx: -0.4, kneeRx: 1.0 }), "out"],
     [0.4, P({ torsoX: -0.4, hipsY: 0.28, shRx: -3.0, shLx: -3.0, shRz: 0.25, shLz: -0.25, elRx: -0.55, elLx: -0.55, handRx: 0.2, handLx: 0.2,
       hipLx: -0.9, kneeLx: 1.3, hipRx: 0.2, kneeRx: 0.9, headX: -0.3 }), "out"],
-    [0.52, P({ torsoX: 0.8, hipsY: -0.42, shRx: -0.35, shLx: -0.35, shRz: 0.12, shLz: -0.12, elRx: -0.05, elLx: -0.05, handRx: 1.35, handLx: 1.35,
+    [0.52, P({ torsoX: 0.8, hipsY: -0.42, shRx: -1.0, shLx: -1.0, shRz: 0.12, shLz: -0.12, elRx: -0.05, elLx: -0.05, handRx: 1.0, handLx: 1.0,
       hipLx: -1.1, kneeLx: 1.3, hipRx: 0.55, kneeRx: 1.1, headX: 0.25 }), "snap"],
-    [0.72, P({ torsoX: 0.78, hipsY: -0.42, shRx: -0.3, shLx: -0.3, shRz: 0.14, shLz: -0.14, elRx: -0.1, elLx: -0.1, handRx: 1.35, handLx: 1.35,
+    [0.72, P({ torsoX: 0.78, hipsY: -0.42, shRx: -0.95, shLx: -0.95, shRz: 0.14, shLz: -0.14, elRx: -0.1, elLx: -0.1, handRx: 1.0, handLx: 1.0,
       hipLx: -1.1, kneeLx: 1.3, hipRx: 0.55, kneeRx: 1.1, headX: 0.2 }), "out"],
     [1, GUARD, "io"],
   ]);
@@ -214,14 +273,13 @@ export function dash(u) {
   ]);
 }
 
-// Đỡ: bắt chéo hai lưỡi trước mặt, hạ trọng tâm.
-export function block() {
-  return P({
-    torsoX: 0.18, hipsY: -0.2, shRx: -1.15, shRy: -0.35, shRz: 0.1, elRx: -1.25, handRx: 0.1, handRz: 0.5,
-    shLx: -1.15, shLy: 0.35, shLz: -0.1, elLx: -1.25, handLx: 0.1, handLz: -0.5,
-    hipLx: -0.4, kneeLx: 0.55, hipRx: 0.3, kneeRx: 0.45, hipLz: -0.08, hipRz: 0.08, headX: 0.05,
-  });
-}
+// Đỡ: bắt chéo hai lưỡi trước mặt, hạ trọng tâm. Trả về hằng dùng chung (đã đóng băng: blendPose chỉ đọc).
+export const BLOCK = Object.freeze(P({
+  torsoX: 0.18, hipsY: -0.2, shRx: -1.15, shRy: -0.35, shRz: 0.1, elRx: -1.25, handRx: 0.1, handRz: 0.5,
+  shLx: -1.15, shLy: 0.35, shLz: -0.1, elLx: -1.25, handLx: 0.1, handLz: -0.5,
+  hipLx: -0.4, kneeLx: 0.55, hipRx: 0.3, kneeRx: 0.45, hipLz: -0.08, hipRz: 0.08, headX: 0.05,
+}));
+export function block() { return BLOCK; }
 
 // Trúng đòn: giật ngửa người, tay văng, lùi nửa bước.
 export function hitReact(u) {
@@ -230,31 +288,53 @@ export function hitReact(u) {
     shLx: 0.4, shLz: -0.6, elLx: -0.6, handLx: 0.5, hipLx: 0.3, kneeLx: 0.3, hipRx: -0.2, kneeRx: 0.5, rootX: -0.1 }), k);
 }
 
-// Né: lộn một vòng về trước, co tròn người.
+// Né: lộn một vòng về trước, co tròn người. Khớp hông là tâm quay (rootX) nên lúc lộn ngược nâng hông lên (sin² theo
+// góc lộn) cho cả khối người lăn quanh bụng, không quanh hông; giữa vòng lộn lật cổ tay cho hai lưỡi nằm dọc cẳng tay
+// (cầm ngược) thay vì chĩa ra xa. Trước đây lúc chúc ngược đầu cắm xuống đất 0,55 m, tay 0,36 m, mũi đao 1,5 m.
 export function dodgeRoll(u) {
-  const r = EASE.io(seg(u, 0.05, 0.9)), k = Math.sin(clamp01(u) * Math.PI);
-  const p = P({ torsoX: 0.9 * k, headX: 0.5 * k, hipsY: -0.52 * k, shRx: -1.2 * k, shLx: -1.2 * k, elRx: -1.4 * k, elLx: -1.4 * k,
-    handRx: 1.4, handLx: 1.4, hipLx: -1.5 * k, hipRx: -1.3 * k, kneeLx: 2.0 * k, kneeRx: 1.9 * k });
+  const r = EASE.io(seg(u, 0.05, 0.9)), k = Math.sin(clamp01(u) * Math.PI), inv = Math.sin(r * Math.PI) ** 2;
+  const p = P({ torsoX: 0.9 * k, headX: 0.5 * k, hipsY: -0.52 * k + 0.65 * inv, shRx: -1.2 * k, shLx: -1.2 * k, elRx: -1.4 * k, elLx: -1.4 * k,
+    handRx: 1.4 - 2.2 * k, handLx: 1.4 - 2.2 * k, hipLx: -1.5 * k, hipRx: -1.3 * k, kneeLx: 2.0 * k, kneeRx: 1.9 * k });
   p.rootX = r * Math.PI * 2;
   return p;
 }
 
-// Ngã ngửa rồi nằm.
+// Ngã ngửa rồi nằm. Chân phải nhấc theo độ ngã (hipRx −0,3·k) cho nằm dọc mặt đất (trước đây 0,1 cố định: nằm thì
+// chân chếch cắm xuống đất 0,2 m).
 export function knockdown(u) {
   const k = EASE.out(clamp01(u * 2.2));
   return P({ rootX: -1.45 * k, hipsY: -0.72 * k, torsoX: -0.1 * k, headX: -0.2 * k, shRx: -2.6 * k, shLx: -2.2 * k, shRz: 0.5 * k, shLz: -0.7 * k,
-    elRx: -0.3, elLx: -0.5, handRx: 0.6, handLx: 0.6, hipLx: -0.3 * k, kneeLx: 0.6 * k, hipRx: 0.1, kneeRx: 0.2 * k });
+    elRx: -0.3, elLx: -0.5, handRx: 0.6, handLx: 0.6, hipLx: -0.3 * k, kneeLx: 0.6 * k, hipRx: 0.1 - 0.4 * k, kneeRx: 0.2 * k });
 }
 
-// Đòn nặng hai tay (Toa Đô đại đao, đòn viền đỏ): giơ cao rồi bổ.
-export function heavyChop(u, windup = 0.55) {
+// Vỡ Thế (sĩ quan, boss hết Phá Thế, 3,5 s chờ Đòn Quyết): t = giây từ lúc vỡ. Loạng choạng ngửa ra (0,2 s đầu) rồi
+// khuỵu gối, gục người, đầu cúi, hai tay buông, thở dốc; vũ khí dài chống mũi xuống đất (rig-motion.js gập cổ tay cho
+// mũi nằm đúng mặt đất). Thân gần thẳng đứng nên chân vẫn bám đất (IK), vạt áo, áo choàng buông sau lưng. Trước đây
+// giữ khung giữa lúc ngã ngửa (knockdown 0,2: nghiêng 57°) cả 3,5 s: chân, vạt sau, áo choàng cắm xuống đất 0,2–0,44 m.
+const REEL = P({ rootX: -0.22, hipsY: -0.16, torsoX: -0.35, headX: -0.3, shRx: 0.35, shRz: 0.45, elRx: -0.5, handRx: 0.5,
+  shLx: 0.35, shLz: -0.45, elLx: -0.5, handLx: 0.5, hipLx: 0.25, kneeLx: 0.45, hipRx: -0.3, kneeRx: 0.45 });
+const SLUMP = P({ rootX: 0.05, hipsY: -0.3, torsoX: 0.5, torsoY: 0.12, headX: 0.45, shRx: 0.05, shRz: 0.2, elRx: -0.35, handRx: 0.85,
+  shLx: 0.15, shLz: -0.25, elLx: -0.45, handLx: 0.6, hipLx: -0.55, hipLz: -0.08, kneeLx: 1.0, hipRx: 0.35, hipRz: 0.1, kneeRx: 1.05 });
+export function stagger(t, long = false) {
+  const p = keys(seg(t, 0.15, 0.7), [[0, REEL], [1, SLUMP, "io"]]);
+  const b = Math.sin(t * 4.5), w = seg(t, 0.4, 1);
+  if (long) p.handRx = 0.35 + (0.85 - 0.35) * (1 - w);          // cán dài: mũi chống đất phía trước
+  return add(p, { torsoX: 0.05 * b * w, headX: 0.04 * b * w, shRx: -0.03 * b * w, hipsY: 0.012 * b * w,
+    torsoZ: 0.05 * Math.sin(t * 1.6) * w, hipsYaw: 0.04 * Math.sin(t * 1.1) * w });
+}
+
+// Đòn nặng hai tay (Toa Đô đại đao, đòn viền đỏ): giơ cao rồi bổ. long = vũ khí cán dài (đại đao, giáo): lúc bổ tay
+// dừng cao hơn, lưỡi chếch nông (trước đây cùng khung với đao ngắn: mũi đại đao cắm xuống đất 1,9–2,1 m, cả lưỡi mất
+// dưới cỏ; rig-motion.js gập cổ tay cho mũi dừng ở mặt đất).
+export function heavyChop(u, windup = 0.55, long = false) {
+  const sI = long ? -0.8 : -0.5, hI = long ? 0.75 : 0.95;
   return keys(u, [
     [0, P({ torsoX: 0.1, shRx: -0.6, shLx: -0.6, shRy: -0.3, shLy: 0.5, elRx: -0.9, elLx: -0.9, handRx: 0.4, hipLx: -0.3, kneeLx: 0.3, hipRx: 0.2, kneeRx: 0.2, hipsY: -0.06 })],
     [windup, P({ torsoX: -0.4, torsoY: 0.4, shRx: -2.95, shLx: -2.8, shRy: -0.2, shLy: 0.4, elRx: -0.5, elLx: -0.7, handRx: 0.3,
       hipLx: -0.25, kneeLx: 0.2, hipRx: 0.3, kneeRx: 0.2, hipsY: 0.02, headX: -0.2 }), "out"],
-    [windup + 0.12, P({ torsoX: 0.75, torsoY: -0.3, shRx: -0.35, shLx: -0.3, shRy: -0.25, shLy: 0.45, elRx: -0.05, elLx: -0.1, handRx: 1.1,
+    [windup + 0.12, P({ torsoX: 0.7, torsoY: -0.3, shRx: sI, shLx: sI + 0.05, shRy: -0.25, shLy: 0.45, elRx: -0.05, elLx: -0.1, handRx: hI,
       hipLx: -0.85, kneeLx: 0.9, hipRx: 0.5, kneeRx: 0.45, hipsY: -0.3, headX: 0.2 }), "snap"],
-    [1, P({ torsoX: 0.6, torsoY: -0.25, shRx: -0.4, shLx: -0.35, shRy: -0.25, shLy: 0.45, elRx: -0.1, elLx: -0.1, handRx: 1.05,
+    [1, P({ torsoX: 0.56, torsoY: -0.25, shRx: sI - 0.05, shLx: sI, shRy: -0.25, shLy: 0.45, elRx: -0.1, elLx: -0.1, handRx: hI - 0.05,
       hipLx: -0.8, kneeLx: 0.85, hipRx: 0.45, kneeRx: 0.4, hipsY: -0.26 }), "out"],
   ]);
 }
@@ -279,12 +359,79 @@ export function backstep(u) {
     hipLx: 0.55, kneeLx: 0.7, hipRx: -0.5, kneeRx: 0.9, headX: 0.1 }), k);
 }
 
-// Đi ngang thăm dò (dir 1 = sang phải), thế thủ giữ nguyên, bước chéo chân.
-export function strafe(phase, dir = 1) {
-  const s = Math.sin(phase), c = Math.cos(phase), p = { ...GUARD };
-  p.hipLz = -0.06 + 0.28 * s * dir; p.hipRz = 0.08 + 0.28 * s * dir;
-  p.kneeLx = 0.42 + 0.35 * Math.max(0, c); p.kneeRx = 0.3 + 0.35 * Math.max(0, -c);
-  p.hipsY = -0.1 - 0.04 * Math.abs(c); p.torsoZ = -0.05 * dir; p.torsoY = GUARD.torsoY + 0.1 * s;
+// ---- bước thủ thế: đi khi đỡ (tướng), đi ngang thăm dò (sĩ quan) ------------------------------------------
+// Thân trên giữ nguyên tư thế base, hai chân bước ngắn theo hướng (dx, dz) trong khung rig (véc-tơ đơn vị: +x phải,
+// +z trước). Đặt bàn chân trong không gian rồi giải IK (legTo): pha trụ (STEP.duty chu kỳ) cổ chân nằm đúng mặt
+// đất, lùi đều so với hông đúng bằng tốc độ thân nên đứng yên trên đất; pha đưa nhấc lên STEP.clear rồi đưa ra theo
+// hướng đi. Tiến/lùi: hai chân lệch nửa chu kỳ như đi thường. Sang ngang: chân phía hướng đi bước trước, chân kia
+// bước đuổi theo sau STEP.close chu kỳ (bước trượt thủ thế, hai chân không bắt chéo), đứng rộng thêm STEP.wide; đi
+// chéo nội suy giữa hai lệch pha. stride = nửa quãng bàn chân quét trong pha trụ (đơn vị rig, từ stepGait()).
+// Trước đây: tướng đi trong thế đỡ 2 m/s mà tư thế đứng yên (trôi trên đất); strafe() của sĩ quan xoay đùi, gập
+// gối theo góc — gối gập làm chân ngắn lại, bàn chân tụt vào và lê (trượt ~20%), hai chân bắt chéo nhau ~0,35 m.
+// ĐỀ XUẤT BẢN THỬ (STEP): thế đỡ 2 m/s ≈ 4 bước/s, bàn chân quét ±0,33 (rig) quanh chỗ của tư thế đỡ; đo trượt
+// chân trụ 10–14% (tướng), ~10% (sĩ quan đi ngang 1,5 m/s).
+const GAIT_S = { rate: 0, stride: 0 };
+export const STEP = { rate: 13, duty: 0.7, close: 0.18, clear: 0.12, wide: 0.04 };
+export function stepGait(sp, scale = 1, out = GAIT_S, rate = STEP.rate) {
+  out.rate = rate / Math.sqrt(scale);
+  out.stride = Math.min(0.45, Math.PI * STEP.duty * sp / (out.rate * scale));
+  return out;
+}
+// Một chân: ψ pha riêng → [vị trí dọc hướng đi −1..1 (1 = đầu pha trụ, −1 = cuối), mức nhấc 0..1].
+const _sl = [0, 0];
+function sideStep(psi, out = _sl, D = STEP.duty) {
+  const u = psi / TAU - Math.floor(psi / TAU);
+  if (u < D) { out[0] = 1 - 2 * u / D; out[1] = 0; }
+  else { const v = (u - D) / (1 - D); out[0] = -Math.cos(Math.PI * v); out[1] = Math.sin(Math.PI * v); }
+  return out;
+}
+// Chân rig (như LEG trong models.js): đùi, cẳng, đế giày; khớp hông cao 0,92 − 0,02 so với gốc khi hipsY = 0.
+const LEGA = { L1: 0.45, L2: 0.40, sole: 0.08, hip: 0.9 };
+const _fk = [0, 0, 0], _lk = [0, 0, 0];
+// Cổ chân so với khớp hông (khung hông) theo góc đùi θ, dạng đùi rz (Euler XYZ), gập gối κ → [x, y, z].
+function footOf(th, rz, kn, out = _fk) {
+  const L = LEGA, P = L.L1 + L.L2 * Math.cos(kn), Q = L.L2 * Math.sin(kn), c = Math.cos(rz), ct = Math.cos(th), st = Math.sin(th);
+  out[0] = Math.sin(rz) * P; out[1] = -c * P * ct + Q * st; out[2] = -c * P * st - Q * ct;
+  return out;
+}
+// Ngược lại: góc [θ, rz, κ] đưa cổ chân tới (X, Y, Z); ngoài tầm với thì duỗi hết về phía điểm đó.
+function legTo(X, Y, Z, out = _lk) {
+  const L = LEGA, dMax = (L.L1 + L.L2) * 0.999, dMin = 0.3;
+  let d2 = X * X + Y * Y + Z * Z;
+  if (d2 > dMax * dMax || d2 < dMin * dMin) {
+    const d = Math.sqrt(d2) || 1e-6, f = (d > dMax ? dMax : dMin) / d;
+    X *= f; Y *= f; Z *= f; d2 = X * X + Y * Y + Z * Z;
+  }
+  const ck = (d2 - L.L1 * L.L1 - L.L2 * L.L2) / (2 * L.L1 * L.L2), kn = Math.acos(ck < -1 ? -1 : ck > 1 ? 1 : ck);
+  const P = L.L1 + L.L2 * Math.cos(kn), Q = L.L2 * Math.sin(kn), sx = X / P;
+  const rz = Math.asin(sx < -1 ? -1 : sx > 1 ? 1 : sx);
+  out[0] = wrapPi(Math.atan2(Z, Y) - Math.atan2(-Q, -Math.cos(rz) * P)); out[1] = rz; out[2] = kn;
+  return out;
+}
+export function guardStep(base, phase, dx, dz, stride) {
+  const S = STEP, p = { ...base }, sg = dx < 0 ? -1 : 1, w = dx * dx;
+  const off = sg * (Math.PI * (1 - w) + TAU * S.close * w);     // chân trái trễ (dx > 0) hay sớm (dx < 0) so với chân phải
+  sideStep(phase, _sl); const xR = _sl[0], uR = _sl[1];
+  sideStep(phase - off, _sl); const xL = _sl[0], uL = _sl[1];
+  p.hipsY = base.hipsY - 0.015 * (uL + uR); p.torsoZ = base.torsoZ - 0.06 * dx;
+  // hướng đi đổi sang khung hông (thế thủ xoay hông), mặt đất dưới khớp hông; đi ngang thì đứng rộng thêm
+  const yw = base.spin + base.hipsYaw, cy = Math.cos(yw), sy = Math.sin(yw);
+  const hx = dx * cy - dz * sy, hz = dx * sy + dz * cy, y0 = LEGA.sole - LEGA.hip - p.hipsY, wd = S.wide * Math.abs(hx);
+  footOf(base.hipLx, base.hipLz, base.kneeLx);
+  legTo(_fk[0] - wd + stride * xL * hx, y0 + S.clear * uL, _fk[2] + stride * xL * hz); p.hipLx = _lk[0]; p.hipLz = _lk[1]; p.kneeLx = _lk[2];
+  footOf(base.hipRx, base.hipRz, base.kneeRx);
+  legTo(_fk[0] + wd + stride * xR * hx, y0 + S.clear * uR, _fk[2] + stride * xR * hz); p.hipRx = _lk[0]; p.hipRz = _lk[1]; p.kneeRx = _lk[2];
+  return p;
+}
+
+// Sĩ quan đi ngang thăm dò quanh tướng (thế thủ song đao/đại đao giữ nguyên): bước thủ thế sang ngang, nhịp chậm
+// hơn thế đỡ của tướng. dir = hướng theo trục x của rig (1 = sang phải), stride từ strafeGait().
+export const STRAFE = { rate: 8.5 };
+const STRAFE_BASE = { ...GUARD, hipsY: -0.04 };
+export function strafeGait(sp, scale = 1, out = GAIT_S) { return stepGait(sp, scale, out, STRAFE.rate); }
+export function strafe(phase, dir = 1, stride = 0.3) {
+  const p = guardStep(STRAFE_BASE, phase, dir, 0, stride);
+  p.torsoY = GUARD.torsoY + 0.05 * Math.sin(phase * 2);
   return p;
 }
 

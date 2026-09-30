@@ -4,19 +4,15 @@
 // khựng, nhận sát thương ×1,5, mở Đòn Quyết (3.7). Đòn viền đỏ báo trước 0,6 s và chỉ phản đòn
 // được, không đỡ được (3.6).
 
-import { makeRig, PAL } from "./models.js";
+import { makeRig, disposeRig, RIGS } from "./models.js";
+import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
 import { TIERS, S, g, heSoGiap, DEFENSE, AI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
+import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
-const RIGS = {
-  doitruong: { scale: 1.12, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dao", shield: true },
-  photuong:  { scale: 1.22, cloth: PAL.cham, armor: PAL.then, trim: PAL.xam, hat: "mulong", weapon: "dadao", cape: 0x3b4a5a },
-  tuong:     { scale: 1.38, cloth: 0x3a2f3a, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x4a2f2a },
-  H33:       { scale: 1.15, cloth: 0x2f4a6a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "giao", cape: PAL.son },
-  H40:       { scale: 1.15, cloth: 0x4a5a2a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "cung", cape: PAL.sonDam },
-};
+const STRAFE_SPEED = 1.5;     // m/s, đi vòng thăm dò quanh tướng
 
 export class BigUnit {
   constructor(ctx, o) {
@@ -33,7 +29,10 @@ export class BigUnit {
       this.T = { mv: 1.5, every: 1.4, red: 0 };
     }
     this.hp = this.maxHp * (o.hpFrac ?? 1); this.poise = this.poiseMax;
-    this.rig = makeRig(RIGS[o.rigKey || o.tier]);
+    const cfg = RIGS[o.rigKey || o.tier];
+    this.rig = makeRig(cfg);
+    this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, áo choàng, tua giáo (rig-motion.js)
+    this.longWeapon = cfg.weapon === "giao" || cfg.weapon === "dadao";
     ctx.scene.add(this.rig.root);
     this.x = o.x; this.z = o.z; this.yaw = o.yaw ?? -Math.PI / 2; this.home = { x: o.x, z: o.z };
     this.post = { x: o.x, z: o.z };
@@ -42,33 +41,38 @@ export class BigUnit {
     this.pose = A.idle(0); this.awake = o.awake ?? (o.side === "ta"); this.aggro = o.aggro ?? 22;
     this.giapPen = 0; this.dead = 0; this.retreating = false; this.speed = o.side === "dich" ? 4.2 : 4.6;
     this.roarT = 0; this.strafeT = 0; this.strafeDir = 1; this.blockWatch = 0; this.hitTimes = []; this.backCd = 0;
+    A.applyPose(this.rig, this.pose);
+    this.place(0);       // đặt rig ngay chỗ xuất hiện, dây treo buông sẵn (khỏi bay từ gốc toạ độ vào)
   }
 
   get y() { return heightAt(this.x, this.z); }
   get radius() { return 0.9 * this.rig.scale; }
 
-  dispose() { this.ctx.scene.remove(this.rig.root); this.alive = false; }
+  // Gỡ rig khỏi cảnh, giải phóng khung xương (texture xương), vật liệu riêng của đơn vị (hình học dùng chung, đệm theo
+  // cấu hình trong models.js). Trước đây chỉ gỡ khỏi cảnh: mỗi lần sinh/xoá (Luyện tập sinh lại sĩ quan mỗi 3 s, thử
+  // lại checkpoint, tướng đồng minh ngã rồi dậy) rò 22 geometry + 1 texture trên GPU.
+  dispose() { disposeRig(this.rig); this.alive = false; }
 
   update(dt) {
     const ctx = this.ctx, hero = ctx.hero;
     this.animT += dt; this.flash = Math.max(0, this.flash - dt);
     if (!this.alive) return;
-    if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.dead), 0.3); if (this.dead > 3.5) this.dispose(); this.place(); return; }
+    if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.dead), 0.3); if (this.dead > 3.5) this.dispose(); this.place(dt); return; }
     if (this.retreating) { this.updateRetreat(dt); return; }
 
     if (this.poiseMax > 0) {
       this.noHit += dt;
       if (this.broken > 0) {
         this.broken -= dt;
-        this.setPose(A.knockdown(Math.min(0.2, this.broken * 0.1)), 0.25);
+        this.setPose(A.stagger(3.5 - this.broken, this.longWeapon), 0.25);     // Vỡ Thế: loạng choạng rồi khuỵu, gục
         if (this.broken <= 0) this.poise = this.poiseMax;
-        this.place(); return;
+        this.place(dt); return;
       }
       if (this.noHit > 3) this.poise = Math.min(this.poiseMax, this.poise + this.poiseMax * 0.2 * dt);
     }
 
     if (this.side === "dich") this.updateEnemy(dt, hero); else this.updateAlly(dt);
-    this.place();
+    this.place(dt);
   }
 
   updateEnemy(dt, hero) {
@@ -125,11 +129,14 @@ export class BigUnit {
     this.strafeT -= dt;
     if (this.strafeT <= 0) { this.strafeDir = ctx.rng.next() < 0.5 ? -1 : 1; this.strafeT = 1.2 + ctx.rng.next() * 1.6; }
     const nx = dx / (d || 1), nz = dz / (d || 1), back = d < 1.8 ? -1.2 : 0;
-    const vx = -nz * this.strafeDir * 1.5 + nx * back, vz = nx * this.strafeDir * 1.5 + nz * back;
-    this.x += vx * dt; this.z += vz * dt;
+    const vx = -nz * this.strafeDir * STRAFE_SPEED + nx * back, vz = nx * this.strafeDir * STRAFE_SPEED + nz * back;
+    const tf = speedFactor(this.x, this.z, vx, vz);          // dốc, bùn (terrain-rules.js)
+    this.x += vx * tf * dt; this.z += vz * tf * dt;
     [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates);
-    this.runPhase += dt * 6;
-    this.setPose(A.strafe(this.runPhase, this.strafeDir), 0.2);
+    // strafeDir = 1 đi về phía −x của rig (mặt hướng tướng) → hoạt ảnh bước theo −strafeDir
+    const sg = A.strafeGait(STRAFE_SPEED * tf, this.rig.scale);
+    this.runPhase += dt * sg.rate;
+    this.setPose(A.strafe(this.runPhase, -this.strafeDir, sg.stride), 0.5);
   }
 
   updateAttack(dt, hero, d) {
@@ -137,20 +144,20 @@ export class BigUnit {
     this.st += dt;
     if (this.state === "atk") {
       const dur = 0.95, u = this.st / dur;
-      this.setPose(this.combo % 2 ? A.sweep(u) : A.heavyChop(u, 0.4), 0.5);
+      this.setPose(this.combo % 2 ? A.sweep(u) : A.heavyChop(u, 0.4, this.longWeapon), 0.5);
       if (!this.hitDone && u > 0.5) {
         this.hitDone = true;
-        if (d < 3.3 && facing(this, hero, 1.2)) hero.receiveHit({ dmg: this.cong * T.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: false, src: this, heavy: true });
+        if (d < 3.3 && facing(this, hero, 1.2)) hero.receiveHit({ dmg: this.cong * T.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: false, src: this, heavy: true });
         this.hitCrowd(3, T.mv * 0.6);
       }
       if (u >= 1) { this.state = "idle"; this.atkCd = T.every * (0.8 + 0.4 * ctx.rng.next()); }
     } else if (this.state === "red") {
       const tele = DEFENSE.redTelegraph, u = this.st / (tele + 0.35);
-      this.setPose(A.heavyChop(u, tele / (tele + 0.35)), 0.6);
+      this.setPose(A.heavyChop(u, tele / (tele + 0.35), this.longWeapon), 0.6);
       if (!this.hitDone && this.st >= tele) {
         this.hitDone = true;
         if (d < 3.8 && facing(this, hero, 1.3)) {
-          const r = hero.receiveHit({ dmg: this.cong * T.red * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: true, src: this, heavy: true });
+          const r = hero.receiveHit({ dmg: this.cong * T.red * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: true, src: this, heavy: true });
           if (r === "parried") { this.state = "stagger"; this.st = 1.3; return; }
         }
         ctx.fx.shake(0.35); ctx.fx.dust(this.x + Math.sin(this.yaw) * 2, this.z + Math.cos(this.yaw) * 2, 1.4);
@@ -162,7 +169,7 @@ export class BigUnit {
       if (!this.hitDone && this.st >= tele + 0.3) {
         this.hitDone = true;
         ctx.fx.shake(0.7); ctx.fx.shockwave(this.x, this.z, 7);
-        if (d < 7) hero.receiveHit({ dmg: this.cong * T.ult * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg, x: this.x, z: this.z, red: false, unblockable: true, src: this, knockdown: true });
+        if (d < 7) hero.receiveHit({ dmg: this.cong * T.ult * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: false, unblockable: true, src: this, knockdown: true });
         this.hitCrowd(7, 3);
       }
       if (this.st >= dur) { this.state = "idle"; this.atkCd = 1.2; }
@@ -218,22 +225,27 @@ export class BigUnit {
     this.setPose(A.idle(this.animT), 0.1);
   }
 
-  moveToward(tx, tz, dt, k) {
+  // free: chạy theo kịch bản (Toa Đô rút chạy) — không tính dốc, bùn
+  moveToward(tx, tz, dt, k, free = false) {
     const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz) || 1;
-    const sp = this.speed * k;
+    const sp = this.speed * k * (free ? 1 : speedFactor(this.x, this.z, dx, dz));   // dốc, bùn (terrain-rules.js)
     this.x += dx / d * sp * dt; this.z += dz / d * sp * dt;
     [this.x, this.z] = collide(this.ctx.world, this.x, this.z, 0.7, this.ctx.openGates);
     this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 7);
-    this.runPhase += dt * sp * 2.2;
-    this.setPose(A.run(this.runPhase, Math.min(1, k + 0.2)), 0.3);
+    const gt = A.gait(sp, this.rig.scale);         // nhịp bước theo tốc độ và cỡ người: chân trụ không trượt
+    this.runPhase += dt * gt.rate;
+    const p = A.run(this.runPhase, Math.min(1, k + 0.2), gt.stride);
+    if (this.longWeapon) A.carryLong(p, this.runPhase);   // giáo, đại đao dựng đứng khi chạy (không cắm đất)
+    this.setPose(p, 0.3);
   }
 
   setPose(p, k) { this.pose = A.blendPose(this.pose, p, Math.min(1, k)); A.applyPose(this.rig, this.pose); }
 
-  place() {
+  // dt = bước mô phỏng vừa chạy (0 khi dựng): chuyển động phụ theo bước mô phỏng, hit-stop thì đứng yên.
+  place(dt = 0) {
     const r = this.rig.root;
     r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw;
-    if (this.rig.p.flagCloth) this.rig.p.flagCloth.rotation.x = Math.sin(this.animT * 5) * 0.12;
+    if (this.alive) this.motion.update(dt, this.pose, heightAt);
   }
 
   // Đòn của tướng người chơi. Trả về { killed, broke }.
@@ -278,11 +290,11 @@ export class BigUnit {
     const tx = this.retreatTo?.x ?? 540, tz = this.retreatTo?.z ?? -175;
     if (this.retreatT < 1.2) { this.setPose(A.hitReact(this.retreatT / 1.2), 0.3); }
     else {
-      this.moveToward(tx, tz, dt, 1.2);
+      this.moveToward(tx, tz, dt, 1.2, true);
       if (this.retreatT > 6) { this.rig.root.visible = Math.floor(this.retreatT * 8) % 2 === 0; }
       if (this.retreatT > 8) { this.dispose(); }
     }
-    this.place();
+    this.place(dt);
   }
 }
 

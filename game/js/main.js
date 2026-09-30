@@ -306,7 +306,9 @@ async function startBattle() {
     res = null;
     toast("Lỗi khi chạy trận: " + err.message, true);
   }
-  stage.remove(); app.style.display = "";
+  // gỡ cả cây DOM của trận: canvas (còn bị gl giữ nếu đệm nào sót listener) không còn dẫn tới lớp phủ, nút cảm
+  // ứng mà closure của chúng giữ ctx → trận cũ thu hồi được
+  stage.remove(); stage.replaceChildren(); app.style.display = "";
   if (!res?.won) music.play("hub");
   if (!res) { render(); return; }
   showResults(res);
@@ -325,7 +327,7 @@ async function startArena() {
   let res = null;
   try { res = await runArena({ container: stage, save, R: pick.R, difficulty: pick.difficulty, music, opts, onSettings: () => persist() }); }
   catch (err) { console.error(err); toast("Lỗi Võ trường: " + err.message, true); }
-  stage.remove(); app.style.display = ""; music.play("hub");
+  stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");   // như startBattle
   if (!res) { render(); return; }
   const rw = arenaRewards(save, res);
   applyArena(save, res, rw); const lv = P.addExp(save, rw.exp); persist();

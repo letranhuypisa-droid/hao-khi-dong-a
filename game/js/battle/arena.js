@@ -9,7 +9,7 @@ import { BigUnit } from "./units.js";
 import { FX } from "./fx.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
-import { lerpAngle, buildTouch, controlsHTML } from "./battle.js";
+import { lerpAngle, buildTouch, controlsHTML, releaseGpu } from "./battle.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, TIERS, E, g } from "../data/tuning.js";
@@ -213,8 +213,8 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     const overlay = container.querySelector(".overlay"), touchRoot = container.querySelector(".touch");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(55, 1, 0.3, 900);
+    renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;   // r186 bỏ PCFSoft (xem battle.js)
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);   // núi xa đặt ngoài vòng 600–900 m
     const ctx = {
       scene, camera, renderer, R, diff, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
       openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music,
@@ -226,6 +226,11 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     music?.play(opts.mode === "luyentap" ? "hub" : "boss");
     ctx.fx = new FX(scene, camera, hudRoot);
     ctx.crowd = new Crowd(scene, ctx);
+    // khán giả trên khán đài: quân Trần đứng xem, reo hò khi tướng hạ địch (không đánh, không bị đánh)
+    for (const s of ctx.world.spectatorSpots || []) {
+      const a = ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "spectator", x: s.x, z: s.z, yaw: s.yaw });
+      a.y = s.y;
+    }
     ctx.hero = new Hero(ctx, stats); ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI;
     const input = new Input(canvas);
     new ArenaHUD(hudRoot, ctx);
@@ -246,6 +251,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     if (settings.touch === "on" || (settings.touch === "auto" && matchMedia("(pointer: coarse)").matches)) buildTouch(touchRoot, input, ctx);
 
     let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, time = 0, endShown = false;
+    // hết lượt (director.over) thì không mở tạm dừng, như battle.js: bảng tạm dừng đè mất bảng kết quả
     const pause = (on) => {
       if (finished) return;
       paused = on; overlay.classList.toggle("on", on);
@@ -253,17 +259,21 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       if (on) {
         document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
         overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
-        overlay.querySelector("[data-a=quit]").onclick = () => { opts.abortedFlag = true; ctx.director.finish(false, "Rời sân."); pause(false); };
+        overlay.querySelector("[data-a=quit]").onclick = () => {
+          if (ctx.director.over) { finish(ctx.director.result); return; }
+          opts.abortedFlag = true; ctx.director.finish(false, "Rời sân."); pause(false);
+        };
       } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
+      if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
     const onLock = () => { if (!document.pointerLockElement && !paused && !finished && !ctx.touch && !ctx.director.over) pause(true); };
     document.addEventListener("pointerlockchange", onLock);
-    const onVis = () => { if (document.hidden && !paused && !finished) pause(true); };
+    const onVis = () => { if (document.hidden && !paused && !finished && !ctx.director.over) pause(true); };
     document.addEventListener("visibilitychange", onVis);
     const finish = (res) => {
       finished = true; cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize); document.removeEventListener("pointerlockchange", onLock); document.removeEventListener("visibilitychange", onVis);
-      input.dispose(); ctx.audio.suspend(); renderer.dispose();
+      input.dispose(); ctx.audio.close(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
       resolve(res);
     };
     const showEnd = (res) => {
@@ -276,9 +286,9 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
 
     const step = (dt, inp, draw) => {
       time += dt; ctx.touch = inp.touch;
-      if (inp.pressed.pause) { pause(true); input.endFrame(); return; }
-      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z;
       const d = ctx.director;
+      if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
+      ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z;
       if (!d.over) {
         if (inp.pressed.lock) ctx.hero.toggleLock();
         let scale = 1;

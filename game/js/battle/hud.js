@@ -2,13 +2,28 @@
 // bản đồ nhỏ vẽ canvas 2D, vòng Mệnh Lệnh 4 ô (đồng hồ trận ×0,2 khi mở, S5.7).
 
 import { FRONTS, MAP, PHASES, EVENTS, lineToX, BASES } from "../data/battle-b15.js";
-import { ORDERS, HERO, MODES } from "../data/tuning.js";
+import { ORDERS, HERO, MODES, TERRAIN } from "../data/tuning.js";
 import { KE_SACH, VILLAGE } from "../data/battle-b15.js";
 import { totalQ } from "../sim/front.js";
 import { tpcReady } from "../sim/haokhi.js";
+import { LANE_TERRAIN } from "../data/terrain-b15.js";
+import { heroTerrain } from "../sim/terrain-rules.js";
+import { laneFeaturesOn } from "./ground.js";
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const ORDER_KEYS = ["tiencong", "giuvung", "theota", "tiepvien"];
+
+// Công sự làn đánh trên bản đồ nhỏ (chỉ khi bật công trình làn đánh): đoạn còn nguyên [x0, z0, x1, z1] của lũy
+// Nguyên, ụ đất ta, hào (bỏ đoạn vỡ — lối đi đọc được trên bản đồ), tính một lần khi nạp module.
+function solidPieces(f, out) {
+  const at = (t) => [f.a[0] + (f.b[0] - f.a[0]) * t, f.a[1] + (f.b[1] - f.a[1]) * t];
+  let t0 = 0;
+  for (const [g0, g1] of [...f.gaps].sort((p, q) => p[0] - q[0])) { if (g0 > t0) out.push([...at(t0), ...at(g0)]); t0 = Math.max(t0, g1); }
+  if (t0 < 1) out.push([...at(t0), ...at(1)]);
+}
+const MAP_LUY = [], MAP_UTA = [], MAP_HAO = [];
+for (const b of LANE_TERRAIN.berms) solidPieces(b, b.kind === "luy_nguyen" ? MAP_LUY : MAP_UTA);
+for (const d of LANE_TERRAIN.ditches) solidPieces(d, MAP_HAO);
 
 export class HUD {
   constructor(root, ctx) {
@@ -32,6 +47,7 @@ export class HUD {
           <div class="bar hp"><div data-k="hp"></div><span data-k="hpt"></span></div>
           <div class="ki"><div class="bar kb"><div data-k="ki0"></div></div><div class="bar kb"><div data-k="ki1"></div></div></div>
           <div class="buffs" data-k="buffs"></div>
+          <div class="ttags"><span class="ttag" data-k="ttag"></span><span class="ttag mud" data-k="tmud"></span></div>
         </div>
       </div>
       <div class="hud-map"><canvas width="240" height="160" data-k="map"></canvas>
@@ -105,6 +121,7 @@ export class HUD {
     if (hero.invuln > 0 && hero.state === "ult") buffs.push("Bất tử");
     if (hero.combo > 4) buffs.push(`${hero.combo} đòn`);
     E.buffs.textContent = buffs.join(" · ");
+    this.terrainTags(hero, E);
     // kỹ năng
     const pt = hero.phaTran;
     E.sk1.classList.toggle("ready", pt.cd <= 0);
@@ -162,6 +179,19 @@ export class HUD {
     this.drawMap();
   }
 
+  // Tag thế đất cạnh thanh máu (terrain-rules.js): chênh độ cao chân tướng với mục tiêu đang khóa (trong 2 × tagR m)
+  // hoặc địch gần nhất đang giáp mặt (tagR m) → hệ số sát thương tướng gây ra; bùn dưới chân → tốc chạy mất bao nhiêu.
+  terrainTags(hero, E) {
+    const R = TERRAIN.tag.r, L = hero.lock;
+    const locked = L?.alive && !L.dead && (L.x - hero.x) ** 2 + (L.z - hero.z) ** 2 < 4 * R * R;
+    const t = hero.alive ? heroTerrain(hero, locked ? L : hero.nearestEnemy(R)) : null;
+    const pct = t ? Math.round((t.dmg - 1) * 100) : 0;
+    const h = t && Math.abs(t.dmg - 1) >= TERRAIN.tag.min && pct !== 0 ? (pct > 0 ? `Thế đất cao +${pct}%` : `Thế đất thấp −${-pct}%`) : "";
+    const m = t && t.mud >= TERRAIN.tag.mud ? `Bùn lầy −${Math.round((1 - t.run) * 100)}% tốc chạy` : "";
+    if (E.ttag.textContent !== h) { E.ttag.textContent = h; E.ttag.classList.toggle("down", pct < 0); }
+    if (E.tmud.textContent !== m) E.tmud.textContent = m;
+  }
+
   nearestOfficer() {
     const h = this.ctx.hero; let best = null, bd = 18 * 18;
     for (const u of this.ctx.units) {
@@ -190,6 +220,18 @@ export class HUD {
       c.fillStyle = "rgba(44,58,74,.45)"; c.fillRect(X(lx), Z(F.laneZ - 22), X(Math.min(F.x1, MAP.fortWallX)) - X(lx), Z(F.laneZ + 22) - Z(F.laneZ - 22));
       c.fillStyle = "#f1d98a"; c.fillRect(X(lx) - 1, Z(F.laneZ - 24), 2, Z(F.laneZ + 24) - Z(F.laneZ - 24));
       c.fillStyle = "#1d1a17"; c.font = "bold 10px sans-serif"; c.fillText(F.id, X(F.x0) - 12, Z(F.laneZ) + 4);
+    }
+    // công sự làn đánh: gò (vệt đất nhạt), hào và hào thành (nét nước), lũy Nguyên (nét đậm), ụ ta, hố (chấm)
+    if (laneFeaturesOn()) {
+      c.fillStyle = "rgba(122,96,58,.5)";
+      for (const m of LANE_TERRAIN.mounds) { c.beginPath(); c.arc(X(m.x), Z(m.z), m.r * sx, 0, 7); c.fill(); }
+      const seg = (list, color, w) => {
+        c.strokeStyle = color; c.lineWidth = w; c.beginPath();
+        for (const p of list) { c.moveTo(X(p[0]), Z(p[1])); c.lineTo(X(p[2]), Z(p[3])); }
+        c.stroke();
+      };
+      seg(MAP_HAO, "#2f5d62", 1.6); seg(MAP_UTA, "#7a5230", 1.2); seg(MAP_LUY, "#3b2a1a", 1.8);
+      for (const p of LANE_TERRAIN.pits) { c.fillStyle = p.kind === "ngap" ? "#2f5d62" : "#4a3a28"; c.beginPath(); c.arc(X(p.x), Z(p.z), 1.3, 0, 7); c.fill(); }
     }
     for (const b of BASES) {
       const v = ctx.world.bases[b.id], s = sim.bases[b.id];

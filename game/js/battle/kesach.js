@@ -93,16 +93,23 @@ export class KeSachManager {
       this.ctx.director.say(`${b.name} bị đánh chìm!`, 4, "bad"); this.ctx.audio.play("gateBreak", b.x, b.z);
     }
   }
+  // Toán giữ bờ: chỉ bù cho đủ G.n lính còn đánh được và 1 sĩ quan mỗi toán. Trước đây mỗi lần dựng lại (thất bại →
+  // 60 s → open) sinh thêm đủ 28 lính + 1 Đội trưởng mà không gỡ toán cũ: bờ sông dày thêm sau mỗi lần thử (28 → 56 →
+  // 84…), thuyền chìm nhanh hơn, mọi vòng quét O(lính) nặng dần. Lần đầu và tải lại checkpoint (đã gỡ hết) vẫn đủ bộ.
+  // Lính cũ còn nhắm thuyền đã chìm thì crowd bỏ đích chết, updateBoats gán lại thuyền mới.
   spawnGuards(k) {
-    const ctx = this.ctx;
+    const ctx = this.ctx, crowd = ctx.crowd;
     for (const [gi, G] of k.def.guards.entries()) {
-      for (let i = 0; i < G.n; i++) {
+      let have = 0;
+      for (const a of crowd.agents) if (a.src === "coAoTong" && a.anchor?.group === gi && crowd.hittable(a)) have++;
+      for (let i = have; i < G.n; i++) {
         const archer = i % 3 !== 2;
-        ctx.crowd.spawn({ side: "dich", unit: archer ? "CUNGKY_NG" : "KHIEN_NG", role: "squad", src: "coAoTong",
+        crowd.spawn({ side: "dich", unit: archer ? "CUNGKY_NG" : "KHIEN_NG", role: "squad", src: "coAoTong",
           x: G.x + ctx.rng.range(-7, 7), z: G.z + ctx.rng.range(-3, 3), anchor: { x: G.x, z: G.z, r: archer ? 12 : 2, group: gi } });
       }
-      if (G.officer) {
+      if (G.officer && !ctx.units.some((u) => u.ksGroup === gi && u.alive && !u.dead)) {
         const u = new BigUnit(ctx, { kind: "officer", side: "dich", tier: G.officer, name: "Đội trưởng giữ bờ", x: G.x, z: G.z + 3, aggro: 26 });
+        u.ksGroup = gi;                                   // đánh dấu sĩ quan của toán gi (lần thử sau khỏi sinh trùng)
         ctx.units.push(u);
       }
     }

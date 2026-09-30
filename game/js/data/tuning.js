@@ -160,6 +160,28 @@ export const SIM = {
   heroQCap: { perSwing: 3, window: 10, perSec: 1.5 },
 };
 
+// ---- Địa hình ảnh hưởng trận: chỗ đất cao thấp, bùn, công sự (ĐỀ XUẤT BẢN THỬ, cả khối) --------------
+// Công thức ở sim/terrain-rules.js. slope: tốc chạy theo độ dốc dọc hướng đi (dò mặt đất ±probe m); dốc
+// < dead coi như phẳng; lên dốc −up mỗi đơn vị dốc (dốc 1 = 45°), sàn upFloor; xuống dốc +down mỗi đơn vị,
+// trần downCap. mud: tốc × (1 − mud · mudAt) trong đáy hố, đáy hào, hào thành. minSpeed: sàn chung (dốc ×
+// bùn). Không áp cho Né, lao (Phá Trận), lực sĩ húc, bị đẩy lùi, hất tung, bỏ chạy, Toa Đô rút chạy.
+// height: sát thương × theo chênh độ cao chân kẻ đánh − chân mục tiêu Δh: |Δh| ≤ dead thì 1; cao hơn +perM
+// mỗi mét vượt dead (trần +cap), thấp hơn −perM mỗi mét (sàn −floor). Kẻ bắn tên đứng cao hơn được tầm
+// ×(1 + rangePerM mỗi mét vượt dead), trần +rangeCap. front: mô phỏng 1 Hz — tuyến trong dải trước lũy Nguyên
+// [luy + luyBand[0], luy + luyBand[1]] khi doanh trại cánh đó còn trong tay địch: tổn thất Nguyên × luyLoss;
+// tuyến bị đẩy về dải ụ đất quân ta [uTa ± uTaBand]: tổn thất quân ta × uTaLoss (vị trí lũy, ụ lấy từ
+// data/terrain-b15.js). perch: cung thủ bộ Nguyên tìm gò trong seek m quanh mình, đỉnh gò cách tướng từ minD
+// tới reach × tầm bắn, thì lên gò đứng bắn; lùi giữ tầm thì ngả về phía gò. tag: HUD chỉ hiện tag Thế đất
+// khi |hệ số − 1| ≥ tag.min; tag Bùn lầy khi mudAt ≥ tag.mud; địch đang giáp mặt trong tag.r m (khóa: 2 × tag.r).
+export const TERRAIN = {
+  slope: { probe: 0.6, dead: 0.04, up: 0.45, upFloor: 0.6, down: 0.3, downCap: 1.12 },
+  mud: 0.4, minSpeed: 0.4,
+  height: { dead: 0.4, perM: 0.08, cap: 0.2, floor: 0.15, rangePerM: 0.12, rangeCap: 0.25 },
+  front: { luyBand: [-0.04, 0.01], luyLoss: 0.75, uTaBand: 0.03, uTaLoss: 0.8 },
+  perch: { seek: 14, minD: 7, reach: 0.9 },
+  tag: { min: 0.01, mud: 0.1, r: 7 },
+};
+
 // ---- Mệnh Lệnh (21.6) — CD gốc; nhân CD Thống Suất 0,92 ----------------------------------
 export const ORDERS = {
   tiencong: { name: "Tiến công", cd: 20, dur: 20, mLenh: 1.15, mThu: 1.1 },
@@ -206,4 +228,4 @@ export const TROOP_LEVELS = [
   { id: "cao",  name: "Cao",  N: 400, r: 0.60 },
   { id: "rc",   name: "Rất cao", N: 800, r: 1.00 },
 ];
-export const ZONE = { radius: 25, enemies: 30, allies: 20, bodyguardsShown: 8, theoTaShown: 12 };
+export const ZONE = { radius: 25, enemies: 30, allies: 20, bodyguardsShown: 8, theoTaShown: 12, countR: 45 };   // countR: trần vùng chiến đấu chỉ đếm lính trong 45 m quanh tướng (ĐỀ XUẤT BẢN THỬ)

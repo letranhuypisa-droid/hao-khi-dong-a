@@ -1,61 +1,35 @@
 // battle/soldiers.js — lính thường có khớp, vẽ instanced.
 //
-// Mỗi kiểu lính (KITS trong tuning) là một bộ lưới low poly chia theo khúc: hông, thân (kèm đầu,
-// mũ), cánh tay trên, cẳng tay (kèm vũ khí, khiên), đùi, cẳng chân. Mỗi khúc là một InstancedMesh;
-// ma trận của khúc = ma trận khúc cha × điểm xoay × góc khớp, tính trên CPU mỗi khung. Kỵ binh dùng
-// bộ khớp ngựa: "đùi"/"cẳng" là bốn chân ngựa, "hông" là mình ngựa, "thân" là người cưỡi.
+// Mỗi kiểu lính (KITS trong tuning) là một bộ lưới low poly chia theo khúc: hông (thắt lưng, eo),
+// thân (kèm đầu, mũ), cánh tay trên, cẳng tay (kèm vũ khí, khiên), đùi, cẳng chân, bàn chân (xoay ở cổ
+// chân), vạt trước, vạt sau (lò xo), tua giáo (dây treo). Các khúc gộp một lưới skinned; ma trận khúc =
+// ma trận khúc cha × điểm xoay × góc khớp, tính trên CPU mỗi khung. Kỵ binh dùng bộ khớp ngựa: "đùi"/
+// "cẳng" là bốn chân ngựa, "hông" là mình ngựa, "thân" là người cưỡi, vạt trước là chăn yên hai bên
+// sườn, "tas" là đuôi ngựa.
 //
-// Tư thế là mảng NCH kênh (xem CH). poseFor() dựng tư thế đích theo trạng thái lính; crowd trộn
-// tư thế hiện tại về đích theo thời gian trận, nên hit-stop đóng băng cả hoạt ảnh lính.
-//
-// Quy ước góc (khớp nào cũng vậy): x âm = đưa ra trước / giơ lên; tay phải z dương = dang ra ngoài,
-// tay trái z âm = dang ra ngoài; cẳng tay x âm = gập khuỷu; cẳng chân x dương = gập gối.
-// "Phải" ở đây là phía +x của lưới, như rig của tướng.
+// Kênh tư thế, bộ khớp, poseFor() và đường ống một lính mỗi khung (soldierFrame: IK chân bám đất, lò xo
+// vạt áo, dây treo tua giáo) nằm ở soldier-motion.js (thuần, không three); file này dựng lưới và
+// skinning, rồi xuất lại mọi thứ để crowd.js, lab.js import một chỗ.
 
 import * as THREE from "three";
 import { part, merge, PAL } from "./models.js";
+import { JOINT_NAMES, NJ, BONE_FLOATS, HAND, SPEAR, jointsInto } from "./soldier-motion.js";
 
-// ---- kênh tư thế --------------------------------------------------------------------------------
-const KEYS = ["pitch", "roll", "lift", "fwd", "hipY", "pelY", "tx", "ty", "tz",
-  "lax", "lay", "laz", "lfx", "rax", "ray", "raz", "rfx", "ltx", "ltz", "lsx", "rtx", "rtz", "rsx"];
-export const NCH = KEYS.length;
-export const CH = Object.fromEntries(KEYS.map((k, i) => [k, i]));
-
-// ---- bộ khớp ------------------------------------------------------------------------------------
-// [tên, cha, điểm xoay trong khung cha, kênh x, kênh y, kênh z, thứ tự Euler]
-const HUMAN = [
-  ["pelvis", null, [0, 0.9, 0], null, "pelY", null, "YXZ"],
-  ["torso", "pelvis", [0, 0.06, 0], "tx", "ty", "tz", "YXZ"],
-  ["uaL", "torso", [-0.26, 0.47, 0], "lax", "lay", "laz", "YXZ"],
-  ["faL", "uaL", [0, -0.29, 0], "lfx", null, null, "XYZ"],
-  ["uaR", "torso", [0.26, 0.47, 0], "rax", "ray", "raz", "YXZ"],
-  ["faR", "uaR", [0, -0.29, 0], "rfx", null, null, "XYZ"],
-  ["thL", "pelvis", [-0.11, -0.02, 0], "ltx", null, "ltz", "XYZ"],
-  ["shL", "thL", [0, -0.44, 0], "lsx", null, null, "XYZ"],
-  ["thR", "pelvis", [0.11, -0.02, 0], "rtx", null, "rtz", "XYZ"],
-  ["shR", "thR", [0, -0.44, 0], "rsx", null, null, "XYZ"],
-];
-const HORSE = [
-  ["pelvis", null, [0, 1.12, 0], null, "pelY", null, "YXZ"],
-  ["torso", "pelvis", [0, 0.34, -0.05], "tx", "ty", "tz", "YXZ"],
-  ["uaL", "torso", [-0.23, 0.44, 0], "lax", "lay", "laz", "YXZ"],
-  ["faL", "uaL", [0, -0.27, 0], "lfx", null, null, "XYZ"],
-  ["uaR", "torso", [0.23, 0.44, 0], "rax", "ray", "raz", "YXZ"],
-  ["faR", "uaR", [0, -0.27, 0], "rfx", null, null, "XYZ"],
-  ["thL", "pelvis", [-0.17, -0.2, 0.5], "ltx", null, null, "XYZ"],     // chân trước trái
-  ["shL", "pelvis", [-0.17, -0.2, -0.5], "lsx", null, null, "XYZ"],    // chân sau trái
-  ["thR", "pelvis", [0.17, -0.2, 0.5], "rtx", null, null, "XYZ"],      // chân trước phải
-  ["shR", "pelvis", [0.17, -0.2, -0.5], "rsx", null, null, "XYZ"],     // chân sau phải
-];
-export const SKELETONS = { human: HUMAN, horse: HORSE };
-export const JOINT_NAMES = HUMAN.map((j) => j[0]);
+export { NCH, CH, SKELETONS, JOINT_NAMES, NJ, BONE_FLOATS, KIT_WEAPON, LEG, poseFor, soldierFrame, resetMotion,
+  advanceStride, smoothPose, legRate, cycleLen, jointsInto } from "./soldier-motion.js";
 
 // ---- hình khối ----------------------------------------------------------------------------------
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, s = 6) => new THREE.CylinderGeometry(rt, rb, h, s);
 const cone = (r, h, s = 6) => new THREE.ConeGeometry(r, h, s);
 const ico = (r, d = 0) => new THREE.IcosahedronGeometry(r, d);
-const HAND = -0.29;
+const EMPTY = () => merge([]);
+// Tấm vạt: rộng trên wt, rộng dưới wb (loe hoặc thu), dài h, dày d; tâm tấm ở y = 0.
+const slab = (wt, wb, h, d) => {
+  const g = box(wt, h, d), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) p.setX(i, p.getX(i) * wb / wt);
+  return g;
+};
 
 // Vũ khí gắn ở bàn tay (khung cẳng tay). Đao, thương, chùy nằm dọc trục z (vuông góc cẳng tay): cẳng
 // tay buông thì vũ khí chĩa ra trước. Nỏ nằm dọc cẳng tay: tay đưa ra trước thì nỏ chĩa ra trước.
@@ -66,10 +40,11 @@ const W = {
     part(box(0.025, 0.075, 0.55), blade, { y: HAND + 0.01, z: 0.4 }),
     part(box(0.025, 0.06, 0.2), blade, { y: HAND + 0.04, z: 0.74, rx: -0.28 }),
   ],
-  giao: (tassel = PAL.long, len = 2.6) => [
+  // tua lông ngựa không còn gắn cứng ở đây: treo ở khúc "tas" (TASSEL), chân mũi giáo z = len − 0,8
+  giao: (len) => [
     part(cyl(0.022, 0.022, len, 5), PAL.go, { y: HAND, z: len / 2 - 0.8, rx: Math.PI / 2 }),
     part(cone(0.05, 0.28, 4), PAL.sat, { y: HAND, z: len - 0.66, rx: Math.PI / 2 }),
-    part(cone(0.07, 0.16, 5), tassel, { y: HAND, z: len - 0.86, rx: -Math.PI / 2 }),
+    part(cyl(0.03, 0.03, 0.05, 6), PAL.then, { y: HAND, z: len - 0.82, rx: Math.PI / 2 }),
   ],
   cung: () => [
     part(box(0.045, 0.05, 0.16), PAL.then, { y: HAND }),
@@ -112,15 +87,72 @@ const SHIELD = {
   ],
 };
 
-// Thân người: hông (thắt lưng + vạt áo), thân (ngực, giáp, cổ, đầu, mũ, đồ sau lưng), tay, chân.
+// Tua lông ngựa ở chân mũi giáo, treo dọc −y từ điểm xoay (khúc "tas" luôn chĩa xuống theo dây treo):
+// khâu buộc, chùm lông thon dài loe dần, túm nhọn ở đuôi. Dài ~0,33 m.
+const TASSEL = (col) => merge([
+  part(cyl(0.026, 0.028, 0.05, 6), PAL.then, { y: -0.015 }),
+  part(cyl(0.028, 0.066, 0.24, 7), col, { y: -0.16 }),
+  part(cone(0.066, 0.08, 7), col, { y: -0.32, rx: Math.PI }),
+]);
+
+// Vạt áo (khúc flF/flB, xoay ở eo trước/sau, tấm treo dọc −y). z0: đẩy tấm ra mặt ngoài eo (eo loe theo
+// wide). Hai phe khác dáng, không chỉ màu (21.9):
+//   dv    — Đại Việt: vạt trước hẹp, dài, thu nhọn xuống (như tấm yếm che), vạt sau rộng; viền gấu đen.
+//   ng    — Nguyên: vạt trước xẻ đôi hai tấm loe, vạt sau một tấm loe; một hàng giáp lá ngang, viền da.
+//   robe  — cung thủ Nguyên: áo dài vạt tới gối, xẻ đôi, không giáp lá.
+//   plate — lực sĩ trọng giáp: phiến sắt dày, hai hàng đinh tán (lò xo cứng, ít đung đưa).
+const FLAPS = {
+  dv: (skirt, trim, armor, wide) => {
+    const z0 = 0.185 * wide - 0.155;
+    return {
+      f: merge([
+        part(slab(0.25 * wide, 0.17 * wide, 0.46, 0.03), skirt, { y: -0.23, z: z0 }),
+        part(slab(0.18 * wide, 0.17 * wide, 0.05, 0.036), trim, { y: -0.44, z: z0 }),
+      ]),
+      b: merge([
+        part(slab(0.36 * wide, 0.41 * wide, 0.42, 0.03), skirt, { y: -0.21, z: -z0 }),
+        part(box(0.41 * wide, 0.05, 0.036), trim, { y: -0.4, z: -z0 }),
+      ]),
+    };
+  },
+  ng: (skirt, trim, armor, wide, len = 0.36, band = true) => {
+    const z0 = 0.185 * wide - 0.155, w = 0.18 * wide, x = 0.1 * wide;
+    const panel = (px, pz, wt, wb) => [
+      part(slab(wt, wb, len, 0.035), skirt, { x: px, y: -len / 2, z: pz }),
+      ...(band ? [part(box(wt * 1.08, 0.06, 0.042), armor, { x: px, y: -len * 0.45, z: pz })] : []),
+      part(box(wb * 1.04, 0.04, 0.04), PAL.long, { x: px, y: -len + 0.02, z: pz }),
+    ];
+    return {
+      f: merge([...panel(-x, z0, w, w * 1.18), ...panel(x, z0, w, w * 1.18)]),
+      b: merge(panel(0, -z0, 0.38 * wide, 0.46 * wide)),
+    };
+  },
+  robe: (skirt, trim, armor, wide) => FLAPS.ng(skirt, trim, armor, wide, 0.44, false),
+  plate: (skirt, trim, armor, wide) => {
+    const z0 = 0.185 * wide - 0.15, len = 0.3;
+    const plate = (px, pz, wt, wb) => [
+      part(slab(wt, wb, len, 0.05), armor, { x: px, y: -len / 2, z: pz }),
+      part(box(wt * 0.8, 0.025, 0.056), PAL.then, { x: px, y: -0.09, z: pz }),
+      part(box(wb * 0.8, 0.025, 0.056), PAL.then, { x: px, y: -0.2, z: pz }),
+    ];
+    return {
+      f: merge([...plate(-0.105 * wide, z0, 0.19 * wide, 0.22 * wide), ...plate(0.105 * wide, z0, 0.19 * wide, 0.22 * wide)]),
+      b: merge(plate(0, -z0, 0.42 * wide, 0.48 * wide)),
+    };
+  },
+};
+
+// Thân người: hông (thắt lưng + khúc eo ngắn), vạt trước, vạt sau, thân (ngực, giáp, cổ, đầu, mũ, đồ sau
+// lưng), tay, chân, bàn chân (xoay ở cổ chân: cổ chân 0 thì trông y như trước khi tách).
 function human(o) {
   const c = o.cloth, a = o.armor ?? c, pants = o.pants ?? PAL.then, boot = o.boot ?? PAL.nau, skin = PAL.da;
-  const wide = o.wide ?? 1;
+  const wide = o.wide ?? 1, skirt = o.skirt ?? c, belt = o.belt ?? PAL.then;
   const pelvis = merge([
-    part(box(0.42 * wide, 0.11, 0.27 * wide), o.belt ?? PAL.then, { y: 0.07 }),
-    part(cyl(0.22 * wide, 0.29 * wide, 0.34, 8), o.skirt ?? c, { y: -0.1 }),
+    part(box(0.42 * wide, 0.11, 0.27 * wide), belt, { y: 0.07 }),
+    part(cyl(0.2 * wide, 0.225 * wide, 0.15, 8), skirt, { y: -0.02, sz: 0.82 }),
     ...(o.pelvisExtra || []),
   ]);
+  const flap = FLAPS[o.flap || "dv"](skirt, belt, a, wide);
   const torso = merge([
     part(box(0.42 * wide, 0.48, 0.26 * wide), c, { y: 0.26 }),
     part(box(0.46 * wide, 0.3, 0.3 * wide), a, { y: 0.3 }),
@@ -143,12 +175,14 @@ function human(o) {
   const th = () => merge([part(box(0.16, 0.44, 0.18), pants, { y: -0.22 })]);
   const sh = () => merge([
     part(box(0.14, 0.38, 0.16), boot, { y: -0.19 }),
-    part(box(0.15, 0.09, 0.27), boot, { y: -0.4, z: 0.05 }),
     ...(o.wrap ? [part(box(0.15, 0.12, 0.17), o.wrap, { y: -0.08 })] : []),
   ]);
+  // đế giày: trước ở khung cẳng chân (y −0,4); cổ chân ở cẳng chân y −0,36 → khung cổ chân y −0,04
+  const ft = () => merge([part(box(0.15, 0.09, 0.27), boot, { y: -0.04, z: 0.05 })]);
   return {
     pelvis, torso, uaL: ua(-1), uaR: ua(1), faL: fa(o.left || []), faR: fa(o.right || []),
-    thL: th(), thR: th(), shL: sh(), shR: sh(),
+    thL: th(), thR: th(), shL: sh(), shR: sh(), ftL: ft(), ftR: ft(), flF: flap.f, flB: flap.b,
+    tas: o.tassel !== undefined ? TASSEL(o.tassel) : EMPTY(),
   };
 }
 
@@ -160,10 +194,10 @@ const beard = [part(box(0.12, 0.08, 0.05), PAL.toc, { y: 0.58, z: 0.13 })];
 
 // ---- các kiểu lính ------------------------------------------------------------------------------
 // Phe Nguyên: chàm + xám thép + lông thú, mũ nhọn. Phe Đại Việt: son + đen then + nón. Hai phe khác
-// nhau cả dáng mũ, không chỉ màu (21.9).
+// nhau cả dáng mũ, dáng vạt áo, không chỉ màu (21.9).
 const BUILD = {
   NG_DAO: () => human({
-    cloth: PAL.cham, armor: PAL.thep, pad: PAL.thep, face: beard,
+    cloth: PAL.cham, armor: PAL.thep, pad: PAL.thep, face: beard, flap: "ng",
     hat: [
       part(cone(0.17, 0.32, 7), PAL.xam, { y: 0.9 }),
       part(cyl(0.2, 0.21, 0.07, 8), PAL.long, { y: 0.77 }),
@@ -172,17 +206,17 @@ const BUILD = {
     left: SHIELD.tron(), right: W.dao(),
   }),
   NG_GIAO: () => human({
-    cloth: 0x34465a, armor: PAL.thep, pad: PAL.cham, boot: PAL.then, face: beard,
+    cloth: 0x34465a, armor: PAL.thep, pad: PAL.cham, boot: PAL.then, face: beard, flap: "ng",
     hat: [
       part(cyl(0.16, 0.18, 0.16, 8), PAL.thep, { y: 0.82 }),
       part(cone(0.04, 0.24, 4), PAL.sat, { y: 1.02 }),
       part(ico(0.05, 0), PAL.son, { y: 1.13 }),
       part(box(0.34, 0.16, 0.24), PAL.cham, { y: 0.66, z: -0.06 }),
     ],
-    left: SHIELD.tron(PAL.long, PAL.then, PAL.xam).map((g) => g.scale(0.72, 0.72, 0.72)), right: W.giao(PAL.long),
+    left: SHIELD.tron(PAL.long, PAL.then, PAL.xam).map((g) => g.scale(0.72, 0.72, 0.72)), right: W.giao(SPEAR.NG_GIAO), tassel: PAL.long,
   }),
   NG_CUNG: () => human({
-    cloth: 0x4b5364, armor: PAL.long, skirt: PAL.long, face: beard,
+    cloth: 0x4b5364, armor: PAL.long, skirt: PAL.long, face: beard, flap: "robe",
     hat: [
       part(cyl(0.21, 0.17, 0.12, 8), PAL.long, { y: 0.8 }),
       part(cone(0.14, 0.2, 7), PAL.cham, { y: 0.96 }),
@@ -190,7 +224,7 @@ const BUILD = {
     back: quiver(), left: W.cung(),
   }),
   NG_TANK: () => human({
-    cloth: 0x2a2f38, armor: PAL.thep, pad: PAL.then, pants: PAL.cham, boot: PAL.then, wide: 1.28,
+    cloth: 0x2a2f38, armor: PAL.thep, pad: PAL.then, pants: PAL.cham, boot: PAL.then, wide: 1.28, flap: "plate",
     cuff: PAL.then, wrap: PAL.thep,
     face: [part(box(0.26, 0.17, 0.06), PAL.sat, { y: 0.65, z: 0.14 })],
     hat: [
@@ -206,7 +240,7 @@ const BUILD = {
   DV_GIAO: () => human({
     cloth: PAL.son, armor: PAL.then, sleeve: PAL.son, cuff: PAL.then, pants: PAL.then, boot: PAL.then,
     hat: [part(cone(0.32, 0.15, 8), PAL.vai, { y: 0.86 }), part(cyl(0.1, 0.12, 0.05, 6), PAL.then, { y: 0.8 })],
-    wrap: PAL.vai, right: W.giao(PAL.son, 2.8),
+    wrap: PAL.vai, right: W.giao(SPEAR.DV_GIAO), tassel: PAL.son,
   }),
   DV_DAO: () => human({
     cloth: PAL.sonDam, armor: PAL.then, pad: PAL.then, pants: PAL.then, boot: PAL.then,
@@ -229,7 +263,7 @@ const BUILD = {
       part(box(0.26, 0.62, 0.3), PAL.ngua, { y: 0.4, z: 0.74, rx: -0.6 }),
       part(box(0.2, 0.22, 0.46), PAL.nguaDen, { y: 0.68, z: 0.98 }),
       part(box(0.06, 0.4, 0.34), PAL.nguaDen, { y: 0.52, z: 0.62, rx: -0.6 }),
-      part(box(0.1, 0.5, 0.1), PAL.nguaDen, { y: 0.02, z: -0.76, rx: 0.5 }),
+      part(box(0.11, 0.13, 0.2), PAL.nguaDen, { y: 0.17, z: -0.73, rx: 0.55 }),           // gốc đuôi (đuôi treo ở "tas")
       part(box(0.56, 0.08, 0.62), PAL.cham, { y: 0.3 }),
       part(box(0.14, 0.4, 0.14), PAL.cham, { x: -0.22, y: 0.3, z: 0.05, rz: 0.4 }),
       part(box(0.14, 0.4, 0.14), PAL.cham, { x: 0.22, y: 0.3, z: 0.05, rz: -0.4 }),
@@ -247,9 +281,27 @@ const BUILD = {
     ]);
     const ua = merge([part(box(0.12, 0.28, 0.13), PAL.thep, { y: -0.12 })]);
     const fa = (extra) => merge([part(box(0.11, 0.25, 0.12), PAL.cham, { y: -0.12 }), part(ico(0.06, 0), PAL.da, { y: -0.27 }), ...extra]);
+    // vạt chăn yên hai bên sườn, sau chân người cưỡi (xoay trước/sau theo nước phi)
+    const cloth = (s) => [
+      part(box(0.03, 0.3, 0.3), PAL.cham, { x: 0.29 * s, y: -0.15 }),
+      part(box(0.036, 0.05, 0.31), PAL.long, { x: 0.29 * s, y: -0.3 }),
+    ];
+    // đuôi: treo dọc −y từ gốc đuôi, dẹt theo bề ngang ngựa
+    const tail = merge([
+      part(cyl(0.05, 0.085, 0.48, 5), PAL.nguaDen, { y: -0.26, sx: 0.75 }),
+      part(cone(0.085, 0.16, 5), PAL.nguaDen, { y: -0.58, rx: Math.PI, sx: 0.75 }),
+    ]);
     return { pelvis, torso, uaL: ua, uaR: ua.clone(), faL: fa(W.cung().map((g) => g.translate(0, 0.02, 0))), faR: fa([]),
-      thL: leg, thR: leg.clone(), shL: leg.clone(), shR: leg.clone() };
+      thL: leg, thR: leg.clone(), shL: leg.clone(), shR: leg.clone(), ftL: EMPTY(), ftR: EMPTY(),
+      flF: merge([...cloth(-1), ...cloth(1)]), flB: EMPTY(), tas: tail };
   },
+
+  // ==== DÂN LÀNG chạy loạn (Hư cấu) — chỉ ambient.js dựng; KHÔNG thêm vào KITS trong tuning.js (Crowd dựng
+  // lưới cho mọi kiểu trong KITS và code đánh nhau duyệt tác tử đám đông; dân không phải tác tử). Hàm dựng
+  // villager() ở cuối file. ==========================================================================
+  DAN_NAM: () => villager("nam"),       // đàn ông gánh quang gánh / cụ già chống gậy
+  DAN_NU: () => villager("nu"),         // đàn bà: tay nải đội đầu, ôm hông, bế con
+  DAN_TRE: () => villager("tre"),       // trẻ con (đi bộ, hoặc được bế)
 };
 
 export function kitGeometry(kit) {
@@ -258,11 +310,11 @@ export function kitGeometry(kit) {
 }
 
 // ---- skinning instanced: một lượt vẽ cho cả kiểu lính -----------------------------------------------
-// 10 khúc gộp thành một lưới, mỗi đỉnh mang số khúc (aBone). Ma trận thế giới của từng khúc (dạng
-// affine 3 × 4, 3 texel RGBA) nằm trong texture float: lính i, khúc j ở texel (i·10 + j)·3, xếp liền
+// NJ khúc gộp thành một lưới, mỗi đỉnh mang số khúc (aBone). Ma trận thế giới của từng khúc (dạng
+// affine 3 × 4, 3 texel RGBA) nằm trong texture float: lính i, khúc j ở texel (i·NJ + j)·3, xếp liền
 // theo hàng rộng BONE_TEX_W. Vertex shader đọc bằng texelFetch(gl_InstanceID); instanceMatrix để
-// nguyên đơn vị. Nhờ vậy 8 kiểu lính chỉ tốn 8 lượt vẽ thay vì 80.
-export const NJ = JOINT_NAMES.length, BONE_TEX_W = 1024, BONE_FLOATS = NJ * 12;
+// nguyên đơn vị. Nhờ vậy 8 kiểu lính chỉ tốn 8 lượt vẽ thay vì 8 × NJ.
+export const BONE_TEX_W = 1024;
 
 export function skinnedKit(kit, cap, material) {
   const { parts, skel } = kitGeometry(kit);
@@ -304,7 +356,7 @@ vec3 objectNormal = normalize(mat3(bm) * vec3(normal));
 #endif`)
       .replace("#include <begin_vertex>", `vec3 transformed = (bm * vec4(position, 1.0)).xyz;`);
   };
-  mat.customProgramCacheKey = () => "skinnedKit";
+  mat.customProgramCacheKey = () => "skinnedKit" + NJ;
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = false;
   return { mesh, data, tex, skel };
@@ -316,220 +368,102 @@ export function writeAffine(out, o, e) {
   out[o + 4] = e[1]; out[o + 5] = e[5]; out[o + 6] = e[9]; out[o + 7] = e[13];
   out[o + 8] = e[2]; out[o + 9] = e[6]; out[o + 10] = e[10]; out[o + 11] = e[14];
 }
-
-// ---- tư thế -------------------------------------------------------------------------------------
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const ease = (t) => t * t * (3 - 2 * t);
-const easeOut = (t) => 1 - (1 - t) * (1 - t);
-
-// Thế đứng cầm vũ khí (ready = đang giao chiến). Chỉ ghi các kênh tay/thân; chân do bước chạy lo.
-const STANCE = {
-  dao: (P, ready) => {
-    if (ready) { P.rax = -0.4; P.raz = 0.18; P.rfx = -1.05; P.lax = -0.55; P.laz = -0.12; P.lfx = -0.55; P.ty += 0.12; }
-    else { P.rax = -0.05; P.raz = 0.1; P.rfx = -0.45; P.lax = -0.12; P.laz = -0.1; P.lfx = -0.3; }
-  },
-  giao: (P, ready) => {
-    if (ready) { P.rax = 0.05; P.raz = 0.14; P.ray = -0.1; P.rfx = -0.12; P.lax = -0.95; P.laz = 0.38; P.lfx = -0.2; P.ty += 0.32; }
-    else { P.rax = -0.08; P.raz = 0.08; P.rfx = -1.45; P.lax = -0.05; P.laz = -0.08; P.lfx = -0.2; }
-  },
-  cung: (P, ready) => {
-    if (ready) { P.lax = -0.7; P.laz = -0.1; P.lfx = -0.35; P.rax = -0.35; P.raz = 0.1; P.rfx = -1.0; P.ty += 0.25; }
-    else { P.lax = -0.2; P.laz = -0.1; P.lfx = -0.3; P.rax = 0; P.raz = 0.1; P.rfx = -0.2; }
-  },
-  chuy: (P) => { P.rax = -0.55; P.raz = 0.22; P.rfx = -2.15; P.lax = -0.25; P.laz = -0.3; P.lfx = -0.7; },
-  no: (P, ready) => {
-    if (ready) { P.rax = -0.95; P.raz = 0.05; P.rfx = -0.55; P.lax = -1.0; P.laz = 0.42; P.lfx = -0.55; P.ty += 0.1; }
-    else { P.rax = -0.05; P.raz = 0.08; P.rfx = -1.45; P.lax = -0.1; P.laz = -0.1; P.lfx = -0.25; }
-  },
-  ky: (P) => { P.lax = -0.45; P.laz = -0.1; P.lfx = -0.55; P.rax = -0.5; P.raz = 0.1; P.rfx = -0.9; },
-};
-
-// Đòn: K1 = đỉnh báo trước, K2 = cuối cú đánh. Báo trước trộn thế đứng → K1 (easeOut), cú đánh
-// trộn K1 → K2 trong 0,1 s (easeOut), hồi thế trộn K2 → thế đứng.
-const ATTACK = {
-  dao: [
-    { ty: 0.6, tx: -0.1, rax: -2.7, raz: 0.5, ray: 0.2, rfx: -0.75, lax: -0.75, laz: -0.05, lfx: -0.45, rtx: 0.25, ltx: -0.25, lsx: 0.25 },
-    { ty: -0.55, tx: 0.32, rax: -0.3, raz: -0.5, ray: -0.2, rfx: 0.0, lax: -0.15, lfx: -0.25, fwd: 0.28, ltx: -0.55, lsx: 0.45, rtx: 0.3, rsx: 0.2, hipY: -0.09 },
-  ],
-  giao: [
-    { ty: 0.65, tx: -0.06, rax: 0.5, raz: 0.18, rfx: -0.55, lax: -0.55, laz: 0.42, lfx: -0.1, fwd: -0.12, rtx: 0.3, ltx: -0.2 },
-    { ty: -0.3, tx: 0.28, rax: -0.5, raz: 0.05, rfx: 0.28, lax: -1.3, laz: 0.2, lfx: 0.0, fwd: 0.5, ltx: -0.65, lsx: 0.35, rtx: 0.4, rsx: 0.15, hipY: -0.1 },
-  ],
-  cung: [
-    { ty: 0.75, lax: -1.57, lay: -0.75, laz: 0, lfx: 0, rax: -1.5, ray: -0.95, raz: 0, rfx: -2.45, tx: -0.02 },
-    { ty: 0.75, lax: -1.55, lay: -0.75, lfx: 0, rax: -1.35, ray: -0.2, raz: 0.3, rfx: -1.5, tx: -0.08 },
-  ],
-  chuy: [
-    { rax: -2.95, raz: 0.05, rfx: -0.45, lax: -2.8, laz: 0.35, lfx: -0.55, tx: -0.32, ty: 0.12, hipY: 0.02, rtx: 0.2, ltx: -0.15 },
-    { rax: -0.05, raz: -0.12, rfx: 0.15, lax: -0.35, laz: 0.5, lfx: -0.15, tx: 0.6, ty: -0.1, hipY: -0.24, fwd: 0.35, ltx: -0.75, lsx: 0.85, rtx: 0.35, rsx: 0.45 },
-  ],
-  no: [
-    { rax: -1.1, raz: 0.02, rfx: -0.45, lax: -1.12, laz: 0.44, lfx: -0.45, tx: 0.06, ty: 0.15 },
-    { rax: -1.35, rfx: -0.45, lax: -1.3, laz: 0.44, lfx: -0.45, tx: -0.14, ty: 0.15, fwd: -0.1 },
-  ],
-  ky: [
-    { ty: 0.85, lax: -1.57, lay: -0.85, lfx: 0, rax: -1.5, ray: -1.0, rfx: -2.45 },
-    { ty: 0.85, lax: -1.55, lay: -0.85, lfx: 0, rax: -1.3, ray: -0.3, raz: 0.3, rfx: -1.5 },
-  ],
-};
-export const KIT_WEAPON = { NG_DAO: "dao", NG_GIAO: "giao", NG_CUNG: "cung", NG_TANK: "chuy", NG_KY: "ky", DV_GIAO: "giao", DV_DAO: "dao", DV_NO: "no" };
-
-const P = {};
-for (const k of KEYS) P[k] = 0;
-const BASE = {};
-function reset() { for (const k of KEYS) P[k] = 0; }
-function mixInto(from, to, t) {
-  for (const k in to) P[k] = (k in from ? from[k] : P[k]) + (to[k] - (k in from ? from[k] : P[k])) * t;
+// Ngược lại: affine 3 × 4 theo hàng tại o → Matrix4 (dùng ở lab, nơi mỗi khúc là một InstancedMesh).
+export function affineToMatrix(a, o, m) {
+  return m.set(a[o], a[o + 1], a[o + 2], a[o + 3], a[o + 4], a[o + 5], a[o + 6], a[o + 7], a[o + 8], a[o + 9], a[o + 10], a[o + 11], 0, 0, 0, 1);
 }
 
-// Độ vung tay khi chạy theo vũ khí [tay trái, tay phải]: tay cầm thương, nỏ, chùy gần như giữ yên.
-const SWING = { dao: [0.25, 0.3], giao: [0.1, 0.06], cung: [0.25, 0.45], chuy: [0.45, 0.08], no: [0.45, 0.06], ky: [0, 0] };
-
-// Bước chạy người: pha ph (rad), amp 0..1 theo tốc độ.
-function walk(ph, amp, sw) {
-  const s = Math.sin(ph), c = Math.cos(ph);
-  P.ltx = -0.72 * amp * s - 0.05; P.rtx = 0.72 * amp * s - 0.05;
-  P.lsx = 0.12 + 1.05 * amp * Math.max(0, c); P.rsx = 0.12 + 1.05 * amp * Math.max(0, -c);
-  P.hipY = -0.02 - 0.07 * amp * Math.abs(s);
-  P.tx = 0.14 * amp; P.ty = 0.1 * amp * s; P.pelY = -0.14 * amp * s;
-  P.lax += sw[0] * amp * s; P.rax -= sw[1] * amp * s;
-}
-function idleLegs(t, id) {
-  const b = Math.sin(t * 1.8 + id) * 0.02;
-  P.ltx = -0.14; P.lsx = 0.24; P.rtx = 0.1; P.rsx = 0.18; P.ltz = -0.05; P.rtz = 0.05;
-  P.hipY = -0.035 + b * 0.5; P.tx = 0.04 + b;
-}
-function gallop(ph, amp) {
-  const f = (o) => Math.sin(ph + o) * 0.75 * amp;
-  P.ltx = f(0); P.rtx = f(0.5); P.lsx = f(Math.PI); P.rsx = f(Math.PI + 0.5);
-  P.hipY = -0.1 * amp * Math.abs(Math.cos(ph)); P.pitch = 0.07 * amp * Math.sin(ph);
-  P.tx = -0.1 * amp * Math.sin(ph) + 0.1 * amp;
-}
-
-// Dựng tư thế đích của một lính vào out (Float32Array NCH). t: đồng hồ trận.
-export function poseFor(a, kit, K, t, out) {
-  reset();
-  const w = KIT_WEAPON[kit], horse = kit === "NG_KY", id = a.id * 1.37;
-  const amp = Math.min(1, (a.spd || 0) / (horse ? 5 : 3.2));
-  const ready = a.ready || a.windup > 0 || a.atkT < 0.5;
-  STANCE[w](P, ready);
-  if (horse) { if (amp > 0.05) gallop(a.walk, amp); }
-  else if (amp > 0.05) walk(a.walk, amp, SWING[w]); else idleLegs(t, id);
-  if (!horse && K.stable) { P.ltz -= 0.08; P.rtz += 0.08; P.lsx += 0.12; P.rsx += 0.12; P.hipY -= 0.04; }
-
-  // đòn: báo trước → đánh → hồi
-  const A = ATTACK[w];
-  if (a.windup > 0) {
-    for (const k of KEYS) BASE[k] = P[k];
-    mixInto(BASE, A[0], easeOut(clamp01(1 - a.windup / (a.windupT || K.windup))));
-    if (K.heavy) { P.tx -= 0.05 * Math.sin(t * 40); }      // lực sĩ gồng rung trước khi nện
-  } else if (a.atkT < 0.5) {
-    for (const k of KEYS) BASE[k] = P[k];
-    const K1 = { ...BASE, ...A[0] }, K2 = { ...K1, ...A[1] };
-    if (a.atkT < 0.16) { const s = easeOut(clamp01(a.atkT / 0.1)); for (const k of KEYS) P[k] = K1[k] + (K2[k] - K1[k]) * s; }
-    else { const r = ease(clamp01((a.atkT - 0.16) / 0.34)); for (const k of KEYS) P[k] = K2[k] + (BASE[k] - K2[k]) * r; }
-  }
-  if (a.flinch > 0) { const k = a.flinch / 0.18; P.tx -= 0.22 * k; P.hipY -= 0.03 * k; }
-  // đỡ khiên: giơ khiên che mặt, hạ trọng tâm, vũ khí thu về
-  if (a.blockT > 0) {
-    const k = Math.sin(clamp01(a.blockT / 0.32) * Math.PI) ** 0.5;
-    P.lax += (-1.35 - P.lax) * k; P.laz += (0.25 - P.laz) * k; P.lfx += (-0.95 - P.lfx) * k;
-    P.tx -= 0.12 * k; P.hipY -= 0.08 * k; P.lsx += 0.3 * k; P.rsx += 0.3 * k; P.ty += 0.25 * k;
-  }
-  // nhảy lùi né đòn gồng của tướng
-  if (a.evadeT > 0 && !horse) {
-    const k = Math.sin(clamp01(1 - a.evadeT / 0.3) * Math.PI);
-    P.tx -= 0.3 * k; P.hipY += -0.12 * k + 0.1 * Math.sin(clamp01(1 - a.evadeT / 0.3) * Math.PI); P.ltx += 0.6 * k; P.lsx += 0.5 * k; P.rtx -= 0.35 * k; P.rsx += 0.6 * k;
-    P.lax -= 0.4 * k; P.rax -= 0.3 * k;
-  }
-  // lao húc (lực sĩ): chạy cúi người, chùy giơ cao
-  if (a.chargeT > 0) {
-    const K1 = ATTACK[w][0];
-    for (const k in K1) if (k[0] === "r" || k[0] === "l") { if (k[1] === "a" || k[1] === "f") P[k] = K1[k]; }
-    P.tx = 0.45; P.ty = 0.1;
-  }
-  // tháo chạy: chạy cúi, hai tay vung loạn, vũ khí buông thõng
-  if (a.fleeT > 0 && a.state === "move") {
-    P.rax = -2.2 + 0.5 * Math.sin(t * 11 + id); P.lax = -2.0 + 0.5 * Math.cos(t * 10 + id); P.raz = 0.4; P.laz = -0.4; P.rfx = -0.4; P.lfx = -0.4;
-    P.tx += 0.2;
-  }
-
-  // phản ứng
-  const st = a.state;
-  if (st === "hit") {
-    const k = Math.sin(clamp01(1 - a.st / 0.32) * Math.PI) ** 0.6, d = a.hitFront ?? 1;
-    P.tx -= 0.6 * k * d; P.pitch -= 0.12 * k * d; P.hipY -= 0.06 * k;
-    P.rax += 0.9 * k; P.lax += 0.9 * k; P.raz += 0.5 * k; P.laz -= 0.5 * k; P.rfx -= 0.3 * k; P.lfx -= 0.3 * k;
-    P.ltx += 0.35 * k * d; P.lsx += 0.3 * k; P.rsx += 0.35 * k; P.ty += 0.3 * k * (a.id % 2 ? 1 : -1);
-  } else if (st === "launch") {
-    const k = clamp01(a.st * 4);
-    P.pitch = -Math.min(2.4, a.st * 6.5); P.lift = 0.3 * k;
-    P.rax = -2.6; P.lax = -2.4; P.raz = 0.6; P.laz = -0.6; P.rfx = -0.4; P.lfx = -0.4;
-    P.ltx = -0.9; P.lsx = 1.2; P.rtx = -0.4; P.rsx = 0.7; P.tx = -0.3;
-  } else if (st === "down") {
-    const up = clamp01((0.3 - a.st) / 0.3);          // 0,3 s cuối: chống tay đứng dậy
-    lying(1 - up, -1); if (up > 0) { P.tx += 0.9 * up; P.lsx += 1.6 * up; P.rsx += 1.6 * up; P.ltx -= 1.0 * up; P.rtx -= 1.0 * up; P.hipY -= 0.4 * up; }
-  } else if (st === "dead") {
-    dying(a, horse);
-  }
-  if (a.panicT > 0 && st === "move" && a.windup <= 0) { P.rax = -2.5 + 0.3 * Math.sin(t * 9 + id); P.lax = -2.3; P.rfx = -0.3; }
-  for (let i = 0; i < NCH; i++) out[i] = P[KEYS[i]];
-  return out;
-}
-
-function lying(k, dir) {
-  // dir −1 = nằm ngửa, +1 = nằm sấp. Gốc lưới ở chân nên nhấc lên một chút cho khỏi lún đất.
-  P.pitch = 1.48 * dir * k; P.lift = 0.14 * k;
-  P.rax = -2.6 * k; P.lax = -2.3 * k; P.raz = 0.7 * k; P.laz = -0.9 * k; P.rfx = -0.3 * k; P.lfx = -0.5 * k;
-  P.ltx = -0.2 * k; P.lsx = 0.35 * k; P.rtx = 0.05 * k; P.rsx = 0.1 * k; P.tx = 0.05 * k * -dir; P.hipY = -0.02 * k;
-  P.ltz = -0.12 * k; P.rtz = 0.15 * k;
-}
-
-// Bốn kiểu ngã theo id: ngửa, sấp, quỵ gối rồi đổ, xoay nghiêng. Ngựa đổ nghiêng.
-function dying(a, horse) {
-  const T = a.dieT, style = a.launchDeath ? 0 : a.id % 4;
-  if (horse) {
-    const k = ease(clamp01(T / 0.7));
-    P.roll = 1.35 * k * (a.id % 2 ? 1 : -1); P.lift = 0.1 * k; P.ltx = -0.6 * k; P.rtx = 0.4 * k; P.lsx = 0.5 * k; P.rsx = -0.5 * k;
-    P.tx = -0.6 * k; P.rax = -2.4 * k; P.lax = -2.0 * k;
-    return;
-  }
-  if (style === 0) { lying(ease(clamp01(T / 0.5)), -1); P.tx -= 0.3 * Math.sin(clamp01(T / 0.5) * Math.PI); }
-  else if (style === 1) {
-    const b = ease(clamp01(T / 0.16)), f = ease(clamp01((T - 0.12) / 0.45));
-    P.lsx += 0.9 * b; P.rsx += 0.7 * b; P.hipY -= 0.18 * b; P.tx += 0.4 * b;
-    if (f > 0) { lying(f, 1); P.rax = -2.8 * f; P.lax = -2.6 * f; }
-  } else if (style === 2) {
-    const kn = ease(clamp01(T / 0.3)), f = ease(clamp01((T - 0.55) / 0.4));
-    P.ltx = -1.45 * kn; P.rtx = -1.4 * kn; P.lsx = 2.5 * kn; P.rsx = 2.45 * kn; P.hipY = -0.46 * kn;
-    P.tx = 0.35 * kn; P.rax = 0.1; P.lax = 0.1; P.rfx = -0.3; P.lfx = -0.3; P.raz = 0.15; P.laz = -0.15;
-    if (f > 0) { P.pitch = 1.1 * f; P.lift = 0.05 * f; P.tx += 0.5 * f; P.rax = -1.6 * f; P.lax = -1.4 * f; }
-  } else {
-    const k = ease(clamp01(T / 0.55)), s = a.id % 8 < 4 ? 1 : -1;
-    P.roll = 1.45 * k * s; P.lift = 0.12 * k; P.ty = 0.6 * k * s; P.tz = -0.3 * k * s;
-    P.raz = 1.2 * k; P.laz = -1.2 * k; P.rax = -0.6 * k; P.ltx = -0.5 * k; P.lsx = 0.8 * k; P.rtx = 0.3 * k;
-  }
-}
-
-// ---- ma trận khúc thân --------------------------------------------------------------------------
-const _mats = {};
-for (const j of HUMAN) _mats[j[0]] = new THREE.Matrix4();
-const _local = new THREE.Matrix4(), _e = new THREE.Euler(), _root = new THREE.Matrix4();
-const _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(), _re = new THREE.Euler(0, 0, 0, "YXZ");
-
-// Tính ma trận thế giới của từng khúc; gọi cb(tên khúc, ma trận) cho mỗi khúc.
+// Tương thích kiểu cũ: ma trận thế giới từng khúc theo tư thế thô (không IK, không vạt/tua), gọi
+// cb(tên khúc, Matrix4). Đường ống đầy đủ là soldierFrame().
+const _jm = new Float64Array(BONE_FLOATS), _m4 = new THREE.Matrix4();
 export function jointMatrices(skel, x, y, z, yaw, scale, pose, cb) {
-  const J = SKELETONS[skel];
-  // gốc: vị trí, hướng, nhấc/lao tới, rồi ngã quanh bàn chân (pitch, roll), rồi tỉ lệ
-  const fwd = pose[CH.fwd] * scale, sy = Math.sin(yaw), cy = Math.cos(yaw);
-  _v.set(x + sy * fwd, y + pose[CH.lift] * scale, z + cy * fwd);
-  _re.set(pose[CH.pitch], yaw, pose[CH.roll]); _q.setFromEuler(_re);
-  _root.compose(_v, _q, _sc.setScalar(scale));
-  for (const [name, parent, pv, cx, cy2, cz, order] of J) {
-    _e.set(cx ? pose[CH[cx]] : 0, cy2 ? pose[CH[cy2]] : 0, cz ? pose[CH[cz]] : 0, order);
-    _local.makeRotationFromEuler(_e);
-    _local.elements[12] = pv[0]; _local.elements[13] = pv[1] + (name === "pelvis" ? pose[CH.hipY] : 0); _local.elements[14] = pv[2];
-    _mats[name].multiplyMatrices(parent ? _mats[parent] : _root, _local);
-    cb(name, _mats[name]);
-  }
+  jointsInto(skel, x, y, z, yaw, scale, pose, _jm);
+  for (let j = 0; j < NJ; j++) cb(JOINT_NAMES[j], affineToMatrix(_jm, j * 12, _m4));
+}
+
+// ==== DÂN LÀNG chạy loạn (Hư cấu; "vườn không nhà trống" 1285 là Chính sử) — lưới cho BUILD.DAN_* =========
+// Dân thường thời Trần: áo nâu (nhuộm củ nâu) ngắn qua hông, quần thâm xắn ống hoặc váy đen, nón lá, khăn
+// vấn, chân đất. Cùng bộ khớp người như lính; khúc nào dân không cần thì mượn làm đồ mang, ambient.js tính
+// lại ma trận của chúng sau soldierFrame:
+//   DAN_NAM — vạt trước/sau là hai thúng quang gánh (dây quang từ gốc = đầu đòn, treo dọc −y), "tas" là
+//             thanh tre dài 1 dọc z quanh gốc (kéo dài thành đòn gánh trên vai, hoặc gậy chống của cụ già);
+//   DAN_NU  — vạt là hai tấm váy (lò xo như vạt áo lính), "tas" là tay nải, đáy ở gốc (đội đầu / ôm hông);
+//   DAN_TRE — đầu to so với người (vóc ×0,6), quần cộc; "tas" là bọc nhỏ xách tay (gốc = nút buộc, nằm ở
+//             bàn tay phải như gốc khúc "tas" mặc định).
+// Đế bàn chân thấp hơn cổ chân đúng LEG.SOLE (0,085) như giày lính, để IK chân đặt đúng mặt đất.
+const DAN = { ao: 0x5e4330, aoNu: 0x684832, aoTre: 0x6f5238, quan: 0x2b2825, vay: 0x221f1c, gau: 0x3a2f28, that: 0x8a7550,
+  thatNu: 0x7a5a36, chan: 0xa8784e, non: 0xd8c48e, khan: 0x2e2622, tre: 0xb19a5c, thung: 0x8c7a52, vanh: 0x6f5f3e,
+  quang: 0x6a5838, gao: 0xcdbd92, noi: 0x7a4a2e, chieu: 0xb8a070, boc: 0x3d4a5e, nut: 0x55627a };
+// dây/thanh mảnh từ a tới b
+function cord(a, b, col, w = 0.018) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz);
+  const g = box(w, L, w);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L)));
+  g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+  return part(g, col);
+}
+// Thúng quang gánh: bốn dây quang chụm ở gốc (đầu đòn), vành thúng ở −0,74, đáy ở −1,02 (ambient.js dùng số
+// này để thúng đặt lên đất khi người ngồi xổm). Thúng trước: gạo và nồi đất; thúng sau: bọc vải, chiếu cuộn.
+function basket(front) {
+  const p = [];
+  for (let k = 0; k < 4; k++) { const a = (k + 0.5) * Math.PI / 2; p.push(cord([0, 0, 0], [Math.cos(a) * 0.21, -0.74, Math.sin(a) * 0.21], DAN.quang)); }
+  p.push(part(cyl(0.25, 0.19, 0.28, 9), DAN.thung, { y: -0.88 }), part(cyl(0.265, 0.265, 0.045, 9), DAN.vanh, { y: -0.745 }));
+  if (front) p.push(part(ico(0.23, 0), DAN.gao, { y: -0.74, sy: 0.45 }), part(ico(0.1, 0), DAN.noi, { x: 0.07, y: -0.65, z: 0.05 }),
+    part(cyl(0.045, 0.065, 0.05, 6), DAN.noi, { x: 0.07, y: -0.56, z: 0.05 }));
+  else p.push(part(box(0.3, 0.15, 0.24), DAN.boc, { y: -0.68, ry: 0.4 }), part(cyl(0.06, 0.06, 0.5, 6), DAN.chieu, { y: -0.6, z: -0.03, rz: Math.PI / 2, ry: -0.3 }));
+  return merge(p);
+}
+function villager(kind) {
+  const nam = kind === "nam", nu = kind === "nu", tre = kind === "tre", skin = PAL.da;
+  const ao = nam ? DAN.ao : nu ? DAN.aoNu : DAN.aoTre;
+  // hông: thắt lưng + vạt áo cánh (nam, trẻ; trẻ thêm cạp quần cộc) hoặc cạp váy (nữ)
+  const pelvis = merge(nu ? [
+    part(box(0.34, 0.06, 0.24), DAN.thatNu, { y: 0.07 }),
+    part(cyl(0.2, 0.235, 0.22, 8), DAN.vay, { y: -0.04, sz: 0.85 }),
+  ] : [
+    part(box(0.36, 0.06, 0.24), DAN.that, { y: 0.07 }),
+    part(cyl(0.195, 0.215, 0.17, 8), ao, { y: -0.01, sz: 0.82 }),
+    ...(tre ? [part(cyl(0.2, 0.205, 0.08, 8), DAN.quan, { y: -0.1, sz: 0.85 })] : []),
+  ]);
+  // thân, đầu; nam: búi tó, khăn vấn dưới nón lá; nữ: khăn vấn quấn tóc; trẻ: đầu to, chỏm tóc trái đào
+  const hy = tre ? 0.68 : 0.64;
+  const torso = merge([
+    part(box(nu ? 0.34 : 0.38, 0.44, 0.23), ao, { y: 0.25 }),
+    part(box(0.13, 0.08, 0.13), skin, { y: 0.5 }),
+    part(ico(tre ? 0.19 : nu ? 0.135 : 0.14, 1), skin, { y: hy }),
+    ...(nam ? [
+      part(ico(0.065, 0), PAL.toc, { y: hy + 0.05, z: -0.12 }),
+      part(cyl(0.145, 0.15, 0.05, 8), DAN.khan, { y: hy + 0.07 }),
+      part(cone(0.34, 0.18, 12), DAN.non, { y: hy + 0.17 }),
+    ] : nu ? [
+      part(cyl(0.148, 0.152, 0.08, 8), DAN.khan, { y: hy + 0.06 }),
+      part(ico(0.125, 0), DAN.khan, { y: hy + 0.1, sy: 0.5 }),
+    ] : [
+      part(ico(0.075, 0), PAL.toc, { y: hy + 0.17, z: 0.06 }),
+    ]),
+  ]);
+  const ua = () => merge(tre ? [part(box(0.12, 0.2, 0.13), ao, { y: -0.09 }), part(box(0.1, 0.12, 0.11), skin, { y: -0.23 })]
+    : [part(box(0.12, 0.29, 0.13), ao, { y: -0.13 })]);
+  // nữ: tay áo dài tới cổ tay; nam: xắn tay áo quá khuỷu; trẻ: cẳng tay trần
+  const fa = () => merge(nu ? [part(box(0.105, 0.26, 0.115), ao, { y: -0.13 }), part(ico(0.058, 0), skin, { y: HAND })]
+    : [...(nam ? [part(box(0.125, 0.06, 0.135), ao, { y: -0.03 })] : []), part(box(0.095, 0.25, 0.1), skin, { y: -0.14 }), part(ico(0.058, 0), skin, { y: HAND })]);
+  // chân: nam quần thâm xắn giữa ống chân, nữ đùi màu váy (khe giữa hai tấm váy), trẻ quần cộc; chân đất
+  const th = () => merge(tre ? [part(box(0.15, 0.2, 0.17), DAN.quan, { y: -0.1 }), part(box(0.12, 0.25, 0.13), skin, { y: -0.32 })]
+    : [part(box(0.15, 0.44, 0.17), nu ? DAN.vay : DAN.quan, { y: -0.22 })]);
+  const sh = () => merge(nam ? [part(box(0.15, 0.12, 0.17), DAN.quan, { y: -0.05 }), part(box(0.11, 0.27, 0.12), skin, { y: -0.23 })]
+    : [part(box(0.11, 0.37, 0.12), skin, { y: -0.185 })]);
+  const ft = () => merge([part(box(0.115, 0.07, 0.25), DAN.chan, { y: -0.05, z: 0.05 })]);
+  // váy: hai tấm dài tới giữa ống chân, viền gấu sẫm (z: đẩy ra mặt ngoài cạp váy như vạt áo lính)
+  const skirt = (wt, wb, len, z) => merge([part(slab(wt, wb, len, 0.03), DAN.vay, { y: -len / 2, z }), part(slab(wb * 0.99, wb, 0.05, 0.036), DAN.gau, { y: -len + 0.025, z })]);
+  let tas;
+  if (nam) tas = merge([part(box(0.06, 0.03, 1), DAN.tre, {}), part(box(0.07, 0.036, 0.04), DAN.quang, { z: 0.47 }), part(box(0.07, 0.036, 0.04), DAN.quang, { z: -0.47 })]);
+  else if (nu) tas = merge([part(box(0.36, 0.19, 0.28), DAN.boc, { y: 0.095 }), part(ico(0.065, 0), DAN.nut, { y: 0.2, z: 0.03 }),
+    part(cone(0.05, 0.12, 4), DAN.nut, { x: 0.05, y: 0.23, z: 0.05, rz: -0.6 }), part(cone(0.05, 0.12, 4), DAN.nut, { x: -0.05, y: 0.23, z: 0.05, rz: 0.6 })]);
+  else tas = merge([part(ico(0.05, 0), DAN.nut, { y: -0.03 }), part(box(0.22, 0.17, 0.16), DAN.boc, { y: -0.15 })]);
+  return {
+    pelvis, torso, uaL: ua(), uaR: ua(), faL: fa(), faR: fa(), thL: th(), thR: th(), shL: sh(), shR: sh(), ftL: ft(), ftR: ft(),
+    flF: nam ? basket(true) : nu ? skirt(0.3, 0.4, 0.68, 0.035) : EMPTY(),
+    flB: nam ? basket(false) : nu ? skirt(0.34, 0.44, 0.66, -0.035) : EMPTY(),
+    tas,
+  };
 }

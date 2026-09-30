@@ -187,8 +187,12 @@ export class Director {
       else if (a.role === "garrison" && d > 70) crowd.release(a);
     }
     if (!hero.alive) return;
+    // Trần 30 địch / 20 ta là của vùng chiến đấu quanh tướng: chỉ đếm lính thật trong ZONE.countR m. Trước đây
+    // đếm cả các toán ở xa (phản công A1, vây tướng, giữ bờ Kế Sách: 22–28 người) nên đứng trong vòng A2 mà
+    // quân đồn trú đã hết thì không sinh thêm ai, G không giảm, P2 kẹt (gặp cả khi không bật làn).
     let enemies = 0, allies = 0;
-    for (const a of crowd.agents) if (crowd.hittable(a)) { if (a.side === "dich") enemies++; else allies++; }
+    const cR2 = ZONE.countR * ZONE.countR;
+    for (const a of crowd.agents) if (crowd.hittable(a) && (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 < cR2) { if (a.side === "dich") enemies++; else allies++; }
     // 2) lính diễn trong 25 m → lính thật, gần nhất trước, không vượt trần 30 địch / 20 ta
     const near = crowd.agents.filter((a) => a.role === "actor" && a.state !== "dead")
       .map((a) => [a, (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2]).filter(([, d2]) => d2 < R * R).sort((p, q) => p[1] - q[1]);
@@ -681,6 +685,10 @@ export class Director {
     h.alive = true; h.state = "free"; h.hp = c.hero.hp; h.ki = c.hero.ki; h.revives = c.hero.revives; h.x = c.hero.x; h.z = c.hero.z; h.invuln = 2; h.lock = null;
     for (const fid in FRONTS) this.prevQ[fid] = { ta: totalQ(ctx.sim.fronts[fid], "ta"), dich: totalQ(ctx.sim.fronts[fid], "dich") };
     this.over = false; this.result = null; this.retries = (this.retries || 0) + 1;
+    // checkpoint chỉ lưu trước khi Toa Đô xuất hiện nên luôn bossDown = false. Trước đây tải lại P4 trong 2,5 s sau khi Toa Đô
+    // rút chạy giữ nguyên bossDown, winAt cũ: tướng không thể thua (onHeroDead bỏ qua) và trận tự thắng khi đồng hồ tua lại
+    // chạm winAt dù Toa Đô mới còn đủ máu.
+    this.bossDown = false; this.winAt = null;
     this.spawnGenerals(); this.spawnGuards(); this.fillActors(true);
     if (this.phase === 3) this.startBossPhase();
     this.keSach.restore(c.keSach);

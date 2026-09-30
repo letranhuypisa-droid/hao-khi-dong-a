@@ -19,6 +19,9 @@ export class Audio {
   }
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
   suspend() { this.ctx?.suspend(); }
+  // Rời trận: đóng hẳn AudioContext (trình duyệt giới hạn số context; suspend thì mỗi trận rò một cái).
+  // ctx = null để unlock() lần sau dựng context mới thay vì resume một context đã đóng.
+  close() { const c = this.ctx; this.ctx = null; c?.close?.().catch?.(() => {}); }
 
   env(node, t, a, peak, dcy) {
     node.gain.setValueAtTime(0.0001, t); node.gain.exponentialRampToValueAtTime(peak, t + a); node.gain.exponentialRampToValueAtTime(0.0001, t + a + dcy);

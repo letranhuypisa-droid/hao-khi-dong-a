@@ -15,6 +15,132 @@ function tex(name) {
   return TEX[name];
 }
 export function preloadFx() { for (const n of ["slash", "spark", "smoke", "ring", "redring", "fire", "embers"]) tex(n); }
+// Rời trận / Võ trường (battle.js releaseGpu): bỏ bản GPU của ảnh dùng chung. Texture đã nạp lên GPU giữ listener
+// "dispose" của renderer cũ → gl → canvas → cả trận cũ ở lại bộ nhớ. Ảnh gốc vẫn trong Texture: trận sau tự nạp lại.
+export function releaseFxTextures() { for (const k in TEX) TEX[k].dispose(); }
+
+// Hiệu ứng giao chiến (vệt chém, tia lửa, vòng báo đòn) vẽ sau khói lửa của trường (renderOrder cao hơn)
+// để cột khói phía sau không phủ lên vòng đỏ, vệt đao.
+const OVER = new Set(["slash", "spark", "ring", "redring", "seal"]);
+const R_OVER = 5;
+
+// ---- trường billboard instanced: khói cột, lửa, tàn lửa theo pha (atmosphere.js) ---------------------
+// Mỗi ảnh một lượt vẽ cho mọi hạt (sprite thường thì mỗi hạt một lượt). Quay về camera trong vertex shader;
+// xếp xa → gần bằng sắp xếp chèn (thứ tự gần như giữ nguyên giữa hai khung); hạt lấy từ pool cố định, không
+// cấp phát mỗi khung. Sương tính riêng (fogK < 1) để cột khói, đốm lửa xa vẫn đọc được qua sương.
+// Thứ tự vẽ: lửa (2) → khói (3) → tàn lửa (4) → hiệu ứng giao chiến (5); nước, mây, cờ (0) vẽ trước cả.
+const FIELDS = {
+  smoke: { tex: "smoke", cap: 160, order: 3, fogK: 0.32 },     // kênh 0: đống lửa tàn, kênh 1: cột khói lớn
+  fire: { tex: "fire", cap: 48, order: 2, fogK: 0.25 },
+  embers: { tex: "embers", cap: 64, order: 4, fogK: 0.4, additive: true },
+};
+const FIELD_VS = `
+attribute vec3 iPos; attribute vec4 iSRA; attribute vec3 iCol;
+varying vec2 vUv; varying vec4 vCol; varying float vDs;
+#include <fog_pars_vertex>
+void main() {
+  vUv = uv; vCol = vec4(iCol, iSRA.z); vDs = iSRA.w;
+  vec4 mvPosition = modelViewMatrix * vec4(iPos, 1.0);
+  float c = cos(iSRA.y), s = sin(iSRA.y);
+  vec2 q = position.xy * iSRA.x;
+  mvPosition.xy += vec2(c * q.x - s * q.y, s * q.x + c * q.y);
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+const FIELD_FS = `
+uniform sampler2D map; uniform vec3 light; uniform float fogK;
+varying vec2 vUv; varying vec4 vCol; varying float vDs;
+#include <fog_pars_fragment>
+void main() {
+  vec4 t = texture2D(map, vUv);
+  float a = t.a * vCol.a;
+  if (a < 0.004) discard;
+  vec3 c = mix(t.rgb, vec3(dot(t.rgb, vec3(0.2126, 0.7152, 0.0722))), vDs) * vCol.rgb * light;
+  gl_FragColor = vec4(c, a);
+  #ifdef USE_FOG
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(fogNear, fogFar, vFogDepth) * fogK);
+  #endif
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+const _f = new THREE.Vector3();
+
+class Field {
+  constructor(scene, def) {
+    const cap = this.cap = def.cap;
+    const g = new THREE.InstancedBufferGeometry();
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    g.setAttribute("position", new THREE.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    const ia = (n) => new THREE.InstancedBufferAttribute(new Float32Array(cap * n), n).setUsage(THREE.DynamicDrawUsage);
+    this.aPos = ia(3); this.aSRA = ia(4); this.aCol = ia(3); this.attrs = [this.aPos, this.aSRA, this.aCol];
+    g.setAttribute("iPos", this.aPos); g.setAttribute("iSRA", this.aSRA); g.setAttribute("iCol", this.aCol);
+    g.instanceCount = 0;
+    const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { light: { value: new THREE.Color(1, 1, 1) }, fogK: { value: def.fogK } }]);
+    uniforms.map = { value: tex(def.tex) };          // gán sau merge: merge nhân bản texture chưa nạp xong
+    this.light = uniforms.light.value;
+    this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms, vertexShader: FIELD_VS, fragmentShader: FIELD_FS, fog: true,
+      transparent: true, depthWrite: false, blending: def.additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = def.order; this.mesh.visible = false;
+    scene.add(this.mesh);
+    this.windX = 0; this.windZ = 0;
+    this.chan = [0, 0];                                 // số hạt sống theo kênh (trần riêng cho từng nguồn)
+    this.live = []; this.pool = [];
+    for (let i = 0; i < cap; i++) this.pool.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, drag: 0, wind: 0, t: 0, T: 1, s: 1, grow: 1, rot: 0, spin: 0,
+      a: 1, r: 1, g: 1, b: 1, lit: 0, ds: 0, fin: 0.12, fout: 0.55, flick: 0, seed: 0, ch: 0, d: 0 });
+  }
+  // Lấy một hạt với giá trị mặc định; người gọi tự gán thêm (không truyền object tuỳ chọn → không cấp phát).
+  spawn(x, y, z, T, ch = 0) {
+    const p = this.pool.pop(); if (!p) return null;
+    p.x = x; p.y = y; p.z = z; p.vx = p.vy = p.vz = 0; p.drag = 0; p.wind = 0; p.t = 0; p.T = T; p.s = 1; p.grow = 1; p.rot = 0; p.spin = 0;
+    p.a = 1; p.r = p.g = p.b = 1; p.lit = 0; p.ds = 0; p.fin = 0.12; p.fout = 0.55; p.flick = 0; p.seed = Math.random() * 100; p.ch = ch;
+    this.live.push(p); this.chan[ch]++;
+    return p;
+  }
+  clear() { for (const p of this.live) { this.chan[p.ch]--; this.pool.push(p); } this.live.length = 0; this.mesh.visible = false; this.mesh.geometry.instanceCount = 0; }
+  step(dt, cam) {
+    const L = this.live;
+    _f.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
+    for (let i = L.length - 1; i >= 0; i--) {
+      const p = L[i];
+      p.t += dt;
+      if (p.t >= p.T) { this.chan[p.ch]--; this.pool.push(p); L[i] = L[L.length - 1]; L.pop(); continue; }
+      if (dt > 0) {
+        const w = p.wind * (0.3 + p.t / p.T);            // lên cao gió thổi mạnh hơn: cột khói nghiêng dần
+        p.vy /= 1 + p.drag * dt;
+        p.x += (p.vx + this.windX * w) * dt; p.y += p.vy * dt; p.z += (p.vz + this.windZ * w) * dt; p.rot += p.spin * dt;
+      }
+      p.d = (p.x - cx) * _f.x + (p.y - cy) * _f.y + (p.z - cz) * _f.z;
+    }
+    for (let i = 1; i < L.length; i++) {                // xa trước gần sau
+      const p = L[i]; let j = i - 1;
+      while (j >= 0 && L[j].d < p.d) { L[j + 1] = L[j]; j--; }
+      L[j + 1] = p;
+    }
+    const P = this.aPos.array, S = this.aSRA.array, C = this.aCol.array, n = L.length;
+    for (let i = 0; i < n; i++) {
+      const p = L[i], u = p.t / p.T, e = 1 - (1 - u) * (1 - u);
+      let sc = p.s * (1 + (p.grow - 1) * e), al = p.a * (u < p.fin ? u / p.fin : u > p.fout ? (1 - u) / (1 - p.fout) : 1);
+      if (p.flick) { const f = Math.sin(p.t * 13 + p.seed) * Math.sin(p.t * 7.7 + p.seed * 1.7); sc *= 1 + p.flick * f; al *= 1 - p.flick * 0.5 * (1 - f); }
+      const k = 1 + p.lit * u;
+      P[i * 3] = p.x; P[i * 3 + 1] = p.y; P[i * 3 + 2] = p.z;
+      S[i * 4] = sc; S[i * 4 + 1] = p.rot; S[i * 4 + 2] = al; S[i * 4 + 3] = p.ds;
+      C[i * 3] = p.r * k; C[i * 3 + 1] = p.g * k; C[i * 3 + 2] = p.b * k;
+    }
+    for (const a of this.attrs) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }
+    this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0;
+  }
+}
+
+// Cụm khói của cột khói lớn theo mức chi tiết: 0 gần (nhiều cụm nhỏ), 1 vừa, 2 xa (ít cụm mà to).
+// Lên 25–60 m trong đời hạt (vy giảm dần theo drag), nở rộng, trôi theo gió của trường.
+// Cụm xa đậm và sẫm hơn (lit: sáng dần theo tuổi) để cột khói còn nổi trên nền trời qua sương.
+const COL_LOD = [
+  { s: 4.2, grow: 3.4, T: 10, vy: 4.2, a: 0.62, lit: 1.3 },
+  { s: 7, grow: 3.0, T: 12, vy: 4.3, a: 0.72, lit: 1.1 },
+  { s: 11, grow: 2.6, T: 14, vy: 4.0, a: 0.85, lit: 0.8 },
+];
 
 export class FX {
   constructor(scene, camera, overlay) {
@@ -30,7 +156,53 @@ export class FX {
     this.ghosts = [];
     this.texts = [];
     this.planeGeo = new THREE.PlaneGeometry(1, 1); this.planeGeo.rotateX(-Math.PI / 2);
+    this.fields = {};                                   // tạo khi dùng lần đầu (Võ trường không dùng)
     preloadFx();
+  }
+
+  // ---- trường instanced (atmosphere.js gọi; chạy theo đồng hồ trận) ---------------------------------------
+  field(name) { return this.fields[name] || (this.fields[name] = new Field(this.scene, FIELDS[name])); }
+  stepFields(dt) { for (const k in this.fields) this.fields[k].step(dt, this.camera); }
+  clearFields() { for (const k in this.fields) this.fields[k].clear(); }
+  fieldCounts() { const o = {}; for (const k in this.fields) o[k] = this.fields[k].live.length; return o; }   // chỉ để đo
+
+  // Một cụm của cột khói lớn (kênh 1). k 0..1: cường độ nguồn (lửa mới bén thì cột mảnh, nhạt).
+  column(x, y, z, lod, k = 1) {
+    const L = COL_LOD[lod], j = 0.6 + lod * 0.8;
+    const p = this.field("smoke").spawn(x + (Math.random() - 0.5) * j, y, z + (Math.random() - 0.5) * j, L.T * (0.9 + 0.2 * Math.random()), 1);
+    if (!p) return null;
+    p.s = L.s * (0.85 + 0.3 * Math.random()) * (0.6 + 0.4 * k); p.grow = L.grow;
+    p.vy = L.vy * (0.9 + 0.2 * Math.random()); p.drag = 0.06; p.wind = 1;
+    p.vx = (Math.random() - 0.5) * 0.4; p.vz = (Math.random() - 0.5) * 0.4;
+    p.rot = Math.random() * 6.28; p.spin = (Math.random() - 0.5) * 0.12;
+    p.a = L.a * (0.5 + 0.5 * k); p.ds = 0.85; p.r = 0.2; p.g = 0.18; p.b = 0.165; p.lit = L.lit; p.fin = 0.08; p.fout = 0.5;
+    return p;
+  }
+  // Khói đống lửa tàn ở trại Nguyên (kênh 0; trước đây mỗi cụm một sprite). s: hệ số dày theo pha.
+  pitSmoke(x, y, z, s = 1) {
+    const p = this.field("smoke").spawn(x + (Math.random() - 0.5), y, z + (Math.random() - 0.5), 4.5 * (1 + 0.08 * (s - 1)), 0);
+    if (!p) return null;
+    p.s = 2.2 * (1 + 0.18 * (s - 1)); p.grow = 3.2; p.vy = 1.5; p.wind = 0.35;
+    p.rot = Math.random() * 6.28; p.spin = 0.2;
+    p.a = Math.min(0.62, 0.4 * (1 + 0.1 * (s - 1))); p.ds = 0.45; p.r = 0.92 - 0.05 * s; p.g = 0.86 - 0.05 * s; p.b = 0.8 - 0.05 * s; p.fin = 0.1; p.fout = 0.15;
+    return p;
+  }
+  // Một lưỡi lửa (cháy liên tục thì gọi đều tay: lưỡi lửa mới đè lên lưỡi cũ đang tàn). big: đốm lửa xa cho dễ thấy.
+  flame(x, y, z, size = 3, k = 1) {
+    const p = this.field("fire").spawn(x, y + size * 0.4, z, 0.9 + Math.random() * 0.5, 0);
+    if (!p) return null;
+    p.s = size * (0.75 + 0.35 * Math.random()) * (0.5 + 0.5 * k); p.grow = 0.75; p.vy = 0.9 + Math.random() * 0.6; p.wind = 0.25;
+    p.rot = (Math.random() - 0.5) * 0.3; p.a = 0.95; p.flick = 0.1; p.fin = 0.15; p.fout = 0.45;
+    return p;
+  }
+  // Tàn lửa, tro bay lên theo gió quanh đám cháy.
+  ember(x, y, z) {
+    const p = this.field("embers").spawn(x + (Math.random() - 0.5) * 3, y + Math.random() * 2, z + (Math.random() - 0.5) * 3, 2 + Math.random() * 1.5, 0);
+    if (!p) return null;
+    p.s = 0.45 + Math.random() * 0.4; p.grow = 0.6; p.vy = 1.6 + Math.random() * 1.8; p.drag = 0.3; p.wind = 1.4;
+    p.vx = (Math.random() - 0.5) * 1.5; p.vz = (Math.random() - 0.5) * 1.5;
+    p.rot = Math.random() * 6.28; p.spin = (Math.random() - 0.5) * 3; p.a = 0.9; p.flick = 0.3; p.fin = 0.05; p.fout = 0.5;
+    return p;
   }
 
   // Sprite (luôn quay về camera) hoặc tấm phẳng nằm trên đất, lấy từ pool theo ảnh.
@@ -43,7 +215,7 @@ export class FX {
       o = flat
         ? new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex(name), transparent: true, depthWrite: false, blending, side: THREE.DoubleSide }))
         : new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(name), transparent: true, depthWrite: false, blending }));
-      o.userData.key = key; this.scene.add(o);
+      o.userData.key = key; if (OVER.has(name)) o.renderOrder = R_OVER; this.scene.add(o);
     }
     o.visible = true; o.position.set(x, y, z);
     if (flat) o.rotation.set(0, rot, 0); else o.material.rotation = rot;
@@ -97,7 +269,7 @@ export class FX {
     const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: 0xd8321e, transparent: true, opacity: big ? 0.26 : 0.2, side: THREE.DoubleSide, depthWrite: false }));
     fill.rotation.x = -Math.PI / 2;
     outer.scale.setScalar(r * 2.25);
-    for (const m of [outer, fill]) this.scene.add(m);
+    for (const m of [outer, fill]) { m.renderOrder = R_OVER; this.scene.add(m); }
     this.teles.push({ unit, r, T, t: 0, outer, fill, big });
     if (big) this.banner("TUYỆT KỸ · NÉ RA KHỎI VÒNG", "#ff8a6a", 0.9);
   }
@@ -112,7 +284,7 @@ export class FX {
 
   afterimage(x, z, cb) {
     const g = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 3, 6), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.45 }));
-    g.position.set(x, heightAt(x, z) + 0.95, z); this.scene.add(g);
+    g.position.set(x, heightAt(x, z) + 0.95, z); g.renderOrder = R_OVER; this.scene.add(g);
     this.ghosts.push({ g, t: 0, T: 0.5, cb, x, z });
   }
 
@@ -185,7 +357,7 @@ export class FX {
     for (let i = this.ghosts.length - 1; i >= 0; i--) {
       const g = this.ghosts[i]; g.t += dt;
       g.g.material.opacity = 0.45 * (1 - g.t / g.T);
-      if (g.t >= g.T) { this.scene.remove(g.g); g.cb?.(); this.shockwave(g.x, g.z, 3); this.ghosts.splice(i, 1); }
+      if (g.t >= g.T) { this.scene.remove(g.g); g.g.geometry.dispose(); g.g.material.dispose(); g.cb?.(); this.shockwave(g.x, g.z, 3); this.ghosts.splice(i, 1); }   // bóng riêng mỗi lần né: giải phóng GPU
     }
     // chữ nổi
     const v = new THREE.Vector3();

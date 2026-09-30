@@ -4,11 +4,13 @@
 // Bộ đệm input 0,15 s. Hủy đòn vào Né ở 30% cuối clip. Đòn thường của lính không ngắt được
 // đòn đang ra (giáp đòn) — chỉ đòn nặng, đòn viền đỏ mới ngắt (ĐỀ XUẤT BẢN THỬ).
 
-import { makeRig, PAL } from "./models.js";
+import { makeRig, RIGS } from "./models.js";
+import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
 import { HERO, MOVES, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, TPC_HERO_MULT, GATE_DIV, HAO_KHI, AI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
+import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao (chỉ chạy thường, sát thương)
 import { HERO_ANIM as ANIM } from "./hero-anim.js";
 import { BladeTrail } from "./trail.js";
 import * as THREE from "three";
@@ -21,8 +23,8 @@ const CHAIN_N = ["N1", "N2", "N3", "N4", "N5", "N6"];
 export class Hero {
   constructor(ctx, stats) {
     this.ctx = ctx; this.stats = stats; this.mods = stats.mods;
-    this.rig = makeRig({ scale: 1.08, cloth: PAL.son, armor: PAL.then, trim: PAL.vang, hat: "tocbui", weapon: "songdao",
-      flag: { text: "破強敵報皇恩", bg: "#9b2d20", fg: "#f1d98a" } });
+    this.rig = makeRig(RIGS.hero);
+    this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, dải khăn, cờ (rig-motion.js)
     ctx.scene.add(this.rig.root);
     this.trails = [new BladeTrail(ctx.scene, 0xd9b36a, 0.14), new BladeTrail(ctx.scene, 0xd9b36a, 0.14)];
     this.x = 72; this.z = -32; this.yaw = Math.PI / 2;     // ngoài rào bản doanh, để camera không kẹt vào lều this.vx = 0; this.vz = 0; this.y = 0;
@@ -31,14 +33,15 @@ export class Hero {
     this.revives = ctx.diff.revive; this.alive = true;
     this.state = "free"; this.st = 0; this.move = null; this.chain = 0; this.chainGrace = 0;
     this.buf = null; this.dodgeChain = 0; this.dodgeCd = 0; this.postDodge = 0;
-    this.invuln = 0; this.parryAt = -9; this.parryLock = 0; this.blocking = false;
+    this.invuln = 0; this.parryAt = -9; this.parryLock = 0; this.blocking = false; this.blockT = 0;
     this.phaTran = { cd: 0, left: 0, window: 0 };
     this.buffs = { atk: 0, atkT: 0, flag: 0, flagT: 0 };
     this.combo = 0; this.comboT = 0; this.lienHoan = 0; this.lienHoanT = 0;
     this.pose = A.idle(0); this.animT = 0; this.runPhase = 0; this.swingId = 0;
     this.lock = null; this.hkUltReady = false;
     this.kiEngaged = 0; this.koHealAcc = 0; this.inTouch = false;
-    this.place();
+    A.applyPose(this.rig, this.pose);
+    this.place(0);
   }
 
   get atkSpeed() { return HERO.atkSpeed * (1 + this.mods.atkSpeed + 0.04 * this.lienHoan); }
@@ -82,7 +85,7 @@ export class Hero {
     if (engaged) this.kiEngaged = 3; else this.kiEngaged -= dt;
     if (this.kiEngaged > 0 && this.state !== "ult") this.addKi(HERO.kiLucRegen * dt * (this.inTPC ? HAO_KHI.tpc.kiLucRegen : 1));
 
-    if (!this.alive) { this.setPose(A.knockdown(this.st += dt), 0.3); this.place(); return; }
+    if (!this.alive) { this.setPose(A.knockdown(this.st += dt), 0.3); this.place(dt); return; }
 
     this.blocking = inp.block;     // phím cạnh đã vào bộ đệm qua intake()
 
@@ -104,21 +107,22 @@ export class Hero {
       case "ult": this.updateUlt(dt); break;
     }
     [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.5, ctx.openGates);
-    this.place();
+    this.place(dt);
   }
 
   // ---- trạng thái tự do ------------------------------------------------------------------
   updateFree(dt, wx, wz, mag) {
     if (this.tryActions()) return;
-    if (this.blocking) { this.state = "block"; return; }
+    if (this.blocking) { this.state = "block"; this.blockT = 0; return; }
     if (mag > 0.15) {
-      const sp = HERO.move * mag * (this.inTPC ? 1.1 : 1);
+      const sp = HERO.move * mag * (this.inTPC ? 1.1 : 1) * speedFactor(this.x, this.z, wx, wz);   // lên dốc, bùn chậm; xuống dốc nhanh
       this.x += (wx / mag) * sp * dt; this.z += (wz / mag) * sp * dt;
       this.yaw = turn(this.yaw, this.lock?.alive ? this.faceLock() : Math.atan2(wx, wz), dt * 12);
       const before = Math.floor(this.runPhase / Math.PI);
-      this.runPhase += dt * sp * 1.6;
+      const g = A.gait(sp, this.rig.scale);        // nhịp bước + biên độ đùi khớp tốc độ: chân trụ không trượt
+      this.runPhase += dt * g.rate;
       if (mag > 0.6 && Math.floor(this.runPhase / Math.PI) !== before) this.ctx.fx.dust(this.x - Math.sin(this.yaw) * 0.4, this.z - Math.cos(this.yaw) * 0.4, 0.3);   // bụi bước chân
-      this.setPose(A.run(this.runPhase, mag), 0.35);
+      this.setPose(A.run(this.runPhase, mag, g.stride), 0.35);
     } else this.setPose(A.idle(this.animT), 0.15);
   }
 
@@ -226,7 +230,7 @@ export class Hero {
       if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
       if (!inShape(a.x, a.z, 0.4)) continue;
       const dx = a.x - this.x, dz = a.z - this.z, d = Math.hypot(dx, dz) || 1;
-      const dmg = this.damageTo(a.giap, mv, m.crit);
+      const dmg = this.damageTo(a.giap, mv, m.crit, a);
       const stun = isC && this.mods.cStun && ctx.rng.chance(this.mods.cStun) ? 1.5 : 0;
       ctx.crowd.damage(a, dmg, { by: "hero", swing: this.swingId, kx: dx / d, kz: dz / d, knock: m.knock || 2.2, launch: m.launch, stun });
       ctx.fx.spark(a.x, heightAt(a.x, a.z) + 1.2, a.z, heavy);
@@ -237,7 +241,7 @@ export class Hero {
       if (u.side !== "dich" || !u.alive || u.dead || u.retreating) continue;
       if (key === "DQ" && u !== this.moveTarget) continue;
       if (!inShape(u.x, u.z, u.radius)) continue;
-      const dmg = this.damageTo(u.giap, mv, m.crit);
+      const dmg = this.damageTo(u.giap, mv, m.crit, u);
       const r = u.takeHeroHit(dmg, POISE_PER_MV * mv * poiseMult, { knock: m.knock, launch: m.launch, by: "hero", finisher: key === "DQ" });
       ctx.fx.spark(u.x, u.y + 1.6, u.z, true);
       if (r.broke && this.mods.breakKi) this.addKi(this.mods.breakKi);
@@ -270,13 +274,14 @@ export class Hero {
     return c;
   }
 
-  damageTo(giap, mv, sureCrit) {
+  // tgt: lính / đơn vị bị đánh — nhân thế đất cao thấp ở cuối (terrain-rules.js hitMult)
+  damageTo(giap, mv, sureCrit, tgt = null) {
     const ctx = this.ctx;
     const g = giap * (1 - this.mods.armorPen);
     let d = this.effCong() * mv * heSoGiap(g, this.stats.level);
     if (sureCrit || ctx.rng.chance(this.stats.crit)) d *= CRIT_MULT;
     if (this.inTPC) d *= TPC_HERO_MULT;
-    return d * (0.95 + 0.1 * ctx.rng.next());
+    return d * (0.95 + 0.1 * ctx.rng.next()) * (tgt ? hitMult(this, tgt) : 1);
   }
 
   onLanded() {
@@ -306,7 +311,7 @@ export class Hero {
   afterimageBurst(x, z) {
     for (const a of this.ctx.crowd.agents) {
       if (a.side !== "dich" || !this.ctx.crowd.hittable(a) || Math.hypot(a.x - x, a.z - z) > 3) continue;
-      this.ctx.crowd.damage(a, this.damageTo(a.giap, 0.5), { by: "hero", swing: ++this.swingId, knock: 3 });
+      this.ctx.crowd.damage(a, this.damageTo(a.giap, 0.5, false, a), { by: "hero", swing: ++this.swingId, knock: 3 });
     }
   }
   updateDodge(dt) {
@@ -319,10 +324,21 @@ export class Hero {
 
   // ---- Đỡ ------------------------------------------------------------------------------------
   updateBlock(dt, wx, wz, mag) {
-    this.setPose(A.block(), 0.4);
+    const walk = mag > 0.15 && this.blocking;
+    if (!walk) this.setPose(A.BLOCK, 0.4);
     if (!this.blocking) { this.state = "free"; return; }
     if (this.buf && (this.buf.a === "dodge" || this.buf.a === "n" || this.buf.a === "c")) { this.state = "free"; this.tryActions(); return; }
-    if (mag > 0.15) { this.x += wx * 2 * dt; this.z += wz * 2 * dt; }
+    this.blockT += dt;
+    if (walk) {
+      // đi trong thế đỡ: bước ngắn, nhanh theo hướng đi so với mặt (A.guardStep), bàn chân trụ đứng yên trên đất.
+      // Trộn tư thế nhanh (0,8) để nhịp ~4 bước/s không bị trễ pha làm lê chân; 0,2 s đầu trộn chậm cho khỏi giật.
+      const vx = wx * 2, vz = wz * 2, sp = Math.hypot(vx, vz), cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
+      this.x += vx * dt; this.z += vz * dt;
+      const g = A.stepGait(sp, this.rig.scale);
+      this.runPhase += dt * g.rate;
+      this.setPose(A.guardStep(A.BLOCK, this.runPhase, (vx * cy - vz * sy) / sp, (vx * sy + vz * cy) / sp, g.stride),
+        this.blockT < 0.2 ? 0.4 : 0.8);
+    }
     const t = this.lock?.alive ? this.lock : this.nearestEnemy(8);
     if (t) this.yaw = turn(this.yaw, Math.atan2(t.x - this.x, t.z - this.z), dt * 10);
   }
@@ -402,14 +418,14 @@ export class Hero {
       if (Math.hypot(a.x - this.x, a.z - this.z) > 2.2) continue;
       this.dashHit.add(a);
       const kx = Math.cos(this.yaw), kz = -Math.sin(this.yaw), side = ((a.x - this.x) * kx + (a.z - this.z) * kz) >= 0 ? 1 : -1;
-      ctx.crowd.damage(a, this.damageTo(a.giap, HERO.phaTran.mv), { by: "hero", swing: this.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
+      ctx.crowd.damage(a, this.damageTo(a.giap, HERO.phaTran.mv, false, a), { by: "hero", swing: this.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
       hit = true; this.onLanded();
     }
     for (const un of ctx.units) {
       if (un.side !== "dich" || !un.alive || un.dead || un.retreating || this.dashHit.has(un)) continue;
       if (Math.hypot(un.x - this.x, un.z - this.z) > 2.2 + un.radius) continue;
       this.dashHit.add(un);
-      un.takeHeroHit(this.damageTo(un.giap, HERO.phaTran.mv), POISE_PER_MV * HERO.phaTran.mv * C_POISE_MULT, { by: "hero" });
+      un.takeHeroHit(this.damageTo(un.giap, HERO.phaTran.mv, false, un), POISE_PER_MV * HERO.phaTran.mv * C_POISE_MULT, { by: "hero" });
       hit = true;
     }
     if (hit) { ctx.hitstop(20); ctx.audio.play("hit", this.x, this.z); }
@@ -441,9 +457,12 @@ export class Hero {
   updateUlt(dt) {
     const ctx = this.ctx, T = HERO.tuyetKy, per = 4 / T.hits;
     this.st += dt;
-    const k = Math.floor(this.st / per);
-    const u = (this.st % (per * 3)) / (per * 3);
-    this.setPose(k % 6 < 3 ? A.slash(u, k % 2 ? 1 : -1, 0.4) : A.spin(u, 1), 0.7);
+    // một nhát chém dài 3 đòn (u chạy hết 0..1 qua 3 đòn), đổi tay mỗi chu kỳ 6 đòn (chém rồi xoay); nhát tay trái giữ
+    // chân như tay phải cho nối liền với nhát xoay. Trước đây đổi tay theo từng đòn (k % 2): giữa nhát chém tư thế lật
+    // trái ↔ phải, chân tay giật 70 lần trong 4,2 s. u tính từ cùng x với k (trước là st % (3·per): sai số dấu phẩy
+    // động làm k sang nhát xoay mà u còn ≈ 1, giật một khung ở chỗ đổi chém ↔ xoay).
+    const x = this.st / per, k = Math.floor(x), u = (x - 3 * Math.floor(k / 3)) / 3;
+    this.setPose(k % 6 < 3 ? A.slash(u, Math.floor(k / 6) % 2 ? 1 : -1, 0.4, false) : A.spin(u, 1), 0.7);
     while (this.ultHits < Math.min(T.hits, k)) {
       this.ultHits++; this.swingId++;
       const tgt = this.nearestEnemy(this.ultR + 5);
@@ -457,12 +476,12 @@ export class Hero {
         if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
         const dx = a.x - this.x, dz = a.z - this.z, dd = Math.hypot(dx, dz);
         if (dd > this.ultR) continue;
-        ctx.crowd.damage(a, this.damageTo(a.giap, this.ultMv), { by: "hero", swing: this.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: this.ultHits % 6 === 0 });
+        ctx.crowd.damage(a, this.damageTo(a.giap, this.ultMv, false, a), { by: "hero", swing: this.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: this.ultHits % 6 === 0 });
       }
       for (const un of ctx.units) {
         if (un.side !== "dich" || !un.alive || un.dead || un.retreating) continue;
         if (Math.hypot(un.x - this.x, un.z - this.z) > this.ultR + un.radius) continue;
-        un.takeHeroHit(this.damageTo(un.giap, this.ultMv), POISE_PER_MV * this.ultMv, { by: "hero" });
+        un.takeHeroHit(this.damageTo(un.giap, this.ultMv, false, un), POISE_PER_MV * this.ultMv, { by: "hero" });
       }
       ctx.fx.shockwave(this.x, this.z, this.ultR * 0.8); ctx.audio.play("hit", this.x, this.z);
       if (this.ultHits % 4 === 0) ctx.fx.shake(0.2);
@@ -519,10 +538,12 @@ export class Hero {
   heal(frac) { this.hp = Math.min(this.maxHp, this.hp + this.maxHp * frac); }
 
   setPose(p, k) { this.pose = A.blendPose(this.pose, p, Math.min(1, k)); A.applyPose(this.rig, this.pose); }
-  place() {
+  // dt = bước mô phỏng vừa chạy (0 khi dựng lần đầu): chuyển động phụ chỉ chạy theo bước mô phỏng nên
+  // hit-stop (0 bước) làm vải, dải khăn đứng yên cùng người.
+  place(dt = 0) {
     this.y = heightAt(this.x, this.z);
     const r = this.rig.root; r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw;
-    if (this.rig.p.flagCloth) this.rig.p.flagCloth.rotation.x = Math.sin(this.animT * 6) * 0.15 + (this.state === "free" && this.inputMag > 0.2 ? 0.35 : 0);
+    this.motion.update(dt, this.pose, heightAt);
     const vis = this.invuln > 0 && this.state !== "ult" ? (Math.floor(this.animT * 14) % 2 === 0) : true;
     r.visible = vis || !this.alive;
     // vệt lưỡi đao khi ra đòn, lao, Tuyệt Kỹ

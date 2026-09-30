@@ -121,6 +121,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .bar.hp span { position: absolute; inset: 0; font-size: .68rem; line-height: 12px; text-align: center; }
 .ki { display: flex; gap: 4px; } .ki .kb { flex: 1; height: 8px; } .ki .kb > div { background: linear-gradient(90deg, #3a7fc0, #9fd4ff); }
 .buffs { font-size: .72rem; color: var(--vang2); min-height: 1em; margin-top: 3px; }
+/* tag thế đất cạnh thanh máu (chỗ đất cao thấp, bùn lầy): nằm ngoài luồng để hiện/ẩn không xô HUD */
+.bars { position: relative; }
+.ttags { position: absolute; left: calc(100% + 8px); top: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; pointer-events: none; }
+.ttag { font-size: .7rem; line-height: 1.35; padding: 0 7px; border-radius: 8px; white-space: nowrap; background: rgba(21,18,16,.72); border: 1px solid var(--vang); color: var(--vang2); }
+.ttag:empty { display: none; }
+.ttag.down { border-color: #7e2419; color: #ffb09a; }
+.ttag.mud { border-color: #6b4f2e; color: #d8c49a; }
 .hud-map { position: absolute; right: 12px; top: 10px; width: 244px; }
 .hud-map canvas { width: 240px; height: 160px; border: 2px solid #6b4f2e; border-radius: 8px; display: block; background: #cdb888; }
 .bigmap .hud-map { right: 50%; top: 50%; transform: translate(50%, -50%) scale(2.6); transform-origin: center; }
