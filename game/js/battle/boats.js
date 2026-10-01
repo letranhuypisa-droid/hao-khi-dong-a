@@ -13,6 +13,7 @@ import { PAL, lambert } from "./models.js";
 import { Deck, poseMatrix } from "./deck.js";
 import { makeRng } from "../core/rng.js";
 import { waveY } from "../data/terrain-b20.js";
+import { STAKE_TOP } from "../data/river-b20.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -85,6 +86,15 @@ export const HULLS = {
     flagAt: [0, 3.3, -5.3], flagSize: { w: 0.8, h: 1.9 },
   },
 };
+// Thuyền chỉ huy nhẹ của tướng ở pha 1 (hợp đồng gameplay B20: thân thuyền nhẹ phóng 1,35×, boong ~16 × 3,5 m): mọi số của
+// thuyền nhẹ nhân k (boong, tường, cửa, cờ); hình vẽ là hình thuyền nhẹ phóng to (hullGeometry). ĐỀ XUẤT BẢN THỬ.
+function scaledHull(base, k, over) {
+  const B = HULLS[base], sc = (o) => Object.fromEntries(Object.entries(o).map(([n, v]) => [n, typeof v === "number" ? v * k : v]));
+  return { ...B, len: B.len * k, beam: B.beam * k, deckY: B.deckY * k, draft: B.draft * k, base, scale: k,
+    deck: { rects: B.deck.rects.map(sc), walls: B.deck.walls.map(sc), portals: B.deck.portals.map(sc) },
+    flagAt: B.flagAt.map((v) => v * k), flagSize: { w: B.flagSize.w * k, h: B.flagSize.h * k }, ...over };
+}
+HULLS.lead = scaledHull("light", 1.35, { name: "Thuyền chỉ huy nhẹ", hp: 2200 });
 // ngân sách tam giác (hợp đồng §5, systems §13)
 export const TRI_BUDGET = { lod0: 3000, flagship0: 8000, lod1: 800, lod2: 60 };
 
@@ -219,7 +229,10 @@ function secAt(sp, z) {
   return S[S.length - 1];
 }
 // nửa bề rộng phía trong mạn (mép sàn) của loại thuyền ở z cục bộ — kiểm mặt đi được nằm trong thân, đặt lính sát mạn
-export function innerHalfBeam(type, z) { const sp = SPECS[type], s = secAt(sp, z); return s.b * 0.975 - sp.th; }
+export function innerHalfBeam(type, z) {
+  const H = HULLS[type]; if (H?.base) return innerHalfBeam(H.base, z / H.scale) * H.scale;      // thuyền phóng to (lead)
+  const sp = SPECS[type], s = secAt(sp, z); return s.b * 0.975 - sp.th;
+}
 // mặt cắt nửa mạn +x từ ky lên đỉnh mạn: [x, y, màu đoạn tới điểm kế]
 function profile(kind, s, D, lod) {
   const { b, bot, T } = s;
@@ -536,6 +549,7 @@ export function hullGeometry(type, lod = 0) {
   const key = type + ":" + lod;
   if (GEO.has(key)) return GEO.get(key);
   const H = HULLS[type]; if (!H) throw new Error("không có loại thuyền " + type);
+  if (H.base && lod < 2) { const g = hullGeometry(H.base, lod).clone(); g.scale(H.scale, H.scale, H.scale); GEO.set(key, g); return g; }
   const mk = new Mk();
   if (lod >= 2) impostor(mk, H.family); else BUILD[type](mk, lod);
   const g = mk.geometry();
@@ -600,16 +614,23 @@ export const BOAT = {
   settle: 4,         // s từ lúc mắc tới lúc nằm nghiêng hẳn (R-world §4c)
   tilt: [8.5, 11.5], // độ nghiêng tổng khi mắc cạn, theo seed từng thuyền (hợp đồng: 8–12°)
   mudSink: 0.3,      // ky lún vào bùn (m)
-  stakeCatch: 0.6,   // trên mốc cọc đã kích hoạt: mắc khi ky còn cách đáy chừng này (cọc đâm thủng đáy)
+  stakeCatch: STAKE_TOP.min,   // trên mốc cọc đã kích hoạt: mắc khi ky chạm đỉnh cọc thấp nhất (river-b20 STAKE_TOP; chỉ khi autoGround)
   sinkRate: 0.6, sinkRoll: 0.5, sinkHide: 6,   // chìm: m/s, độ nghiêng cuối (rad), giây rồi ẩn
 };
 const _P = { x: 0, z: 0, tx: 0, tz: 1 };
 
 export class Boat {
   // sail: true = buồm giương (buồm gộp trong mesh loại thuyền ở đợt này; giữ để sau có mesh buồm hạ)
-  constructor({ type = "junk", side = "dich", id = "", path = null, speed = 0, flag = "", sail = true, s0 = 0, seed } = {}) {
+  // autoGround: tự mắc khi ky chạm đáy / đỉnh cọc đã kích hoạt (lab-b20 giữ). Trong trận (naval.js) = false: director quyết
+  // lúc nào thuyền "caught" (dừng, chưa nghiêng) và lúc nào strand() (lún, nghiêng) — hợp đồng gameplay B20. Tắt tự mắc thì
+  // thuyền vẫn không lún quá đáy: y ≥ đáy + mớn − lún bùn (nằm trên bùn, chưa nghiêng).
+  // follow: { boat, dx, dz, dyaw } — áp mạn (naval.grapple): bám theo thuyền kia, vị trí trong hệ thuyền kia cố định.
+  constructor({ type = "junk", side = "dich", id = "", path = null, speed = 0, flag = "", sail = true, s0 = 0, seed, autoGround = true } = {}) {
     const H = HULLS[type]; if (!H) throw new Error("không có loại thuyền " + type);
     this.type = type; this.hull = H; this.side = side; this.id = id; this.flag = flag; this.sail = sail;
+    this.autoGround = autoGround; this.follow = null;
+    this.drive = null;           // hàm (dt) → s: vị trí trên đường do ngoài điều khiển (đò chuyển của naval.js), bỏ qua tăng tốc
+    this.calm = false;           // true: không dập dềnh (cụm Liên Hoàn Thuyền xích lại làm bệ đứng vững)
     this.deck = new Deck(H.deck); this.deck.boat = this;
     this.hpMax = H.hp; this.hp = H.hp;
     this.x = 0; this.z = 0; this.y = 0; this.yaw = 0; this.pitch = 0; this.roll = 0;
@@ -636,8 +657,11 @@ export class Boat {
     return this;
   }
   stop() { if (this.state === "sail") this.state = "hold"; return this; }
+  // mắc cọc (director, lúc con nước qua strandAt): dừng hẳn, nổi theo nước nhưng không lún quá đáy, CHƯA nghiêng; strand()
+  // sau đó mới lún và nghiêng
+  catch() { if (this.state === "sail" || this.state === "hold") { this.state = "caught"; this.restY = -Infinity; } return this; }
   go(speed) { if (speed !== undefined) this.targetSpeed = speed; if (this.state === "hold") this.state = "sail"; this.arrived = false; return this; }
-  // mắc cạn / mắc cọc: bắt đầu lún và nghiêng (director gọi, hoặc tự xảy ra khi ky chạm đáy)
+  // mắc cạn / mắc cọc: bắt đầu lún và nghiêng (director gọi, hoặc tự xảy ra khi ky chạm đáy nếu autoGround)
   strand() { if (this.state === "sail" || this.state === "hold" || this.state === "caught") this._settle(null); return this; }
   sink() { if (this.state !== "sunk") { this.state = "sunk"; this.sinkT = 0; this.ySink = this.y; this.sinkSign = this.roll >= 0 ? 1 : -1; this.speed = 0; } return this; }
   _settle(env) {
@@ -648,12 +672,22 @@ export class Boat {
   // env: { tideY (m), t (s), bedHeight(x, z), stakeActive(x, z) → bool }
   update(dt, env = {}) {
     const H = this.hull, t = env.t ?? 0, tideY = env.tideY ?? 0;
-    if (this.state === "caught") this._settle(env);
-    if ((this.state === "settle" || this.state === "stranded") && this.restY === -Infinity && env.bedHeight)
+    if ((this.state === "settle" || this.state === "stranded" || this.state === "caught") && this.restY === -Infinity && env.bedHeight)
       this.restY = env.bedHeight(this.x, this.z) + H.draft - BOAT.mudSink;
-    // chạy theo đường (mắc cạn thì trượt thêm một đoạn rồi dừng)
-    if (this.track && this.state !== "stranded" && this.state !== "sunk") {
-      const tgt = this.state === "sail" ? this.targetSpeed : 0, acc = this.state === "settle" ? BOAT.acc * 3 : BOAT.acc;
+    // áp mạn: vị trí, hướng theo thuyền kia (đặt trước khi lấy mẫu sóng)
+    const F = this.follow;
+    if (F && this.state !== "stranded" && this.state !== "settle" && this.state !== "sunk") {
+      const L = F.boat, c = Math.cos(L.yaw), sn = Math.sin(L.yaw);
+      this.x = L.x + F.dx * c + F.dz * sn; this.z = L.z - F.dx * sn + F.dz * c; this.yaw = wrap(L.yaw + F.dyaw); this.speed = L.speed;
+    }
+    // chạy theo đường (mắc cạn thì trượt thêm một đoạn rồi dừng; bị mắc cọc thì hãm lại)
+    else if (this.drive && this.track && this.state !== "stranded" && this.state !== "sunk") {
+      const s0 = this.s; this.s = clamp(this.drive(dt), 0, this.track.len); this.speed = dt > 0 ? Math.abs(this.s - s0) / dt : 0;
+      this.track.at(this.s, _P); this.x = _P.x; this.z = _P.z;
+      if (this.speed > 0.05) this.yaw = wrap(this.yaw + wrap(Math.atan2(_P.tx, _P.tz) - this.yaw) * Math.min(1, dt * 4));
+    }
+    else if (this.track && this.state !== "stranded" && this.state !== "sunk") {
+      const tgt = this.state === "sail" ? this.targetSpeed : 0, acc = this.state === "settle" || this.state === "caught" ? BOAT.acc * 3 : BOAT.acc;
       this.speed += clamp(tgt - this.speed, -acc * dt, acc * dt);
       if (this.speed > 0) {
         this.s += this.speed * dt;
@@ -664,19 +698,26 @@ export class Boat {
     }
     // dập dềnh: lấy mẫu sóng ở mũi, đuôi, hai mạn; thuyền lớn nhấp nhô ít hơn
     // (độ sâu lấy một lần ở tâm thuyền: nước nông thì sóng lặng như shader)
-    const L = H.len, B = H.beam, amp = clamp(10 / L, 0.35, 1), fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const L = H.len, B = H.beam, amp = this.calm ? 0 : clamp(10 / L, 0.35, 1), fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const dep = env.bedHeight ? tideY - env.bedHeight(this.x, this.z) : 9;
     const yb = waveY(this.x + fx * L * 0.4, this.z + fz * L * 0.4, t, dep), ys = waveY(this.x - fx * L * 0.4, this.z - fz * L * 0.4, t, dep);
     const yp = waveY(this.x + fz * B * 0.5, this.z - fx * B * 0.5, t, dep), yq = waveY(this.x - fz * B * 0.5, this.z + fx * B * 0.5, t, dep);
     const floatY = tideY + amp * (yb + ys + yp + yq) / 4;
     const wp = amp * Math.atan2(ys - yb, L * 0.8), wr = amp * (Math.atan2(yp - yq, B) + 0.03 * Math.sin(t * 0.7 + this.phase));
     // tự mắc: ky chạm đáy (hoặc chạm cọc ở mốc đã kích hoạt)
-    if ((this.state === "sail" || this.state === "hold") && env.bedHeight) {
+    if (this.autoGround && (this.state === "sail" || this.state === "hold") && env.bedHeight) {
       const bed = env.bedHeight(this.x, this.z), catchH = env.stakeActive && env.stakeActive(this.x, this.z) ? BOAT.stakeCatch : 0;
       if (tideY - H.draft <= bed + catchH) this._settle(env);
     }
     switch (this.state) {
-      case "sail": case "hold": this.y = floatY; this.pitch = wp; this.roll = wr; break;
+      case "sail": case "hold":
+        // không tự mắc (naval.js): nước cạn thì ky tựa bùn, không chìm xuyên đáy
+        this.y = !this.autoGround && env.bedHeight ? Math.max(floatY, env.bedHeight(this.x, this.z) + H.draft - BOAT.mudSink) : floatY;
+        this.pitch = wp; this.roll = wr; break;
+      case "caught": {                                  // mắc cọc: lắc rất ít, không lún quá đáy, chưa nghiêng
+        const k = 0.35;
+        this.y = Math.max(tideY + (floatY - tideY) * k, this.restY); this.pitch = wp * k; this.roll = wr * k; break;
+      }
       case "settle": {
         this.settleT += dt;
         const k = smooth(0, BOAT.settle, this.settleT);
@@ -725,7 +766,32 @@ export class FleetRenderer {
     }
     for (const fam of ["yuan", "tran"]) this._add(fam + ":2", impostorGeometry(fam), FLEET_LOD.lod2Cap, false, 2);
     this._flags();
+    if (this._ownMat) this._seeThrough();
   }
+  // Xuyên thấu hành lang máy quay → tướng (như seeThrough của scenery.js, cho lưới instance: toạ độ thế giới qua instanceMatrix):
+  // mảnh thân thuyền, buồm, lầu chỉ huy cao hơn hông tướng nằm trong ống 1,2–2,6 m quanh đoạn máy quay → ngực tướng (chừa 0,6–1,6 m
+  // cuối quanh tướng), hoặc cách ống kính < 2–3,5 m, bị loại theo mẫu chấm (tối đa 88%). Mặt boong dưới chân tướng không mờ. Bóng
+  // đổ giữ nguyên. setSee(cam, x, y, z) mỗi khung (naval: world.fadeOccluders). Review B20: buồm / mạn / lầu che trận đánh 15–35%
+  // khung ở P2, P4, P5; trước đây máy quay xoay song song buồm, kéo sát 6 m (sailCamera) — nay chỉ làm mờ.
+  _seeThrough() {
+    const uCam = this.uSeeCam = { value: new THREE.Vector3(0, -1e4, 0) }, uTgt = this.uSeeTgt = { value: new THREE.Vector3(0, -1e4, 1) };
+    this.mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uSeeCam = uCam; sh.uniforms.uSeeTgt = uTgt;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSeeW;")
+        .replace("#include <project_vertex>", "#include <project_vertex>\n vec4 sw = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\n sw = instanceMatrix * sw;\n#endif\n vSeeW = (modelMatrix * sw).xyz;");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vSeeW;\nuniform vec3 uSeeCam, uSeeTgt;")
+        .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
+  {
+    vec3 ax = uSeeTgt - uSeeCam; float L = max(length(ax), 1e-3); ax /= L;
+    vec3 d = vSeeW - uSeeCam; float t = dot(d, ax), r = length(d - ax * t);
+    float k = (1.0 - smoothstep(1.2, 2.6, r)) * step(0.0, t) * (1.0 - smoothstep(L - 1.6, L - 0.6, t)) * step(uSeeTgt.y - 0.5, vSeeW.y);
+    k = max(k, 1.0 - smoothstep(2.0, 3.5, length(d)));
+    if (k * 0.88 > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard;
+  }`);
+    };
+    this.mat.customProgramCacheKey = () => "hk-see-fleet";
+  }
+  setSee(cam, x, y, z) { if (this.uSeeCam) { this.uSeeCam.value.copy(cam); this.uSeeTgt.value.set(x, y, z); } }
   _add(key, geo, capN, cast, lod) {
     const m = new THREE.InstancedMesh(geo, this.mat, capN);
     m.count = 0; m.visible = false; m.castShadow = cast; m.receiveShadow = lod < 2;
@@ -749,11 +815,14 @@ export class FleetRenderer {
     g.setAttribute("aCell", cell);
     const mat = this.flagMat = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide });
     this.uTime = { value: 0 };
+    // mặt sau lá cờ: lật u trong ô atlas (chữ không bị ngược khi nhìn từ phía kia — review B20: 帥 đọc thành "中白", 陳 thành 刺)
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = this.uTime;
-      sh.vertexShader = "uniform float uTime;\nattribute float aCell;\n" + sh.vertexShader
-        .replace("#include <uv_vertex>", `#include <uv_vertex>\n#ifdef USE_MAP\n vMapUv.x = (vMapUv.x + aCell) / ${N}.0;\n#endif`)
+      sh.vertexShader = "uniform float uTime;\nattribute float aCell;\nvarying float vCell;\n" + sh.vertexShader
+        .replace("#include <uv_vertex>", `#include <uv_vertex>\n vCell = aCell;\n#ifdef USE_MAP\n vMapUv.x = (vMapUv.x + aCell) / ${N}.0;\n#endif`)
         .replace("#include <begin_vertex>", "#include <begin_vertex>\n float fw = -transformed.z;\n transformed.x += sin(uTime * 4.5 + fw * 2.4 + aCell * 1.7) * 0.16 * fw;");
+      sh.fragmentShader = "varying float vCell;\n" + sh.fragmentShader.replace("#include <map_fragment>",
+        `#ifdef USE_MAP\n vec2 fuv = vMapUv;\n if (!gl_FrontFacing) fuv.x = (2.0 * vCell + 1.0) / ${N}.0 - fuv.x;\n diffuseColor *= texture2D(map, fuv);\n#endif`);
     };
     const m = this.flagMesh = new THREE.InstancedMesh(g, mat, this.cap + 8);
     m.count = 0; m.visible = false; m.name = "boats:flags"; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

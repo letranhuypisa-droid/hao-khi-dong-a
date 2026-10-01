@@ -35,11 +35,17 @@ export function unlockCards(save, chapter, keys, now = Date.now(), bank = cardBa
   return out;
 }
 
-// Khóa mở thẻ rút từ kết quả một trận (director.buildResult; B20 dùng cùng khóa: bossMet, keSach:<id>, firstWin).
+// Khóa mở thẻ rút từ kết quả một trận (director.buildResult). B15 (res.battle thiếu hoặc "B15"): bossMet khi gặp Toa Đô,
+// keSach:<id> khi Kế Sách đã phân thắng bại (thành hay bại đều mở), firstWin khi thắng — như trước đợt 9.
+// B20 (đợt 9, B20-GAMEPLAY §D5): keSach:<id> chỉ khi Kế Sách THÀNH CÔNG (nghiBinh, kichCoc, conNuoc — danh sách lấy từ
+// res.keSachList, thiếu thì từ res.river.keSach của riverResult); bossMet khi Ô Mã Nhi (X20) đã xuất hiện: res.bossesMet
+// (mảng id boss đã gặp) có "X20", không có mảng thì res.bossMet (director-b20 chỉ bật khi X20 ra trận, không tính Phàn Tiếp).
 export function battleUnlockKeys(res) {
   const keys = [];
-  if (res.bossMet) keys.push("bossMet");
-  for (const k of res.keSachList || []) if (k.state === "thanhcong" || k.state === "thatbai") keys.push("keSach:" + k.id);
+  const b20 = res.battle === "B20";
+  if (b20 ? (Array.isArray(res.bossesMet) ? res.bossesMet.includes("X20") : !!res.bossMet) : res.bossMet) keys.push("bossMet");
+  const list = res.keSachList || (b20 ? Object.values(res.river?.keSach || {}) : []);
+  for (const k of list) if (k.state === "thanhcong" || (!b20 && k.state === "thatbai")) keys.push("keSach:" + k.id);
   if (res.won) keys.push("firstWin");
   return keys;
 }

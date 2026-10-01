@@ -124,14 +124,15 @@ export class HUD {
     E.promptring.style.strokeDashoffset = String(94.25 * (1 - Math.max(0, Math.min(1, p))));
     E.prompt.classList.toggle("full", p >= 1);
   }
-  // Chọn điểm đến: items [{ id, label, sub?, icon? }] (tối đa 4), phím 1–4 (battle.js chuyển cmd1–4 vào pick khi đang
-  // mở, đồng hồ trận ×0,2 như vòng lệnh) hoặc chạm. Chọn xong gọi onPick(item) rồi tự đóng. items null: đóng.
-  picker(items, onPick = null) {
+  // Chọn điểm đến: items [{ id, label, sub?, icon?, svg?, kind? }] (tối đa 4), phím 1–4 (battle.js chuyển cmd1–4 vào pick khi
+  // đang mở, đồng hồ trận ×0,2 như vòng lệnh) hoặc chạm. Chọn xong gọi onPick(item) rồi tự đóng. items null: đóng.
+  // icon: id ảnh assets/icons; svg: hình vẽ sẵn (chuỗi <svg>, vd thuyền / bè / bến của B20); kind → data-kind để tô CSS.
+  picker(items, onPick = null, title = "Chọn nơi đến") {
     const E = this.el;
     if (!items || !items.length) { this.pickerOpen = false; this.pickItems = null; this.onPick = null; E.picker.hidden = true; E.picker.innerHTML = ""; return; }
     this.pickItems = items.slice(0, 4); this.onPick = onPick; this.pickerOpen = true;
-    E.picker.innerHTML = `<div class="pk-title">Chọn nơi đến</div>` + this.pickItems.map((it, i) =>
-      `<button data-pick="${i}">${it.icon ? `<img src="${ICON(it.icon)}" alt="">` : ""}<b>${i + 1}</b><span>${it.label}</span>${it.sub ? `<small>${it.sub}</small>` : ""}</button>`).join("");
+    E.picker.innerHTML = `<div class="pk-title">${title}</div>` + this.pickItems.map((it, i) =>
+      `<button data-pick="${i}"${it.kind ? ` data-kind="${it.kind}"` : ""}>${it.svg ? `<i class="pk-ic">${it.svg}</i>` : it.icon ? `<img src="${ICON(it.icon)}" alt="">` : ""}<b>${i + 1}</b><span>${it.label}</span>${it.sub ? `<small>${it.sub}</small>` : ""}</button>`).join("");
     E.picker.hidden = false;
     E.picker.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.pick(Number(b.dataset.pick)); }));
   }
@@ -163,7 +164,8 @@ export class HUD {
     E.hp.style.width = `${(hero.hp / hero.maxHp) * 100}%`;
     E.hpt.textContent = `${Math.ceil(hero.hp)} / ${Math.round(hero.maxHp)}`;
     E.hp.parentElement.classList.toggle("low", hero.hp / hero.maxHp < 0.3);
-    for (let i = 0; i < this.nKi; i++) E["ki" + i].style.width = `${Math.max(0, Math.min(100, hero.ki - 100 * i))}%`;
+    const per = hero.def?.kiLucPerBar ?? HERO.kiLucPerBar ?? 100;                                   // Khí Lực mỗi vạch theo tướng (H35: 100)
+    for (let i = 0; i < this.nKi; i++) E["ki" + i].style.width = `${Math.max(0, Math.min(100, (hero.ki - per * i) / per * 100))}%`;
     E.rev.textContent = hero.revives > 0 ? `· Gượng dậy ×${hero.revives}` : "";
     const buffs = [];
     if (hero.buffs.atk) buffs.push(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
@@ -197,7 +199,7 @@ export class HUD {
     let ks = (d.keSach?.hud?.() || []).filter((k) => k.state !== "khoa").map((k) =>
       `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${k.detail ? " · " + k.detail : ""}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
     for (const [id, html] of this.panels) ks += `<div class="hud-panel" data-panel="${id}">${html}</div>`;
-    E.ks.innerHTML = ks;
+    if (ks !== this.ksHtml) { E.ks.innerHTML = ks; this.ksHtml = ks; }     // chỉ vẽ lại khi đổi: hoạt ảnh CSS (nhấp nháy Sẵn sàng) chạy liền
     // tin nhắn
     E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${m.text}</div>`).join("");
     E.ko.textContent = d.ko;
@@ -329,10 +331,11 @@ export class HUD {
 // Hàng trên: đòn N, đòn C kế tiếp (đổi icon theo chuỗi: N N → C báo "C3 Lốc đao"), Né, Đỡ. Hàng dưới: kỹ năng.
 // slots (hero.skillSlots()) / ult (hero.ultInfo()): không có thì đúng thanh của H35 (Phá Trận E, Tuyệt Kỹ R).
 export function skillBarHTML(full, slots = null, ult = null) {
-  const tile = (k, id, key, name, extra = "", cls = "", icon = MOVE_INFO[id].icon) => `<div class="sk ${cls}" data-k="${k}"><img class="ico" src="${ICON(icon)}" alt="" data-k="${k}ic"><b>${key}</b><span data-k="${k}nm">${name}</span><i data-k="${k}cd">${extra}</i></div>`;
-  const sk = slots ? slots.map((s, i) => tile(SLOT_TILE[i], "skill", s.key ?? SLOT_KEY[i], s.name ?? s.id, "", "", s.icon ?? MOVE_INFO[s.id]?.icon ?? "skill")).join("")
+  const tile = (k, id, key, name, extra = "", cls = "", icon = MOVE_INFO[id].icon, skill = "") => `<div class="sk ${cls}" data-k="${k}"${skill ? ` data-skill="${skill}"` : ""}><img class="ico" src="${ICON(icon)}" alt="" data-k="${k}ic"><b>${key}</b><span data-k="${k}nm">${name}</span><i data-k="${k}cd">${extra}</i></div>`;
+  const sk = slots ? slots.map((s, i) => tile(SLOT_TILE[i], "skill", s.key ?? SLOT_KEY[i], s.name ?? s.id, "", "", s.icon ?? MOVE_INFO[s.id]?.icon ?? "skill", s.id)).join("")
     : tile("sk1", "skill", "E", "Phá Trận");
-  const ut = ult ? tile("sk2", "ult", ult.key ?? "R", ult.label ?? "Tuyệt Kỹ", "", "", ult.icon ?? "ult") : tile("sk2", "ult", "R", "Tuyệt Kỹ");
+  // nhãn ô Tuyệt Kỹ: ult.label, không có thì tên chiêu của tướng (H31 "Bạch Đằng Quyết Chiến"); Bóp Nát của H35 giữ chữ "Tuyệt Kỹ"
+  const ut = ult ? tile("sk2", "ult", ult.key ?? "R", ult.label ?? ((ult.id && ult.id !== "bopNat" && ult.name) || "Tuyệt Kỹ"), "", "", ult.icon ?? "ult") : tile("sk2", "ult", "R", "Tuyệt Kỹ");
   return `<div class="hud-skills">
     <div class="skrow atk">${tile("atkN", "N", "J", "Đòn N", "")}${tile("atkC", "C1", "K", "C1 Phá thế", "")}${tile("atkD", "dodge", "Space", "Né")}${tile("atkB", "block", "Shift", "Đỡ")}</div>
     <div class="skrow">${sk}${ut}${full ? tile("sk3", "tpc", "F", "Tổng Phản Công", "", "tpc") + tile("sk4", "cmd", "Tab", "Mệnh Lệnh") : ""}</div>

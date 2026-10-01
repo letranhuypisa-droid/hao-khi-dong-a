@@ -39,6 +39,12 @@ export const STAKE_FIELDS = [
   { id: "M2", x: 655, along: 70, across: 60 },
   { id: "M3", x: 765, along: 70, across: 60 },
 ];
+// Đỉnh cọc cao hơn đáy (m) — MỘT bộ số cho cảnh (scenery-b20 dựng cọc), thuyền (boats.js BOAT.stakeCatch: ky chạm đỉnh cọc
+// thấp nhất) và kiểm thử. Đáy khúc cọc ≈ −2,1 ± 0,25 nên đỉnh ≈ −1,15 … −0,05: cọc chỉ ló khỏi mặt nước khi con nước dưới
+// ≈ 30–45% (hợp đồng gameplay B20), vẫn chìm ở sàn pha 2 (55%). Canon: cọc dài 1,5–3 m kể cả phần chôn. ĐỀ XUẤT BẢN THỬ.
+export const STAKE_TOP = { min: 1.2, max: 1.8 };
+// Bè cỏ ngụy trang ở tâm mỗi mốc (m): rộng w (ngang thân bè, trục x cục bộ) × dài d, mặt sàn cao y trên mặt nước.
+export const RAFT = { w: 10, d: 6, y: 0.25 };
 
 // Điểm trên bờ: điểm cách tâm dòng một khoảng theo hướng bờ (side −1 bắc, +1 nam).
 export const bankPoint = (x, side, off) => ({ x, z: zc(x) + side * (hw(x) + off) });

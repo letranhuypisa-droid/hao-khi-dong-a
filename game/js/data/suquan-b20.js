@@ -10,8 +10,9 @@
 // trung tính, có nguồn; không một con số thương vong phía Nguyên (các nguồn chênh 4 vạn – 8, 9 vạn); không bè lửa.
 //
 // Khóa mở (unlock) — meta/chapter.js mở thẻ theo khóa: "chapterOpen", "battleStart", "bossMet" (gặp Ô Mã Nhi),
-// "keSach:<id>" với id Kế Sách của battle-b20.js (nghiBinh, kichCoc, conNuoc; thành hay bại đều mở), "firstWin",
-// "firstQuiz". Nội Bàng (Kế Sách Nhỏ) chưa có ở bản thử nên thẻ Nội Bàng mở khi thắng lần đầu.
+// "keSach:<id>" với id Kế Sách của battle-b20.js (nghiBinh, kichCoc, conNuoc; chỉ mở khi Kế Sách thành công —
+// B20-GAMEPLAY §D5, khác B15 thành hay bại đều mở), "firstWin", "firstQuiz".
+// Nội Bàng (Kế Sách Nhỏ) chưa có ở bản thử nên thẻ Nội Bàng mở khi thắng lần đầu.
 
 import { COMIC_B20 } from "./comic-b20.js";
 
@@ -48,7 +49,7 @@ export const CARDS = [
     title: "Phàn Tiếp", unlock: "battleStart", hint: "Ra trận Bạch Đằng lần đầu.",
     body: [
       "Tướng thủy quân nhà Nguyên (樊楫) trong cuộc tiến quân 1287–1288, cùng Ô Mã Nhi chỉ huy chiến thuyền.",
-      "Tháng 4 năm 1288 theo sông Bạch Đằng rút ra biển và bị bắt sống trong trận. Các nguồn ghi khác nhau về kết cục của ông sau đó.",
+      "Tháng 4 năm 1288 ông rút theo sông Bạch Đằng ra biển và bị bắt sống trong trận. Các nguồn ghi khác nhau về kết cục của ông sau đó.",
       "Trong game ông là tướng cẩn trọng, sớm nghi lòng sông, cho thuyền dò luồng và xích thuyền khi bị dồn; các cơ chế ấy và câu thoại \"Nước này quá lặng\" là Hư cấu.",
     ],
     src: [TT, NS, CANON("X24")], panels: ["K1"],
@@ -66,7 +67,7 @@ export const CARDS = [
   },
   {
     id: "B20-nghibinh", chapter: "B20", group: "kesach", label: "Chính sử", review: "draft",
-    title: "Kế Sách: Nghi binh lúc triều lên", unlock: "keSach:nghiBinh", hint: "Dùng Kế Sách \"Nghi binh lúc triều lên\" (thành hay bại đều mở).",
+    title: "Kế Sách: Nghi binh lúc triều lên", unlock: "keSach:nghiBinh", hint: "Kế Sách \"Nghi binh lúc triều lên\" thành công.",
     body: [
       "Ngày 9/4/1288, lúc triều lên, thuyền nhẹ quân Trần ra khiêu chiến rồi giả thua, lui dần. Hạm đội Nguyên đuổi theo vào khúc sông đã đóng cọc mà không thấy cọc.",
       "Tên Kế Sách, 8 thuyền nhẹ, khoảng cách 15–40 m với thuyền dẫn đầu và mốc \"Khúc cọc\" là cơ chế của game (Hư cấu).",
@@ -75,7 +76,7 @@ export const CARDS = [
   },
   {
     id: "B20-baicoc", chapter: "B20", group: "kesach", label: "Chính sử", review: "draft",
-    title: "Bãi cọc Bạch Đằng", unlock: "keSach:kichCoc", hint: "Dùng Kế Sách \"Kích hoạt bãi cọc\" (thành hay bại đều mở).",
+    title: "Bãi cọc Bạch Đằng", unlock: "keSach:kichCoc", hint: "Kế Sách \"Kích hoạt bãi cọc\" thành công.",
     body: [
       "Hưng Đạo vương cho đóng cọc gỗ lớn, vạt nhọn một đầu, thành nhiều bãi dưới lòng sông Bạch Đằng từ trước, ngụy trang để lúc triều lên cọc chìm khuất.",
       "Khảo cổ học đã tìm thấy các bãi cọc ở Yên Giang, Đồng Má Ngựa, Đồng Vạn Muối, Cao Quỳ (Quảng Ninh): cọc gỗ đường kính 10–30 cm, dài 1,5–3 m.",
@@ -86,7 +87,7 @@ export const CARDS = [
   },
   {
     id: "B20-connuoc", chapter: "B20", group: "kesach", label: "Chính sử", review: "draft",
-    title: "Con nước", unlock: "keSach:conNuoc", hint: "Dùng Kế Sách \"Con nước\" (thành hay bại đều mở).",
+    title: "Con nước", unlock: "keSach:conNuoc", hint: "Kế Sách \"Con nước\" thành công.",
     body: [
       "Thế trận dựa vào con nước: lúc triều lên, cọc chìm khuất, hạm đội Nguyên đi qua được; khi triều rút, cọc nhô lên, thuyền lớn mắc cọc, nghiêng, không xoay trở được.",
       "Quân mai phục ở các nhánh sông đổ ra, quân Trần đánh từ nhiều phía vào đoàn thuyền đã mắc lại.",
@@ -110,7 +111,7 @@ export const CARDS = [
     title: "Nội minh tự Đỗ Hành", unlock: "firstWin", hint: "Thắng trận Bạch Đằng.",
     body: [
       "Quan nhà Trần giữ chức Nội minh tự. Toàn thư chép ông bắt được Ô Mã Nhi và Tích Lệ Cơ Ngọc trong trận Bạch Đằng, đem dâng Thượng hoàng.",
-      "Trong game, tướng quân dồn Ô Mã Nhi tới Vỡ Thế trên kỳ hạm; comic kết chương vẫn ghi đúng người bắt theo Toàn thư.",
+      "Trong game, người chơi (Hưng Đạo vương) dồn Ô Mã Nhi tới Vỡ Thế trên kỳ hạm (Hư cấu); comic kết chương ghi đúng người bắt theo Toàn thư.",
       "Cảnh Ô Mã Nhi đứng thẳng, đặt gươm dưới chân, giáo quân Trần hạ xuống là cách dựng hình của comic (Hư cấu).",
     ],
     src: [TT, CANON("B20")], panels: ["K2"],
@@ -119,12 +120,12 @@ export const CARDS = [
     id: "B20-noibang", chapter: "B20", group: "sukien", label: "Chính sử", review: "draft",
     title: "Nội Bàng và A Bát Xích", unlock: "firstWin", hint: "Thắng trận Bạch Đằng.",
     body: [
-      "Khi thủy quân vỡ ở Bạch Đằng, quân bộ của Thoát Hoan rút về phương Bắc qua vùng Lạng Sơn và bị quân Trần đón đánh dọc đường. Theo en.wikipedia, Phạm Ngũ Lão phục kích ở ải Nội Bàng.",
+      "Cùng lúc thủy quân rút theo sông Bạch Đằng, quân bộ của Thoát Hoan rút về phương Bắc qua vùng Lạng Sơn và bị quân Trần đón đánh dọc đường. Phạm Ngũ Lão phục kích ở ải Nội Bàng.",
       "A Bát Xích (來阿八赤), người Đường Ngột, giữ chức Hữu thừa hành tỉnh, cầm quân mở đường cho đoàn rút, đi đầu nơi nguy hiểm nhất. Ông trúng ba mũi tên độc mà chết trên đường rút.",
       "Nguyên sử ghi việc ấy lúc đánh Trúc Động và cửa An Bang; một số tài liệu Việt hiện đại ghi ở vùng ải Nội Bàng.",
       "Thoát Hoan về được Tư Minh; Hốt Tất Liệt đày ông ra trấn Dương Châu, suốt đời không cho vào chầu. Mặt trận Nội Bàng chưa có trong bản thử này.",
     ],
-    src: ["Nguyên sử q.129, truyện Lai A Bát Xích", NS, "en.wikipedia, Battle of Bạch Đằng (1288) (theo canon B20)", CANON("X25")], panels: ["K4"],
+    src: ["Nguyên sử q.129, truyện Lai A Bát Xích", NS, "en.wikipedia, Battle of Bạch Đằng (1288) — Phạm Ngũ Lão phục kích ở ải Nội Bàng (theo canon B20)", CANON("X25")], panels: ["K4"],
   },
   {
     id: "B20-bl-938", chapter: "B20", group: "benle", label: "Chính sử", review: "draft",
@@ -171,7 +172,7 @@ const NEW = [
   },
   {
     id: "B20-Q08", type: "mcq4", panel: "K4", label: "Chính sử", seenRef: ["panel:K4", "card:B20-noibang"], src: [TT, NS],
-    q: vi("Sau khi thủy quân vỡ ở Bạch Đằng, quân bộ của Thoát Hoan ra sao?"),
+    q: vi("Năm 1288, trên đường bộ, quân Thoát Hoan ra sao?"),
     options: ["Rút về phương Bắc, bị quân Trần đón đánh dọc đường", "Ở lại giữ Vạn Kiếp thêm một năm", "Xuống thuyền theo sông Bạch Đằng ra biển", "Quay lại chiếm Thăng Long"],
     why: vi("Quân bộ rút qua vùng Lạng Sơn về phương Bắc giữa những trận phục kích; A Bát Xích trúng tên độc mà chết trên đường rút, Thoát Hoan về được Tư Minh."),
   },

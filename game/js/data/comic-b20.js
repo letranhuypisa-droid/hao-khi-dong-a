@@ -20,8 +20,8 @@ export const COMIC_B20 = {
    "en": "The playable battle happens here — six phases driven by the tide."
   },
   "card": {
-   "vi": "Trọn vẹn! Mở khóa thẻ Sử quán: Bãi cọc Bạch Đằng.",
-   "en": "Perfect! Archive card unlocked: The Bạch Đằng stakes."
+   "vi": "Trọn vẹn! Kế Sách bãi cọc thành công thì mở thẻ Sử quán: Bãi cọc Bạch Đằng.",
+   "en": "Perfect! Succeed with the stake-field Strategy to unlock the archive card: The Bạch Đằng stakes."
   }
  },
  "variant": "VS",
@@ -312,8 +312,8 @@ export const COMIC_B20 = {
    "part": "close",
    "aspect": "4:3",
    "caption": {
-    "vi": "Trong trận, tướng quân dồn Ô Mã Nhi; Toàn thư chép Nội minh tự Đỗ Hành bắt sống ông.",
-    "en": "In battle you corner Omar; the Annals credit officer Đỗ Hành with taking him alive.",
+    "vi": "Toàn thư chép: Nội minh tự Đỗ Hành bắt được Ô Mã Nhi.",
+    "en": "The Annals record: officer Đỗ Hành captured Omar.",
     "label": "Chính sử"
    },
    "bubbles": [],

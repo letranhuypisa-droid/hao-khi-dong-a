@@ -17,6 +17,7 @@
 // sourceWant(s, phase, cols, openGates, anyOpen), glowFrom? } — B15 (battles/b15.js) đưa đúng ATMO / buildSources /
 // sourceWant dưới đây; không có ctx.battle (lab, kiểm thử) thì dùng luôn bộ của B15. Chỉ số pha kẹp trong bảng (trận 6 pha
 // với bảng ngắn hơn không vỡ). World có world.hemi / world.far (B20) thì dùng thẳng, không thì dò cảnh như cũ.
+// Nguồn có fs ≤ 0 chỉ bốc khói, không lưỡi lửa (B20: data/atmo-b20.js, cột khói giao chiến — không có thuyền cháy).
 
 import { heightAt, ZONES } from "./ground.js";
 
@@ -252,9 +253,9 @@ export class Atmosphere {
       if (s.boat) { s.x = s.boat.position.x; s.z = s.boat.position.z; s.y = s.boat.position.y + 1.7; }
       if (s.k < 0.05 || bdt <= 0) continue;
       const dist = Math.hypot(s.x - h.x, s.z - h.z), lod = columnLOD(dist);
-      if ((s.acc -= bdt * s.k) <= 0) { s.acc += COL_EVERY[lod] * (0.8 + 0.4 * Math.random()); if (smokeF.chan[1] < COL_CAP) fx.column(s.x, s.y + s.h, s.z, lod, s.k); }
+      if ((s.acc -= bdt * s.k) <= 0) { s.acc += COL_EVERY[lod] * (0.8 + 0.4 * Math.random()); if (smokeF.chan[1] < COL_CAP) fx.column(s.x, s.y + s.h, s.z, lod, s.k, s.col); }
       const gate = s.kind === "gate";
-      if ((s.facc -= bdt) <= 0) {
+      if (s.fs > 0 && (s.facc -= bdt) <= 0) {                // fs ≤ 0: nguồn chỉ có khói (cột khói giao chiến B20)
         s.facc += FIRE_EVERY[lod] * (0.8 + 0.4 * Math.random());
         if (gate) gateFlame(fx, s, s.fs * FIRE_BIG[lod]);
         else fx.flame(s.x + (Math.random() - 0.5) * s.fw, s.y + 0.3, s.z + (Math.random() - 0.5) * s.fw, s.fs * FIRE_BIG[lod], s.k);

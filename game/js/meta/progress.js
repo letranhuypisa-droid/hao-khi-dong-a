@@ -200,10 +200,11 @@ function otherHeroStats(save, R, heroId, preset) {
 // Diem = 35M + 15T + 20Q + 20C + 10K, mỗi thành phần 0..1:
 //   M nhiệm vụ (chính + phụ), T thời gian so với par, Q quân ta còn, C Cứ Điểm, K Kế Sách thành công
 //   (5.6: "Kế Sách thất bại chỉ mất phần thưởng chưa nhận và điểm K khi xếp hạng").
-export function scoreBattle({ missions, timeSec, qRatio, baseRatio, keSach = 0, mode = "nhanh" }) {
-  const par = MODES[mode].par;
+// par (đợt 9): par riêng của trận (B20: tổng par 6 pha), thiếu thì par của chế độ như B15. kLost: mất trọn thành phần K
+// (B20: chỉ 50% hạm đội mắc cạn vì Kích hoạt bãi cọc hoặc Con nước hỏng — riverResult(st).kRank === false, systems §7).
+export function scoreBattle({ missions, timeSec, qRatio, baseRatio, keSach = 0, mode = "nhanh", par = MODES[mode].par, kLost = false }) {
   const T = timeSec <= par ? 1 : Math.max(0, 1 - (timeSec - par) / par);
-  const K = Math.min(1, keSach);
+  const K = kLost ? 0 : Math.min(1, keSach);
   const parts = { M: missions, T, Q: Math.min(1, qRatio), C: baseRatio, K };
   const diem = Math.round(35 * parts.M + 15 * parts.T + 20 * parts.Q + 20 * parts.C + 10 * parts.K);
   const rank = RANKS.find((r) => diem >= r.min);
@@ -258,6 +259,31 @@ export function applyRewards(save, res, rw) {
   save.log.unshift({ at: res.at || 0, R: res.R, won: res.won, rank: res.rank || "-", diem: res.diem || 0, exp: rw.exp, tien: rw.tien });
   save.log = save.log.slice(0, 12);
   return { levelsGained: lv };
+}
+
+// ---- Trận ngoài thang R (đợt 9: B20 Bạch Đằng, tướng dựng sẵn) -----------------------------------------
+// Chỉ Tiền / Tinh thiết / Quân công (cùng công thức computeRewards ở cấp trận cố định) và thống kê: không EXP (tướng dựng
+// sẵn, EXP là của Trần Quốc Toản), không rơi binh khí, không điểm kỹ năng, không mở cấp R. Hạng tốt nhất, thời gian thắng
+// nhanh nhất, số lần đánh ghi ở save.battles[id] (không đụng save.ladder / stats.bestTime của B15).
+export function computeFixedRewards(save, res) {
+  const rw = computeRewards(save, res);
+  return Object.assign(rw, { exp: 0, drops: [], skillPoint: false, unlockR: null });
+}
+const RANK_ORDER = ["S", "A", "B", "C"];
+export function applyFixedRewards(save, battleId, res, rw) {
+  save.wallet.tien += rw.tien; save.wallet.tt += rw.tt; save.wallet.qc += rw.qc;
+  const sb = ((save.battles ||= {})[battleId] ||= { best: null, cleared: false });
+  sb.plays = (sb.plays || 0) + 1;
+  const newBest = !!(res.won && (!sb.best || RANK_ORDER.indexOf(res.rank) < RANK_ORDER.indexOf(sb.best)));
+  if (res.won) {
+    if (newBest) sb.best = res.rank;
+    if (!sb.bestTime || res.timeSec < sb.bestTime) sb.bestTime = Math.round(res.timeSec);
+    sb.cleared = true; save.stats.wins++;
+  }
+  save.stats.battles++; save.stats.tpc += res.tpcCount || 0; save.stats.ko += res.ko || 0;
+  save.log.unshift({ at: res.at || 0, R: res.R, battle: battleId, won: res.won, rank: res.rank || "-", diem: res.diem || 0, exp: 0, tien: rw.tien });
+  save.log = save.log.slice(0, 12);
+  return { levelsGained: 0, newBest };
 }
 
 // Nâng cấp bản lưu cũ (mỗi phiên bản thêm một bước, không xoá trường cũ — 15.10).

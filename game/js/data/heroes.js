@@ -30,6 +30,7 @@ export function kiLucBarsAt(L, steps = KI_LUC_STEPS) {
 }
 
 // ---- Kỹ năng (theo id; lõi sẽ dựng hero-skills.js theo bảng này) ------------------------------------------------------
+// short: nhãn ngắn cho nút cảm ứng tròn (tên đầy đủ bị cắt); không có thì dùng name.
 export const SKILLS = {
   // H35 (B15, đang chạy trong hero.js — số đọc thẳng từ HERO để không lệch)
   phaTran: { id: "phaTran", name: "Phá Trận", slot: 1, label: "Hư cấu", ...HERO.phaTran },
@@ -39,13 +40,13 @@ export const SKILLS = {
   // +15 Sĩ Khí mọi cánh ta, Công quân ta +10% trong 20 s, CD 40 s).
   // MÂU THUẪN CANON: canon H31 ghi CD 90 s, Công +20% và Thủ +20% trong 25 s, Sĩ Khí không giảm trong thời gian đó. Bản
   // thử theo systems.md (luật chung mọi kỹ năng hiệu lệnh, §4.1); canon cần sửa theo — đã báo trong báo cáo đợt 9.
-  hichTuongSi: { id: "hichTuongSi", name: "Hịch Tướng Sĩ", slot: 1, label: "Chính sử", channel: 3, interruptBy: ["heavy", "red", "knockdown"],
+  hichTuongSi: { id: "hichTuongSi", name: "Hịch Tướng Sĩ", short: "Hịch", slot: 1, label: "Chính sử", channel: 3, interruptBy: ["heavy", "red", "knockdown"],
     siKhi: 15, allyAtk: 0.10, dur: 20, cd: 40, scope: "toànQuân",
     canon: { cd: 90, allyAtk: 0.20, allyDef: 0.20, dur: 25, siKhiLock: true } },
   // ô 2: Binh Thư Yếu Lược (Chính sử: tác phẩm Binh thư yếu lược; cơ chế Hư cấu). Đánh dấu mục tiêu đang khoá, không có
   // thì Cứ Điểm/đơn vị địch gần nhất trong range m (ĐỀ XUẤT BẢN THỬ 30 m); 20 s mọi đòn quân ta lên mục tiêu +40%,
   // đường đi hiện trên minimap, lộ đoàn nghi trang. Tư thế: chỉ gươm (anim-wc01 binhThu, 0,9 s).
-  binhThu: { id: "binhThu", name: "Binh Thư Yếu Lược", slot: 2, label: "Chính sử + Hư cấu", mark: 20, dmgPct: 0.40, cd: 35, range: 30,
+  binhThu: { id: "binhThu", name: "Binh Thư Yếu Lược", short: "Binh Thư", slot: 2, label: "Chính sử + Hư cấu", mark: 20, dmgPct: 0.40, cd: 35, range: 30,
     targets: ["unit", "base"], castSec: 0.9, revealDecoy: true },
   // Nội tại Quốc Công Tiết Chế: cửa sổ Kế Sách +15%, hiệu ứng mô phỏng của Kế Sách thành công +15% (không thêm Hào Khí)
   // — khớp thẳng mods.ksWindow / mods.ksEffect của progress.js.
@@ -57,7 +58,7 @@ export const SKILLS = {
   // (§4.1 Tuyệt Kỹ Hào Khí), thuyền nhẹ hai bờ cùng lao ra (chỉ VFX + spawn).
   // MÂU THUẪN CANON: canon ghi thêm "tốc tuyến mô phỏng +30% trong 20 s" cho mọi cánh; §4.5 cấm Tuyệt Kỹ toàn bản đồ đẩy
   // tuyến ở mặt trận khác → bản thử bỏ phần này (chỉ Sĩ Khí + lệnh Tiến công), canon cần sửa theo.
-  bachDang: { id: "bachDang", name: "Bạch Đằng Quyết Chiến", slot: "ult", label: "Chính sử + Hư cấu", cost: 100, invuln: 12, clip: 4.4,
+  bachDang: { id: "bachDang", name: "Bạch Đằng Quyết Chiến", short: "Bạch Đằng", slot: "ult", label: "Chính sử + Hư cấu", cost: 100, invuln: 12, clip: 4.4,
     chops: [{ t: 0.9, mv: 4.5 }, { t: 2.0, mv: 5 }, { t: 3.2, mv: 6.5, breakShields: true }], r: 15, qCost: 20,
     escort: { soldiers: 20, dur: 4 },
     tpc: { r: 25, mvTotal: 35, chops: [{ t: 0.9, mv: 10 }, { t: 2.0, mv: 11 }, { t: 3.2, mv: 14, breakShields: true }], lightBoats: true },

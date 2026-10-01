@@ -14,6 +14,10 @@
 //   · Siêu giáp: trong cửa sổ m.armor của đòn đang ra, đòn nặng và đòn hất ngã không ngắt (đòn viền đỏ vẫn ngắt — ĐỀ XUẤT).
 //   · C3 giữ C: lốc kiếm quay thêm tới hold.maxHits nhát. C6 bỏ qua 30% giáp (armorPen).
 //   · Không có Liên hoàn (chỉ WC03).
+// Thủy chiến B20 (naval.js; B15 không bao giờ vào các nhánh này): trạng thái "ride" (đứng trên đò chuyển: không đánh, không
+// đỡ, tên vẫn trúng nhưng không khựng) và "climb" (leo boong 0,8 s: naval.js đặt x, z, climbY; tướng không va chạm, chân
+// không bám đất). Tướng trên boong mang this.deck (naval chở theo toạ độ cục bộ); va chạm truyền chính tướng (tham số thứ
+// 6 của collide) để lan can boong, nước sâu giữ lại.
 
 import { makeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
@@ -32,6 +36,7 @@ import { BladeTrail } from "./trail.js";
 import * as THREE from "three";
 
 const _b = new THREE.Vector3(), _t = new THREE.Vector3(), _s = new THREE.Vector3();
+const NO_IK = { ik: false };           // đang leo boong: chân không bám đất (rig-motion.js)
 
 // Tư thế ngoài đòn theo lớp: WC03 là bộ song đao của anim.js (như cũ), WC01 bộ đại kiếm của anim-wc01.js.
 const POSES = {
@@ -162,9 +167,11 @@ export class Hero {
       case "down": this.st -= dt; this.setPose(this.st > 0.5 ? this.P.knockdown(1) : this.P.idle(this.animT), this.st > 0.5 ? 0.4 : 0.12); if (this.st <= 0) this.state = "free"; break;
       case "skill": this.updateSkill(dt); break;
       case "ult": this.updateUlt(dt); break;
+      case "ride": this.setPose(this.P.idle(this.animT), 0.15); break;                    // đò chuyển (naval.js)
+      case "climb": this.setPose(A.climb(this.climbU || 0), 0.5); break;                 // leo boong (naval.js)
     }
     if (this.state !== "attack") { this.charge = null; this.chargeLevel = 0; }
-    [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.5, ctx.openGates);
+    if (this.state !== "climb") [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.5, ctx.openGates, this);
     if (dt > 0) { this.vx = (this.x - px) / dt; this.vz = (this.z - pz) / dt; }
     this.place(dt);
   }
@@ -499,11 +506,13 @@ export class Hero {
   receiveHit(h) {
     const ctx = this.ctx;
     if (!this.alive || this.invuln > 0 || this.state === "ult") return "immune";
+    if (ctx.director.heroImmune?.()) return "immune";             // B20: vừa bắt sống tướng Nguyên, chờ chuyển pha / thắng (B15 không có móc này)
     if (this.state === "dodge" && this.st < DEFENSE.dodgeIFrame) { ctx.fx.text(this.x, this.z, "Né", "#e6dcc3"); return "dodged"; }
     const angTo = Math.atan2(h.x - this.x, h.z - this.z);
     let da = angTo - this.yaw; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
     const front = Math.abs(da) <= (DEFENSE.blockArc / 2) * Math.PI / 180;
-    if (h.red && this.parryAt > 0 && ctx.clock - this.parryAt <= this.parryWindow + 0.02) {
+    const riding = this.state === "ride" || this.state === "climb";     // trên đò / đang leo: không phản, không khựng
+    if (h.red && this.parryAt > 0 && ctx.clock - this.parryAt <= this.parryWindow + 0.02 && !riding) {
       this.parryAt = -9;
       ctx.fx.banner("PHẢN ĐÒN", "#f1d98a"); ctx.audio.play("parry", this.x, this.z); ctx.hitstop(120);
       this.yaw = angTo; this.state = "free"; this.startMove("CT", h.src);
@@ -522,6 +531,7 @@ export class Hero {
       h.dmg *= 0.6;   // đòn viền đỏ phá đỡ
     }
     this.hp -= h.dmg; this.addKi(2);
+    if (h.heavy || h.red) this.lastHardHit = ctx.clock;                 // ngắt giữ phím Tương tác (naval.interactStep)
     ctx.fx.hurt(); ctx.audio.play(h.heavy ? "hurtHeavy" : "hurt");
     ctx.fx.blood(this.x, this.y + 1.2, this.z, -Math.sin(angTo), -Math.cos(angTo), h.heavy ? 0.8 : 0.4);
     if (h.heavy || h.red) { ctx.fx.shake(h.red ? 0.45 : 0.25); ctx.fx.kick(-Math.sin(angTo), -Math.cos(angTo), 0.3); ctx.hitstop(h.red ? 90 : 50); }
@@ -533,6 +543,7 @@ export class Hero {
       armored = true;                            // siêu giáp đại kiếm: đòn nặng / hất ngã không ngắt nhát đang vung
       ctx.fx.text(this.x, this.z, "Siêu giáp", "#e6c07a");
     }
+    if (riding) armored = true;
     if (!armored) {
       if (this.state === "skill") { this.skillActive?.interrupted?.(this, h); this.skillActive = null; }
       if (h.red || h.knockdown) { this.state = "down"; this.st = 1.1; this.invuln = Math.max(this.invuln, 1.0); }
@@ -655,9 +666,10 @@ export class Hero {
   // dt = bước mô phỏng vừa chạy (0 khi dựng lần đầu): chuyển động phụ chỉ chạy theo bước mô phỏng nên
   // hit-stop (0 bước) làm vải, dải khăn đứng yên cùng người.
   place(dt = 0) {
-    this.y = heightAt(this.x, this.z);
+    const climb = this.state === "climb" && this.climbY !== undefined;
+    this.y = climb ? this.climbY : heightAt(this.x, this.z);
     const r = this.rig.root; r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw;
-    this.motion.update(dt, this.pose, heightAt);
+    this.motion.update(dt, this.pose, heightAt, climb ? NO_IK : undefined);
     const vis = this.invuln > 0 && this.state !== "ult" ? (Math.floor(this.animT * 14) % 2 === 0) : true;
     r.visible = vis || !this.alive;
     // vệt lưỡi khi ra đòn, lao, Tuyệt Kỹ

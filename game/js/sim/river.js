@@ -242,9 +242,14 @@ export function riverTick(st, events = []) {
 
   if (st.phase === 0) tickLure(st, events);
   if (st.phase === 1 || st.phase === 2) tickScouts(st, events);
-  if (st.phase === 1) {
+  // Pha 2–3: đầu hạm đội tiếp tục vào khúc cọc tới FLEET.stopX rồi neo (hạ đủ hộ vệ sớm thì hạm đội vẫn đi nốt, khối thuyền
+  // luôn neo trong bãi cọc ở pha 4 — director-b20 đặt thuyền theo headX)
+  if (st.phase === 1 || st.phase === 2) {
     const f = st.fleet;
     if (f.headX < FLEET.stopX) { f.speed = FLEET.p1Speed; f.headX = Math.min(FLEET.stopX, f.headX + f.speed); } else f.speed = 0;
+  }
+  if (st.phase === 1) {
+    const f = st.fleet;
     if (f.escortsDown >= 4) once(st, "escortsReady", events, { type: "escortsReady", down: f.escortsDown });
     if (st.phaseT >= TIDE.p2Sec[st.mode]) once(st, "p2Timeout", events, { type: "p2Timeout" });
   }
@@ -352,11 +357,14 @@ function tickScouts(st, events) {
   }
 }
 
-// P3: tướng địch đứng ở mốc > 10 s → mốc lộ; hết cửa sổ thì chốt; nước rút về 50.
+// P3: tướng địch đứng ở mốc > 10 s → mốc lộ; hết cửa sổ thì chốt; nước rút về 50. Kế Sách cọc đã chốt (10 s nước rút về 50) thì mốc
+// còn ẩn thôi bị dò — kế đã định, không còn gì để lộ (đợt 9 D4: trước đây toán dò đứng mốc thứ ba trong 10 s ấy làm lộ mốc, mất
+// nhiệm vụ phụ "không để lộ mốc" dù Kế Sách đã thành).
 function tickStakes(st, events) {
+  const kc = st.ks.kichCoc, open = !kc || !ksDone(kc);
   for (const s of STAKES) {
     const m = st.markers[s.id];
-    if (m.state !== "hidden") { m.officerOnT = 0; continue; }
+    if (m.state !== "hidden" || !open) { m.officerOnT = 0; continue; }
     if (m.officerOn) {
       m.officerOnT++;
       if (m.officerOnT > s.exposeSec) exposeMarker(st, s.id, "officer", events);
@@ -384,7 +392,8 @@ function tickEbb(st, events) {
   }
   if (secondsTo(st, TIDE.strandAt) <= TIDE.warn + 1e-6) once(st, "warnStrand", events, { type: "tideWarn", at: "strand", pct: TIDE.strandAt });
   if (st.tide <= TIDE.strandAt && once(st, "strandAt", events, { type: "strandAt", active: activeMarkers(st) })) {
-    if (k && !ksDone(k) && !esc.full) ksReward(st, "conNuoc", KE_SACH.conNuoc.partial.stakesUp, events);
+    // cọc nhô giữ thuyền (+5): chỉ khi có bãi đã mở — không mốc nào mở thì cọc vẫn ngụy trang dưới bè, không giữ được ai (review B20)
+    if (k && !ksDone(k) && !esc.full && activeMarkers(st) > 0) ksReward(st, "conNuoc", KE_SACH.conNuoc.partial.stakesUp, events);
   }
   if (secondsTo(st, 0) <= TIDE.warn + 1e-6) once(st, "warnEbb", events, { type: "tideWarn", at: "ebb", pct: 0 });
   if (st.tide <= 0 && once(st, "tideZero", events, { type: "tideZero" })) resolveTide(st, events);
@@ -450,6 +459,7 @@ export function markerAction(st, id, what, events = []) {
     checkStakesDone(st, events);
   } else if (what === "expose") {
     if (st.phase !== 1 && st.phase !== 2) return { ok: false, why: "phase", hk: 0 };
+    if (st.phase === 2 && st.ks.kichCoc && ksDone(st.ks.kichCoc)) return { ok: false, why: "done", hk: 0 };   // kế cọc đã chốt
     exposeMarker(st, id, "scout", events);
   } else return { ok: false, why: "what", hk: 0 };
   return { ok: true, hk: st.hkPaid - n0, state: m.state };

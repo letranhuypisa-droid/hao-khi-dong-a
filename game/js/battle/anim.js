@@ -465,3 +465,22 @@ export function cheer(t) {
   p.shRx = -2.9 + b; p.elRx = -0.2; p.handRx = 0.2; p.shLx = -2.5 - b; p.elLx = -0.4; p.headX = -0.3;
   return p;
 }
+
+// ---- thủy chiến B20 (naval.js) — chỉ thêm, không đổi tư thế nào cũ ------------------------------------------------------
+// Leo boong / leo sang đò (0,8 s, u ∈ [0, 1]): với tay bám mạn, co một gối lên, kéo người lên rồi đứng thẳng. Hông hạ rồi
+// nâng (naval.js cộng thêm một cung độ cao, chân không bám đất khi leo).
+const CLIMB_REACH = P({ torsoX: 0.45, headX: -0.35, hipsY: -0.3, shRx: -2.55, shRz: 0.15, elRx: -0.35, handRx: 0.2, shLx: -2.45, shLz: -0.15, elLx: -0.4,
+  handLx: 0.2, hipLx: -1.35, kneeLx: 1.9, hipRx: 0.15, kneeRx: 0.35 });
+const CLIMB_PULL = P({ torsoX: 0.6, headX: -0.15, hipsY: -0.2, shRx: -1.25, shRz: 0.4, elRx: -1.55, handRx: 0.6, shLx: -1.2, shLz: -0.4, elLx: -1.5,
+  handLx: 0.6, hipLx: -0.9, kneeLx: 1.3, hipRx: -0.55, kneeRx: 1.5 });
+export function climb(u) {
+  return keys(clamp01(u), [[0, GUARD], [0.28, CLIMB_REACH, "out"], [0.68, CLIMB_PULL, "io"], [1, GUARD, "io"]]);
+}
+// Bị bắt sống (Ô Mã Nhi, Phàn Tiếp — hợp đồng B20 / R-spec §6): ĐỨNG THẲNG, hai tay buông tự nhiên, đầu ngẩng, vũ khí đã đặt
+// dưới chân (units.js giấu vũ khí trong tay, đặt vũ khí xuống sàn). Không trói, không quỳ, không cúi rạp. t: giây (thở nhẹ).
+const CAPTURED = P({ torsoX: -0.04, headX: -0.06, shRx: 0.08, shRz: 0.1, elRx: -0.18, handRx: 0.2, shLx: 0.08, shLz: -0.1, elLx: -0.18, handLx: 0.2,
+  hipLx: -0.06, hipLz: -0.05, hipRx: 0.06, hipRz: 0.05, kneeLx: 0.05, kneeRx: 0.05 });
+export function captured(t) {
+  const b = Math.sin(t * 1.6) * 0.02;
+  return add({ ...CAPTURED }, { torsoX: b, hipsY: b * 0.5 - 0.01 });
+}

@@ -42,24 +42,16 @@ function solve(m, r, wx, wz) {
 const outside = (r, lx, lz) => { const dx = Math.max(r.x0 - lx, 0, lx - r.x1), dz = Math.max(r.z0 - lz, 0, lz - r.z1); return Math.hypot(dx, dz); };
 const inRect = (r, lx, lz, pad = 0) => lx >= r.x0 - pad && lx <= r.x1 + pad && lz >= r.z0 - pad && lz <= r.z1 + pad;
 const hOf = (r, lx, lz) => r.a + r.sx * lx + r.sz * lz;
+const mkRect = (r) => { const sx = r.sx || 0, sz = r.sz || 0; return { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, y: r.y, sx, sz, a: r.y - sx * r.x0 - sz * r.z0 }; };
 
 const _L = { x: 0, z: 0, h: 0, i: -1, d: 0 }, _W = { x: 0, y: 0, z: 0 };
 
 export class Deck {
   constructor({ rects = [], portals = [], walls = [] } = {}) {
-    this.rects = rects.map((r) => {
-      const sx = r.sx || 0, sz = r.sz || 0;
-      return { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, y: r.y, sx, sz, a: r.y - sx * r.x0 - sz * r.z0 };
-    });
+    this.rects = rects.map(mkRect);
     this.portals = portals.map((p) => ({ lx: p.lx, lz: p.lz, r: p.r }));
     this.walls = walls.map((w) => ({ x0: w.x0, x1: w.x1, z0: w.z0, z1: w.z1, h: w.h }));
-    // vòng bao (mặt bằng, quanh gốc): góc xa nhất + phần lệch khi nghiêng tới ~15° (đỉnh cao nhất × 0,26)
-    let R = 0, top = 0;
-    for (const r of this.rects) {
-      for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) R = Math.max(R, Math.hypot(x, z));
-      top = Math.max(top, Math.abs(r.y), Math.abs(hOf(r, r.x1, r.z1)), Math.abs(hOf(r, r.x0, r.z1)), Math.abs(hOf(r, r.x1, r.z0)));
-    }
-    this._R = R + top * 0.26 + 0.5;
+    this._bound();
     this.m = poseMatrix(new Float64Array(12), 0, 0, 0, 0, 0, 0);
     this.m0 = Float64Array.from(this.m);
     this.x = 0; this.y = 0; this.z = 0; this.yaw = 0; this.pitch = 0; this.roll = 0; this.yaw0 = 0;
@@ -69,6 +61,22 @@ export class Deck {
   }
 
   get radius() { return this._R; }
+  // vòng bao (mặt bằng, quanh gốc): góc xa nhất + phần lệch khi nghiêng tới ~15° (đỉnh cao nhất × 0,26)
+  _bound() {
+    let R = 0, top = 0;
+    for (const r of this.rects) {
+      for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) R = Math.max(R, Math.hypot(x, z));
+      top = Math.max(top, Math.abs(r.y), Math.abs(hOf(r, r.x1, r.z1)), Math.abs(hOf(r, r.x0, r.z1)), Math.abs(hOf(r, r.x1, r.z0)));
+    }
+    this._R = R + top * 0.26 + 0.5;
+  }
+  // Thêm / đổi / bỏ mặt đi được sau khi dựng (ván dốc xuống bùn của thuyền mắc cạn, ván bắc áp mạn đổi dài theo khoảng
+  // cách hai mạn). Trả mặt (đối tượng nội bộ, dùng lại cho setRect / removeRect).
+  addRect(spec) { const r = mkRect(spec); this.rects.push(r); this._bound(); return r; }
+  setRect(r, spec, bound = true) { Object.assign(r, mkRect({ ...r, ...spec })); if (bound) this._bound(); return r; }
+  removeRect(r) { const i = this.rects.indexOf(r); if (i >= 0) { this.rects.splice(i, 1); this._bound(); } }
+  addPortal(p) { const q = { lx: p.lx, lz: p.lz, r: p.r }; this.portals.push(q); return q; }
+  removePortal(q) { const i = this.portals.indexOf(q); if (i >= 0) this.portals.splice(i, 1); }
 
   // Đặt tư thế thế giới mới; giữ tư thế cũ trong m0 để carry() tính độ dời. Lần đặt đầu không có độ dời.
   setPose(x, y, z, yaw, pitch = 0, roll = 0) {
@@ -82,7 +90,13 @@ export class Deck {
 
   // Độ cao thế giới của mặt đi được tại (wx, wz), NaN nếu không đứng trên boong. pad > 0: nới mép (bàn chân thò
   // qua mạn vẫn lấy mặt boong, không rơi xuống đáy sông) — điểm ngoài mép lấy độ cao ở mép gần nhất.
+  // Tra KHÔNG nới trước, chỉ nới khi điểm ngoài mọi mặt (review P1-1: đứng ở boong dưới kỳ hạm sát hông cầu thang, nới
+  // trước thì lấy mặt cầu thang cao hơn 2,6 m).
   heightAt(wx, wz, pad = 0) {
+    const h = this._height(wx, wz, 0);
+    return h === h || !(pad > 0) ? h : this._height(wx, wz, pad);
+  }
+  _height(wx, wz, pad) {
     const m = this.m, dx = wx - m[9], dz = wz - m[11], R = this._R + pad;
     if (dx * dx + dz * dz > R * R) return NaN;
     let best = NaN;
@@ -161,11 +175,12 @@ export class Deck {
   }
 
   // Giữ vòng tròn bán kính r (người, lính) trong boong: không ra khỏi mép, không leo lên/rơi xuống mặt chênh quá một
-  // bậc (mép lầu, hông cầu thang), không vào tường. Gần cửa thì thả. Trả true nếu đã dời.
-  clampInside(o, r) {
+  // bậc (mép lầu, hông cầu thang), không vào tường. Gần cửa thì thả (force: vẫn giữ — bước qua cửa mà ngoài kia là nước
+  // sâu). Trả true nếu đã dời.
+  clampInside(o, r, force = false) {
     const L = this.toLocal(o.x, o.z, _L);
     if (L.i < 0) return false;
-    for (const p of this.portals) if ((L.x - p.lx) ** 2 + (L.z - p.lz) ** 2 < p.r * p.r) return false;
+    if (!force) for (const p of this.portals) if ((L.x - p.lx) ** 2 + (L.z - p.lz) ** 2 < p.r * p.r) return false;
     const cur = this.rects[L.i];
     let lx = L.x, lz = L.z;
     const fit = (v, a, b) => (b - a < 2 * r ? (a + b) / 2 : clamp(v, a + r, b - r));
@@ -193,17 +208,32 @@ export class DeckSet {
     let i = this.all.indexOf(d); if (i >= 0) this.all.splice(i, 1);
     i = this.act.indexOf(d); if (i >= 0) this.act.splice(i, 1);
   }
-  // Chọn tối đa cap boong: boong có priority > 0 trước (kể cả ngoài R), rồi gần nhất (tính từ mép vòng bao).
+  // Chọn tối đa cap boong: boong có priority > 0 trước (kể cả ngoài R), rồi gần nhất (tính từ mép vòng bao). Khoá sắp
+  // xếp ghi vào chính boong (d._key): không cấp phát mỗi khung (review P3).
   active(cx, cz, R = 80) {
     const k = this._k; k.length = 0;
     for (const d of this.all) {
+      if (d.off) continue;
       const dist = Math.hypot(d.m[9] - cx, d.m[11] - cz) - d.radius;
-      if (dist <= R || d.priority > 0) k.push({ d, key: dist - (d.priority > 0 ? 1e6 * d.priority : 0) });
+      if (dist <= R || d.priority > 0) { d._key = dist - (d.priority > 0 ? 1e6 * d.priority : 0); k.push(d); }
     }
-    k.sort((a, b) => a.key - b.key);
+    if (k.length > 1) k.sort(byKey);
     this.act.length = 0;
-    for (let i = 0; i < k.length && i < this.cap; i++) this.act.push(k[i].d);
+    for (let i = 0; i < k.length && i < this.cap; i++) this.act.push(k[i]);
     return this.act;
+  }
+  // Boong có mặt đi được ở (wx, wz) trong MỌI boong (không chỉ boong đang xét) — cao nhất; bỏ qua skip và boong tắt
+  // (d.off). out.h: độ cao mặt đó. Lính ở xa tướng, va chạm của lính cần tra này (active chỉ quanh tướng).
+  find(wx, wz, pad = 0, skip = null, out = null) {
+    let best = null, bh = -Infinity;
+    for (const d of this.all) {
+      if (d === skip || d.off) continue;
+      const dx = wx - d.m[9], dz = wz - d.m[11], R = d._R + pad;
+      if (dx * dx + dz * dz > R * R) continue;
+      const h = d.heightAt(wx, wz, pad); if (h > bh) { bh = h; best = d; }
+    }
+    if (out) out.h = bh;
+    return best;
   }
   heightAt(wx, wz, pad = 0) {
     let best = NaN;
@@ -216,3 +246,4 @@ export class DeckSet {
     return best;
   }
 }
+const byKey = (a, b) => a._key - b._key;

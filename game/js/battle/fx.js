@@ -6,6 +6,7 @@ import { heightAt } from "./world.js";
 
 const MAXP = 600;
 const BLOOD_A = new THREE.Color(0x8a1d12), BLOOD_B = new THREE.Color(0xb3261a);
+const DUST_A = new THREE.Color(0xc9a86a), DUST_B = new THREE.Color(0xe8d6a8);       // noBlood: vụn gỗ, bụi vàng nhạt
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
 
 // Ảnh hiệu ứng sinh bằng Higgsfield (assets/SOURCES.md). Nạp một lần, dùng chung mọi trận.
@@ -169,7 +170,8 @@ export class FX {
   fieldCounts() { const o = {}; for (const k in this.fields) o[k] = this.fields[k].live.length; return o; }   // chỉ để đo
 
   // Một cụm của cột khói lớn (kênh 1). k 0..1: cường độ nguồn (lửa mới bén thì cột mảnh, nhạt).
-  column(x, y, z, lod, k = 1) {
+  // col: [r, g, b] màu khói riêng (B20: bụi vàng nhạt); thiếu thì khói sẫm như cũ
+  column(x, y, z, lod, k = 1, col = null) {
     const L = COL_LOD[lod], j = 0.6 + lod * 0.8;
     const p = this.field("smoke").spawn(x + (Math.random() - 0.5) * j, y, z + (Math.random() - 0.5) * j, L.T * (0.9 + 0.2 * Math.random()), 1);
     if (!p) return null;
@@ -177,7 +179,7 @@ export class FX {
     p.vy = L.vy * (0.9 + 0.2 * Math.random()); p.drag = 0.06; p.wind = 1;
     p.vx = (Math.random() - 0.5) * 0.4; p.vz = (Math.random() - 0.5) * 0.4;
     p.rot = Math.random() * 6.28; p.spin = (Math.random() - 0.5) * 0.12;
-    p.a = L.a * (0.5 + 0.5 * k); p.ds = 0.85; p.r = 0.2; p.g = 0.18; p.b = 0.165; p.lit = L.lit; p.fin = 0.08; p.fout = 0.5;
+    p.a = L.a * (0.5 + 0.5 * k); p.ds = 0.85; p.r = col ? col[0] : 0.2; p.g = col ? col[1] : 0.18; p.b = col ? col[2] : 0.165; p.lit = L.lit; p.fin = 0.08; p.fout = 0.5;
     return p;
   }
   // Khói đống lửa tàn ở trại Nguyên (kênh 0; trước đây mỗi cụm một sprite). s: hệ số dày theo pha.
@@ -233,7 +235,7 @@ export class FX {
       this.parts.push({ x, y, z, vx: Math.cos(a) * sp, vy: up, vz: Math.sin(a) * sp, t: 0, T: 0.25 + Math.random() * 0.2, c, s: heavy ? 1.4 : 1 });
     }
     if (heavy) for (let i = 0; i < 3 && this.parts.length < MAXP; i++) {
-      this.parts.push({ x, y: y - 0.4, z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 2, vz: (Math.random() - 0.5) * 2, t: 0, T: 0.5, c: new THREE.Color(0x8a1d12), s: 1.2 });
+      this.parts.push({ x, y: y - 0.4, z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 2, vz: (Math.random() - 0.5) * 2, t: 0, T: 0.5, c: this.noBlood ? DUST_A : BLOOD_A, s: 1.2 });
     }
   }
   dust(x, z, s = 1) {
@@ -265,13 +267,14 @@ export class FX {
     requestAnimationFrame(() => { v.style.transition = "opacity .18s ease-out"; v.style.opacity = "0"; });
   }
   // Tia máu kiểu mực son: giọt đỏ sẫm văng theo hướng đòn (kx, kz), rơi theo trọng lực. s: cỡ (lính chém lính 0,3–0,5).
+  // noBlood (B20 — R-spec §6 "không máu"): cùng chuyển động nhưng màu vụn gỗ / bụi vàng nhạt (Math.random như cũ, không đụng rng trận).
   blood(x, y, z, kx, kz, s = 1) {
-    const n = Math.round(3 + 7 * s);
+    const n = Math.round(3 + 7 * s), A = this.noBlood ? DUST_A : BLOOD_A, B = this.noBlood ? DUST_B : BLOOD_B;
     for (let i = 0; i < n && this.parts.length < MAXP; i++) {
       const sp = (2 + Math.random() * 4.5) * (0.6 + 0.4 * s), up = 1 + Math.random() * 3.2;
       const jx = (Math.random() - 0.5) * 1.6, jz = (Math.random() - 0.5) * 1.6;
       this.parts.push({ x, y, z, vx: (kx + jx) * sp, vy: up, vz: (kz + jz) * sp, t: 0, T: 0.35 + Math.random() * 0.35,
-        c: Math.random() < 0.5 ? BLOOD_A : BLOOD_B, s: (0.9 + Math.random() * 0.8) * (0.7 + 0.5 * s), grav: 1.4 });
+        c: Math.random() < 0.5 ? A : B, s: (0.9 + Math.random() * 0.8) * (0.7 + 0.5 * s), grav: 1.4 });
     }
   }
   // Nhát chém của tướng trúng một mục tiêu: chớp sáng tại chỗ trúng, vệt chém chéo ngắn, tia lửa, tia máu. full = false:
@@ -336,7 +339,9 @@ export class FX {
     this.texts.push({ el, x, y: heightAt(x, z) + 2.4, z, t: 0, T: 0.9 });
   }
 
+  // Một băng chữ một lúc: băng mới thay băng đang hiện (trước đây hai băng liền nhau đè chữ lên nhau — chỉ DOM, không đụng trận).
   banner(s, color = "#f1d98a", T = 1.1) {
+    for (const old of this.overlay.querySelectorAll(".fx-banner")) old.remove();
     const el = document.createElement("div");
     el.className = "fx-banner"; el.textContent = s; el.style.color = color;
     this.overlay.appendChild(el);

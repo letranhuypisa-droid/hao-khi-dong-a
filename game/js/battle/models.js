@@ -88,8 +88,10 @@ export const CAPE = { y: 0.6, z: -0.185, h: [0.3, 0.32, 0.33], w: [0.48, 0.52, 0
 // xương khúc dưới (đỉnh nằm ngay gốc xương đó nên gập bản lề không làm hở), hai khúc gập, lệch ngang thì mặt vải
 // nối liền (không khấc như ghép hộp cứng). Viền gấu: nhân đôi hàng đỉnh ở mép viền để đổi màu gọn. Toạ độ đỉnh tính
 // trong khung xương của nó (xương khúc b có gốc ở mép trên khúc b), skinIndex là số khúc 0..2.
-function capeGeometry(color, trimColor) {
-  const C = CAPE, H = C.h.reduce((a, b) => a + b, 0), last = C.h.length - 1;
+// cs: [rộng, dài] nhân theo rig (RIGS.*.capeScale; thiếu = [1, 1] — hình học như cũ từng số)
+function capeGeometry(color, trimColor, cs = null) {
+  const C = cs ? { ...CAPE, w: CAPE.w.map((w) => w * cs[0]), h: CAPE.h.map((h) => h * cs[1]) } : CAPE;
+  const H = C.h.reduce((a, b) => a + b, 0), last = C.h.length - 1;
   const rows = [], top = [0];                              // [y, rộng, xương, màu]; top[b] = mép trên khúc b
   let y = 0;
   for (let i = 0; i <= last; i++) { rows.push([y, C.w[i], i, color]); y -= C.h[i]; top.push(y); }
@@ -159,7 +161,8 @@ const I4 = new THREE.Matrix4();
 export function makeRig(cfg = {}) {
   const { scale = 1, cloth = PAL.son, armor = PAL.then, trim = PAL.vang, skin = PAL.da,
     hat = "tocbui", weapon = "songdao", cape = null, flag = null, shield = false,
-    skirt = null, beard = null, heavy = false } = cfg;        // skirt: màu vạt áo (mặc định cloth); beard: màu râu; heavy: giáp nặng
+    skirt = null, beard = null, heavy = false, capeScale = null } = cfg;        // skirt: màu vạt áo (mặc định cloth); beard: màu râu; heavy: giáp nặng
+  // capeScale: [rộng, dài] của áo choàng (H31: áo choàng hẹp, ngắn cho thấy giáp then viền vàng — review B20)
   const flapCol = skirt ?? cloth;
   const root = new THREE.Group(), p = {};
   const joint = (parent, x, y, z) => { const j = new THREE.Group(); j.position.set(x, y, z); parent.add(j); return j; };
@@ -319,15 +322,15 @@ export function makeRig(cfg = {}) {
   if (shield) add(p.elL, () => merge([part(cyl(0.38, 0.38, 0.06, 10), PAL.nau, { y: -0.2, z: 0.16, rx: Math.PI / 2 }), part(cyl(0.1, 0.1, 0.08, 6), trim, { y: -0.2, z: 0.2, rx: Math.PI / 2 })]));
   if (cape) {
     // CAPE.h.length xương nối bản lề (xương dưới là con xương trên, gốc ở mép trên khúc), bọc da liền mặt (capeGeometry).
-    const joints = [];
+    const joints = [], ch = capeScale ? CAPE.h.map((h) => h * capeScale[1]) : CAPE.h;
     let par = p.torso;
-    for (let i = 0; i < CAPE.h.length; i++) {
-      const b = new THREE.Bone(); b.position.set(0, i ? -CAPE.h[i - 1] : CAPE.y, i ? 0 : CAPE.z);
+    for (let i = 0; i < ch.length; i++) {
+      const b = new THREE.Bone(); b.position.set(0, i ? -ch[i - 1] : CAPE.y, i ? 0 : CAPE.z);
       par.add(b); joints.push(b); par = b;
     }
-    parts[1].push([() => capeGeometry(cape, trim), joints.map(boneOf)]);
+    parts[1].push([() => capeGeometry(cape, trim, capeScale), joints.map(boneOf)]);
     p.cape = joints[0];
-    dyn.cape = { joints, h: CAPE.h };
+    dyn.cape = { joints, h: ch };
   }
   let flagMat = null;
   if (flag) {
@@ -337,6 +340,11 @@ export function makeRig(cfg = {}) {
     // quanh cán (rotation.y). Mặt có chữ (+x khi chưa xoay) nhìn sang phải.
     p.flagCloth = joint(p.flag, 0, 1.3, 0);
     flagMat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
+    // mặt sau: lật u — chữ trên cờ lưng không bị ngược khi nhìn từ phía kia (review B20; chỉ là hình, không đụng mô phỏng)
+    flagMat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>",
+        "#ifdef USE_MAP\n vec2 fuv = vMapUv;\n if (!gl_FrontFacing) fuv.x = 1.0 - fuv.x;\n diffuseColor *= texture2D(map, fuv);\n#endif");
+    };
     p.flagCloth.add(new THREE.Mesh(undefined, flagMat));
     dyn.flag = p.flag;
   }
@@ -392,10 +400,19 @@ export const RIGS = {
   tuong:     { scale: 1.38, cloth: 0x3a2f3a, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x4a2f2a },
   H33:       { scale: 1.15, cloth: 0x2f4a6a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "giao", cape: PAL.son },
   H40:       { scale: 1.15, cloth: 0x4a5a2a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "cung", cape: PAL.sonDam },
+  // Boss B20 (cùng họ rig với Toa Đô "tuong": đại đao — lớp địch EWC02 Kích / đại phủ; màu, mũ, cờ lưng riêng — Hư cấu):
+  // Phàn Tiếp (X24): tướng thủy quân cẩn trọng — áo chàm, giáp thép, mũ trụ Nguyên nhọn, áo choàng chàm sẫm, cờ lưng chữ 樊.
+  // Ô Mã Nhi (X20): vạn hộ thủy quân, chỉ huy kỳ hạm — áo then sẫm, giáp then viền vàng, mũ lông, áo choàng đỏ sẫm (viền đỏ
+  // như kỳ hạm), râu đen, cờ lưng ghi đủ tên 烏馬兒 (canon) nền đỏ sẫm chữ vàng — một chữ 烏 đứng riêng đọc là "con quạ" (review B20).
+  X24:       { scale: 1.34, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dadao", cape: 0x27324a, beard: 0x2a2522,
+    flag: { text: "樊", bg: "#27324a", fg: "#e6dcc3" } },
+  X20:       { scale: 1.42, cloth: 0x2a2630, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x6a2420, beard: 0x1e1a18,
+    heavy: true, flag: { text: "烏馬兒", bg: "#6a2420", fg: "#f1d98a" } },
   // H31 Trần Hưng Đạo (người chơi ở B20): tướng chỉ huy lão luyện — to hơn H35, giáp nặng sơn then viền vàng, vạt giáp
-  // then, áo choàng son, mũ trụ Tiết chế, râu bạc, đại kiếm hai tay (WC01). Không cờ sau lưng.
+  // then, áo choàng son, mũ trụ Tiết chế, râu bạc, đại kiếm hai tay (WC01). Không cờ sau lưng. Áo choàng hẹp 0,62, ngắn 0,72
+  // (review B20: áo choàng cỡ chung phủ kín thân giáp — nhìn từ sau chỉ thấy một tấm đỏ giữa quân ta cũng áo đỏ).
   H31:       { scale: 1.12, cloth: PAL.sonDam, armor: PAL.then, trim: PAL.vang, skirt: PAL.then, hat: "tietche", beard: 0xc9c3b6,
-    heavy: true, weapon: "daikiem", cape: PAL.son },
+    heavy: true, weapon: "daikiem", cape: PAL.son, capeScale: [0.62, 0.72] },
 };
 
 // Lá cờ viết chữ dọc (Cờ sáu chữ của Trần Quốc Toản là Chính sử theo canon).

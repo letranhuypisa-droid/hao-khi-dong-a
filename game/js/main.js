@@ -69,7 +69,7 @@ function render() {
   app.innerHTML = `
   <div class="hub">
     <header class="hub-head">
-      <div class="brand"><h1>HÀO KHÍ ĐÔNG A</h1><p>Nam Quốc Sơn Hà · Quyển Nhà Trần · bản thử B15 Hàm Tử</p></div>
+      <div class="brand"><h1>HÀO KHÍ ĐÔNG A</h1><p>Nam Quốc Sơn Hà · Quyển Nhà Trần · bản thử B15 Hàm Tử, B20 Bạch Đằng</p></div>
       <div class="purse">
         <span class="chip tien" title="Tiền (quan tiền)">${n(w.tien)}<small>Tiền</small></span>
         <span class="chip tt" title="Tinh thiết">${n(w.tt)}<small>Tinh thiết</small></span>
@@ -103,9 +103,9 @@ function xuattran() {
     }).join("")}</div>
     <p class="small">Thắng một cấp thì mở cấp kế (+3, như R1: B12 = 1 … B20 = 25). Địch mạnh theo R; tướng được nâng tối thiểu lên cấp R − 2 và binh khí tối thiểu E(R) − 0,10 khi vào trận (12.1, 12.7).</p>`
     : `<h3>Cấp trận R ${R} · cố định</h3>
-    <p class="small">${B.title}: tướng dựng sẵn cấp ${B.preset?.level ?? R}, binh khí E(R), không dùng cây kỹ năng, Lò rèn của Trần Quốc Toản (bản VS).${save.battles?.[B.id]?.best ? ` Hạng tốt nhất: <b>${save.battles[B.id].best}</b>.` : ""}</p>`}
+    <p class="small">${B.title}: tướng dựng sẵn cấp ${B.preset?.level ?? R}, binh khí E(R), không dùng cây kỹ năng và Lò rèn của Trần Quốc Toản (bản VS).${save.battles?.[B.id]?.best ? ` Hạng tốt nhất: <b>${save.battles[B.id].best}</b>${save.battles[B.id].bestTime ? ` · thắng nhanh nhất ${Math.floor(save.battles[B.id].bestTime / 60)}:${String(save.battles[B.id].bestTime % 60).padStart(2, "0")}` : ""}.` : ""}</p>`}
     <h3>Chế độ</h3>
-    <div class="ladder">${modes.map((m) => `<button data-mode="${m.id}" class="${curMode === m.id ? "on" : ""}">${m.name}<small>par ${Math.round((B.par?.[m.id] ?? m.par) / 60)} phút · ${m.id === "nhanh" ? `Hào Khí ×1,3 · thưởng ×0,6 · ${B.ladder ? "1 Kế Sách" : "3 Kế Sách"}` : "thưởng ×1 · 2 Kế Sách"}</small></button>`).join("")}</div>
+    <div class="ladder">${modes.map((m) => `<button data-mode="${m.id}" class="${curMode === m.id ? "on" : ""}">${m.name}<small>par ${Math.round((B.par?.[m.id] ?? m.par) / 60)} phút · ${m.id === "nhanh" ? `Hào Khí ×1,3 · thưởng ×0,6 · ${B.keSach?.nhanh ?? 1} Kế Sách` : `thưởng ×1 · ${B.keSach?.chuan ?? 2} Kế Sách`}</small></button>`).join("")}</div>
     <h3>Độ khó</h3>
     <div class="ladder">${DIFFICULTY.map((d) => `<button data-diff="${d.id}" class="${pick.difficulty === d.id ? "on" : ""}">${d.name}<small>${d.tokens} lính đánh cùng lúc · thưởng ×${d.reward}</small></button>`).join("")}</div>
     <div class="grid2">
@@ -153,7 +153,10 @@ function battleCard(id) {
       const H = HEROES[h], ok = B.playable.includes(h);
       return `<button data-hero="${h}" data-hb="${id}" class="${ok && hero === h ? "on" : ""}" ${ok ? "" : "disabled"}><b>${esc(H?.name || h)}</b><small>${ok ? esc(H?.title?.split(" · ")[0] || "") : "sắp có"}</small></button>`;
     }).join("")}</div>
-    <p class="small">${B.wip ? `Bản thử đợt 9: bản đồ khúc sông, nước triều và tướng ${esc(HEROES[B.playable[0]].name)} đã dựng; hạm đội, Con nước, Kế Sách đang làm — vào trận là bản đi thử bản đồ. ` : ""}R ${B.fixedR} cố định, tướng dựng sẵn cấp ${B.preset?.level}, ${B.modes.length === 1 ? MODES[B.modes[0]].name : "mọi chế độ"}.${ch?.openSeen ? " Comic mở chương đọc lại ở Sử quán." : ""}</p>
+    <p class="small">${B.wip ? `Bản thử đợt 9, còn đang dựng: có thể còn thô, thiếu phần. ` : ""}R ${B.fixedR} cố định, tướng dựng sẵn cấp ${B.preset?.level}, ${B.modes.length === 1 ? MODES[B.modes[0]].name : "mọi chế độ"}${B.keSach?.[B.modes[0]] ? `, ${B.keSach[B.modes[0]]} Kế Sách Lớn` : ""}.${save.battles?.[id]?.best ? ` Hạng tốt nhất: <b>${save.battles[id].best}</b>.` : ""}</p>
+    ${ch?.openSeen ? `<div class="row" style="margin-top:10px"><button data-comic="open" data-ch="${B.chapter}">Xem comic mở chương</button>
+      <span class="small">Lần đầu vào trận: comic, Hiến kế, lệnh Chủ soái tự phát. Chơi lại thì bỏ qua comic (nút "Xem comic" ở hội đồng), thẻ kế của người xưa mang dấu "Người xưa chọn".</span></div>`
+      : `<p class="small" style="margin-top:10px">Trước trận đầu tiên: comic mở chương (${metaOf(B.chapter)?.comic?.open?.length ?? 4} khung), Hiến kế ba thẻ, lệnh Chủ soái quyết — bỏ qua được comic, không bỏ qua được Hiến kế.</p>`}
   </section>`;
 }
 
@@ -204,7 +207,7 @@ const TITLES = [
 const EMPTY_CH = { opened: false, openSeen: false, closeSeen: false, insertSeen: false, seen: [], cleared: false };
 const COMIC_INFO = {
   B15: { open: "Tình thế, Chủ soái quyết", insert: "Áo Tống trên bến", insertLock: "Mở khi thuyền quân Triệu Trung cập bến" },
-  B20: { open: "Tình thế, hội quân", decree: "Chủ soái quyết" },
+  B20: { open: "Tình thế, hội quân", decree: "Chủ soái quyết", close: "Triều rút, bắt sống Ô Mã Nhi" },
 };
 function suquan() {
   const s = save.settings;
@@ -239,8 +242,9 @@ function chapterBlock(B) {
         ${btn("open", ch.openSeen, "Mở chương", ch.openSeen ? `${C.open.length} khung${info.open ? " · " + info.open : ""}` : "Mở khi vào trận lần đầu")}
         ${C.decree?.length ? btn("decree", ch.decreeSeen, "Chủ soái quyết", ch.decreeSeen ? `${C.decree.length} khung · sau Hiến kế` : "Mở sau Hiến kế lần đầu") : ""}
         ${C.insert?.length ? btn("insert", ch.insertSeen, "Giữa trận", ch.insertSeen ? `${C.insert.length} khung${info.insert ? " · " + info.insert : ""}` : info.insertLock || "Mở giữa trận") : ""}
-        ${btn("close", ch.cleared || ch.closeSeen, "Kết chương", ch.cleared || ch.closeSeen ? `${C.close.length} khung${ch.closeSeen ? "" : " · chưa đọc"}` : "Mở khi thắng trận")}
+        ${btn("close", ch.cleared || ch.closeSeen, "Kết chương", ch.cleared || ch.closeSeen ? `${C.close.length} khung${info.close ? " · " + info.close : ""}${ch.closeSeen ? "" : " · chưa đọc"}` : "Mở khi thắng trận")}
       </div>
+      ${M.comic.council && ch.council?.picked ? councilLine(M.comic.council, ch.council) : ""}
     </div>
     <div><h3>Quiz chương</h3>
       <p class="small">Sử quan hỏi 3–5 câu về điều tướng quân đã gặp trong comic, trong trận và trong thẻ. Không tính giờ, không trừ gì; chỉ thưởng thẻ và danh hiệu.</p>
@@ -251,6 +255,14 @@ function chapterBlock(B) {
   <h3>Thẻ sử liệu · ${got} / ${M.cards.length}</h3>
     ${M.groups.map((g) => { const cs = M.cards.filter((c) => c.group === g.id); return cs.length ? `<div class="sq-group">${g.name}</div><div class="cards">${cs.map(cardBtn).join("")}</div>` : ""; }).join("")}
   </section>`;
+}
+
+// Sử quán: lần Hiến kế gần nhất của Chương (kế đã hiến, có hợp cách người xưa không). Kế Hư cấu ghi nhãn Hư cấu.
+function councilLine(council, got) {
+  const k = council.cards.find((c) => c.id === got.picked), old = council.cards.find((c) => c.historical);
+  if (!k) return "";
+  return `<p class="small sq-council"><b>Hiến kế:</b> ${esc(k.text.vi)} <span class="label ${LCLS[k.label]}">${k.label}</span>
+    ${got.historical ? "— trùng lựa chọn của người xưa." : `— người xưa chọn: ${esc(old?.text.vi || "")} <span class="label cs">Chính sử</span>`}</p>`;
 }
 
 function showCard(id, onClose = render) {
@@ -310,16 +322,22 @@ async function startQuiz(chId = CH) {
   render();
 }
 
-// Hiến kế (Quyết sách, ui/council.js) khi comic của Chương có khối council: lần đầu có thẻ hướng dẫn; Chương đã thắng thì
-// thẻ lịch sử mang dấu "Người xưa chọn". Lần đầu vào Chương thì đọc tiếp phần "Chủ soái quyết" theo kế đã chọn.
+// Hiến kế (Quyết sách, ui/council.js) khi comic của Chương có khối council: lần đầu có thẻ hướng dẫn. Chơi lại (đã hiến kế
+// một lần, hoặc đã thắng Chương): thẻ lịch sử mang dấu "Người xưa chọn" ngay từ đầu, cả hai nhánh có Tình báo sớm (R-spec §5),
+// comic bỏ qua — thanh trên hội đồng có nút "Xem comic" (phát phần mở chương, rồi sau Hiến kế phát tiếp "Chủ soái quyết").
+// Lần đầu vào Chương thì đọc tiếp phần "Chủ soái quyết" theo kế đã chọn.
+// Trả về ctx.quyetSach của trận: { picked, historical, replay, ok } — ok = Tình báo sớm (director B20 → createRiver quyetSachOk).
 async function councilFlow(chId, M, first) {
   const { runCouncil, applyCouncil } = await import("./ui/council.js");
-  const ch = chapterState(save, chId);
-  const r = await runCouncil({ council: M.comic.council, comic: M.comic, settings: save.settings, replay: !!ch.cleared,
-    tutorial: !save.councilSeen, onSettings: persist });
+  const ch = chapterState(save, chId), B = battleOfChapter(chId);
+  const replay = !!(ch.cleared || ch.council?.picked);
+  let marks = null;
+  try { marks = (await B.marks?.()) || null; } catch (e) { console.error(e); }
+  const r = await runCouncil({ council: M.comic.council, comic: M.comic, settings: save.settings, replay, marks,
+    tutorial: !save.councilSeen, onSettings: persist, onComic: first ? null : () => playComic("open", { ch: chId }) });
   save.councilSeen = true; ch.council = { picked: r.picked, historical: !!r.historical }; persist();
-  if (first && M.comic.decree?.length) await playComic("decree", { ch: chId, comic: r.picked ? applyCouncil(M.comic, r.picked) : M.comic });
-  return ch.council;
+  if ((first || r.comic) && M.comic.decree?.length) await playComic("decree", { ch: chId, comic: r.picked ? applyCouncil(M.comic, r.picked) : M.comic });
+  return { ...ch.council, replay, ok: !!r.historical || replay };
 }
 // comic đã điền bóng thoại theo kế đã chọn lần trước (đọc lại "Chủ soái quyết" ở Sử quán); chưa chọn thì null
 async function decreeComic(chId) {
@@ -472,7 +490,7 @@ function hoso() {
       <tr><td>Số trận</td><td>${s.battles}</td></tr><tr><td>Thắng</td><td>${s.wins}</td></tr>
       <tr><td>Tổng KO</td><td>${n(s.ko)}</td></tr><tr><td>Lần kích Tổng Phản Công</td><td>${s.tpc}</td></tr>
       <tr><td>Thắng nhanh nhất</td><td>${s.bestTime ? `${Math.floor(s.bestTime / 60)}:${String(s.bestTime % 60).padStart(2, "0")}` : "—"}</td></tr></table>
-      <h3>Nhật ký</h3><table class="stat log">${save.log.map((l) => `<tr><td>R ${l.R}</td><td>${l.won ? `Thắng · hạng ${l.rank}` : "Thua"}</td><td>+${n(l.exp)} EXP</td><td>+${n(l.tien)} Tiền</td></tr>`).join("") || "<tr><td>Chưa có trận nào.</td></tr>"}</table>
+      <h3>Nhật ký</h3><table class="stat log">${save.log.map((l) => `<tr><td>${l.battle && !BATTLES[l.battle]?.ladder ? esc(BATTLES[l.battle]?.name || l.battle) : `R ${l.R}`}</td><td>${l.won ? `Thắng · hạng ${l.rank}` : "Thua"}</td><td>+${n(l.exp)} EXP</td><td>+${n(l.tien)} Tiền</td></tr>`).join("") || "<tr><td>Chưa có trận nào.</td></tr>"}</table>
     </div>
     <div class="card"><h3>Bản lưu</h3>
       <p class="small">Lưu trong trình duyệt này. Safari xóa dữ liệu trang sau 7 ngày không mở, nên hãy xuất file nếu chơi trên iPhone.</p>
@@ -510,7 +528,7 @@ const bind = {
     app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
     app.querySelector("[data-go]").onclick = () => startBattle(pick.battle);
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
-    app.querySelector("[data-comic]")?.addEventListener("click", async (e) => { e.stopPropagation(); await playComic("open", { ch: e.currentTarget.dataset.ch || CH }); render(); });
+    app.querySelectorAll("[data-comic]").forEach((b) => b.addEventListener("click", async (e) => { e.stopPropagation(); await playComic("open", { ch: e.currentTarget.dataset.ch || CH }); render(); }));
     app.querySelectorAll("[data-bpick]").forEach((s) => s.addEventListener("click", () => { if (pick.battle !== s.dataset.bpick) { pick.battle = s.dataset.bpick; render(); } }));
     app.querySelectorAll("[data-hero]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); pick.battle = b.dataset.hb; pick.hero[b.dataset.hb] = b.dataset.hero; render(); }));
   },
@@ -592,19 +610,22 @@ async function startBattle(battleId = pick.battle) {
   if (!res?.won) music.play("hub");
   if (!res) { render(); return; }
   if (res.stub) { toast(`${B.title} còn đang dựng — đã về Doanh trại.`); tab = "xuattran"; render(); return; }   // bản giữ chỗ: không chấm, không thưởng
-  afterBattle({ battle: B.id, ...res }, met);
+  return afterBattle({ battle: B.id, ...res }, met, { council: quyetSach });
 }
 
 // Sau trận: mở thẻ Sử quán theo kết quả, đánh dấu Chương xong (lần thắng đầu), rồi màn kết quả. res.battle: trận nào
-// (thiếu thì B15, như kết quả trước đợt 9).
-function afterBattle(res, met = []) {
+// (thiếu thì B15, như kết quả trước đợt 9). Trận có phần kết quả riêng (BATTLES[id].resultUI — B20) nạp module đó trước
+// rồi mới vẽ (trả Promise); B15 vẽ ngay như cũ. opts.council: Hiến kế của lần vào trận này (thiếu thì lần gần nhất).
+function afterBattle(res, met = [], { council } = {}) {
   const B = BATTLES[res.battle] || BATTLES.B15, chId = B.chapter;
   const ch = chapterState(save, chId);
   if (res.won) completeChapter(save, chId);
   const firstClear = res.won && !ch.closeSeen;     // lần thắng đầu, hoặc thắng rồi mà comic kết chương chưa đọc
   const cards = [...met, ...unlockCards(save, chId, battleUnlockKeys(res))];
   persist();
-  showResults(res, { cards, firstClear });
+  if (!B.resultUI) { showResults(res, { cards, firstClear }); return; }
+  return B.resultUI().then((ui) => showResults(res, { cards, firstClear, ui, council: council ?? ch.council ?? null }),
+    (e) => { console.error(e); showResults(res, { cards, firstClear }); });
 }
 
 // Kết chương sau lần thắng đầu: comic kết → thẻ Sử quán vừa mở → mời Quiz → Doanh trại.
@@ -655,72 +676,66 @@ async function startArena() {
   app.querySelector("[data-again]").onclick = () => startArena();
 }
 
-// Trận ngoài thang R (B20, tướng dựng sẵn): chỉ Tiền / Tinh thiết / Quân công và thống kê; không EXP, không rơi binh khí,
-// không mở cấp R; hạng tốt nhất ghi ở save.battles[id]. (Phần thưởng riêng của B20 là việc của pha D.)
-function applyBattleRewards(save, B, full, rw) {
-  Object.assign(rw, { exp: 0, drops: [], skillPoint: false, unlockR: null });
-  save.wallet.tien += rw.tien; save.wallet.tt += rw.tt; save.wallet.qc += rw.qc;
-  const sb = (save.battles ||= {})[B.id] ||= { best: null, cleared: false };
-  if (full.won) {
-    const order = ["S", "A", "B", "C"];
-    if (!sb.best || order.indexOf(full.rank) < order.indexOf(sb.best)) sb.best = full.rank;
-    sb.cleared = true; save.stats.wins++;
-  }
-  save.stats.battles++; save.stats.tpc += full.tpcCount || 0; save.stats.ko += full.ko || 0;
-  save.log.unshift({ at: full.at || 0, R: full.R, battle: B.id, won: full.won, rank: full.rank || "-", diem: full.diem || 0, exp: 0, tien: rw.tien });
-  save.log = save.log.slice(0, 12);
-  return { levelsGained: 0 };
-}
-
-function showResults(res, { cards = [], firstClear = false } = {}) {
+// Màn kết quả. Trận trong thang R (B15) như trước đợt 9. Trận ngoài thang (B20, tướng dựng sẵn): thưởng chỉ ví và thống kê
+// (meta/progress.js computeFixedRewards / applyFixedRewards — hạng tốt nhất ở save.battles[id]), par riêng của trận, mất
+// điểm K khi river.kRank === false; opts.ui (module resultUI của trận) chèn phần riêng (B20: 6 nhiệm vụ, Kế Sách, khúc sông).
+function showResults(res, { cards = [], firstClear = false, ui = null, council = null } = {}) {
   const B = BATTLES[res.battle] || BATTLES.B15, RD = B.result;
-  const score = res.won ? P.scoreBattle(res) : { diem: 0, rank: "-", rankMult: 0, parts: {} };
+  const parSec = res.parSec ?? B.par?.[res.mode] ?? MODES[res.mode].par;
+  const kLost = res.river?.kRank === false;
+  const score = res.won ? P.scoreBattle({ ...res, par: parSec, kLost }) : { diem: 0, rank: "-", rankMult: 0, parts: {} };
   const full = { ...res, ...score, rank: score.rank, rankMult: score.rankMult, diem: score.diem, at: Date.now() };
   const lvBefore = save.hero.level;
-  const rw = P.computeRewards(save, full);
-  const applied = B.ladder ? P.applyRewards(save, full, rw) : applyBattleRewards(save, B, full, rw);
+  const rw = B.ladder ? P.computeRewards(save, full) : P.computeFixedRewards(save, full);
+  const applied = B.ladder ? P.applyRewards(save, full, rw) : P.applyFixedRewards(save, B.id, full, rw);
   persist();
   const evName = (k) => (res.eventNames || RD.eventNames)[k] ?? (B.id === "B15" ? "Tướng ta bị vây" : k);
-  const parSec = res.parSec ?? B.par?.[res.mode] ?? MODES[res.mode].par;
   const parts = score.parts;
   const pct = (v) => `${Math.round((v || 0) * 100)}%`;
+  const ksList = res.keSachList || Object.values(res.river?.keSach || {});
   const hkRows = Object.entries(res.hkLog || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v > 0 ? "+" : ""}${Math.round(v)}</td></tr>`).join("");
+  const extra = ui?.resultHTML ? ui.resultHTML(res, { council }) : "";
   app.innerHTML = `
-  <div class="results ${res.won ? "win" : "lose"}">
+  <div class="results ${res.won ? "win" : "lose"}${B.ladder ? "" : " fixed"}">
     <div class="rank-seal r${score.rank}">${res.won ? score.rank : "✕"}</div>
     <h1>${res.won ? esc(RD.title) : "Thua trận"}</h1><p>${esc(res.why)}</p>
     ${res.won ? `<div class="card"><h3>Điểm ${score.diem} / 100</h3><table class="stat">
       <tr><td>Nhiệm vụ (35)</td><td>${pct(parts.M)} · chính ${res.mainDone}/${res.missionsTotal ?? RD.missionsTotal}, phụ ${res.sideDone}/${res.sideTotal ?? RD.sideTotal}</td></tr>
       <tr><td>Thời gian (15)</td><td>${pct(parts.T)} · ${Math.floor(res.timeSec / 60)}:${String(Math.floor(res.timeSec % 60)).padStart(2, "0")} (par ${Math.floor(parSec / 60)}:${String(Math.round(parSec % 60)).padStart(2, "0")})</td></tr>
-      <tr><td>Quân ta còn (20)</td><td>${pct(parts.Q)}</td></tr><tr><td>Cứ Điểm (20)</td><td>${pct(parts.C)}</td></tr>
-      <tr><td>Kế Sách (10)</td><td>${pct(parts.K)} · ${(res.keSachList || []).map((k) => `${k.name}: ${k.word.toLowerCase()}`).join(", ")}</td></tr>
+      <tr><td>Quân ta còn (20)</td><td>${pct(parts.Q)}</td></tr><tr><td>${esc(RD.cLabel || "Cứ Điểm")} (20)</td><td>${pct(parts.C)}</td></tr>
+      <tr><td>Kế Sách (10)</td><td>${pct(parts.K)} · ${ksList.map((k) => `${k.name}: ${k.word.toLowerCase()}`).join(", ")}${kLost ? ` <small class="bad">— mất điểm Kế Sách: chỉ một nửa hạm đội mắc cạn</small>` : ""}</td></tr>
       <tr><td>KO</td><td>${res.ko} (par ${MODES[res.mode].koPar})</td></tr></table></div>` : ""}
+    ${extra}
     <div class="grid2">
       <div class="card"><h3>Phần thưởng</h3><table class="stat">
-        <tr><td>EXP</td><td>+${n(rw.exp)}${applied.levelsGained ? ` · <b>lên cấp ${save.hero.level}</b> (từ ${lvBefore})` : ""}</td></tr>
+        ${B.ladder ? `<tr><td>EXP</td><td>+${n(rw.exp)}${applied.levelsGained ? ` · <b>lên cấp ${save.hero.level}</b> (từ ${lvBefore})` : ""}</td></tr>`
+          : `<tr><td>EXP</td><td>— <small class="small">tướng dựng sẵn cấp ${B.preset?.level ?? res.R}</small></td></tr>`}
         <tr><td>Tiền</td><td>+${n(rw.tien)}${res.chestCoins ? ` (gồm ${n(res.chestCoins)} từ rương)` : ""}</td></tr>
         <tr><td>Tinh thiết</td><td>+${n(rw.tt)}</td></tr><tr><td>Quân công</td><td>+${n(rw.qc)}</td></tr>
         ${rw.drops.map((d) => `<tr><td>Binh khí</td><td><b>${WEAPON_NAMES[d.tier]}</b> · ${esc(d.why)}</td></tr>`).join("")}
         ${rw.skillPoint ? `<tr><td>Điểm kỹ năng</td><td>+1 (lần đầu hạng S ở R ${res.R})</td></tr>` : ""}
         ${rw.unlockR ? `<tr><td>Mở</td><td>Cấp trận R ${rw.unlockR}</td></tr>` : ""}
+        ${applied.newBest ? `<tr><td>Hạng tốt nhất</td><td><b>${score.rank}</b> · mới</td></tr>` : ""}
       </table></div>
       <div class="card"><h3>Quân ta và Hào Khí</h3><table class="stat">
         <tr><td>Hào Khí gốc</td><td>${Math.round(res.hkRaw)} · nguồn tùy chọn ${res.hkRaw ? Math.round((res.hkOptional / res.hkRaw) * 100) : 0}%</td></tr>
         <tr><td>Tổng Phản Công</td><td>${res.tpcCount} lần</td></tr><tr><td>Mệnh Lệnh</td><td>${res.orders}</td></tr>
-        <tr><td>Kế Sách thành công</td><td>${res.keSachOk} / ${(res.keSachList || []).length}</td></tr>
+        <tr><td>Kế Sách thành công</td><td>${res.keSachOk} / ${ksList.length}</td></tr>
         <tr><td>Sĩ Khí TB</td><td>${Math.round(res.avgSK)}</td></tr>
         ${Object.entries(res.events || {}).map(([k, v]) => `<tr><td>${esc(evName(k))}</td><td>${esc(EVENT_WORD[v] || v)}</td></tr>`).join("")}
       </table><details><summary>Hào Khí theo nguồn</summary><table class="stat">${hkRows}</table></details></div>
     </div>
     ${cards.length ? `<div class="card"><h3>Sử quán mở thẻ</h3><div class="unlocked" style="justify-content:flex-start">${cards.map((id) => cardOf(id)).filter(Boolean).map((c) => `<div class="sq-card new"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${groupName(c)}</small></div>`).join("")}</div></div>` : ""}
     <div class="row center">${firstClear && STORY ? `<button class="primary" data-end>Tiếp: Kết chương ›</button>` : `<button class="primary" data-back>Về Doanh trại</button>`}
-      <button data-again>Đánh lại</button><button data-sq>Sử quán</button></div>
+      <button data-again>Đánh lại</button><button data-sq>Sử quán</button>${!B.ladder && res.won && !firstClear ? `<button data-close-comic>Xem comic kết chương</button>` : ""}</div>
   </div>`;
   const nextR = () => { if (B.ladder) pick.R = Math.max(...save.ladder.unlocked.filter((r) => r <= Math.max(pick.R, rw.unlockR || 0))); };
   app.querySelector("[data-back]")?.addEventListener("click", () => { tab = "xuattran"; nextR(); render(); });
   app.querySelector("[data-end]")?.addEventListener("click", () => { nextR(); endChapter(cards, B.chapter); });
   app.querySelector("[data-sq]").onclick = () => { tab = "suquan"; nextR(); render(); };
   app.querySelector("[data-again]").onclick = () => startBattle(B.id);
+  // chơi lại đã thắng: comic kết chương không tự phát; xem xong thì về Doanh trại (màn kết quả đã ghi thưởng)
+  app.querySelector("[data-close-comic]")?.addEventListener("click", async () => { await playComic("close", { ch: B.chapter }); tab = "xuattran"; render(); });
 }
 
 render();

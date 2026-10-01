@@ -20,7 +20,7 @@ import { HUD } from "./hud.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
-import { HEROES } from "../data/heroes.js";
+import { HEROES, SKILLS } from "../data/heroes.js";
 import { heroStats } from "../meta/progress.js";
 import { movesGuideHTML } from "../ui/guide.js";
 import { readComic } from "../ui/comic.js";
@@ -100,7 +100,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       reject(err);
       return;
     }
-    if (location.search.includes("debug")) { window.__hk = ctx; ctx.input = input; }   // chỉ để kiểm thử bằng script
+    ctx.input = input;                 // director đọc phím giữ (held.interact — Tương tác B20); B15 không đọc
+    if (location.search.includes("debug")) window.__hk = ctx;   // chỉ để kiểm thử bằng script
     ctx.hitstopT = 0;
     ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
     const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
@@ -135,7 +136,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // mất khoá chuột, ẩn tab); nếu vẫn lọt thì tắt tạm dừng sẽ dựng lại bảng kết quả, "Rút quân" thì rời luôn.
     const pause = (on) => {
       if (finished) return;
-      paused = on; overlay.innerHTML = on ? pauseHTML(save) : ""; overlay.classList.toggle("on", on);
+      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle) : ""; overlay.classList.toggle("on", on);
       if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
@@ -178,8 +179,9 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       document.removeEventListener("pointerlockchange", onLockChange);
       document.removeEventListener("visibilitychange", onVis);
       input.dispose(); ctx.audio.close();                      // đóng hẳn AudioContext (suspend thì mỗi trận rò một cái)
-      releaseGpu(scene, renderer);
+      // dọn riêng của trận trước khi trả GPU (B20: naval tự gỡ lưới hạm đội — làm sau releaseGpu là gỡ hai lần)
       resetGround(); def.dispose?.(ctx);
+      releaseGpu(scene, renderer);
       resolve(res);
     };
 
@@ -209,7 +211,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // ---- vòng lặp ------------------------------------------------------------------------
     // Thắng: cảnh kết trong engine (22.2 bước 6, ≤ 10 s): camera kéo xa, nâng cao thấy cả bến, rồi mới hiện bảng
     // THẮNG TRẬN; bấm phím / chạm bất kỳ để bỏ qua. Thua giữ như cũ (1,8 s).
-    const OUTRO = { sec: 5, pull: 3.4, pitch: 0.66 };
+    const OUTRO = { sec: def.outroSec ?? 5, pull: 3.4, pitch: 0.66 };   // B20: cảnh kết riêng của director (máy quay nhìn cả khúc sông) dài hơn
     let hudAcc = 0, endShown = false, time = 0, bedT = 0, outroT = -1, outroTap = false;
     container.addEventListener("pointerdown", () => { if (outroT > 0.6) outroTap = true; });   // chạm/nhấp bỏ qua cảnh kết
     const frame = (now) => {
@@ -218,6 +220,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
       if (paused || finished) return;
       step(dt, input.poll(), true);
+      input.pickMode = !!ctx.hud?.pickerOpen;   // bảng chọn điểm đến mở: D-pad tay cầm chọn 1–4 (input.js)
     };
     // Tua trận bằng script (chỉ khi ?debug): chạy logic không cần requestAnimationFrame.
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => {
@@ -252,6 +255,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         let steps = 0;
         while (acc >= STEP && steps < 4) {
           acc -= STEP; steps++; ctx.clock += STEP;
+          ctx.naval?.update(STEP);          // B20 (naval.js): thuyền, boong, chở người trên boong — trước mọi người; B15 không có
           ctx.hero.update(STEP, inp);
           ctx.crowd.update(STEP);
           for (const u of ctx.units) u.update(STEP);
@@ -299,6 +303,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         }
       }
       cy = Math.max(cy, Math.max(heightAt(cx, cz), waterLevel(cx, cz)) + 1.2);   // B15: waterLevel() = −∞
+      if (h.deck) cy = Math.max(cy, h.y + 2.2);          // B20: tướng trên boong — camera không tụt xuống dưới mạn thuyền
       const k = Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
       if (time < 0.2) { cam.x = cx; cam.y = cy; cam.z = cz; }
@@ -386,7 +391,7 @@ export function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
-function pauseHTML(save) {
+function pauseHTML(save, heroId = "H35", def = null) {
   const s = save.settings;
   const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? "selected" : ""}>${label}</option>`;
   return `<div class="panel pause">
@@ -399,19 +404,25 @@ function pauseHTML(save) {
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
-    ${controlsHTML(matchMedia("(pointer: coarse)").matches)}
+    ${controlsHTML(matchMedia("(pointer: coarse)").matches, heroId)}${def?.touch?.interact ? interactNote(def) : ""}
   </div>`;
 }
 
-// Bảng điều khiển trong bảng tạm dừng: dùng chung bảng hướng dẫn có icon (ui/guide.js), bản gọn.
-export function controlsHTML(touch = false) {
-  return `<h3>Điều khiển</h3>${movesGuideHTML({ dev: touch ? 1 : 0, compact: true })}`;
+// Bảng điều khiển trong bảng tạm dừng: dùng chung bảng hướng dẫn có icon (ui/guide.js), bản gọn. hero: tướng đang ra trận
+// (đợt 9: H31 thấy đòn đại kiếm, Hịch Tướng Sĩ, Binh Thư; mặc định H35 — Võ trường, B15 như cũ).
+export function controlsHTML(touch = false, hero = "H35") {
+  return `<h3>Điều khiển</h3>${movesGuideHTML({ dev: touch ? 1 : 0, compact: true, hero })}`;
 }
+
+// Trận có Tương tác (B20): một dòng dưới bảng đòn; def.controlsNote (tùy chọn) ghi việc cụ thể của trận. B15 không có.
+const interactNote = (def) => `<p class="small"><b>Tương tác</b>: giữ <b>X</b> (tay cầm: D-pad xuống; nút cảm ứng Tương tác) — ${def.controlsNote || "thao tác theo chỗ đứng: chiếm thuyền, lên boong, mở mốc cọc, gọi đò chuyển"}.</p>`;
 
 // nút cảm ứng có icon chiêu (nút C đổi icon theo đòn C kế tiếp, hud.js)
 const tb = (b, icon, label, cls = "") => `<button data-b="${b}" class="${cls}"><img src="./assets/icons/${icon}.webp" alt=""><em>${label}</em></button>`;
 // Ô kỹ năng theo tướng (hero.skillSlots(), hero.ultInfo()): H35 đúng hai nút Phá Trận, Tuyệt Kỹ như cũ; tướng có ô thứ
 // hai (H31 Binh Thư) thêm nút skill2; trận có Tương tác (BattleDef.touch.interact) thêm nút interact.
+// Nhãn nút tròn: tên ngắn SKILLS[id].short (tên đầy đủ "Binh Thư Yếu Lược" bị cắt trong nút 54–58 px), không có thì tên ô.
+const tlabel = (s) => (s ? SKILLS[s.id]?.short ?? s.name : undefined);
 export function buildTouch(root, input, ctx) {
   root.classList.add("on"); root.parentElement.classList.add("touchmode");
   const slots = ctx.hero?.skillSlots?.() || [], s1 = slots[0], s2 = slots[1], ult = ctx.hero?.ultInfo?.();
@@ -421,7 +432,7 @@ export function buildTouch(root, input, ctx) {
     <div class="tbtns">
       ${tb("n", "n", "N", "big")}${tb("c", "c1", "C", "mid")}
       ${tb("dodge", "dodge", "Né")}${tb("block", "block", "Đỡ")}
-      ${tb("skill", s1?.icon ?? "skill", s1?.name ?? "Phá Trận")}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ")}${s2 ? tb("skill2", s2.icon ?? "skill", s2.name ?? s2.id) : ""}
+      ${tb("skill", s1?.icon ?? "skill", tlabel(s1) ?? "Phá Trận")}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ")}${s2 ? tb("skill2", s2.icon ?? "skill", tlabel(s2) ?? s2.id, "sk-" + s2.id) : ""}
       ${ctx.battle?.touch?.interact ? tb("interact", "kesach", "Tương tác", "act") : ""}
     </div>
     <div class="tsys">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div>`;

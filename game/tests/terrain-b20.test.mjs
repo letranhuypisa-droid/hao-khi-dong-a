@@ -5,7 +5,7 @@ import {
   TIDE, TIDE_Y, zc, hw, bedHeight, bedHeightExact, bedHeightLin, depthAt, riverMask, tribAt, inReach, stakeFieldAt,
   waterDist, mudAt, waveY, TERRAIN_B20, WADE_MAX, TRIBS, tribPoint, HQ_PAD, gridAxis, ensureLut, LUT_INFO,
 } from "../js/data/terrain-b20.js";
-import { RIVER, STAKE_FIELDS } from "../js/data/river-b20.js";
+import { RIVER, STAKE_FIELDS, STAKE_TOP } from "../js/data/river-b20.js";
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -123,9 +123,9 @@ t("ba mốc M1/M2/M3 nằm trên bãi cạn, đúng khuôn 70 × 60 m quanh tâm
     for (let dx = -35; dx <= 35; dx += 5) for (let dz = -30; dz <= 30; dz += 5) {
       const x = f.x + dx, z = zc(x) + dz, y = bedHeight(x, z);
       assert.ok(y >= -2.35 && y <= -1.85, `${f.id} (${dx},${dz}): đáy ${y.toFixed(2)}`);
-      // cọc dài nhất (đỉnh = đáy + 2,6) chìm ≥ 0,5 m khi triều cao; cọc ngắn nhất (đáy + 1,8) nhô khi triều ròng
-      assert.ok(TIDE_Y(100) - (y + 2.6) >= 0.5, `${f.id} cọc lộ khi triều cao`);
-      assert.ok(TIDE_Y(0) - (y + 1.8) < 0, `${f.id} cọc không lộ khi triều ròng`);
+      // cọc dài nhất (đỉnh = đáy + STAKE_TOP.max) chìm ≥ 0,5 m khi triều cao; ngắn nhất (đáy + STAKE_TOP.min) nhô khi triều ròng
+      assert.ok(TIDE_Y(100) - (y + STAKE_TOP.max) >= 0.5, `${f.id} cọc lộ khi triều cao`);
+      assert.ok(TIDE_Y(0) - (y + STAKE_TOP.min) < 0, `${f.id} cọc không lộ khi triều ròng`);
     }
   }
   assert.equal(stakeFieldAt(300, zc(300)), null);

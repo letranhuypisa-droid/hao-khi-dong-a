@@ -1,0 +1,185 @@
+/* b20.css — HUD riêng của B20 Bạch Đằng (js/battle/hud-b20.js). Chỉ tác động khi gốc HUD có lớp .hud-b20 (và sân khấu có .b20),
+   nên nạp chung index.html mà B15 / Võ trường không đổi. Tông sơn mài như game.css: then, son, vàng thếp; thêm màu nước chàm lục
+   cho Con nước. Mọi cỡ là ĐỀ XUẤT BẢN THỬ; điện thoại ngang (≤ 860 px) gọn lại ở cuối file. */
+.hud-b20 { --nuoc: #2f5d62; --nuoc2: #5fa6a0; --nuoc3: #9fd6cf; --tim: #b58cff; }
+
+/* ---- đồng hồ Con nước (ô setTopWidget, dưới thanh Hào Khí) ---- */
+.b20-tide { margin-top: 3px; padding: 3px 6px 4px; border-radius: 6px; background: rgba(18,34,36,.55); border: 1px solid rgba(95,166,160,.45); }
+.b20-tide .bt-l { display: flex; align-items: baseline; gap: 6px; line-height: 1.15; white-space: nowrap; }
+.b20-tide .bt-l b { font-family: var(--serif); font-weight: 900; letter-spacing: .08em; font-size: .68rem; color: var(--nuoc3); }
+.b20-tide .bt-v { font-family: var(--serif); font-weight: 700; font-size: .9rem; color: #e6f4f1; }
+.b20-tide .bt-a { font-style: normal; font-size: .72rem; } .b20-tide .bt-a.up { color: var(--nuoc3); } .b20-tide .bt-a.down { color: #ffc27a; } .b20-tide .bt-a.flat { color: var(--muted); font-size: .55rem; }
+.b20-tide .bt-n { margin-left: auto; font-size: .7rem; color: var(--trung); white-space: nowrap; }
+.b20-tide .bt-bar { position: relative; height: 7px; margin-top: 3px; border-radius: 4px; background: #0d1a1b; border: 1px solid #28474a; overflow: hidden; }
+.b20-tide .bt-f { height: 100%; background: linear-gradient(90deg, #1f4a50, var(--nuoc2) 70%, var(--nuoc3));
+  background-image: repeating-linear-gradient(115deg, rgba(255,255,255,.14) 0 3px, transparent 3px 9px), linear-gradient(90deg, #1f4a50, var(--nuoc2) 70%, var(--nuoc3));
+  transition: width .3s; }
+.b20-tide .bt-k { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(241,217,138,.7); } .b20-tide .bt-k.k50 { background: rgba(230,220,195,.35); }
+.b20-tide .bt-m { position: absolute; top: -1px; width: 0; height: 0; border: 4px solid transparent; border-top-color: #ffc27a; transform: translateX(-4px); }
+.b20-tide .bt-m[hidden] { display: none; }
+.b20-tide.low .bt-f { background-image: repeating-linear-gradient(115deg, rgba(255,255,255,.1) 0 3px, transparent 3px 9px), linear-gradient(90deg, #5a4a30, #7a6a48); }
+.b20-tide.warn { border-color: #ff9a5a; animation: b20warn .7s infinite alternate; } .b20-tide.warn .bt-n { color: #ffc27a; font-weight: 700; }
+@keyframes b20warn { from { box-shadow: 0 0 0 rgba(255,140,80,0); } to { box-shadow: 0 0 12px rgba(255,140,80,.85); } }
+
+/* ---- cột phải: bản đồ nhỏ thấp hơn B15, bảng dưới sát bản đồ ---- */
+.hud-b20 .hud-map canvas { background: #bca77a; }
+.hud-b20 .hud-ks { top: 106px; width: 252px; right: 8px; gap: 5px; }
+.hud-b20 .hud-events { top: 106px; right: 270px; }
+.hud-b20 .hud-msgs { top: 136px; }
+.hud-b20 .hud-time span { white-space: nowrap; }
+.hud-b20 .hud-phase span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }   /* mục tiêu dài: tối đa 3 dòng */
+.b20.touchmode .hud-ko { display: none; }                         /* cảm ứng: KO nhường chỗ cho cột phải và cụm nút */            /* mục tiêu pha B20 dài (3 dòng): tin nhắn xuống dưới hộp pha */
+.hud-b20 .hud-panel[data-panel=b20] { background: none; border: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.b20-sec { background: rgba(21,18,16,.84); border: 1px solid #6b4f2e; border-left: 3px solid var(--vang); border-radius: 6px; padding: 5px 9px 6px; font-size: .74rem; line-height: 1.3; }
+.b20-sec header { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px; }
+.b20-sec header > b:first-child { font-family: var(--serif); font-weight: 900; letter-spacing: .12em; font-size: .74rem; color: var(--vang2); }
+.b20-sec header > span { font-size: .7rem; color: var(--trung); } .b20-sec header > span b { color: var(--vang2); }
+.b20-sec .row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-top: 2px; }
+.b20-sec .row > span:first-child:not(.b20-chip) { width: 74px; flex: none; color: var(--muted); font-size: .68rem; white-space: nowrap; }
+.b20-sec .row > b { font-family: var(--serif); color: var(--trung); min-width: 30px; text-align: right; }
+.b20-sec .sub { margin-top: 3px; font-size: .64rem; color: var(--muted); line-height: 1.3; } .b20-sec .sub.warn { color: #ffb09a; font-weight: 700; }
+.b20-sec .bar { flex: 1; margin-top: 0; height: 8px; }
+.b20-sec kbd { display: inline-block; font: 700 .66rem var(--sans); color: var(--then); background: var(--vang2); border-radius: 3px; padding: 0 4px; box-shadow: 0 1px 0 #7a5a2a; }
+.b20-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .66rem; padding: 1px 7px 1px 2px; border-radius: 9px; border: 1px solid #6b4f2e; background: rgba(0,0,0,.45); color: var(--trung); white-space: nowrap; }
+.b20-chip img { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; } .b20-chip small { color: var(--muted); }
+.b20-chip.none { padding-left: 7px; color: var(--muted); border-style: dashed; }
+
+/* P1 Nghi binh: dải khoảng cách 0–60 m, vùng đỏ < 15, dải vàng 15–40, dấu hiện tại */
+.b20-sec.lure .gapv { color: var(--vang2); font-size: .86rem; white-space: nowrap; }
+.b20-sec.lure .gs { white-space: nowrap; font-style: normal; margin-left: auto; font-size: .66rem; font-weight: 700; padding: 0 6px; border-radius: 8px; }
+.b20-sec.lure.in .gs { color: #1b2412; background: #9fcf7a; } .b20-sec.lure.far .gs { color: #2a2016; background: #d8c49a; }
+.b20-sec.lure.near { border-color: #ff6a4a; box-shadow: 0 0 calc(14px * var(--pulse, 1)) rgba(255,90,58,.8); }
+.b20-sec.lure.near .gs { color: #fff; background: #c0392b; opacity: var(--pulse, 1); }
+.gapbar { position: relative; height: 12px; margin: 4px 0 11px; border-radius: 3px; background: rgba(90,80,70,.45); border: 1px solid #4a3c30; }
+.gapbar i { position: absolute; top: 0; bottom: 0; } .gapbar .zn { left: 0; background: rgba(192,57,43,.55); } .gapbar .zb { background: rgba(201,161,74,.55); border-left: 1px solid var(--vang2); border-right: 1px solid var(--vang2); }
+.gapbar u { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 4px #000; border-radius: 2px; transition: left .25s; }
+.gapbar s { position: absolute; top: 12px; transform: translateX(-50%); text-decoration: none; font-size: .56rem; color: var(--muted); }
+.b20-sec .bar.kk > div { background: linear-gradient(90deg, #7e2419, #e0543a 60%, #ffb07a); } .b20-sec .bar.kk.full > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
+.pips { display: flex; gap: 3px; flex: 1; }
+.pips i { width: 11px; height: 6px; border-radius: 1px 5px 5px 1px; background: linear-gradient(#e0543a, #9b2d20); border: 1px solid #f1d98a88; }
+.pips i.lost { background: none; border: 1px dashed #6b4f2e; } .pips.bad i.lost { border-color: #ff6a4a; }
+
+/* hộ vệ: 6 (đợt 2: 8) thuyền nhỏ; đã hạ = vàng (chiếm) */
+.b20-sec .ships { display: flex; gap: 4px; margin: 3px 0 1px; }
+.b20-sec .ships i { width: 20px; height: 7px; border-radius: 1px 7px 7px 1px; background: #22303e; border: 1px solid #9fc2e6aa; }
+.b20-sec .ships i.down { background: linear-gradient(#f1d98a, #c9a14a); border-color: #7a5a2a; }
+
+/* mốc cọc: ✦ ẩn (tím, chỉ người chơi thấy) · ◆ đã mở (vàng) · ✖ lộ (đỏ); vòng đỏ = tướng địch đứng mốc, đầy thì lộ */
+.mchips { display: flex; justify-content: space-between; gap: 4px; margin: 2px 0; }
+.mchip { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 2px; border-radius: 6px; background: rgba(0,0,0,.3); border: 1px solid #3e3228; }
+.mchip .mring { --p: 0; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(#ff5a3a calc(var(--p) * 1turn), rgba(241,217,138,.18) 0); }
+.mchip .mring span { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #1b1613; font-size: .9rem; line-height: 1; }
+.mchip b { font-family: var(--serif); font-size: .72rem; color: var(--trung); } .mchip small { font-size: .6rem; color: var(--muted); white-space: nowrap; }
+.mchip.hidden .mring span { color: var(--tim); text-shadow: 0 0 6px rgba(181,140,255,.7); }
+.mchip.active { border-color: var(--vang); background: rgba(201,161,74,.16); } .mchip.active .mring { background: var(--vang); } .mchip.active .mring span { color: var(--vang2); }
+.mchip.exposed { border-color: #7e2419; opacity: .8; } .mchip.exposed .mring { background: #7e2419; } .mchip.exposed .mring span { color: #ff7a5c; }
+.mchip.danger { border-color: #ff6a4a; box-shadow: 0 0 10px rgba(255,90,58,.55); } .mchip.danger small { color: #ffb09a; font-weight: 700; }
+
+/* Thoát vây (P4): thanh đỏ 0–100, đầy = Kế Sách Con nước hỏng (không thua trận) */
+.b20-sec.escape { border-left-color: #c0392b; } .b20-sec.escape .v { font-family: var(--serif); color: #ffb09a; font-size: .95rem; } .b20-sec.escape .v small { font-size: .62rem; color: var(--muted); }
+.b20-sec .bar.esc { height: 10px; } .b20-sec .bar.esc > div { background: linear-gradient(90deg, #6e1f16, #c0392b 60%, #ff7a5c); }
+.b20-sec.escape .row { justify-content: space-between; margin-top: 4px; } .b20-sec.escape .rate { font-size: .66rem; color: #ffb09a; }
+.b20-sec.escape.hot { box-shadow: 0 0 calc(14px * var(--pulse, 1)) rgba(255,90,58,.8); }
+.b20-sec.escape.full { opacity: .75; } .b20-sec.escape.full .bar.esc > div { background: #5a2a22; }
+.b20-chip.hold.on { border-color: var(--good); color: #dff0c8; background: rgba(60,90,44,.55); }
+
+/* Kế Sách: 3 Kế Sách Lớn; mục của pha hiện tại đầy đủ (kiểu .ks của B15), mục khác một dòng */
+.b20-sec.ksl { background: none; border: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.hud-b20 .ks.mini { flex-direction: row; align-items: baseline; gap: 6px; padding: 3px 8px; font-size: .66rem; border-left-width: 3px; opacity: .92; }
+.hud-b20 .ks.mini b { font-size: .7rem; flex: 1; line-height: 1.15; }   /* xuống dòng thay vì cắt "Nghi binh lúc triều…" (review B20) */ .hud-b20 .ks.mini span { color: var(--muted); white-space: nowrap; }
+.hud-b20 .ks.mini em { font-style: normal; color: var(--muted); font-size: .6rem; }
+.hud-b20 .ks.khoa { border-left-color: #5a4838; opacity: .7; } .hud-b20 .ks.khoa b { color: var(--muted); }
+.hud-b20 .ks.thanhcong b::before { content: "✓ "; color: var(--good); } .hud-b20 .ks.thatbai b::before { content: "✗ "; color: var(--bad); }
+.b20-sec.rally { border-color: var(--vang); background: rgba(155,45,32,.82); animation: pulse .8s infinite alternate; } .b20-sec.rally .sub { color: var(--vang2); font-size: .7rem; }
+
+/* ---- thanh boss ---- */
+.b20-boss { position: absolute; left: 50%; top: 126px; transform: translateX(-50%); width: 460px; padding: 5px 12px 6px; background: linear-gradient(rgba(34,28,24,.9), rgba(21,18,16,.88));
+  border: 1px solid #6b4f2e; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,.45); }
+.b20-boss[hidden] { display: none; }
+.b20-boss .bn { display: flex; align-items: baseline; gap: 8px; } .b20-boss .bn b { font-family: var(--serif); font-weight: 900; font-size: 1rem; letter-spacing: .1em; color: #ffb09a; text-transform: uppercase; }
+.b20-boss .bn span { font-family: var(--serif); color: var(--vang); font-size: .9rem; } .b20-boss .bn small { margin-left: auto; font-size: .68rem; color: var(--muted); }
+.b20-boss .bhp { position: relative; height: 14px; margin-top: 4px; background: rgba(0,0,0,.7); border: 1px solid #5a4838; border-radius: 4px; overflow: hidden; }
+.b20-boss .bhp .bf { height: 100%; background: linear-gradient(#e0543a, #9b2d20); transition: width .2s; }
+.b20-boss .bhp .block { position: absolute; top: -1px; bottom: -1px; width: 3px; margin-left: -1.5px; background: var(--vang2); box-shadow: 0 0 5px rgba(255,210,122,.9); }
+.b20-boss .bhp .block[hidden] { display: none; }
+.b20-boss .bhp span { position: absolute; inset: 0; font-size: .66rem; line-height: 14px; text-align: center; }
+.b20-boss .bpo { height: 5px; margin-top: 3px; background: rgba(0,0,0,.7); border-radius: 3px; overflow: hidden; } .b20-boss .bpo > div { height: 100%; background: linear-gradient(90deg, #c9a14a, #ffe7a0); transition: width .2s; }
+.b20-boss .bpips { position: absolute; right: 12px; bottom: 7px; display: flex; gap: 3px; } .b20-boss .bpips i { width: 8px; height: 8px; transform: rotate(45deg); border: 1px solid var(--vang); } .b20-boss .bpips i.done { background: var(--vang); }
+.b20-boss .bhint { margin-top: 3px; font-size: .7rem; color: var(--muted); text-align: center; min-height: 1em; }
+.b20-boss.locked { border-color: var(--vang); box-shadow: 0 0 0 1px var(--vang), 0 0 16px rgba(255,210,122,.45); } .b20-boss.locked .bhp { border-color: var(--vang2); }
+.b20-boss.locked .bhp .bf { background: linear-gradient(#ffd27a, #c9a14a); } .b20-boss.locked .bhint { color: var(--vang2); }
+.b20-boss.broken .bhint { color: #1d1a17; background: linear-gradient(90deg, transparent, #ffd27a 20%, #ffd27a 80%, transparent); font-weight: 900; font-family: var(--serif); letter-spacing: .08em; font-size: .8rem; animation: pulse .5s infinite alternate; }
+.b20-boss.captured { opacity: .9; } .b20-boss.captured .bhp .bf { background: #5a4838; } .b20-boss.captured .bhint { color: var(--good); font-family: var(--serif); font-weight: 900; letter-spacing: .2em; font-size: .9rem; }
+.b20-boss-target .hud-target { display: none; }
+.hud-picker:not([hidden]) ~ .b20-boss { display: none; }           /* bảng Đò chuyển mở: thanh boss nhường chỗ */
+.b20-boss .bn b, .b20-boss .bn span { white-space: nowrap; }
+/* thanh boss đang hiện: băng chữ giữa màn (fx-banner, top 24%) hạ xuống dưới thanh boss cho khỏi đè (D2b) */
+.hud-b20.b20-bossing .fx-banner { top: 214px; }
+
+/* ---- nhắc Tương tác: phím trong vòng giữ ---- */
+.hud-b20 .hud-prompt { bottom: 158px; font-size: .9rem; padding: 4px 16px 4px 4px; }
+.hud-b20 .hud-prompt svg { width: 38px; height: 38px; }
+.hud-b20 .hud-prompt::before { content: attr(data-key); position: absolute; left: 4px; top: 4px; width: 38px; height: 38px; display: grid; place-items: center;
+  font: 900 .95rem var(--serif); color: var(--vang2); }
+.hud-b20 .hud-prompt.full::before { color: #fff; }
+
+/* nhắc "Gọi đò" lúc đang giao chiến (director: interact.quiet): nhỏ, mờ, góc phải trên cụm chiêu — không chiếm giữa màn trên đầu tướng */
+.hud-b20 .hud-prompt.quiet { left: auto; right: 18px; bottom: 214px; transform: none; font-size: .72rem; padding: 2px 10px 2px 2px; opacity: .8; border-color: rgba(241,217,138,.45); }
+.hud-b20 .hud-prompt.quiet svg { width: 26px; height: 26px; }
+.hud-b20 .hud-prompt.quiet::before { left: 2px; top: 2px; width: 26px; height: 26px; font-size: .72rem; }
+.b20.touchmode .hud-b20 .hud-prompt.quiet { right: 186px; bottom: 290px; }          /* cảm ứng: cạnh trái nút Tương tác, không đè nút Né */
+/* khung mục tiêu ẩn khi ngồi đò / leo, mục tiêu khoá ở xa quá 25 m (hud-b20 targetVis) */
+.hud-b20.b20-notarget .hud-target { display: none; }
+/* màn thắng / thua: HUD và nút cảm ứng ẩn sau bảng (trước đây nhắc giữ phím, bộ đếm liên hoàn lòi ra hai bên bảng) */
+.b20:has(> .overlay.on .panel.end) > .hud, .b20:has(> .overlay.on .panel.end) > .touch { visibility: hidden; }
+
+/* ---- bảng Đò chuyển: bên trái giữa màn (không che tướng ở giữa) ---- */
+.hud-picker.b20-ferry { width: 400px; left: 18px; top: 48%; transform: translateY(-50%); }
+.hud-picker .pk-ic { grid-row: 1 / 3; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; background: rgba(47,93,98,.55); border: 1px solid #5fa6a088; font-style: normal; }
+.hud-picker .pk-ic svg { width: 30px; height: 30px; }
+.hud-picker .pk-ic .f { fill: #c9a14a; stroke: #1d1a17; stroke-width: 1; } .hud-picker .pk-ic .f2 { fill: #9b2d20; stroke: #1d1a17; stroke-width: 1; }
+.hud-picker .pk-ic .s { fill: none; stroke: #f1d98a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; } .hud-picker .pk-ic .w { fill: none; stroke: #9fd6cf; stroke-width: 1.5; }
+.hud-picker button[data-kind=flagship] .pk-ic, .hud-picker button[data-kind=ship] .pk-ic, .hud-picker button[data-kind=escort] .pk-ic { background: rgba(155,45,32,.4); border-color: #c0392b88; }
+.hud-picker button[data-kind=captured] .pk-ic { background: rgba(201,161,74,.3); border-color: var(--vang); }
+
+/* ---- nút cảm ứng Tương tác của B20: vòng giữ (không dùng ảnh cuộn Kế Sách, khỏi lẫn) ---- */
+.b20 .touch [data-b=interact] img { display: none; }
+.b20 .touch [data-b=interact]::before { content: "✋"; position: absolute; left: 0; right: 0; top: 13px; text-align: center; font-size: 1.3rem; line-height: 1; }
+.b20 .touch [data-b=interact] { background: radial-gradient(circle, rgba(47,93,98,.75) 55%, rgba(21,18,16,.7) 57%); box-shadow: inset 0 0 0 3px rgba(255,210,122,.35); }
+.b20 .touch [data-b=interact] em { margin-top: 62%; font-size: .6rem; }
+
+/* ---- điện thoại ngang (844 × 390): cột phải gọn (bỏ dòng phụ, Kế Sách chỉ còn mục đang chạy), cụm nút cảm ứng hạ xuống
+   sát đáy cho cột phải khỏi đè nút, nút Tương tác đặt cạnh cụm (gần nhắc giữ phím), tin nhắn lên góc trái trên ---- */
+@media (max-width: 860px) {
+  .b20-tide { padding: 2px 5px 3px; } .b20-tide .bt-l b { font-size: .6rem; letter-spacing: .06em; } .b20-tide .bt-v { font-size: .8rem; } .b20-tide .bt-n { font-size: .6rem; }
+  .hud-b20 .hud-ks { top: 72px; right: 6px; transform: scale(.72); transform-origin: top right; }
+  .hud-b20 .b20-sec .sub:not(.warn), .hud-b20 .gapbar s { display: none; } .hud-b20 .gapbar { margin-bottom: 3px; }
+  .hud-b20 .ks.mini { display: none; } .hud-b20 .ks i { display: none; }
+  /* thanh boss một dòng gọn sát dưới hàng Hào Khí (tên + Sinh lực + Phá Thế), gợi ý chỉ khi Vỡ Thế / khóa — trước đây cùng nhắc giữ
+     phím ép tướng và boss vào ~60 px (review B20) */
+  .b20-boss { top: 60px; width: 300px; padding: 2px 8px 3px; transform: translateX(-50%); border-radius: 7px; }
+  .b20-boss .bn small, .b20-boss .bpips { display: none; } .b20-boss .bn b { font-size: .72rem; } .b20-boss .bn span { font-size: .7rem; }
+  .b20-boss .bhp { height: 9px; margin-top: 1px; } .b20-boss .bhp span { font-size: .55rem; line-height: 9px; } .b20-boss .bpo { height: 3px; margin-top: 2px; }
+  .b20-boss .bhint { display: none; } .b20-boss.broken .bhint, .b20-boss.locked .bhint, .b20-boss.captured .bhint { display: block; margin-top: 1px; font-size: .6rem; }
+  .hud-b20.b20-bossing .fx-banner { top: 112px; font-size: 1.2rem; }
+  .hud-b20 .hud-prompt { bottom: 8px; font-size: .78rem; }               /* nhắc giữ phím ở đáy giữa, giữa cần điều khiển và cụm nút */
+  .hud-b20 .hud-prompt.quiet, .b20.touchmode .hud-b20 .hud-prompt.quiet { right: auto; left: 50%; bottom: 8px; transform: translateX(-50%); }
+  .hud-picker.b20-ferry { width: 340px; left: 8px; top: 52%; transform: translateY(-50%) scale(.8); transform-origin: left center; padding: 6px 10px; gap: 4px; }
+  .b20.touchmode .touch .tbtns { bottom: 12px; }
+  .b20.touchmode .touch [data-b=interact] { right: 262px; bottom: 0; }
+  .b20.touchmode .touch .stick { left: 74px; bottom: 14px; }             /* cần điều khiển tránh cột nút hệ thống bên trái */
+  /* tin nhắn: 2 tin mới nhất, mỗi tin ≤ 2 dòng, góc trái trên (trên cột nút hệ thống) — 4 tin cũ phủ gần 1/3 màn */
+  .hud-b20 .hud-msgs .msg:nth-last-child(n+3) { display: none; }
+  .hud-b20 .hud-msgs .msg { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; max-height: calc(2.6em + 10px); }   /* (max-height: dòng thứ ba không lòi xuống phần đệm) */
+  .b20.touchmode .hud-msgs, .hud-b20 .hud-msgs { left: 8px; top: 6px; width: 236px; font-size: .78em; }
+}
+@media (max-height: 450px) {
+  .b20.touchmode .hud-combo { top: 26%; right: auto; left: 74px; text-align: left; }   /* bộ đếm liên hoàn: không đè nút N, không bị cắt */
+  .b20.touchmode .hud-combo b { font-size: 2rem; }
+}
+/* điện thoại dọc: trận B20 cần màn ngang (bảng chồng nhau ở 390 × 844) */
+@media (orientation: portrait) and (max-width: 600px) {
+  .stage.b20::after { content: "Xoay ngang điện thoại để chơi trận Bạch Đằng"; position: absolute; inset: 0; z-index: 60; display: grid; place-items: center;
+    padding: 32px; text-align: center; background: rgba(21,18,16,.94); color: var(--vang2); font: 900 1.15rem/1.5 var(--serif); letter-spacing: .06em; }
+}

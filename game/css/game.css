@@ -29,6 +29,7 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; }
   background: radial-gradient(ellipse at 10% 0, rgba(155,45,32,.25), transparent 60%); }
 .brand h1 { font-size: 1.9rem; letter-spacing: .12em; margin: 0; color: var(--vang2); text-shadow: 0 2px 0 #000; }
 .brand p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+@media (max-width: 420px) { .brand h1 { font-size: 1.3rem; letter-spacing: .06em; white-space: nowrap; } }   /* điện thoại dọc: tên game không gãy dòng */
 .purse { display: flex; gap: 8px; }
 .chip { display: flex; flex-direction: column; align-items: center; min-width: 78px; padding: 6px 10px; background: var(--then2); border: 1px solid #4a3b2e; border-radius: 8px; font-weight: 700; font-size: 1.05rem; }
 .chip small { font-weight: 400; font-size: .7rem; color: var(--muted); }
@@ -335,3 +336,40 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 /* nút cảm ứng thêm cho tướng có ô kỹ năng thứ hai, trận có Tương tác */
 .touch [data-b=skill2] { width: 54px; height: 54px; right: 236px; bottom: 70px; }
 .touch [data-b=interact] { width: 64px; height: 64px; right: 96px; bottom: 170px; border-color: #ffd27a; }
+/* ---- đợt 9 D5: màn kết quả trận ngoài thang R (B20: ui/result-b20.js), dòng Hiến kế ở Sử quán ---- */
+.results .rb20 h4 { font-size: .9rem; margin: .2em 0 .5em; }
+.results .grid2.rb20 { margin-bottom: 14px; } .results .grid2.rb20 > .card { margin-bottom: 0; }
+.rb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rb-list li { display: flex; gap: 8px; align-items: flex-start; font-size: .86rem; }
+.rb-list li b { display: block; font-weight: 600; color: var(--trung); } .rb-list li.ok b { color: var(--vang2); }
+.rb-list li small { display: block; font-size: .74rem; color: var(--muted); line-height: 1.35; }
+.rb-tick { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: .72rem; font-weight: 900; margin-top: 1px; }
+.rb-tick.ok { background: #3c5a2c; color: #dff0c8; } .rb-tick.no { background: #2e2620; color: #8a7a6a; border: 1px solid #4a3b2e; }
+.rb-ks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rb-ks li { border-left: 3px solid #5a4838; background: rgba(0,0,0,.18); border-radius: 0 6px 6px 0; padding: 6px 10px; }
+.rb-ks li.ks-thanhcong { border-left-color: var(--good); } .rb-ks li.ks-thatbai { border-left-color: var(--bad); }
+.rb-ksh { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; } .rb-ksh b { font-family: var(--serif); color: var(--vang2); font-size: .9rem; }
+.rb-state { font-size: .74rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.ks-thanhcong .rb-state { color: var(--good); } .ks-thatbai .rb-state { color: var(--bad); }
+.rb-ks small { display: block; font-size: .74rem; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.rb-plan { font-style: normal; color: var(--vang); border: 1px solid #6b4f2e; border-radius: 3px; padding: 0 5px; }
+.rb-chip { display: inline-block; font-size: .72rem; padding: 0 6px; border-radius: 3px; margin: 1px 2px 1px 0; background: #2e2620; color: var(--muted); border: 1px solid #4a3b2e; white-space: nowrap; }
+.rb-chip.m-active { background: #3c5a2c; color: #dff0c8; border-color: #5b7a44; } .rb-chip.m-exposed { background: #5a2016; color: #ffc6b4; border-color: #8a3a2a; }
+.results small.bad, .rb20 small.bad { color: var(--bad); }
+.rb20 table.stat td small { color: var(--muted); font-size: .74rem; }
+.sq-council { margin: 8px 0 0; }
+.card.battle .wiptag { white-space: nowrap; }
+@media (max-width: 860px) {
+  .results.fixed { padding: 16px 12px; } .results.fixed h1 { font-size: 1.5rem; } .results.fixed .rank-seal { width: 84px; height: 84px; font-size: 3rem; }
+  .results.fixed .row.center { flex-wrap: wrap; }
+}
+/* bảng mặt trận rỗng (trận không có mặt trận, vd B20: frontsHTML trả "") thì ẩn hẳn, không để một khung trống */
+.fronts:empty { display: none; }
+/* Binh Thư Yếu Lược (H31): ảnh cuộn binh thư (kesach) ghép vòng ngắm đỏ — đánh dấu mục tiêu — cho khỏi lẫn với nút Kế Sách */
+.sk[data-skill=binhThu] .ico, .sk[data-skill=binhThu].ready .ico { filter: sepia(.35) hue-rotate(-18deg) saturate(1.25); }
+.sk[data-skill=binhThu]:not(.ready) .ico { filter: sepia(.35) hue-rotate(-18deg) saturate(.7) brightness(.8); }
+.sk[data-skill=binhThu]::after, .touch .sk-binhThu::after { content: ""; position: absolute; left: 50%; top: 42%; width: 24px; height: 24px; transform: translate(-50%, -50%); border-radius: 50%;
+  border: 2px solid #ff6a4a; box-shadow: 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.5); pointer-events: none;
+  background: radial-gradient(circle, #ff6a4a 0 2.5px, transparent 3px), linear-gradient(#ff6a4a, #ff6a4a) center/2px 100% no-repeat, linear-gradient(#ff6a4a, #ff6a4a) center/100% 2px no-repeat;
+  -webkit-mask: radial-gradient(circle, #000 0 3px, transparent 3.5px 7px, #000 7.5px); mask: radial-gradient(circle, #000 0 3px, transparent 3.5px 7px, #000 7.5px); }
+.touch .sk-binhThu::after { top: 38%; width: 22px; height: 22px; }

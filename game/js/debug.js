@@ -2,8 +2,10 @@
 //   __start()               vào trận từ Doanh trại
 //   __hk.advance(s, bot)    tua s giây logic trận (không cần requestAnimationFrame)
 //   __bot(target, opts)     bot chơi thay người (xem dưới); target là điểm {x, z} hoặc hàm (ctx) → điểm
-//   __objective(ctx)        mục tiêu theo pha: A1 → A2 → cổng bắc → Toa Đô
-//   __state()               ảnh chụp gọn trạng thái trận
+//   __objective(ctx)        mục tiêu theo pha: A1 → A2 → cổng bắc → Toa Đô (B20 Bạch Đằng: chuyển sang __objectiveB20)
+//   __objectiveB20(ctx)     B20: việc theo pha (thế đứng thuyền nhẹ, cứu thuyền bị áp mạn, đò chặn thuyền dò, chiếm hộ vệ, mở mốc
+//                           cọc, Lệnh Kế Sách, Giữ vững cửa nhánh, Phàn Tiếp, kỳ hạm + cầu thang, Tổng Phản Công ở pha 6) — xem dưới
+//   __state()               ảnh chụp gọn trạng thái trận (B20: battles/b20.js debug.state)
 //   __botDbg                bot đang chạy: việc đang làm (mode), mục tiêu (tgt), bộ đếm phản đòn / đỡ / né / Tuyệt Kỹ…,
 //                           time: giây trận dồn theo "pha + việc" (biết bot tốn thời gian ở đâu)
 //
@@ -111,9 +113,14 @@ function smartBot(getTarget, opts) {
   const dbg = window.__botDbg = { mode: "", tgt: "", parry: 0, dodgeRed: 0, block: 0, dodgeArrow: 0, dodgeHeavy: 0, ult: 0, skill: 0,
     orders: 0, heal: 0, unstick: 0, missed: 0, time: {} };
 
+  let lastFerry = -9;                  // B20: lần gọi đò gần nhất (đồng hồ trận)
   return (c) => {
     const h = c.hero, inp = c.input, d = c.director, crowd = c.crowd, sim = c.sim, now = c.clock, P = inp.pressed;
     inp.touchHeld.block = false; inp.touchHeld.cmd = false;
+    // B20 Bạch Đằng: lớp thủy chiến (ctx.naval) — địch trên thuyền khác (không có ván / cửa nối) không tới được; Tương tác giữ X
+    // do mục tiêu B20 quyết (__objectiveB20: obj.hold) nên mỗi khung thả trước. B15 không vào nhánh nào có b20.
+    const b20 = c.battle?.id === "B20" ? c.naval : null;
+    if (b20) inp.touchHeld.interact = false;
     if (!h.alive || d.over) { inp.setStick(0, 0); return; }
 
     // ---- tiện ích --------------------------------------------------------------------------------
@@ -130,12 +137,16 @@ function smartBot(getTarget, opts) {
     // thời gian trận dành cho từng việc (theo đồng hồ trận): biết bot tốn thời gian ở đâu
     if (dbg.mode && lastNow >= 0) { const k = "P" + (d.phase + 1) + " " + dbg.mode.replace(/ \(.*\)$/, ""); dbg.time[k] = (dbg.time[k] || 0) + (now - lastNow); }
     lastNow = now;
+    // B20: đang ngồi đò / leo boong — không điều khiển được, chờ
+    if (b20 && (h.state === "ride" || h.state === "climb")) { inp.setStick(0, 0); if (d.ferryPick) d.ferryPick = null; mode(h.state === "ride" ? "ngồi đò" : "leo boong"); return; }
+    const reach = b20 ? reachFn(b20, h) : null;
 
     const foes = [];
-    for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a)) { const dd = dist(a); if (dd < 70) foes.push({ a, d: dd }); }
+    for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a) && (!reach || reach(a))) { const dd = dist(a); if (dd < 70) foes.push({ a, d: dd }); }
     foes.sort((p, q) => p.d - q.d);
     const bigs = [];
-    for (const u of c.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating) bigs.push({ u, d: dist(u) });
+    // (B20: đơn vị lớn ở tầng khác — Ô Mã Nhi trên lầu chỉ huy khi tướng ở boong dưới — chém không tới: bỏ, mục tiêu dẫn lên cầu thang)
+    for (const u of c.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating && (!reach || (!u.script && reach(u) && Math.abs(u.y - h.y) < 1.8))) bigs.push({ u, d: dist(u) });
     bigs.sort((p, q) => p.d - q.d);
     const count = (r, f) => { let n = 0; for (const o of foes) { if (o.d >= r) break; if (!f || f(o.a)) n++; } return n; };
 
@@ -218,7 +229,7 @@ function smartBot(getTarget, opts) {
     }
 
     // ---- 2. Mệnh Lệnh (một khung giữ vòng lệnh) ------------------------------------------------------
-    if (on("orders") && now - lastOrder > 1 && !lockUsed && free) {
+    if (!b20 && on("orders") && now - lastOrder > 1 && !lockUsed && free) {
       const cmd = pickOrder(c, reinfUsed);
       if (cmd) {
         const hf = sim.heroFront || d.lastFront;
@@ -229,11 +240,26 @@ function smartBot(getTarget, opts) {
     }
 
     // ---- 3. Tổng Phản Công, Kế Sách -----------------------------------------------------------------
-    if (on("tpc") && !c.hk.tpc && c.hk.value >= 100) P.tpc = true;
+    if (!b20 && on("tpc") && !c.hk.tpc && c.hk.value >= 100) P.tpc = true;
     if (on("kesach") && d.keSach.list.some((k) => k.state === "sansang")) P.kesach = true;
 
     // ---- 4. mục tiêu -----------------------------------------------------------------------------
     const obj = typeof getTarget === "function" ? getTarget(c) : getTarget;
+    // B20: việc của mục tiêu — Tổng Phản Công đúng lúc (obj.tpc), Lệnh Kế Sách (G), giữ X (chiếm thuyền, mở mốc), gọi đò
+    // (director.ferryTo: bảng chọn nơi đến là việc của người, bot gọi thẳng), Mệnh Lệnh cho cánh thủy quân (obj.order)
+    if (b20) {
+      if (on("tpc") && obj.tpc && !c.hk.tpc && c.hk.value >= 100) P.tpc = true;
+      if (on("kesach") && obj.kesach) P.kesach = true;
+      if (d.ferryPick) d.ferryPick = null;              // bảng chọn tự mở (vừa mở mốc): đóng, bot gọi đò thẳng
+      if (on("orders") && obj.order && now - lastOrder > 1) { d.order(obj.order.wing, obj.order.id); lastOrder = now; dbg.orders++; }
+      if (obj.hold && !d.needRelease) inp.touchHeld.interact = true;
+      const busy = count(3.4) > 0 || bigs.some((o) => o.d < 4.5 && o.u.awake);
+      if (obj.ferry && free && (!busy || obj.urgent) && now - lastFerry > 2.5 && !b20.ferries.some((f) => !f.done)) {
+        dropLock();
+        if (d.ferryTo(obj.ferry)) { lastFerry = now; dbg.ferry = (dbg.ferry || 0) + 1; inp.setStick(0, 0); mode("gọi đò → " + obj.ferry); return; }
+      }
+      dbg.b20 = obj.why || "";
+    }
     const L0 = Math.hypot(obj.x - h.x, obj.z - h.z);
     let baseId = null, gateId = null;
     for (const id in sim.bases) {
@@ -249,7 +275,7 @@ function smartBot(getTarget, opts) {
     const gar = src ? foes.filter((o) => o.a.role === "garrison" && o.a.src === src) : [];
     const garAll = src ? crowd.agents.some((a) => a.role === "garrison" && a.src === src && crowd.hittable(a)) : false;
     const ready = !!B && B.G < 1 && !garAll && !B.keeperAlive;
-    const boss = obj.isBig ? obj : null;
+    const boss = obj.isBig ? obj : (b20 && obj.boss) || null;
     // Kế Sách "Cờ áo Tống": toán giữ bờ (lính + Đội trưởng) chặn thuyền — mục tiêu { ks: true, ref } là người giữ bờ
     // __objective đã chọn (toán tây nhất trước). Đánh đúng người đó, không đánh "người giữ bờ gần nhất": người gần nhất
     // thường ở toán phía đông, bot chạy qua lại giữa hai toán (mục tiêu xa > 30 m thì chỉ chạy) mà không hạ được ai.
@@ -305,7 +331,7 @@ function smartBot(getTarget, opts) {
     const hunting = (a) => a.K.ranged && (a.fleeT || 0) <= 0;
     // xa mục tiêu thì chỉ chạy — trừ khi quân đồn trú của chính mục tiêu đang ở quanh (cung kỵ thả diều kéo tướng ra
     // ngoài 30 m: trước đây bot lượn qua lại ở mép 30 m, lúc săn lúc quay về, mất 10–20 s)
-    if (L0 > ENGAGE && !boss && !(gar.length && L0 < 75)) {
+    if (L0 > ENGAGE && !boss && !(gar.length && L0 < 75) && !(b20 && obj.clear)) {
       // đi đường: chỉ đánh khi bị kẹt giữa đám đông
       if (adj.length >= 3) { tgt = adj[0].a; why = "mở đường"; }
     } else if (boss) {
@@ -337,6 +363,12 @@ function smartBot(getTarget, opts) {
         // quân đồn trú còn sót: cung kỵ trước (hay thả diều ngoài vòng), rồi người gần nhất
         const rg = gar.find((o) => o.a.K.ranged && o.d < 30);
         tgt = (rg || gar[0]).a; why = "săn đồn trú";
+      }
+      else if (b20 && obj.clear && (foes.length || bigs.length)) {
+        // B20: dọn boong (lính, trấn thủ / Đội trưởng) trong obj.clear m, chỉ kẻ tới được (cùng boong hoặc qua ván / cửa)
+        const f = foes[0], g = bigs[0];
+        if (g && g.d < obj.clear && (!f || g.d <= f.d + 3)) { tgt = g.u; why = "B20: sĩ quan"; }
+        else if (f && f.d < obj.clear) { tgt = f.a; why = "B20: dọn boong"; }
       }
       else if (foes.length && foes[0].d < (gateId ? 6 : 9)) { tgt = foes[0].a; why = "dọn"; }
     }
@@ -399,6 +431,13 @@ function smartBot(getTarget, opts) {
     }
     // Đi tới (x, z): tránh nhặt thuốc khi máu còn cao, gỡ kẹt, lộn liên tiếp khi đi xa.
     function travel(x, z, L, roll) {
+      // B20: đích ở boong khác (hoặc dưới bùn) — đi qua cửa đầu tiên (ván bắc, ván xích, ván dốc; naval.route), vượt ngưỡng
+      // 2,5 m cho bước hẳn sang; trên boong không lộn (lộn liên tiếp trên boong hẹp đâm lan can)
+      if (b20) {
+        const w = b20.route(h, null, x, z);
+        if (w) { const ex = w.x - h.x, ez = w.z - h.z, n0 = Math.hypot(ex, ez) || 1; x = w.x + ex / n0 * 2.5; z = w.z + ez / n0 * 2.5; L = Math.hypot(x - h.x, z - h.z); }
+        if (h.deck) roll = false;
+      }
       // tường tây Hàm Tử quan: mục tiêu ở bên kia tường thì đi qua cổng đã mở gần nhất (trước đây bot đâm thẳng vào
       // tường khi đuổi Toa Đô từ chỗ khác ngoài cổng, kẹt hơn 2 phút và mất một lần Gượng dậy)
       const gs = c.world.gates;
@@ -445,6 +484,19 @@ function faces(u, t, halfArc) {
 // Phá Trận sẵn sàng (H35). Tướng có ô 1 khác (H31 Hịch Tướng Sĩ — đứng đọc 3 s) không dùng các nhánh lao Phá Trận của bot.
 function skillReady(h) { if (h.def && h.def.skills?.sk1 !== "phaTran") return false; return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
 
+// B20: vật o tới được bằng chân từ chỗ tướng đứng — cùng boong (hoặc cùng dưới đất / bùn), hoặc có đường qua cửa (ván bắc, ván
+// xích, ván dốc, cầu bến; naval._firstDoor). Nhớ theo boong trong khung.
+function reachFn(nav, h) {
+  const hd = h.deck || null, memo = new Map();
+  return (o) => {
+    const od = o.deck || null;
+    if (od === hd) return true;
+    let r = memo.get(od);
+    if (r === undefined) { r = !!nav._firstDoor(hd, od); memo.set(od, r); }
+    return r;
+  };
+}
+
 // Tên của địch sẽ trúng tướng trong 0,3 s tới (giả sử tướng đứng yên): thời gian + vận tốc tên. Luật trúng như
 // crowd.updateArrows: cách ngang < 0,9 m, lệch cao < 1,3 m so với ngực, và tên phải trúng được tướng (heroMult > 0: nhắm
 // tướng hoặc tên lạc — đợt 9; tên nhắm người khác ở xa bay qua người tướng không trúng nên không né).
@@ -490,6 +542,7 @@ function pickOrder(c, reinfUsed) {
 const OBJ_OFF = window.__objectiveOff = { ks: false, b2: false };
 const B2_TRIP = new WeakMap();     // director → đã quyết sang B2 (trạng thái của bot, không ghi lên director của trận)
 window.__objective = (c) => {
+  if (c.battle?.id === "B20") return window.__objectiveB20(c);   // B20: mục tiêu theo pha riêng (dưới)
   const d = c.director, w = c.world.bases, sim = c.sim, h = c.hero;
   if (d.phase === 0) return w.A1;
   if (d.phase === 1 || d.phase === 2) {
@@ -511,8 +564,176 @@ window.__objective = (c) => {
   return d.boss && d.boss.alive ? d.boss : { x: 528, z: -40 };
 };
 
+// ---- B20 Bạch Đằng (đợt 9 pha D4): mục tiêu theo pha cho bot ---------------------------------------------------------------------
+// Trả { x, z, why, clear (m: dọn địch tới được trong tầm), hold (giữ X: chiếm thuyền / mở mốc — khi Tương tác đầu danh sách là
+// việc ấy), ferry (id nơi đến cho director.ferryTo), urgent (gọi đò cả khi đang bị áp sát), boss (đơn vị lớn phải đánh), order
+// ({ wing, id } Mệnh Lệnh cho cánh thủy quân), kesach (bấm G), tpc (được kích Tổng Phản Công) }. Việc theo pha:
+//   P1  thế đứng đoàn thuyền nhẹ: Tiến công (áp 16 m, khiêu chiến) tới khi Khiêu khích đầy, rồi Giữ vững (28 m, trong dải 15–40);
+//       thuyền tiên phong áp mạn: đánh trên thuyền mình; áp thuyền nhẹ khác mà còn lính địch trên boong thì đò sang dọn (gấp nhất
+//       trước — lossT lớn nhất), thuyền mình còn địch thì chỉ đi khi thuyền kia sắp mất (> urgentLoss s).
+//   P2  thuyền dò luồng đang tới bè của mốc còn ẩn: đò chặn (director dừng nó 12 s) rồi hạ Đội trưởng; không có thì hộ vệ gần
+//       nhất: đò sang, dọn thủy thủ, hạ trấn thủ, giữ X 3 s chiếm.
+//   P3  đang trên bè mốc ẩn: dọn toán dò luồng rồi giữ X 5 s mở mốc; thuyền dò đang tới mốc ẩn: chặn; không thì đò tới bè của toán
+//       sắp tới sớm nhất (theo lịch SQUADS). Đủ 2 mốc: cửa sổ Kế Sách còn > 40 s thì đi mở mốc thứ ba (3/3, nhiệm vụ phụ), không thì G.
+//   P4  Giữ vững cho một cánh thuyền phục (luân phiên, liên tục khi hết hồi); hộ vệ đang chạy xa nhất về phía cửa sông trước (đò
+//       chặn → dừng), rồi hộ vệ mắc cọc / chờ rời khối; chiếm như pha 2.
+//   P5  thuyền chỉ huy Phàn Tiếp: có đường đi bộ (bùn, ván dốc, ván xích) thì đi, không thì đò; đánh Phàn Tiếp tới Vỡ Thế → Đòn Quyết.
+//   P6  kỳ hạm: đò / đi bộ lên boong dưới, Tổng Phản Công khi đã lên kỳ hạm; Ô Mã Nhi lui lên lầu thì dọn toán giữ cầu thang, vòng
+//       qua cột buồm chính lên lầu, đánh tới Sinh lực khóa 10% → Vỡ Thế → Đòn Quyết "Bắt sống".
+// Tắt việc phụ: window.__objectiveOff.b20Stakes3 = false (đủ 2 mốc là bấm G ngay), .b20Vg = true (không đi cứu thuyền nhẹ).
+const B20_MEM = new WeakMap();      // director → trí nhớ của bot (luân phiên cánh Giữ vững…)
+const B20_OPS = { urgentLoss: 18, clear: 28 };
+window.__objectiveB20 = (c) => {
+  const d = c.director, h = c.hero, st = c.sim, nav = c.naval, crowd = c.crowd;
+  let M = B20_MEM.get(d); if (!M) B20_MEM.set(d, (M = { holdN: 0 }));
+  const dist = (o) => Math.hypot(o.x - h.x, o.z - h.z);
+  const on = (b) => !!b && !!h.deck && h.deck === b.deck;
+  const alive = (u) => !!u && u.alive && !u.dead && !u.captured && u.dead !== true;
+  const reach = reachFn(nav, h);
+  const foesOn = (...D) => { let n = 0; for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a) && a.deck && D.includes(a.deck)) n++; return n; };
+  const it = nav.interactables(h)[0];
+  const hold = !!it && (it.kind === "capture" || it.kind === "marker");
+  let near = 0; for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a) && reach(a) && dist(a) < 8) near++;
+  // Tổng Phản Công: pha 6 khi đã tới kỳ hạm / gần Ô Mã Nhi; trước đó khi đang giáp chiến đông (Hào Khí đầy thì cứ dùng, pha 6 kịch bản
+  // đặt lại 100)
+  const x20 = d.bosses?.X20, fs = d.ships?.FS;
+  const tpc = d.phase === 5 ? on(fs) || (x20 && reach(x20) && dist(x20) < 12) : near >= 4 || Object.values(d.bosses || {}).some((u) => alive(u) && reach(u) && dist(u) < 12);
+  const base = { x: h.x, z: h.z, clear: B20_OPS.clear, hold, tpc };
+  const R = (o) => ({ ...base, ...o });
+  const pick = (list, key) => list.reduce((a, b) => (!a || key(b) < key(a) ? b : a), null);
+
+  if (d.phase === 0) {
+    // thế đứng
+    const k = st.ks.nghiBinh, n = st.nghi, want = k?.state === "khadung" ? "tiencong" : "giuvung";
+    const order = n.stance !== want && n.stanceCd <= 0 ? { wing: "flotilla", id: want } : null;
+    if (OBJ_OFF.b20Vg) return R({ order, why: "P1: thế đứng" });
+    // thuyền tiên phong áp mạn
+    const hb = h.deck?.boat;
+    let job = null;
+    for (const v of d.vg) {
+      if (v.state !== "grappled" || !v.target || v.target.lost) continue;
+      const T = v.target, pl = v.link?.plank, n2 = foesOn(T.deck, ...(pl ? [pl] : []));
+      if (on(T) || on(v.boat) || (pl && h.deck === pl)) { if (n2 || foesOn(v.boat.deck)) return R({ order, x: T.x, z: T.z, why: "P1: đánh lính tiên phong" }); continue; }
+      if (T.slot === 0 || !n2) continue;
+      if (!job || v.lossT > job.lossT) job = v;
+    }
+    if (job) {
+      const mine = hb ? foesOn(hb.deck) : 0;
+      if (!mine || job.lossT > B20_OPS.urgentLoss) return R({ order, ferry: job.target.id, urgent: job.lossT > B20_OPS.urgentLoss, why: "P1: cứu " + job.target.id });
+    }
+    return R({ order, why: "P1: giữ thuyền" });
+  }
+
+  // thuyền dò luồng đang tới bè của mốc còn ẩn (pha 2–3): chặn — đang ở trên thì hạ Đội trưởng
+  const scouts = (d.phase === 1 || d.phase === 2) ? d.scouts.filter((s) => s.state === "go" && alive(s.officer) && st.markers[s.target]?.state === "hidden") : [];
+  const onScout = scouts.find((s) => on(s.boat) || reach(s.officer));
+  if (onScout && !(h.deck?.raft && hold)) return R({ x: onScout.officer.x, z: onScout.officer.z, boss: null, why: "chặn thuyền dò " + onScout.target });
+
+  if (d.phase === 1) {
+    if (hold) return R({ why: "P2: chiếm hộ vệ" });
+    const mine = Object.values(d.esc).find((e) => !e.down && !e.gone && on(e.boat));
+    if (mine && (foesOn(mine.boat.deck) || alive(mine.officer))) return R({ x: mine.boat.x, z: mine.boat.z, why: "P2: dọn hộ vệ " + mine.id });
+    if (scouts.length) { const s = pick(scouts, (q) => dist(q.boat)); return R({ ferry: s.boat.id, urgent: true, why: "P2: đò chặn thuyền dò " + s.target }); }
+    if (mine) return R({ x: mine.boat.x, z: mine.boat.z, why: "P2: chờ chiếm " + mine.id });
+    const e = pick(Object.values(d.esc).filter((q) => !q.down && !q.gone && q.patrol), (q) => dist(q.boat));
+    if (e) return R({ ferry: e.id, why: "P2: đò tới hộ vệ " + e.id });
+    return R({ why: "P2: chờ" });
+  }
+
+  if (d.phase === 2) {
+    const k = st.ks.kichCoc, raft = h.deck?.raft ? nav.rafts.find((r) => r.id === h.deck.raft) : null;
+    const hidden = (id) => st.markers[id]?.state === "hidden";
+    if (k && k.state !== "khadung" && k.state !== "sansang") return R({ clear: 12, why: "P3: Kế Sách cọc đã chốt, chờ nước rút" });
+    // Đủ 2 mốc: G — trừ khi đang đứng trên bè thứ ba còn ẩn mà rảnh tay (mở nốt cho đủ 3/3, nhiệm vụ phụ)
+    // Đủ 2 mốc mà cửa sổ còn > 40 s: đò sang bè thứ ba (3/3 mốc là nhiệm vụ phụ S_STAKES3); đang trên bè đó thì mở nốt khi còn > 12 s
+    const s3 = OBJ_OFF.b20Stakes3 !== false;
+    const third = raft && hidden(raft.id) && s3 && k.left > 12;
+    // (chỉ khi chắc ăn: không thuyền dò nào đang nhắm bè ấy, toán dò của bè ấy còn > 14 s mới tới — không thì mốc dễ lộ, mất nhiệm vụ
+    // phụ "không để lộ mốc" mà vẫn không mở được)
+    const safe = (id) => !d.scouts.some((q) => q.state === "go" && q.target === id) && !d.squads.some((q) => q.id === id && (q.state === "on" || q.at - d.time < 14));
+    const goThird = s3 && k?.state === "sansang" && k.left > 40 && nav.rafts.some((r) => hidden(r.id) && safe(r.id));
+    if (k?.state === "sansang" && !third && !goThird) return R({ kesach: true, why: "P3: Lệnh Kế Sách" });
+    if (raft && hidden(raft.id)) return R({ x: raft.deck.m[9], z: raft.deck.m[11], clear: 16, why: "P3: mốc " + raft.id + (hold ? " (giữ X)" : "") });
+    if (k?.state === "sansang" && !goThird) return R({ kesach: true, why: "P3: Lệnh Kế Sách" });
+    // thuyền dò và toán dò luồng cùng lúc: chặn cái làm lộ mốc sớm hơn — thuyền dò lộ mốc khi chạm bè (giây = quãng / tốc độ), toán
+    // dò lộ mốc khi Đội trưởng đứng bè quá exposeSec s (giây = còn tới nơi + exposeSec − đã đứng). Trước đây luôn đuổi thuyền dò trước
+    // nên toán dò ở bè kia làm lộ mốc trong lúc tướng còn đánh trên thuyền dò (review B20, Quân sĩ 1001: Kích hoạt bãi cọc hỏng).
+    const sEta = (q) => { const r = nav.rafts.find((x) => x.id === q.target); return r ? Math.hypot(q.boat.x - r.deck.m[9], q.boat.z - r.deck.m[11]) / 4 : 99; };
+    const qEta = (q) => { const m = st.markers[q.id], ex = 10;                                    // STAKES[i].exposeSec
+      return q.state === "on" ? ex - (m.officerOnT || 0) : Math.max(0, q.at - d.time) + ex; };
+    const qUrgent = d.squads.filter((q) => hidden(q.id) && (q.state === "on" || q.state === "go") && alive(q.officer)).sort((a, b) => qEta(a) - qEta(b))[0];
+    const sFirst = scouts.length ? pick(scouts, (q) => sEta(q)) : null;
+    if (qUrgent && (!sFirst || qEta(qUrgent) < sEta(sFirst))) return R({ ferry: "raft:" + qUrgent.id, urgent: true, why: "P3: đò tới bè " + qUrgent.id + " (toán dò)" });
+    if (scouts.length) { const s = pick(scouts, (q) => dist(q.boat)); return R({ ferry: s.boat.id, urgent: true, why: "P3: đò chặn thuyền dò " + s.target }); }
+    // bè kế tiếp: toán dò luồng tới sớm nhất (chưa tới thì tới trước để mở luôn), không có toán thì bè ẩn gần nhất
+    const q = d.squads.filter((s) => s.state !== "skip" && s.state !== "done" && hidden(s.id)).sort((a, b) => a.at - b.at)[0];
+    const id = q ? q.id : pick(nav.rafts.filter((r) => hidden(r.id)), (r) => Math.hypot(r.deck.m[9] - h.x, r.deck.m[11] - h.z))?.id;
+    if (id) return R({ ferry: "raft:" + id, urgent: !!raft, why: "P3: đò tới bè " + id });
+    return R({ why: "P3: chờ" });
+  }
+
+  if (d.phase === 3) {
+    // Giữ vững cho cánh thuyền phục (luân phiên ba nhánh), nối liền khi hết hồi
+    const W = ["rut", "chanh", "gia"];
+    const holding = W.some((id) => st.wings[id].order?.id === "giuvung" && st.wings[id].order.left > 1);
+    const order = !holding && st.cooldowns.giuvung <= 0 ? { wing: W[M.holdN++ % 3], id: "giuvung" } : null;
+    if (hold) return R({ order, why: "P4: chiếm hộ vệ" });
+    const act = Object.values(d.esc).filter((e) => !e.down && !e.gone && (e.flee || e.stuck));
+    const mine = act.find((e) => on(e.boat));
+    if (mine && (foesOn(mine.boat.deck) || alive(mine.officer))) return R({ order, x: mine.boat.x, z: mine.boat.z, why: "P4: dọn hộ vệ " + mine.id });
+    if (mine) return R({ order, x: mine.boat.x, z: mine.boat.z, why: "P4: chờ chiếm " + mine.id });
+    // đang chạy (đã rời khối) xa nhất về phía cửa sông; không có thì hộ vệ gần nhất (mắc cọc / chờ rời khối)
+    const run = act.filter((e) => e.flee && !e.stuck && d.time >= (e.dep || 0));
+    const e = run.length ? run.reduce((a, b) => (b.boat.x > a.boat.x ? b : a)) : pick(act, (q) => dist(q.boat));
+    if (e) return R({ order, ferry: e.id, why: "P4: đò chặn hộ vệ " + e.id });
+    return R({ order, why: "P4: chờ" });
+  }
+
+  // P5 Phàn Tiếp, P6 Ô Mã Nhi
+  const u = d.phase === 4 ? d.bosses?.X24 : x20, b = d.phase === 4 ? d.ships?.PT : fs;
+  if (!b) return R({ why: "P" + (d.phase + 1) + ": chờ" });
+  // gỡ kẹt: 10 s đứng một chỗ (rảnh tay, chưa lên thuyền đích) dù có đường đi bộ (thân thuyền khác chắn, cửa lạ) → gọi đò tới thuyền đích
+  if (!M.st || Math.hypot(h.x - M.st.x, h.z - M.st.z) > 1.5 || h.state !== "free" || M.st.ph !== d.phase) M.st = { x: h.x, z: h.z, t: d.time, ph: d.phase };
+  if (d.time - M.st.t > 10 && h.deck !== b.deck) { M.forceFerry = d.time + 15; M.st.t = d.time; }
+  const way = !(M.forceFerry > d.time) && (h.deck === b.deck || !!nav._firstDoor(h.deck || null, b.deck));
+  if (!way) return R({ ferry: b.id, urgent: true, why: "P" + (d.phase + 1) + ": đò tới " + b.id });
+  // sát mạn thuyền đích dưới bùn (thân thuyền chắn đường tới ván dốc bên kia): giữ X 1 s lên boong
+  if (it && it.kind === "board" && it.deck === b.deck) return R({ x: b.x, z: b.z, hold: true, why: "P" + (d.phase + 1) + ": lên boong " + b.id });
+  if (!alive(u)) return R({ x: b.x, z: b.z, why: "P" + (d.phase + 1) + ": chờ" });
+  const D = b.deck;
+  if (d.phase === 5 && d.x20 && d.x20.st !== "deck" && h.deck === D) {
+    // Ô Mã Nhi đã lui lên lầu chỉ huy, tướng còn ở boong dưới: hạ toán giữ cầu thang, rồi tới chân thang (vòng qua cột buồm chính
+    // ở tim thuyền), lên thẳng lầu
+    const g = d.stairGuard, gl = g && (alive(g.officer) || g.agents.some((a) => crowd.hittable(a)));
+    const towerY = D.toWorld(0, -10.8, {}).y;
+    if (h.y < towerY - 1) {
+      if (gl && d.x20.st === "wait" && near) return R({ x: h.x, z: h.z, clear: 14, why: "P6: toán giữ cầu thang" });
+      // Cầu thang (boats.js HULLS.flagship): mặt dốc |x| ≤ 1,1, z 2,0 (chân, cao bằng boong dưới) → −6,05 (lầu); chỉ vào được từ chân
+      // (hai bên là bậc cao hơn một bước). Cột buồm chính ở tim thuyền z 4,5. Đứng cạnh thang: ra khỏi hông thang về phía mũi (z 2,8),
+      // rồi vào chân thang ở giữa (0; 2,4), thẳng hàng rồi mới lên; sau cột buồm thì vòng qua mạn cột.
+      const L = D.toLocal(h.x, h.z, {}), ax = Math.abs(L.x), sg = L.x < 0 ? -1 : 1;
+      let wx, wz, step;
+      if (ax <= 0.6 && L.z < 3.3) { wx = 0; wz = -10.5; step = "lên thang"; }                 // thẳng hàng ở chân / trên thang
+      else if (L.z > 4.0 && ax < 1.2) { wx = sg * 1.9; wz = 4.5; step = "vòng cột buồm"; }       // sau cột buồm chính
+      else if (L.z < 2.4 && ax > 0.6) { wx = sg * 1.7; wz = 3.0; step = "ra hông thang"; }       // cạnh thang (bậc chắn)
+      else { wx = 0; wz = 2.4; step = "vào chân thang"; }
+      const Wp = D.toWorld(wx, wz, {}), ex = Wp.x - h.x, ez = Wp.z - h.z, n0 = Math.hypot(ex, ez);
+      // điểm quá gần (< 1,5 m) thì kéo dài theo hướng đi — bot đứng yên khi cách mục tiêu dưới 1,2 m
+      const k = n0 > 1e-3 && n0 < 1.5 ? 1.5 / n0 : 1;
+      return R({ x: h.x + ex * k, z: h.z + ez * k, clear: gl ? 6 : 3, why: "P6: lên lầu chỉ huy (" + step + ")" });
+    }
+    if (u.script) return R({ x: u.x, z: u.z, clear: 8, why: "P6: chờ Ô Mã Nhi trên lầu" });
+  }
+  if (reach(u) && !u.script) return R({ x: u.x, z: u.z, boss: u, why: "P" + (d.phase + 1) + ": đánh " + u.name });
+  const w = nav.route(h, u, u.x, u.z);
+  if (!w) return R({ x: u.x, z: u.z, why: "P" + (d.phase + 1) + ": tới " + u.name });
+  const dx = w.x - h.x, dz = w.z - h.z, L = Math.hypot(dx, dz) || 1;
+  return R({ x: w.x + dx / L * 2.5, z: w.z + dz / L * 2.5, clear: 10, why: "P" + (d.phase + 1) + ": đường tới " + u.name });
+};
+
 window.__state = () => {
   const c = window.__hk, d = c.director, s = c.sim;
+  if (c.battle?.debug?.state) return c.battle.debug.state(c);   // B20: ảnh chụp gọn riêng (battles/b20.js)
   const q = (f, side) => Math.round(Object.values(s.fronts[f].q[side]).reduce((a, b) => a + b, 0));
   const B = (id) => ({ o: s.bases[id].owner, G: +s.bases[id].G.toFixed(1), k: s.bases[id].keeperAlive, cap: +(d.capT[id] || 0).toFixed(1), gate: s.bases[id].gate });
   return {

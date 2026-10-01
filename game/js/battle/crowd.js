@@ -10,11 +10,16 @@
 // được theo khớp, ma trận khớp đọc từ texture, nên lính bước chân, vung đòn, ngã theo nhiều kiểu
 // mà cả đám đông chỉ tốn một lượt vẽ cho mỗi kiểu lính. Lính gần tướng (LOD gần) còn có chân bám
 // đất, vạt áo đung đưa, tua giáo và đuôi ngựa treo theo trọng lực (soldierFrame, soldier-motion.js).
+//
+// Thủy chiến (B20, chỉ khi có ctx.naval — B15 không có nên mọi nhánh dưới đây không chạy): lính đứng trên boong (a.deck,
+// naval.js chở theo toạ độ cục bộ), độ cao đứng qua naval.standY (boong / đất / mặt nước), đường qua ván bắc / ván dốc
+// (naval.route), rơi xuống nước sâu thì bơi vào bờ (trạng thái "swim", không có xác trôi), tên rơi tới mặt nước thì dừng.
 
 import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
 import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
+import { surfaceY } from "./ground.js";
 import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
@@ -75,6 +80,8 @@ export class Crowd {
       slotAng: undefined, blockT: 0, blockCd: 0, evadeT: 0, evadedSwing: -1, chargeT: 0, chargeCd: 2 + this.ctx.rng.next() * 4, chargeHit: false, fleeT: 0,
       hitBy: 0, scale: tier.scale * (K.scale || 1), lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
       foe: null, retT: 0, duel: false, _eng: 0, slot: undefined, pool: null, partner: null,
+      // đặt lại khi dùng lại lính trong bể: dấu Binh Thư (core verify mục 2), boong / thuyền (naval.js)
+      markT: 0, markMult: 1, deck: null, boat: null, _pins: null,
     });
     if (!a.pose) a.pose = new Float32Array(NCH);
     resetMotion(a);                  // lò xo vạt áo, dây tua, trọng số IK của lần dùng trước (pool)
@@ -237,7 +244,7 @@ export class Crowd {
 
   // ---- AI --------------------------------------------------------------------------------
   update(dt) {
-    const ctx = this.ctx, hero = ctx.hero, rng = ctx.rng;
+    const ctx = this.ctx, hero = ctx.hero, rng = ctx.rng, nav = ctx.naval;
     const enemies = [], allies = [];
     for (const a of this.agents) if (this.hittable(a)) (a.side === "dich" ? enemies : allies).push(a);
     // đối thủ của địch: lính ta và tướng đồng minh; đếm lại số người đang nhắm mỗi đối thủ
@@ -261,11 +268,13 @@ export class Crowd {
       a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7; a.atkT += dt; a.flinch = Math.max(0, a.flinch - dt);
       a.blockT = Math.max(0, a.blockT - dt); a.blockCd -= dt; a.chargeCd -= dt;
       if (a.panicT > 0) a.panicT -= dt;
+      if (a.state === "swim") { nav.swim(a, dt); continue; }          // rơi xuống sông (naval.js): bơi vào bờ
       if (a.state === "dead") {
         a.dieT += dt;
         a.x += a.vx * dt; a.z += a.vz * dt; a.vx *= 0.9; a.vz *= 0.9;
         if (a.vy > 0 || a.y > 0) {
           a.y += a.vy * dt; a.vy -= 16 * dt;
+          if (a.y < 0 && nav && nav.land(a)) continue;    // rơi xuống nước sâu: bơi, không để xác trôi
           if (a.y < 0) {                                  // xác rơi chạm đất: bụi, tiếng ngã (chỉ quanh tướng)
             if (a.vy < -4 && this.nearHero(a, 25)) { this.ctx.fx?.dust(a.x, a.z, 0.5); this.ctx.audio?.play("fall", a.x, a.z); }
             a.y = 0; a.vy = 0;
@@ -276,6 +285,7 @@ export class Crowd {
       }
       if (a.state === "launch") {
         a.st += dt; a.y += a.vy * dt; a.vy -= 16 * dt; a.x += a.vx * dt; a.z += a.vz * dt;
+        if (a.y <= 0 && nav && nav.land(a)) continue;      // rơi xuống nước sâu: bơi vào bờ
         if (a.y <= 0) { a.y = 0; a.state = "down"; a.st = 0.9; a.vx = a.vz = 0; ctx.fx?.dust(a.x, a.z, 0.5); }
         continue;
       }
@@ -300,21 +310,21 @@ export class Crowd {
         a.fleeT -= dt; a.target = null; a.token = false; a.ready = false; a.windup = 0;
         const sp = a.speed * 1.2, ax = -hx / dH, az = -hz / dH;
         a.x += ax * sp * dt; a.z += az * sp * dt; a.yaw = turn(a.yaw, Math.atan2(ax, az), dt * 8);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates); this.stride(a, px, pz, dt);
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.stride(a, px, pz, dt);
         continue;
       }
       if (a.evadeT > 0) {
         a.evadeT -= dt;
         const sp = AI.evadeDist / 0.3;
         a.x += a.evadeX * sp * dt; a.z += a.evadeZ * sp * dt; a.yaw = turn(a.yaw, Math.atan2(hx, hz), dt * 10);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates); a.spd = 0;
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); a.spd = 0;
         continue;
       }
       if (a.chargeT > 0) {
         a.chargeT -= dt;
         const sp = a.speed * AI.charge.speed;
         a.x += a.chargeX * sp * dt; a.z += a.chargeZ * sp * dt; a.yaw = turn(a.yaw, Math.atan2(a.chargeX, a.chargeZ), dt * 6);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates); this.stride(a, px, pz, dt);
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.stride(a, px, pz, dt);
         if (hero.alive && dH <= reach + 0.4) { a.chargeT = 0; a.chargeHit = true; a.windup = a.windupT = 0.22; a.fake = false; a.target = hero; }
         else if (a.chargeT <= 0) a.atkCd = Math.max(a.atkCd, 0.8);
         continue;
@@ -386,6 +396,12 @@ export class Crowd {
         } else { tx = a.sx; tz = a.sz; wantDist = 1; }
       }
       a.target = target;
+      // thủy chiến: mục tiêu (người thật, không phải chỗ đứng chờ) ở boong khác thì đi qua cửa (ván bắc, ván dốc, gốc cầu bến) —
+      // naval.route trả điểm bên kia ngưỡng
+      if (nav && target && (a.deck || target.deck)) {
+        const w = nav.route(a, target, tx, tz);
+        if (w) { tx = w.x; tz = w.z; wantDist = 0.1; duel = false; slot = false; kiting = false; }
+      }
 
       // ---- di chuyển ----
       const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz) || 1e-6;
@@ -440,7 +456,7 @@ export class Crowd {
       }
       const tf = mvx !== 0 || mvz !== 0 ? speedFactor(a.x, a.z, mvx, mvz) : 1;    // lên dốc chậm, xuống dốc nhanh, bùn lầy
       a.x += (mvx * a.speed * tf + sx * 4) * dt; a.z += (mvz * a.speed * tf + sz * 4) * dt;
-      [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates);
+      [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a);
       this.stride(a, px, pz, dt);
 
       // ---- đánh ----
@@ -546,8 +562,11 @@ export class Crowd {
 
   // fake: tên cảnh của lính diễn — bay thật, không trúng ai, không phát tiếng.
   fireArrow(a, t, fake = false) {
-    const g0 = heightAt(a.x, a.z), y0 = g0 + (a.K.mounted ? 2.2 : 1.45) * a.scale;
-    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3, ty = (t.boatY ?? heightAt(tx, tz)) + (fake ? 0 : 1.2);
+    const nav = this.ctx.naval;
+    const g0 = a.deck ? nav.standY(a) : heightAt(a.x, a.z), y0 = g0 + (a.K.mounted ? 2.2 : 1.45) * a.scale;     // người bắn trên boong: chân ở mặt boong
+    const tx = t.x + (t.vx || 0) * 0.3, tz = t.z + (t.vz || 0) * 0.3;
+    // đích: người trên boong → mặt boong; điểm trên sông (B20) → mặt nước; còn lại mặt đất (B15 như cũ)
+    const ty = (t.boatY ?? (t.deck ? (t.K ? nav.standY(t) : t.y) : nav && !t.K && !t.isBig && t !== this.ctx.hero ? nav.surfaceY(tx, tz) : heightAt(tx, tz))) + (fake ? 0 : 1.2);
     const d = Math.hypot(tx - a.x, tz - a.z), T = Math.max(0.35, d / 26);
     // heroMult: tên địch trúng tướng được bao nhiêu (tuning.arrowHeroMult) — nhắm tướng 1, tên lạc (đích trong AI.stray.r m
     // quanh tướng lúc buông) AI.stray.dmg, còn lại 0 (đợt 9; trước đây mọi tên địch bay qua người tướng đều trúng đủ)
@@ -563,7 +582,8 @@ export class Crowd {
     for (let i = this.arrows.length - 1; i >= 0; i--) {
       const r = this.arrows[i];
       r.t += dt; r.x += r.vx * dt; r.z += r.vz * dt; r.y += r.vy * dt; r.vy -= 9.8 * dt;
-      let done = r.t > r.T || r.y < heightAt(r.x, r.z);
+      // tên dừng ở mặt đất, boong hoặc MẶT NƯỚC (surfaceY; B15 không có nước: đúng heightAt như cũ)
+      let done = r.t > r.T || r.y < surfaceY(r.x, r.z);
       // mục tiêu không phải tướng người chơi (thuyền, tướng đồng minh): tính trúng khi tên tới nơi
       if (!done && r.tgt && r.tgt !== hero && r.t >= r.T0) {
         const g = r.tgt, a = r.src;
@@ -582,7 +602,7 @@ export class Crowd {
           x: r.x - r.vx * 0.1, z: r.z - r.vz * 0.1, red: false, src: a, arrow: true });
         done = true;
       }
-      if (done) this.arrows.splice(i, 1);
+      if (done) { if (ctx.naval && r.y < ctx.naval.world.tideY + 0.05 && this.nearHero(r, 35)) ctx.naval.splash(r.x, r.z, 0.3); this.arrows.splice(i, 1); }
     }
   }
 
@@ -612,7 +632,7 @@ export class Crowd {
   // Hoạt ảnh chạy theo đồng hồ trận (ctx.clock), nên hit-stop đóng băng cả đám lính (kể cả lò xo vạt
   // áo, dây tua: dtA = 0).
   render() {
-    const clk = this.ctx.clock, dtA = Math.min(0.1, Math.max(0, clk - (this.lastClock ?? clk)));
+    const clk = this.ctx.clock, dtA = Math.min(0.1, Math.max(0, clk - (this.lastClock ?? clk))), nav = this.ctx.naval;
     this.lastClock = clk;
     const kSoft = 1 - Math.exp(-dtA * 18), kSnap = 1 - Math.exp(-dtA * 55);
     const counts = {}, hero = this.ctx.hero, frame = ++this.frame;
@@ -622,7 +642,8 @@ export class Crowd {
       const M = this.meshes[a.kit], i = counts[a.kit];
       if (i >= CAP) continue;
       counts[a.kit]++;
-      if (a.gx !== a.x || a.gz !== a.z) { a.gy = heightAt(a.x, a.z); a.gx = a.x; a.gz = a.z; }   // đứng yên thì khỏi lấy lại
+      // đứng yên thì khỏi lấy lại; trên boong (boong chạy, dập dềnh) và đang bơi thì lấy mỗi khung (naval.standY)
+      if (a.deck || a.gx !== a.x || a.gz !== a.z || a.state === "swim") { a.gy = nav ? nav.standY(a) : heightAt(a.x, a.z); a.gx = a.x; a.gz = a.z; }
       const gy = a.gy;
       const sink = a.state === "dead" && a.dieT > 1.8 ? (a.dieT - 1.8) * 1.0 : 0;
       const far = (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 > LOD_FAR2;
@@ -651,7 +672,7 @@ export class Crowd {
         else _c.setRGB(1.5, 0.9, 0.8);
       }
       M.color.setXYZ(i, _c.r, _c.g, _c.b);
-      if (nb < 2200 && sink < 0.5) {
+      if (nb < 2200 && sink < 0.5 && a.state !== "swim") {
         _p.set(a.x, gy + 0.06, a.z); _s.setScalar(a.K.mounted ? 1.5 : a.scale);
         _m.compose(_p, _q.identity(), _s); this.blob.setMatrixAt(nb++, _m);
       }

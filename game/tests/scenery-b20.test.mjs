@@ -17,7 +17,7 @@ const THREE = await import("three");
 const { SCN, fairwayHW, stakeLayout, pierLayout, boomLayout, layoutB20, addSceneryB20 } = await import("../js/battle/scenery-b20.js");
 const { karstGeo } = await import("../js/battle/kit.js");
 const { TIDE, TIDE_Y, zc, hw, bedHeight, waterDist, stakeFieldAt, TRIBS, tribAt, HQ_PAD, BOUNDS, WADE_MAX } = await import("../js/data/terrain-b20.js");
-const { STAKE_FIELDS } = await import("../js/data/river-b20.js");
+const { STAKE_FIELDS, STAKE_TOP } = await import("../js/data/river-b20.js");
 const { MAP } = await import("../js/data/battle-b20.js");
 
 let pass = 0, fail = 0;
@@ -44,20 +44,25 @@ t("cọc đứng trên bãi cạn (đáy −2,6 … −1,6), không ở lòng s�
     assert.ok(Math.abs(s.bed - bedHeight(s.x, s.z)) < 1e-9);
   }
 });
-t("đỉnh cọc = đáy + 1,8 … 2,6 m (sau khi nghiêng); nghiêng ≤ 0,15 rad; bán kính 5–19 cm (đường kính 10–30 cm ±)", () => {
+t("đỉnh cọc = đáy + STAKE_TOP (1,2 … 1,8 m, sau khi nghiêng); nghiêng ≤ 0,15 rad; bán kính 5–19 cm (đường kính 10–30 cm ±)", () => {
   for (const f of STAKE_FIELDS) for (const s of L.stakes[f.id]) {
     const d = s.top.y - s.bed;
-    assert.ok(d >= 1.8 - 1e-6 && d <= 2.6 + 1e-6, `cao ${d.toFixed(3)}`);
+    assert.ok(d >= STAKE_TOP.min - 1e-6 && d <= STAKE_TOP.max + 1e-6, `cao ${d.toFixed(3)}`);
     assert.ok(Math.abs(s.rx) <= 0.15 + 1e-9 && Math.abs(s.rz) <= 0.15 + 1e-9);
     assert.ok(s.r >= 0.05 && s.r <= 0.19, `r ${s.r}`);
     assert.ok(s.L >= 1.5 && s.L <= 3.2, `dài ${s.L.toFixed(2)} (canon 1,5–3 m + phần chôn)`);
   }
 });
-t("triều cao: mọi đỉnh cọc chìm ≥ 0,5 m; dưới 30% con nước: mọi đỉnh ló khỏi mặt nước", () => {
+// hợp đồng gameplay B20: cọc chìm ở sàn pha 2 (55%), ló dần dưới ≈ 30–45%, dưới 10% ló hết; một phần đã ló ở 30%
+t("triều cao: mọi đỉnh cọc chìm ≥ 0,5 m; ở 55% vẫn chìm hết; dưới 10% ló hết; ở 30% đã ló ≥ 40%", () => {
+  let n = 0, up30 = 0;
   for (const f of STAKE_FIELDS) for (const s of L.stakes[f.id]) {
+    n++; if (s.top.y > TIDE_Y(30)) up30++;
     assert.ok(TIDE_Y(100) - s.top.y >= 0.5, `${f.id} đỉnh ${s.top.y.toFixed(2)} chỉ chìm ${(TIDE_Y(100) - s.top.y).toFixed(2)}`);
-    assert.ok(s.top.y > TIDE_Y(30), `${f.id} đỉnh ${s.top.y.toFixed(2)} ≤ mặt nước 30%`);
+    assert.ok(s.top.y < TIDE_Y(55), `${f.id} đỉnh ${s.top.y.toFixed(2)} ló ở 55%`);
+    assert.ok(s.top.y > TIDE_Y(10), `${f.id} đỉnh ${s.top.y.toFixed(2)} ≤ mặt nước 10%`);
   }
+  assert.ok(up30 / n >= 0.4, `ở 30% mới ló ${(100 * up30 / n).toFixed(0)}%`);
 });
 t("~10% cọc gãy; cọc không chồng khít nhau (cách ≥ 0,5 m)", () => {
   const all = STAKE_FIELDS.flatMap((f) => L.stakes[f.id]), br = all.filter((s) => s.broken).length / all.length;

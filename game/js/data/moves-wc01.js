@@ -65,7 +65,8 @@ export const CHAIN_N = ["N1", "N2", "N3", "N4", "N5", "N6"];
 export const HEAVY_MOVES = new Set(Object.keys(MOVES_WC01).filter((k) => MOVES_WC01[k].heavyTell));
 
 // Tên, icon, lời giải thích (cùng khoá với MOVE_INFO của moves-info.js để HUD thay bộ). Tên đòn là Hư cấu của game;
-// icon dùng lại bộ có sẵn (assets/icons).
+// icon dùng lại bộ có sẵn (assets/icons). Binh Thư: cuộn binh thư (ảnh "kesach"), CSS ghép thêm vòng ngắm đỏ (css/game.css
+// .sk[data-skill=binhThu], .touch .sk-binhThu) để khỏi lẫn với nút Kế Sách.
 export const MOVE_INFO_WC01 = {
   N:  { icon: "n",  name: "Tiết chế kiếm pháp", label: "Hư cấu", keys: ["J · chuột trái", "nút N", "X"],
         text: "Chuỗi 6 nhát N1–N6 bằng đại kiếm hai tay; khi vung không bị đòn thường ngắt. N6 xoay một vòng rưỡi đẩy lùi mọi kẻ quanh mình." },
@@ -76,11 +77,11 @@ export const MOVE_INFO_WC01 = {
   C5: { icon: "c5", name: "Xuyên Trận", label: "Hư cấu", seq: "N N N N → C", text: "Lao thẳng 8 m, mũi gươm xuyên hàng lính. Mở ở cấp 5." },
   C6: { icon: "c6", name: "Lôi Đình", label: "Hư cấu", seq: "N N N N N → C (giữ)", text: "Nhảy lên bổ xuống, vòng chấn 6 m hất tung tất cả, bỏ qua 30% giáp. Mở ở cấp 10." },
   D:  { icon: "dash", name: "Lướt kiếm", label: "Hư cấu", seq: "Né → N / C", text: "Vừa né xong bấm N (Lướt N) hoặc C (Lướt C): lao tới chém." },
-  DQ: { icon: "dq", name: "Đòn Quyết", seq: "C cạnh kẻ Vỡ Thế", text: "Sĩ quan cạn thanh Phá Thế thì Vỡ Thế: bấm C cạnh hắn để kết liễu, chắc chắn chí mạng." },
+  DQ: { icon: "dq", name: "Đòn Quyết", seq: "C cạnh kẻ Vỡ Thế", text: "Sĩ quan cạn thanh Phá Thế thì Vỡ Thế: bấm C cạnh người đó để ra Đòn Quyết — hạ đội trưởng; với tướng Nguyên là bắt sống." },
   CT: { icon: "ct", name: "Phản đòn", seq: "Đỡ đúng lúc", text: "Bấm Đỡ đúng lúc đòn viền đỏ sắp trúng: gạt bằng bản gươm rồi chém trả." },
   skill: { icon: "skill", name: "Hịch Tướng Sĩ", label: "Chính sử", keys: ["E", "nút Hịch", "LB"],
            text: "Cắm gươm đọc hịch 3 s (bị ngắt nếu trúng đòn nặng): mọi cánh quân ta +15 Sĩ Khí, Công quân ta +10% trong 20 s. Hồi 40 s." },
-  skill2: { icon: "lock", name: "Binh Thư Yếu Lược", label: "Chính sử", keys: ["T", "nút Binh Thư", "D-pad trái"],
+  skill2: { icon: "kesach", name: "Binh Thư Yếu Lược", label: "Chính sử + Hư cấu", keys: ["T", "nút Binh Thư", "D-pad trái"],
             text: "Chỉ gươm đánh dấu một đơn vị địch hoặc Cứ Điểm: 20 s quân ta đánh mục tiêu +40%. Hồi 35 s." },
   ult: { icon: "ult", name: "Bạch Đằng Quyết Chiến", label: "Chính sử + Hư cấu", keys: ["R", "nút Tuyệt Kỹ", "B"],
          text: "Tốn một vạch Khí Lực: 12 s bất tử, 3 nhát bổ xuống đất tạo sóng chấn 15 m (nhát 3 phá mọi khiên); xong mọi cánh quân ta Tiến công, +15 Sĩ Khí." },

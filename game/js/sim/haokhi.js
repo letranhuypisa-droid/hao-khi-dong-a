@@ -13,9 +13,10 @@
 
 import { HAO_KHI } from "../data/tuning.js";
 
-export function createHaoKhi({ quick = true, start = 0, gainPct = 0, decayMult = 1, tpcExt = 0, diffMult = 1 } = {}) {
+// floor: sàn suy giảm lúc mở màn (B20: Hào Khí 30 "Vân Đồn đã thắng" giữ sàn 25 tới mốc đầu tiên); mặc định 0 như cũ.
+export function createHaoKhi({ quick = true, start = 0, gainPct = 0, decayMult = 1, tpcExt = 0, diffMult = 1, floor = 0 } = {}) {
   return {
-    value: Math.min(45, start), overflow: 0, floor: 0,
+    value: Math.min(45, start), overflow: 0, floor: Math.max(0, Math.min(floor, Math.min(45, start))),
     quick, gainPct, decayMult, tpcExt, diffMult,
     idle: 0, decayAcc: 0, atMaxFor: 0,
     tpc: false, tpcLeft: 0, tpcGained: 0, tpcCount: 0,

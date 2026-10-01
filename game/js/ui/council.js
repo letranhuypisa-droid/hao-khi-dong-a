@@ -8,6 +8,9 @@
 //     replay    Chương đã thắng: thẻ lịch sử mang dấu "Người xưa chọn" ngay từ đầu, hai nhánh đều có Tình báo sớm
 //     tutorial  lần đầu gặp Quyết sách (bản VS: B20): 1 thẻ hướng dẫn 1 màn hình trước khi chọn
 //     marks     tên các Kế Sách mang dấu "Kế đã định" (quyetSach.danhDau) để ghi ở màn kết quả
+//     onComic   (đợt 9, chơi lại) có thì thanh trên có nút "Xem comic": ẩn hội đồng, chờ onComic() (phát lại comic mở
+//               chương) rồi hiện lại đúng bước đang dở. Kết quả mang comic: true khi đã bấm (main.js phát tiếp phần
+//               Chủ soái quyết như lần đầu).
 //
 // Luật (§12.6): vị trí thẻ xáo mỗi lần; trước khi chọn không thẻ nào lộ nhãn hay chữ "người xưa"; chọn → lời đáp của
 // chủ soái → lệnh Chủ soái quyết (luôn theo sử). Quyết sách không đổi Hào Khí, hạng, độ khó; không bỏ qua được.
@@ -18,7 +21,7 @@
 const LCLS = { "Chính sử": "cs", "Tương truyền": "tt", "Hư cấu": "hc" };
 const T = {
   vi: {
-    seal: "Kế", pick: "Chọn một kế để hiến", next: "Tiếp", go: "Nghe lệnh", done: "Vào trận", old: "Người xưa chọn", you: "Kế của tướng quân",
+    seal: "Kế", pick: "Chọn một kế để hiến", next: "Tiếp", comic: "Xem comic", go: "Nghe lệnh", done: "Vào trận", old: "Người xưa chọn", you: "Kế của tướng quân",
     replyHead: "Chủ soái đáp", decreeHead: "Chủ soái quyết", fiction: "Lời đáp: Hư cấu",
     right: (m) => `Kế của tướng quân hợp với cách người xưa. <b>Kế đã định</b>: ${m} mang dấu trên bản đồ lớn và bản đồ nhỏ từ đầu trận; <b>Tình báo sớm</b> lộ tuyến tiến của địch ngay từ sa bàn.`,
     wrong: "Người xưa đã chọn cách khác. Trận vẫn như cũ: tướng quân tự tìm Kế Sách qua quân sư và tháp canh; comic kết chương kể người xưa đã làm gì.",
@@ -33,7 +36,7 @@ const T = {
     ],
   },
   en: {
-    seal: "Kế", pick: "Choose a plan to offer", next: "Next", go: "Hear the order", done: "To battle", old: "The ancients' choice", you: "Your plan",
+    seal: "Kế", pick: "Choose a plan to offer", next: "Next", comic: "Read comic", go: "Hear the order", done: "To battle", old: "The ancients' choice", you: "Your plan",
     replyHead: "The commander replies", decreeHead: "The commander decides", fiction: "Reply: fiction",
     right: (m) => `Your plan matches what the ancients did. <b>Plan set</b>: ${m} are marked on the map and minimap from the start; <b>early intelligence</b> shows the enemy's route on the sand table.`,
     wrong: "The ancients chose differently. The battle is unchanged: find the stratagems through your adviser and the watchtowers; the closing comic tells what really happened.",
@@ -115,7 +118,7 @@ export function councilSpeaker(comic) {
 // ---- màn hình ----------------------------------------------------------------------------------------------------
 
 export function runCouncil({ council, comic = null, settings = {}, replay = false, tutorial = false, rng = Math.random, marks = null,
-  bgPanel = "O7", onSettings } = {}) {
+  bgPanel = "O7", onSettings, onComic = null } = {}) {
   const errs = councilErrors(council);
   if (errs.length) { console.error("Hiến kế: " + errs.join("; ")); return Promise.resolve({ picked: null, historical: false, error: errs }); }
   return new Promise((resolve) => {
@@ -124,11 +127,12 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
     const motion = settings.motion !== false;
     const cards = shuffleCards(council.cards, rng);
     const who = councilSpeaker(comic);
-    let stage = tutorial ? "tut" : "pick", picked = null, focus = 0, kbd = false, entered = false, done = false;
+    let stage = tutorial ? "tut" : "pick", picked = null, focus = 0, kbd = false, entered = false, done = false, busy = false, sawComic = false;
     const armedAt = performance.now() + 400;      // phím/nút đang giữ lúc mở không chọn nhầm
     const armed = () => performance.now() >= armedAt;
-    document.activeElement?.blur?.();
+    // giữ chỗ đang focus TRƯỚC khi bỏ focus (trước đây blur rồi mới lưu → luôn lưu <body>, không trả focus được)
     const prevFocus = document.activeElement;
+    document.activeElement?.blur?.();
 
     // bóng thoại dùng chữ viết tay như comic (ui/comic.js cũng nạp; nạp ở đây nếu Hiến kế mở trước comic)
     if (!document.querySelector('link[href*="Patrick+Hand"]')) {
@@ -157,7 +161,7 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
       const k = picked && council.cards.find((c) => c.id === picked);
       const marksTxt = marks?.length ? marks.map((m) => `<b>${esc(m)}</b>`).join(", ") : t().marksDefault;
       el.innerHTML = `${bg ? `<div class="cc-bg" style="background-image:url(${bg})"></div>` : ""}
-        <div class="cc-bar"><div class="cc-title">${esc(tx(council.title, lang))}</div><button data-c="lang">${lang === "vi" ? "EN" : "VI"}</button></div>
+        <div class="cc-bar"><div class="cc-title">${esc(tx(council.title, lang))}</div>${onComic ? `<button data-c="comic">${t().comic}</button>` : ""}<button data-c="lang">${lang === "vi" ? "EN" : "VI"}</button></div>
         <div class="cc-main"><div class="cc-in">
           <div class="cc-head"><div class="seal">${t().seal}</div><p class="cc-prompt">${esc(tx(council.prompt, lang))}</p></div>
           <div class="cc-cards" role="group" aria-label="${t().pick}">${cards.map(cardHTML).join("")}</div>
@@ -183,10 +187,22 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
     }
     function act(c) {
       if (c === "lang") { lang = lang === "vi" ? "en" : "vi"; settings.comicLang = lang; onSettings?.(); render(); return; }
+      if (c === "comic") { watchComic(); return; }
       if (!armed()) return;
       if (c === "tutok" && stage === "tut") { stage = "pick"; render(); }
       else if (c === "next" && stage === "reply") { stage = "decree"; render(); }
       else if (c === "next" && stage === "decree") finish();
+    }
+    // "Xem comic" (chơi lại): tắt phím/tay cầm của hội đồng trong lúc comic chạy (comic có phím riêng), rồi bật lại
+    function watchComic() {
+      if (!onComic || busy || done) return;
+      busy = true; sawComic = true;
+      removeEventListener("keydown", onKey, true);
+      el.style.visibility = "hidden";
+      Promise.resolve().then(onComic).catch((e) => console.error(e)).finally(() => {
+        busy = false; el.style.visibility = "";
+        if (!done) { addEventListener("keydown", onKey, true); render(); }
+      });
     }
     function move(d) { if (stage !== "pick") return; kbd = true; focus = (focus + d + cards.length) % cards.length; render(); }
     function primary() {
@@ -196,7 +212,7 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
     }
 
     const onKey = (e) => {
-      if (done) return;
+      if (done || busy) return;
       e.stopPropagation();
       const k = e.key;
       if (["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", " ", "Enter"].includes(k)) e.preventDefault();
@@ -211,6 +227,7 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
     for (const gp of navigator.getGamepads?.() || []) if (gp) for (const bi of [0, 14, 15]) padPrev[gp.index + ":" + bi] = !!gp.buttons[bi]?.pressed;
     const poll = () => {
       raf = requestAnimationFrame(poll);
+      if (busy) { for (const k in padPrev) padPrev[k] = true; return; }    // nút đang giữ khi comic đóng không tính
       for (const gp of navigator.getGamepads?.() || []) {
         if (!gp) continue;
         for (const [bi, f] of [[0, primary], [14, () => move(-1)], [15, () => move(1)]]) {
@@ -227,8 +244,8 @@ export function runCouncil({ council, comic = null, settings = {}, replay = fals
       removeEventListener("keydown", onKey, true);
       el.classList.add("out");
       setTimeout(() => el.remove(), 250);
-      prevFocus?.focus?.();
-      resolve(councilResult(council, picked));
+      if (prevFocus?.isConnected && prevFocus !== document.body) prevFocus.focus?.();
+      resolve(sawComic ? { ...councilResult(council, picked), comic: true } : councilResult(council, picked));
     }
 
     render();

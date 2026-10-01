@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
 import { makeRng } from "../core/rng.js";
 import { TIDE, TIDE_Y, zc, hw, bedHeight, waterDist, TRIBS, tribHalfW, tribPoint, HQ_PAD, BOUNDS, CLAMP, vnoise, waveY, tribAt } from "../data/terrain-b20.js";
-import { STAKE_FIELDS } from "../data/river-b20.js";
+import { STAKE_FIELDS, STAKE_TOP, RAFT } from "../data/river-b20.js";
 import { MAP } from "../data/battle-b20.js";
 import { box, cyl, cone, ico, blade, unit, spanM, rod, bar, placeParts, colorByY, makeInst, solidAdder, groveGeo, reedGeo, rockGeo,
   tintTrees, karstGeo, addSkyKit, flagBatch } from "./kit.js";
@@ -28,9 +28,15 @@ const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 
 export const SCN = {
   seed: 1288,
   fairwayMax: 78,               // nửa luồng tàu phải để trống ở cửa sông (đảo đá chỉ đứng ngoài)
-  // cọc: canon đường kính 10–30 cm, dài 1,5–3 m (Chính sử + khảo cổ); đỉnh cao hơn đáy 1,8–2,6 m (hợp đồng §6)
-  stakes: { per: 300, bury: 0.45, top: [1.8, 2.6], r: [0.05, 0.15], lean: 0.15, leanUp: 0.05, broken: 0.1, inset: 0.9, rowDx: 2.4, colDz: 2.1 },
-  raft: { w: 10, d: 6, drift: 1.1, pull: 0.08, spin: 0.05, life: 30, fade: 8 },
+  // cọc: canon đường kính 10–30 cm, dài 1,5–3 m (Chính sử + khảo cổ); đỉnh cao hơn đáy theo STAKE_TOP (river-b20.js:
+  // 1,2–1,8 m — đợt 9 pha D; trước là 1,8–2,6 m nên cọc ló ngay ở pha 2–3, review P1-2)
+  stakes: { per: 300, bury: 0.45, top: [STAKE_TOP.min, STAKE_TOP.max], r: [0.05, 0.15], lean: 0.15, leanUp: 0.05, broken: 0.1, inset: 0.9, rowDx: 2.4, colDz: 2.1,
+    // vẽ: bán kính ×2,4, nghiêng ×0,6 — cọc cỡ thật (10–30 cm) nhìn từ máy quay trận chỉ là vệt mảnh lấm tấm, không đọc được là bãi
+    // cọc lúc triều ròng (review B20). Cách vẽ là Hư cấu; số liệu bố trí (r, lean) giữ đúng canon.
+    showR: 2.4, showLean: 0.6 },
+  // bè: cỡ theo RAFT (river-b20.js, boong bè của naval.js dùng chung); chặt dây thì trôi và mờ hết trong 20 s (hợp đồng
+  // gameplay B20 P3)
+  raft: { w: RAFT.w, d: RAFT.d, drift: 1.1, pull: 0.08, spin: 0.05, life: 20, fade: 8 },
   pierDeckY: 2.3, pierW: 2.6,
   boom: { bow: 7, log: 5.2, gap: 0.45, raise: 2.5 },
   counts: { karstBank: 46, islets: 30, trees: 300, mangroves: 190, reeds: 800, rocks: 130 },
@@ -360,7 +366,8 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   const stW = track(inst(sgW, all.filter((s) => !s.broken).length, { cast: true })); stW.name = "stakes";
   const stB = track(inst(sgB, all.filter((s) => s.broken).length, { cast: true })); stB.name = "stakes-broken";
   let maxTop = -9;
-  for (const s of all) { (s.broken ? stB : stW).put(s.x, s.y0, s.z, 0, s.r, s.L, new THREE.Color().setScalar(s.tint).getHex(), s.rx, s.rz); maxTop = Math.max(maxTop, s.top.y); }
+  const SV = SCN.stakes;
+  for (const s of all) { (s.broken ? stB : stW).put(s.x, s.y0, s.z, 0, s.r * SV.showR, s.L, new THREE.Color().setScalar(s.tint).getHex(), s.rx * SV.showLean, s.rz * SV.showLean); maxTop = Math.max(maxTop, s.top.y); }
 
   // -- bè cỏ + dây neo (dây nối góc bè với đỉnh bốn cọc quanh bè), phao đánh dấu mốc lộ
   const rfg = raftGeo(); geos.push(rfg);
@@ -379,7 +386,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     raftIM.put(x, 0, z); ropeIM.put(0, -50, 0, 0, 0);
     for (let k = 1; k < 4; k++) ropeIM.put(0, -50, 0, 0, 0);
     buoyIM.put(0, -50, 0, 0, 0);
-    return { id: f.id, i, x0: x, z0: z, x, z, yaw: 0, t: 0, drifting: false, gone: false, anchors, state: "hidden" };
+    return { id: f.id, i, x0: x, z0: z, x, z, y: 0, yaw: 0, pitch: 0, roll: 0, fade: 1, t: 0, drifting: false, gone: false, anchors, state: "hidden" };
   });
   ropeIM.put(0, -50, 0, 0, 0); ropeIM.put(0, -50, 0, 0, 0);                   // hai dây đầu phao chặn luồng
   ropeIM.count = ropeIM.max; raftIM.frustumCulled = ropeIM.frustumCulled = buoyIM.frustumCulled = false;
@@ -548,6 +555,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     const y = Math.max(ty, gy(r.x, r.z) + 0.15) + waveY(r.x, r.z, t, ty - gy(r.x, r.z)) * 0.8 - (1 - fade) * 0.6;
     _m.compose(_v.set(r.x, y, r.z), _q.setFromEuler(_e.set(0.02 * Math.sin(t * 0.9 + r.i), r.yaw, 0.03 * Math.sin(t * 1.1 + r.i * 2))), _s.setScalar(Math.max(1e-4, fade)));
     raftIM.setMatrixAt(r.i, _m);
+    r.y = y; r.pitch = _e.x; r.roll = _e.z; r.fade = fade;          // tư thế bè cho boong bè (naval.js)
     // dây neo: góc bè → đỉnh cọc; cắt (bè trôi) thì giấu
     for (let k = 0; k < 4; k++) {
       if (r.drifting || r.gone) { _m.makeScale(0, 0, 0); ropeIM.setMatrixAt(r.i * 4 + k, _m); continue; }

@@ -178,6 +178,17 @@ t("2 mốc → Sẵn sàng; Lệnh Kế Sách → Thành công, tổng thưởng
   const r = keSachTrigger(st, "kichCoc", ev); assert.ok(r.ok); assert.equal(r.hk, 10);
   assert.equal(st.ks.kichCoc.state, "thanhcong"); assert.equal(hkSum(ev), 20); assert.equal(st.ks.kichCoc.got, 20);
 });
+t("Kế Sách cọc đã chốt: mốc còn ẩn thôi bị lộ (tướng địch đứng mốc, thuyền dò) trong 10 s nước rút", () => {
+  const st = createRiver({ mode: "nhanh" }); const ev = [];
+  setPhase(st, 1, ev); setPhase(st, 2, ev);
+  markerAction(st, "M1", "activate", ev); markerAction(st, "M2", "activate", ev);
+  assert.equal(keSachTrigger(st, "kichCoc", ev).ok, true); assert.equal(st.ks.kichCoc.state, "thanhcong");
+  setMarkerOfficer(st, "M3", true);
+  for (let s = 0; s < 12; s++) riverTick(st, ev);
+  assert.equal(st.markers.M3.state, "hidden");
+  assert.equal(markerAction(st, "M3", "expose", ev).ok, false);
+  assert.equal(st.markers.M3.state, "hidden");
+});
 t("3/3 mốc tự chốt; lộ hết cả 3 → thất bại, không thêm Hào Khí", () => {
   const st = at(2); const ev = [];
   for (const id of ["M1", "M2", "M3"]) markerAction(st, id, "activate", ev);
@@ -341,9 +352,23 @@ t("tất định: cùng kịch bản → cùng JSON; checkpoint giữa trận ch
   const e1 = ticks(s1, 50), e2 = ticks(s2, 50);
   assert.equal(JSON.stringify(s1), JSON.stringify(s2)); assert.equal(JSON.stringify(e1), JSON.stringify(e2));
 });
-t("Quyết sách đúng: báo trước thuyền dò 5 s (Tình báo sớm)", () => {
-  assert.ok(P.log.events.includes("scoutWarn"));
+t("đầu hạm đội đi tiếp tới FLEET.stopX ở pha 3 (hạ hộ vệ sớm), rồi neo; pha 1 không chạm stopX", () => {
+  const st = at(1); st.fleet.headX = 600; setPhase(st, 2);
+  ticks(st, 60); assert.equal(st.fleet.headX, B20.FLEET.stopX); assert.equal(st.fleet.speed, 0);
+  const s3 = at(3), x3 = s3.fleet.headX; ticks(s3, 20); assert.equal(s3.fleet.headX, x3, "pha 4: hạm đội đứng");
+});
+t("Quyết sách đúng: báo trước thuyền dò (Tình báo sớm, FLEET.scoutWarn = 10 s theo hợp đồng gameplay)", () => {
+  assert.ok(P.log.events.includes("scoutWarn")); assert.equal(B20.FLEET.scoutWarn, 10);
   const st = at(1); const ev = ticks(st, 60); assert.ok(!has(ev, "scoutWarn")); assert.ok(has(ev, "scout"));
+});
+t("nước 30% không mốc nào mở: không thưởng Con nước \"cọc nhô\" (+5); có mốc mở thì có", () => {
+  for (const [nAct, want] of [[0, 0], [1, B20.KE_SACH.conNuoc.partial.stakesUp]]) {
+    const st = at(2); if (nAct) markerAction(st, "M1", "activate"); setPhase(st, 3);
+    const ev = [];
+    for (let s = 0; s < 80 && !st.flags.strandAt; s++) { const e = []; riverTick(st, e); ev.push(...e); }
+    assert.ok(st.flags.strandAt, "đã tới 30%");
+    assert.equal(st.ks.conNuoc.got, want, `${nAct} mốc mở`);
+  }
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

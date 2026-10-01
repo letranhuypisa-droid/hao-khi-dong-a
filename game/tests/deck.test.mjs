@@ -204,13 +204,35 @@ t("mắc cạn: settle 4 s rồi stranded, độ nghiêng 8–12° (50 thuyền 
     const x = b.x; for (let k = 0; k < 20; k++) b.update(0.05, env); near(b.x, x, 1e-9, "không trôi");
   }
 });
-t("mắc sớm trên mốc cọc đã kích hoạt; director đặt state 'caught' cũng lún và nghiêng", () => {
+t("mắc sớm trên mốc cọc đã kích hoạt (autoGround); catch() dừng chưa nghiêng, strand() mới lún và nghiêng", () => {
   const env = { tideY: TIDE_Y(40), t: 0, bedHeight: () => -2.1, stakeActive: () => true };
   const b = new Boat({ type: "junk", id: "k", path: [{ x: 0, z: 0 }, { x: 99, z: 0 }], speed: 3 });
-  b.update(0.05, env); assert.equal(b.state, "settle", "ky −1,9 ≤ đáy + 0,6");
+  b.update(0.05, env); assert.equal(b.state, "settle", "ky −1,8 ≤ đáy + STAKE_TOP.min");
   const c = new Boat({ type: "light", id: "l", path: [{ x: 0, z: 0 }, { x: 99, z: 0 }], speed: 3 });
-  c.state = "caught"; for (let k = 0; k < 90; k++) c.update(0.05, { tideY: 0, t: 0 });
+  c.catch(); for (let k = 0; k < 90; k++) c.update(0.05, { tideY: 0, t: 0 });
+  assert.equal(c.state, "caught"); assert.ok(c.speed === 0 && c.tilt < 0.05, "mắc cọc: dừng, chưa nghiêng");
+  c.strand(); for (let k = 0; k < 90; k++) c.update(0.05, { tideY: 0, t: 0 });
   assert.equal(c.state, "stranded"); near(c.y, 0, 1e-9, "không biết đáy: nằm ở mặt nước");
+});
+t("autoGround = false: không tự mắc; nước ròng thì ky tựa bùn (không chìm xuyên đáy), chưa nghiêng", () => {
+  const env = { tideY: TIDE_Y(0), t: 0, bedHeight: () => -2.1, stakeActive: () => true };
+  const b = new Boat({ type: "junk", id: "g", path: [{ x: 0, z: 0 }, { x: 99, z: 0 }], speed: 0, autoGround: false });
+  for (let k = 0; k < 40; k++) b.update(0.05, env);
+  assert.equal(b.state, "sail"); assert.ok(b.y - b.hull.draft >= -2.1 - 0.3 - 1e-9, `ky ${(b.y - b.hull.draft).toFixed(2)}`);
+});
+t("áp mạn (follow): thuyền bám thuyền kia, vị trí cục bộ không trôi", () => {
+  const a = new Boat({ type: "light", id: "a", path: [{ x: 0, z: 0 }, { x: 200, z: 60 }], speed: 4, autoGround: false });
+  const b = new Boat({ type: "escort", id: "b", autoGround: false });
+  b.follow = { boat: a, dx: 4, dz: 1, dyaw: 0.1 };
+  for (let k = 0; k < 200; k++) { a.update(0.05, { tideY: 0, t: k * 0.05 }); b.update(0.05, { tideY: 0, t: k * 0.05 }); }
+  const c = Math.cos(a.yaw), s = Math.sin(a.yaw), lx = (b.x - a.x) * c - (b.z - a.z) * s, lz = (b.x - a.x) * s + (b.z - a.z) * c;
+  near(lx, 4, 1e-9); near(lz, 1, 1e-9); near(b.yaw - a.yaw, 0.1, 1e-9);
+});
+t("thuyền chỉ huy nhẹ = thuyền nhẹ × 1,35 (boong ~16 × 3,5 m)", () => {
+  const L = HULLS.lead, S = HULLS.light;
+  near(L.len, S.len * 1.35, 1e-9); near(L.beam, 3.51, 1e-9);
+  const r = L.deck.rects[0]; near(r.x1 - r.x0, (S.deck.rects[0].x1 - S.deck.rects[0].x0) * 1.35, 1e-9); near(r.y, S.deckY * 1.35, 1e-9);
+  const b = new Boat({ type: "lead", id: "lead" }); assert.ok(b.deck.heightAt(0, 0) > 0.9);
 });
 t("chìm: tụt 0,6 m/s rồi ẩn sau 6 s; hullCapsule dọc thân", () => {
   const b = new Boat({ type: "escort", id: "x", path: [{ x: 0, z: 0 }, { x: 0, z: 50 }], speed: 2 });

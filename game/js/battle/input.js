@@ -1,7 +1,9 @@
 // battle/input.js — bàn phím + chuột, tay cầm (Gamepad API, ánh xạ standard), cảm ứng (15.8).
 // pressed: phím cạnh của khung (xoá ở endFrame). held (tính lại mỗi poll): c = đang giữ C (K, chuột phải, Y tay cầm, nút C
-// cảm ứng — tụ lực đại kiếm WC01, C3 giữ để kéo dài), interact = đang giữ Tương tác (X, RT, nút ngữ cảnh cảm ứng "interact").
-// Đợt 9: skill2 = T / D-pad trái / nút cảm ứng "skill2" (ô kỹ năng 2 của H31: Binh Thư Yếu Lược); interact = X (giữ).
+// cảm ứng — tụ lực đại kiếm WC01, C3 giữ để kéo dài), interact = đang giữ Tương tác (X, D-pad xuống, nút ngữ cảnh cảm ứng
+// "interact"). Đợt 9: skill2 = T / D-pad trái / nút cảm ứng "skill2" (ô kỹ năng 2 của H31: Binh Thư Yếu Lược); interact = X
+// (giữ). Pha D (B20): Tương tác trên tay cầm chuyển từ RT sang D-pad xuống (RT chỉ còn khoá mục tiêu — core verify mục 1);
+// pickMode (battle.js bật khi bảng chọn điểm đến đang mở): D-pad lên/phải/xuống/trái = chọn 1/2/3/4.
 
 const KEYMAP = {
   KeyJ: "n", KeyK: "c", Space: "dodge", KeyL: "block", ShiftLeft: "block", ShiftRight: "block",
@@ -17,14 +19,14 @@ export class Input {
     this.keys = new Set(); this.pressed = {}; this.held = {};
     this.moveX = 0; this.moveY = 0; this.camDX = 0; this.camDY = 0;
     this.touch = false; this.stick = { x: 0, y: 0 }; this.touchHeld = {};
-    this.padPrev = []; this.enabled = true; this.mouseC = false;
+    this.padPrev = []; this.enabled = true; this.mouseC = false; this.pickMode = false;
     this.onKey = (e) => {
       if (!this.enabled) return;
       const down = e.type === "keydown";
       if (["Tab", "Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.code)) e.preventDefault();
       if (down) { if (!this.keys.has(e.code)) { const a = KEYMAP[e.code]; if (a) this.pressed[a] = true; } this.keys.add(e.code); }
       else this.keys.delete(e.code);
-      this.touch = false;
+      this.touch = false; this.pad = false; this.keyUsed = true;
     };
     this.onMouse = (e) => {
       if (!this.enabled || e.pointerType === "touch") return;
@@ -77,30 +79,31 @@ export class Input {
     let heldC = k.has("KeyK") || this.mouseC || !!this.touchHeld.c, heldI = k.has("KeyX") || !!this.touchHeld.interact;
 
     // tay cầm: A=0 Né, B=1 Tuyệt Kỹ, X=2 N, Y=3 C, LB=4 Kỹ năng, RB=5 Đỡ, LT=6 Mệnh Lệnh, RT=7 khóa,
-    // Back=8 bản đồ, Start=9 tạm dừng, D-pad lên=12 Tổng Phản Công, D-pad phải=15 Kế Sách, D-pad trái=14 kỹ năng 2; trong vòng
-    // lệnh: D-pad chọn lệnh. Giữ Y = giữ C (tụ lực), giữ RT = giữ Tương tác (RT vẫn bấm khóa như cũ — B20 cần tách, xem báo cáo).
+    // Back=8 bản đồ, Start=9 tạm dừng, D-pad lên=12 Tổng Phản Công, D-pad phải=15 Kế Sách, D-pad trái=14 kỹ năng 2, D-pad xuống=13
+    // Tương tác (giữ); trong vòng lệnh / bảng chọn điểm đến: D-pad chọn 1–4. Giữ Y = giữ C (tụ lực).
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const p of pads) {
       if (!p || !p.connected) continue;
       const b = (i) => !!p.buttons[i]?.pressed, edge = (i) => b(i) && !this.padPrev[i];
       const ax = (i) => (Math.abs(p.axes[i] || 0) > 0.18 ? p.axes[i] : 0);
-      if (ax(0) || ax(1)) { mx = ax(0); my = -ax(1); this.touch = false; }
+      if (ax(0) || ax(1)) { mx = ax(0); my = -ax(1); this.touch = false; this.pad = true; }
+      if (p.buttons.some((x) => x.pressed)) { this.pad = true; this.touch = false; }   // chữ nhắc phím theo tay cầm (B20: Tương tác = D-pad xuống)
       this.camDX += ax(2) * 14; this.camDY += ax(3) * 8;
-      const ring = b(6);
+      const ring = b(6), pick = this.pickMode && !ring;
       if (edge(0)) this.pressed.dodge = true;
       if (edge(1)) this.pressed.ult = true;
       if (edge(2)) this.pressed.n = true;
       if (edge(3)) this.pressed.c = true;
       if (edge(4)) this.pressed[ring ? "cmdSwap" : "skill"] = true;
       if (edge(5)) this.pressed.block = true;
-      if (edge(7)) { this.pressed.lock = true; this.pressed.interact = true; }
+      if (edge(7)) this.pressed.lock = true;
       if (edge(8)) this.pressed.map = true;
       if (edge(9)) this.pressed.pause = true;
-      if (edge(12)) this.pressed[ring ? "cmd1" : "tpc"] = true;
-      if (edge(15)) this.pressed[ring ? "cmd2" : "kesach"] = true;
-      if (edge(13) && ring) this.pressed.cmd3 = true;
-      if (edge(14)) this.pressed[ring ? "cmd4" : "skill2"] = true;
-      block = block || b(5); cmdHeld = cmdHeld || ring; heldC = heldC || b(3); heldI = heldI || b(7);
+      if (edge(12)) this.pressed[ring || pick ? "cmd1" : "tpc"] = true;
+      if (edge(15)) this.pressed[ring || pick ? "cmd2" : "kesach"] = true;
+      if (edge(13)) this.pressed[ring || pick ? "cmd3" : "interact"] = true;
+      if (edge(14)) this.pressed[ring || pick ? "cmd4" : "skill2"] = true;
+      block = block || b(5); cmdHeld = cmdHeld || ring; heldC = heldC || b(3); heldI = heldI || (b(13) && !ring && !pick);
       this.padPrev = p.buttons.map((x) => x.pressed);
       break;
     }

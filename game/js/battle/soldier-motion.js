@@ -401,6 +401,12 @@ export function poseFor(a, kit, K, t, out) {
     lying(1 - up, -1); if (up > 0) { P.tx += 0.9 * up; P.lsx += 1.6 * up; P.rsx += 1.6 * up; P.ltx -= 1.0 * up; P.rtx -= 1.0 * up; P.hipY -= 0.4 * up; }
   } else if (st === "dead") {
     dying(a, horse);
+  } else if (st === "swim") {
+    // bơi (B20: rơi xuống sông thì bơi vào bờ — naval.js): nằm sấp trên mặt nước, hai tay sải luân phiên, chân đạp nước
+    const ph = t * 4.2 + id;
+    P.pitch = 1.0; P.lift = 0; P.tx = -0.3;
+    P.rax = -1.6 - 1.2 * Math.sin(ph); P.lax = -1.6 - 1.2 * Math.sin(ph + Math.PI); P.raz = 0.35; P.laz = -0.35; P.rfx = -0.4; P.lfx = -0.4;
+    P.ltx = 0.35 * Math.sin(ph * 1.7); P.rtx = -0.35 * Math.sin(ph * 1.7); P.lsx = 0.3; P.rsx = 0.3;
   }
   // khán giả reo hò: giơ vũ khí, nhún nhảy; lệch pha theo id cho khỏi đồng loạt
   if (a.cheer > 0) {
@@ -641,7 +647,7 @@ export function soldierFrame(a, skel, x, y, z, g0, pose, dt, ground, near, out) 
   } else if (!near) mo[6] = 0;
 
   // ---- trọng số IK: lính sống, đứng trên đất, trong LOD gần; trộn mượt khi đổi trạng thái ----
-  const ok = near && a.y <= 0.02 && a.role !== "spectator" && a.state !== "dead" && a.state !== "launch" && a.state !== "down";
+  const ok = near && a.y <= 0.02 && a.role !== "spectator" && a.state !== "dead" && a.state !== "launch" && a.state !== "down" && a.state !== "swim";
   if (!near) mo[7] = 0;
   else if (mo[7] < 0) mo[7] = ok ? 1 : 0;
   else if (dt > 0) mo[7] += ((ok ? 1 : 0) - mo[7]) * (1 - Math.exp(-dt * 12));

@@ -21,8 +21,8 @@ window.COMIC = {
    "en": "Bạch Đằng"
   },
   "card": {
-   "vi": "Trọn vẹn! Mở khóa thẻ Sử quán: Bãi cọc Bạch Đằng.",
-   "en": "Perfect! Archive card unlocked: The Bạch Đằng stakes."
+   "vi": "Trọn vẹn! Kế Sách bãi cọc thành công thì mở thẻ Sử quán: Bãi cọc Bạch Đằng.",
+   "en": "Perfect! Succeed with the stake-field Strategy to unlock the archive card: The Bạch Đằng stakes."
   }
  },
  "panels": [
@@ -276,8 +276,8 @@ window.COMIC = {
    ],
    "scene": "On the tilted deck of the grounded Yuan flagship: Admiral Omar standing upright with dignity, his sword laid down at his feet, Dai Viet soldiers around him with spears lowered, a Vietnamese court officer in dark armor-robe stepping forward to accept his surrender; calm, respectful, no violence.",
    "caption": {
-    "vi": "Trong trận, tướng quân dồn Ô Mã Nhi; Toàn thư chép Nội minh tự Đỗ Hành bắt sống ông.",
-    "en": "In battle you corner Omar; the Annals credit officer Đỗ Hành with taking him alive.",
+    "vi": "Toàn thư chép: Nội minh tự Đỗ Hành bắt được Ô Mã Nhi.",
+    "en": "The Annals record: officer Đỗ Hành captured Omar.",
     "label": "Chính sử"
    },
    "bubbles": []

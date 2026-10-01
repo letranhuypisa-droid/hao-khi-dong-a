@@ -3,16 +3,40 @@
 // Bậc có thanh Phá Thế dùng HP = 120 × hệ số bậc × S(R) (11.1). Phá Thế về 0 → Vỡ Thế: đứng
 // khựng, nhận sát thương ×1,5, mở Đòn Quyết (3.7). Đòn viền đỏ báo trước 0,6 s và chỉ phản đòn
 // được, không đỡ được (3.6).
+//
+// Bắt sống (B20, defeatMeans "bị bắt" — Ô Mã Nhi, Phàn Tiếp): hpLockPct > 0 thì Sinh lực không xuống dưới ngưỡng đó (khóa, viền
+// vàng ở HUD — this.hpLocked); Đòn Quyết trúng lúc Vỡ Thế khi Sinh lực ≤ captureAtPct% (mặc định = hpLockPct), hoặc Sinh lực về
+// 0, thì bị bắt: đứng thẳng, vũ khí đặt dưới chân, không đánh nữa (không trói, không quỳ — R-spec §6). director.onCaptured(u)
+// (không có thì onBossDefeated). Thủy chiến (naval.js): this.deck, toạ độ trên boong do naval chở; this.climbY khi đang leo.
+// Boss B20 (director-b20.js): o.T đè số của bậc (Ô Mã Nhi: bậc "tuong" nhưng HP 12000, Phá Thế 1000 — Đại tướng), o.leash (m quanh
+// nhà), o.stay(tướng) (boss giữ boong của mình: tướng ở ngoài thì về chỗ đứng), this.script = { pts, k, onDone } đi theo kịch bản (lui lên lầu kỳ hạm — không nhận đòn), T.lunge
+// "Kích xuyên" (lao đâm: báo trước rồi lướt tới) khi this.lungeOn.
+// B15 không có các trường này nên mọi nhánh mới không chạy.
 
 import { makeRig, disposeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
+import * as THREE from "three";
 import { heightAt, collide } from "./world.js";
 import { TIERS, S, g, heSoGiap, DEFENSE, AI } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
 const STRAFE_SPEED = 1.5;     // m/s, đi vòng thăm dò quanh tướng
+const NO_IK = { ik: false };  // đang leo boong: chân không bám đất
+
+// Vũ khí đặt dưới chân người bị bắt (đạo cụ đơn giản, nằm ngang trước mũi chân, trục x cục bộ): đại đao, giáo, đao, cung.
+function weaponProp(kind, s = 1) {
+  const g = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x6a4a2e }), steel = new THREE.MeshLambertMaterial({ color: 0xb8bcc0 });
+  const bar = (len, r, mat, x) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat); m.rotation.z = Math.PI / 2; m.position.x = x; m.castShadow = true; g.add(m); };
+  const blade = (len, w, x) => { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.04, w), steel); m.position.x = x; m.castShadow = true; g.add(m); };
+  if (kind === "dadao") { bar(2.0, 0.035, wood, -0.35); blade(0.8, 0.26, 1.0); }
+  else if (kind === "giao") { bar(2.6, 0.03, wood, -0.2); blade(0.4, 0.08, 1.3); }
+  else if (kind === "cung") { bar(1.4, 0.03, wood, 0); }
+  else { bar(0.25, 0.03, wood, -0.55); blade(1.0, 0.09, 0.1); }
+  g.scale.setScalar(s); g.name = "captured-weapon";
+  return g;
+}
 
 export class BigUnit {
   constructor(ctx, o) {
@@ -21,16 +45,21 @@ export class BigUnit {
     this.rigKey = o.rigKey || o.tier;
     const R = ctx.R;
     if (o.side === "dich") {
-      const T = TIERS[o.tier];
+      const T = o.T ? { ...TIERS[o.tier], ...o.T } : TIERS[o.tier];
       // HP địch ×, Phá Thế địch × theo độ khó (§10)
       this.maxHp = T.hp * S(R) * (ctx.diff?.hp ?? 1); this.cong = T.cong * g(R); this.giap = T.giap * g(R);
-      this.poiseMax = T.poise * S(R) * (ctx.diff?.poise ?? 1); this.T = T;
+      // ctx.poiseAbs (B20): Phá Thế theo số tuyệt đối của canon (Đội trưởng 100, Tướng 600, Đại tướng 1000 mỗi tầng) — không nhân
+      // S(R) như Sinh lực (đòn của tướng bào Phá Thế theo MV, không theo cấp). B15 (R1, S = 1) không đặt cờ này.
+      this.poiseMax = T.poise * (ctx.poiseAbs ? 1 : S(R)) * (ctx.diff?.poise ?? 1); this.T = T;
     } else {
       this.maxHp = o.hp * g(R) * (1 + (ctx.stats?.mods.allyHpPct || 0)); this.cong = 110 * g(R); this.giap = 60 * g(R); this.poiseMax = 0;
       this.T = { mv: 1.5, every: 1.4, red: 0 };
     }
     this.hp = this.maxHp * (o.hpFrac ?? 1); this.poise = this.poiseMax;
     const cfg = RIGS[o.rigKey || o.tier];
+    this.weaponKind = cfg.weapon;
+    this.defeatMeans = o.defeatMeans || null; this.hpLockPct = o.hpLockPct || 0; this.captureAtPct = o.captureAtPct ?? this.hpLockPct;
+    this.captured = false; this.hpLocked = false; this.leash = o.leash; this.stay = o.stay || null; this.script = null; this.lungeOn = false; this.lungeCd = 3;
     this.rig = makeRig(cfg);
     this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, áo choàng, tua giáo (rig-motion.js)
     this.longWeapon = cfg.weapon === "giao" || cfg.weapon === "dadao";
@@ -46,19 +75,42 @@ export class BigUnit {
     this.place(0);       // đặt rig ngay chỗ xuất hiện, dây treo buông sẵn (khỏi bay từ gốc toạ độ vào)
   }
 
-  get y() { return heightAt(this.x, this.z); }
+  get y() {
+    if (this.climbY !== undefined) return this.climbY;                   // đang leo boong (naval.js)
+    if (this.deck) { const h = this.deck.heightAt(this.x, this.z, 0.8); if (h === h) return h; }   // trên boong xa tướng
+    return heightAt(this.x, this.z);
+  }
   get radius() { return 0.9 * this.rig.scale; }
 
   // Gỡ rig khỏi cảnh, giải phóng khung xương (texture xương), vật liệu riêng của đơn vị (hình học dùng chung, đệm theo
   // cấu hình trong models.js). Trước đây chỉ gỡ khỏi cảnh: mỗi lần sinh/xoá (Luyện tập sinh lại sĩ quan mỗi 3 s, thử
   // lại checkpoint, tướng đồng minh ngã rồi dậy) rò 22 geometry + 1 texture trên GPU.
-  dispose() { disposeRig(this.rig); this.alive = false; }
+  dispose() {
+    disposeRig(this.rig); this.alive = false;
+    if (this.prop) { this.ctx.scene.remove(this.prop); this.prop.traverse((m) => { m.geometry?.dispose(); m.material?.dispose(); }); this.prop = null; }
+  }
+
+  // Bắt sống: dừng mọi hành động, giấu vũ khí trong tay, đặt vũ khí nằm ngang dưới chân (đạo cụ riêng); thẻ "retreating"
+  // để mọi vòng chọn mục tiêu cũ (tướng, khoá mục tiêu, Đòn Quyết) bỏ qua người đã bị bắt.
+  capture(opt = {}) {
+    if (this.captured) return;
+    const ctx = this.ctx;
+    this.captured = true; this.state = "captured"; this.st = 0; this.broken = 0; this.retreating = true; this.hp = Math.max(this.hp, 1);
+    this.rig.p.handR.scale.setScalar(0.001);
+    if (this.weaponKind === "cung") this.rig.p.handL.scale.setScalar(0.001);
+    this.prop = weaponProp(this.weaponKind, this.rig.scale); ctx.scene.add(this.prop);
+    if (ctx.hero?.lock === this) ctx.hero.lock = null;
+    ctx.fx?.banner?.("BẮT SỐNG", "#f1d98a");
+    if (ctx.director?.onCaptured) ctx.director.onCaptured(this, opt); else ctx.director?.onBossDefeated?.(this);
+  }
 
   update(dt) {
     const ctx = this.ctx, hero = ctx.hero;
     this.animT += dt; this.flash = Math.max(0, this.flash - dt);
     if (!this.alive) return;
+    if (this.captured) { this.setPose(A.captured(this.animT), 0.12); this.place(dt); return; }   // bị bắt: đứng yên
     if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.dead), 0.3); if (this.dead > 3.5) this.dispose(); this.place(dt); return; }
+    if (this.script) { this.updateScript(dt); this.place(dt); return; }   // đi theo kịch bản (B20: lui lên lầu kỳ hạm)
     if (this.retreating) { this.updateRetreat(dt); return; }
 
     if (this.poiseMax > 0) {
@@ -88,29 +140,44 @@ export class BigUnit {
     if (this.state === "evade") {
       this.st -= dt; const sp = 3.2 / 0.4;
       this.x -= dx / (d || 1) * sp * dt; this.z -= dz / (d || 1) * sp * dt;
-      [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates);
+      [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates, this);
       this.setPose(A.backstep(1 - this.st / 0.4), 0.5); if (this.st <= 0) { this.state = "idle"; this.atkCd = Math.min(this.atkCd, 0.4); }
       return;
     }
     if (this.state === "hit") { this.st -= dt; this.setPose(A.hitReact(1 - this.st / 0.3), 0.4); if (this.st <= 0) this.state = "idle"; return; }
     if (this.state === "stagger") { this.st -= dt; this.setPose(A.hitReact(0.5), 0.3); if (this.st <= 0) this.state = "idle"; return; }
 
-    if (this.state === "atk" || this.state === "red" || this.state === "ult") { this.updateAttack(dt, hero, d); return; }
+    if (this.state === "atk" || this.state === "red" || this.state === "ult" || this.state === "lunge") { this.updateAttack(dt, hero, d); return; }
 
     if (!this.awake || !hero.alive) {
       const hd = Math.hypot(this.home.x - this.x, this.home.z - this.z);
       if (hd > 2) this.moveToward(this.home.x, this.home.z, dt, 0.5); else this.setPose(A.idle(this.animT), 0.1);
       return;
     }
+    // Boss giữ boong (B20, o.stay(tướng) → false khi tướng không đứng trên boong cho phép): về chỗ, đứng nhìn — không xuống bùn đuổi.
+    if (this.stay && !this.stay(hero)) {
+      if (Math.hypot(this.home.x - this.x, this.home.z - this.z) > 1.5) this.moveToward(this.home.x, this.home.z, dt, 0.8);
+      else { this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 4); this.setPose(A.idle(this.animT), 0.15); }
+      return;
+    }
     // Đội trưởng, Phó tướng bị giữ quanh Cứ Điểm; Toa Đô đuổi khắp bãi.
-    const leash = this.tier === "tuong" ? 999 : 40;
+    const leash = this.leash ?? (this.tier === "tuong" ? 999 : 40);
     if (Math.hypot(this.x - this.home.x, this.z - this.home.z) > leash && d > 8) { this.moveToward(this.home.x, this.home.z, dt, 1); return; }
 
     this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 6);
     this.atkCd -= dt; this.redCd -= dt; this.ultCd -= dt;
     const T = this.T;
-    if (this.tier === "tuong" && T.ult && this.hp < this.maxHp * 0.5 && this.ultCd <= 0 && d < 9) {
+    if (T.lunge && this.lungeOn) {                 // Kích xuyên (B20 Ô Mã Nhi ở lầu chỉ huy): tướng cách 3,5–7,5 m thì lao đâm
+      this.lungeCd -= dt;
+      if (this.lungeCd <= 0 && d > 3.5 && d < 7.5) {
+        this.state = "lunge"; this.st = 0; this.hitDone = false; this.lungeCd = T.lunge.cd; this.lungeYaw = Math.atan2(dx, dz);
+        ctx.fx.telegraph(this, 3, T.lunge.tele, false); ctx.audio.play("warn", this.x, this.z); return;
+      }
+    }
+    // T.ultMax (B20 Ô Mã Nhi: 1 — canon một Tuyệt Kỹ trên lầu chỉ huy): số lần tối đa; thiếu = không giới hạn (B15 Toa Đô như cũ)
+    if (this.tier === "tuong" && T.ult && this.hp < this.maxHp * 0.5 && this.ultCd <= 0 && d < 9 && !(T.ultMax !== undefined && (this.ultN || 0) >= T.ultMax)) {
       this.state = "ult"; this.st = 0; this.hitDone = false; this.ultCd = 16;
+      if (T.ultMax !== undefined) this.ultN = (this.ultN || 0) + 1;
       ctx.fx.telegraph(this, 7, T.ultTelegraph, true); ctx.audio.play("horn", this.x, this.z); return;
     }
     if (T.red && this.redCd <= 0 && d < 4.2) {
@@ -133,7 +200,7 @@ export class BigUnit {
     const vx = -nz * this.strafeDir * STRAFE_SPEED + nx * back, vz = nx * this.strafeDir * STRAFE_SPEED + nz * back;
     const tf = speedFactor(this.x, this.z, vx, vz);          // dốc, bùn (terrain-rules.js)
     this.x += vx * tf * dt; this.z += vz * tf * dt;
-    [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates);
+    [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates, this);
     // strafeDir = 1 đi về phía −x của rig (mặt hướng tướng) → hoạt ảnh bước theo −strafeDir
     const sg = A.strafeGait(STRAFE_SPEED * tf, this.rig.scale);
     this.runPhase += dt * sg.rate;
@@ -174,7 +241,37 @@ export class BigUnit {
         this.hitCrowd(7, 3);
       }
       if (this.st >= dur) { this.state = "idle"; this.atkCd = 1.2; }
+    } else if (this.state === "lunge") {
+      // Kích xuyên: báo trước tele s (thế chém nặng lấy đà), rồi lướt tới dist m trong 0,3 s theo hướng đã nhắm, trúng tướng
+      // trong 2,8 m quanh mũi đòn (đòn nặng, đỡ / né được)
+      const L = T.lunge, tele = L.tele, dash = 0.3, dur = tele + dash + 0.4;
+      if (this.st < tele) { this.yaw = turn(this.yaw, this.lungeYaw, dt * 6); this.setPose(A.heavyChop(this.st / tele * 0.45, 0.9, this.longWeapon), 0.5); }
+      else if (this.st < tele + dash) {
+        const sp = L.dist / dash; this.yaw = this.lungeYaw;
+        this.x += Math.sin(this.yaw) * sp * dt; this.z += Math.cos(this.yaw) * sp * dt;
+        [this.x, this.z] = collide(ctx.world, this.x, this.z, 0.7, ctx.openGates, this);
+        this.setPose(A.dash(0.2 + (this.st - tele) / dash * 0.45), 0.7);
+        if (!this.hitDone && Math.hypot(hero.x - this.x, hero.z - this.z) < 2.8) {
+          this.hitDone = true;
+          hero.receiveHit({ dmg: this.cong * L.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: false, src: this, heavy: true });
+        }
+      } else this.setPose(A.dash(0.65 + (this.st - tele - dash) / 0.4 * 0.35), 0.4);
+      if (this.st >= dur) { this.state = "idle"; this.atkCd = 0.9; }
     }
+  }
+
+  // Đi theo kịch bản (this.script: { pts: [{x, z}], k, i, onDone }): tới từng điểm, không nhận đòn; tới nơi thì đứng thủ thế nhìn
+  // tướng tới khi director gỡ kịch bản.
+  updateScript(dt) {
+    const S = this.script, p = S.pts[S.i || 0], h = this.ctx.hero;
+    this.state = "idle"; this.broken = 0;
+    if (p) {
+      if (Math.hypot(p.x - this.x, p.z - this.z) < 0.6) S.i = (S.i || 0) + 1;       // tới điểm: bước sau đi điểm kế
+      else this.moveToward(p.x, p.z, dt, S.k ?? 1, true);
+      return;
+    }
+    this.yaw = turn(this.yaw, Math.atan2(h.x - this.x, h.z - this.z), dt * 4); this.setPose(A.idle(this.animT), 0.15);
+    if (!S.done) { S.done = true; S.onDone?.(this); }
   }
 
   hitCrowd(r, mv) {
@@ -228,10 +325,13 @@ export class BigUnit {
 
   // free: chạy theo kịch bản (Toa Đô rút chạy) — không tính dốc, bùn
   moveToward(tx, tz, dt, k, free = false) {
+    // thủy chiến: đích ở boong khác thì đi qua ván bắc / ván dốc (naval.route)
+    const nav = this.ctx.naval;
+    if (nav && (this.deck || this.ctx.hero?.deck)) { const w = nav.route(this, null, tx, tz); if (w) { tx = w.x; tz = w.z; } }
     const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz) || 1;
     const sp = this.speed * k * (free ? 1 : speedFactor(this.x, this.z, dx, dz));   // dốc, bùn (terrain-rules.js)
     this.x += dx / d * sp * dt; this.z += dz / d * sp * dt;
-    [this.x, this.z] = collide(this.ctx.world, this.x, this.z, 0.7, this.ctx.openGates);
+    [this.x, this.z] = collide(this.ctx.world, this.x, this.z, 0.7, this.ctx.openGates, this);
     this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 7);
     const gt = A.gait(sp, this.rig.scale);         // nhịp bước theo tốc độ và cỡ người: chân trụ không trượt
     this.runPhase += dt * gt.rate;
@@ -246,16 +346,30 @@ export class BigUnit {
   place(dt = 0) {
     const r = this.rig.root;
     r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw;
-    if (this.alive) this.motion.update(dt, this.pose, heightAt);
+    if (this.alive) this.motion.update(dt, this.pose, heightAt, this.climbY !== undefined ? NO_IK : undefined);
+    if (this.prop) {             // vũ khí đặt nằm ngang trước mũi chân (bị bắt), theo người (người đứng trên boong trôi theo boong)
+      const f = 0.75 * this.rig.scale, px = this.x + Math.sin(this.yaw) * f, pz = this.z + Math.cos(this.yaw) * f;
+      this.prop.position.set(px, (this.deck ? this.y : heightAt(px, pz)) + 0.05, pz); this.prop.rotation.y = this.yaw;
+    }
   }
 
   // Đòn của tướng người chơi. Trả về { killed, broke }.
   takeHeroHit(dmg, poiseDmg, opt = {}) {
-    if (!this.alive || this.dead || this.retreating || this.side !== "dich") return {};
+    if (!this.alive || this.dead || this.retreating || this.script || this.side !== "dich") return {};
     const ctx = this.ctx;
+    if (this.stay && !this.stay(ctx.hero)) return {};          // boss giữ boong: tướng đứng ngoài (bùn dưới mạn) không chém tới
     let mult = this.broken > 0 ? 1.5 : 1;
     if (this.markT > ctx.clock) mult *= this.markMult;       // dấu Binh Thư Yếu Lược (hero-skills.js): +40% tới giờ markT
+    const wasBroken = this.broken > 0;
     this.hp -= dmg * mult; this.flash = 0.12; this.noHit = 0; this.awake = true;
+    if (this.defeatMeans === "bị bắt") {                 // bắt sống (B20): khóa Sinh lực, Đòn Quyết lúc Vỡ Thế thì bị bắt
+      const lock = this.maxHp * this.hpLockPct / 100;
+      if (lock > 0 && this.hp < lock) this.hp = lock;
+      this.hpLocked = lock > 0 && this.hp <= lock + 1e-6;
+      if (this.hp <= 0 || (opt.finisher && wasBroken && this.hp <= this.maxHp * this.captureAtPct / 100 + 1e-6)) {
+        this.capture(opt); return { killed: true, broke: false, captured: true };
+      }
+    }
     let broke = false;
     if (this.poiseMax > 0 && this.broken <= 0) {
       this.poise -= poiseDmg;
