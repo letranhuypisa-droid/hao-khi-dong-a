@@ -91,7 +91,7 @@ t("cổng còn đóng chặn tuyến kể cả khi cánh địch sụp đổ li�
 });
 t("mô phỏng bào mòn G của Cứ Điểm địch nhưng không tự chiếm (chỉ tướng mới chiếm)", () => {
   const s = mk(); s.bases.A1.keeperAlive = false; s.fronts.A.x = 0.27;
-  for (let i = 0; i < 400; i++) { simTick(s); s.fronts.A.x = Math.max(s.fronts.A.x, 0.27); }
+  for (let i = 0; i < 600; i++) { simTick(s); s.fronts.A.x = Math.max(s.fronts.A.x, 0.27); }     // 600 s: A1 G 140 (đợt 12) mất ~470 s bào mòn
   assert.equal(s.bases.A1.G, 0); assert.equal(s.bases.A1.owner, "dich");
 });
 t("Cứ Điểm của ta ở tuyến bị bào mòn hết G thì mất", () => {
@@ -853,10 +853,10 @@ console.log("\nCân bằng đợt 9 (Tuyệt Kỹ vào sĩ quan, tên lạc, đ�
     const tNow = G0 / (E.squad * E.drain * G0), tOld = 40 / (E.squad * 0.05);
     near(tNow, tOld, 1e-9); assert.ok(tNow < 0.7 * E.limit / 1.2, `${tNow.toFixed(1)} s — trong 70% hạn Trận chuẩn (60 s)`);
   });
-  t("nhịp Trận nhanh: Cứ Điểm và cổng nặng hơn (A1 G 110, A2/B2 G 160, cổng 8000)", () => {
+  t("nhịp Trận nhanh: Cứ Điểm và cổng nặng hơn (A1 G 140, A2/B2 G 160, cổng 11000, quân giữ cổng 45 — đợt 12 chỉnh lại sau khi cắt viện binh)", () => {
     const b = (id) => BASES.find((x) => x.id === id);
-    assert.equal(b("A1").G, 110); assert.equal(b("A2").G, 160); assert.equal(b("B2").G, 160);
-    assert.equal(b("A3").gate, 8000); assert.equal(b("B3").gate, 8000);
+    assert.equal(b("A1").G, 140); assert.equal(b("A2").G, 160); assert.equal(b("B2").G, 160);
+    assert.equal(b("A3").gate, 11000); assert.equal(b("B3").gate, 11000); assert.equal(b("A3").G, 45); assert.equal(b("B3").G, 45);
   });
 }
 

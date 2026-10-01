@@ -18,11 +18,14 @@ export const MAP = {
 };
 
 // Mặt trận: tuyến x ∈ [0,1] đổi sang toạ độ thế giới theo lineToX.
+// door (đợt 12c, ĐỀ XUẤT BẢN THỬ): "cửa ngõ" của cánh — Cứ Điểm nguồn viện binh, ở đây là doanh trại của chính cánh đó (đúng GDD, systems.md "Doanh trại":
+// "thành điểm xuất tiếp viện và nguồn hồi quân; địch mất nguồn hồi quân và các đợt tiếp viện còn lại của doanh trại đó"). Còn của địch: hồi quân, đợt tiếp
+// viện +100, và lính ở tuyến được bổ sung từ cửa ngõ rồi hành quân ra (battle/supply.js). Về tay ta (tướng chiếm, hoặc cánh địch vỡ trận): hết cả ba.
 export const FRONTS = {
   A: { id: "A", name: "Mặt trận A · bến trên", laneZ: -75, x0: 60, x1: 560, line0: 0.20,
-       qTa: 1000, qDich: 1200, allyGeneral: "H33" },
+       qTa: 1000, qDich: 1200, allyGeneral: "H33", door: "A2" },
   B: { id: "B", name: "Mặt trận B · bến dưới", laneZ: 75, x0: 60, x1: 560, line0: 0.40,
-       qTa: 1000, qDich: 1200, allyGeneral: "H40" },
+       qTa: 1000, qDich: 1200, allyGeneral: "H40", door: "B2" },
 };
 export const ENEMY_MIX = { KHIEN_NG: 0.6, CUNGKY_NG: 0.4 };   // 21.6
 export const lineToX = (f, x) => f.x0 + x * (f.x1 - f.x0);
@@ -37,14 +40,18 @@ export const xToLine = (f, wx) => (wx - f.x0) / (f.x1 - f.x0);
 // Sau kiểm chứng: A1 80 → 110 kéo P1 (pha ít dao động nhất); nâng cổng (9500–12000) thì P3 phình 250–330 s ở các seed mà
 // quân giữ cổng và cánh A địch còn đông (bot bị kéo đi săn cung, dọn) — cổng giữ 8000. A2/B2 170–175 không đổi P2 (P2 do
 // tuyến mô phỏng và Kế Sách quyết).
+// Đợt 12 (đo bot Quân sĩ Trận nhanh, trung vị tổng / P1 / P3, 9 seed: mốc 397 / 88 / 161 s): sửa cung kỵ không đánh được, giữ quân đồn trú trong dây và
+// cắt viện binh khi chiếm cửa ngõ kéo nhịp xuống 300 / 68 / 97 s (bot thắng trong 5 phút, mức đợt 9 đã coi là quá nhanh). Chỉnh lại: A1 G 110 → 140 (P1: lính
+// đồn trú không còn tản ra nên hạ nhanh hơn), cổng 8000 → 11000 và quân giữ cổng G 30 → 45 (P3: cửa ngõ A đã đóng nên cánh A không còn dày như lúc đợt 9 thấy
+// cổng 9500–12000 làm P3 phình tới 250–330 s). A2/B2 giữ 160.
 export const BASES = [
   { id: "HQ_TA", name: "Bản doanh ta", type: "ban_doanh", owner: "ta", front: null, x: 34, z: 0, r: 16 },
-  { id: "A1", name: "Đồn bến trên", type: "don", owner: "dich", front: "A", lineX: 0.30, G: 110, keeper: "doitruong", cap: 3, hk: [3, -5] },
+  { id: "A1", name: "Đồn bến trên", type: "don", owner: "dich", front: "A", lineX: 0.30, G: 140, keeper: "doitruong", cap: 3, hk: [3, -5] },
   { id: "A2", name: "Doanh trại trên bãi", type: "doanh_trai", owner: "dich", front: "A", lineX: 0.55, G: 160, keeper: "photuong", cap: 5, hk: [6, -10] },
-  { id: "A3", name: "Cổng bắc Hàm Tử quan", type: "cong", owner: "dich", front: "A", lineX: 0.80, gate: 8000, G: 30, hk: [5, 0] },
+  { id: "A3", name: "Cổng bắc Hàm Tử quan", type: "cong", owner: "dich", front: "A", lineX: 0.80, gate: 11000, G: 45, hk: [5, 0] },
   { id: "B1", name: "Đồn bến dưới", type: "don", owner: "ta", front: "B", lineX: 0.30, G: 40, keeper: "doitruong", cap: 3, hk: [3, -5] },
   { id: "B2", name: "Doanh trại bến dưới", type: "doanh_trai", owner: "dich", front: "B", lineX: 0.55, G: 160, keeper: "photuong", cap: 5, hk: [6, -10] },
-  { id: "B3", name: "Cổng nam Hàm Tử quan", type: "cong", owner: "dich", front: "B", lineX: 0.80, gate: 8000, G: 30, hk: [5, 0] },
+  { id: "B3", name: "Cổng nam Hàm Tử quan", type: "cong", owner: "dich", front: "B", lineX: 0.80, gate: 11000, G: 45, hk: [5, 0] },
 ];
 export const BASE_RING = { don: 10, doanh_trai: 13, cong: 7, ban_doanh: 16 };
 
@@ -56,7 +63,7 @@ export const PHASES = [
   { id: "P1", name: "Chiếm bến trên", goal: "Chiếm Đồn bến trên (A1)", par: 2, target: { base: "A1" },
     tip: "Đi theo mặt trận A về phía đông. Hạ quân đồn trú và Đội trưởng, rồi đứng trong vòng để chiếm." },
   { id: "P2", name: "Hai cánh", goal: "Chiếm Doanh trại trên bãi (A2)", par: 3, target: { base: "A2" },
-    tip: "Hai mặt trận cùng cần bạn. {Act:cmd} để mở vòng Mệnh Lệnh và giao việc cho quân." },
+    tip: "Doanh trại là cửa ngõ viện binh: chiếm nó thì cánh đó hết quân bù. {Act:cmd} giao việc cho quân." },
   { id: "P3", name: "Hàm Tử quan", goal: "Phá Cổng bắc (A3) hoặc Cổng nam (B3)", par: 3, target: { base: ["A3", "B3"] },
     tip: "Cổng bắc gần hơn. Cổng nam xa hơn, nhưng mở được thì cánh B +15 Sĩ Khí." },
   // hkFloor: kịch bản đảm bảo Hào Khí ≥ 90 ở pha boss (canon VS, systems.md §12 "dạy Tổng Phản Công") — đặt thẳng lúc vào

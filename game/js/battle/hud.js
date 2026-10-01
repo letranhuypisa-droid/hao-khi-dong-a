@@ -9,7 +9,7 @@
 // Sách), prompt (nhắc tương tác giữa đáy màn, vòng giữ phím), picker (chọn ≤ 4 điểm đến bằng phím 1–4 / chạm).
 
 import { ORDERS, HERO, MODES, TERRAIN } from "../data/tuning.js";
-import { totalQ } from "../sim/front.js";
+import { totalQ, supplyOpen } from "../sim/front.js";
 import { tpcReady } from "../sim/haokhi.js";
 import { heroTerrain } from "../sim/terrain-rules.js";
 import { MOVE_INFO, ICON, nextHeavy } from "../data/moves-info.js";
@@ -84,6 +84,7 @@ export class HUD {
       <div class="hud-prompt" data-k="prompt" hidden><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="bg"></circle><circle cx="18" cy="18" r="15" class="fg" data-k="promptring"></circle></svg><span data-k="prompttext"></span></div>
       <div class="hud-picker" data-k="picker" hidden></div>
       <div class="hud-wp" data-k="wp" hidden><div class="wp-in"><div class="wp-box"><i class="wp-dir" data-k="wpdir"></i><div><b data-k="wpname"></b><span data-k="wpdist"></span></div></div><i class="wp-tip"></i></div></div>
+      <div class="hud-wp alt" data-k="wp2" hidden><div class="wp-in"><div class="wp-box"><i class="wp-dir" data-k="wp2dir"></i><div><b data-k="wp2name"></b><span data-k="wp2dist"></span></div></div><i class="wp-tip"></i></div></div>
       <div class="hud-lockhint" data-k="lockhint" hidden></div>
       <div class="cine" data-k="cine"></div>
       <div class="lockmark" data-k="lockmark">◆</div>`;
@@ -145,7 +146,7 @@ export class HUD {
     const list = d.objectives && hero.alive && !d.over ? d.objectives() : null;
     let best = null, bd = Infinity;
     for (const o of list || []) { const dd = Math.hypot(o.x - hero.x, o.z - hero.z); if (dd < bd) { bd = dd; best = o; } }
-    if (!best || bd < best.r) { if (!E.wp.hidden) E.wp.hidden = true; return; }
+    if (!best || bd < best.r) { if (!E.wp.hidden) E.wp.hidden = true; this.frameBlocker(W, H, null); return; }
     const yaw = ctx.cam.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw), dx = best.x - hero.x, dz = best.z - hero.z;
     const fwd = dx * fx + dz * fz, rgt = -dx * fz + dz * fx;      // phải của camera = (−cos, sin)
     const w = placeWaypoint({ W, H, fwd, rgt, p: fwd > 0 ? ctx.project(best.x, best.y + 9, best.z) : null, half: this.wpHalf || 90, avoid: this.avoid || [] });   // hình học: waypoint.js
@@ -157,6 +158,28 @@ export class HUD {
     if (!this.wpHalf) this.wpHalf = Math.max(60, ((E.wp.querySelector(".wp-box").offsetWidth || 180) + 26) / 2);       // đo lại khi đổi chữ
     const dist = `${Math.round(bd)} m`;
     if (dist !== this.wpDist) { this.wpDist = dist; E.wpdist.textContent = dist; }
+    this.frameBlocker(W, H, w);
+  }
+  // Nhãn thứ hai (đợt 12b): con lính đồn trú cuối cùng còn chặn việc chiếm (director.blockers(), còn ≤ GARRISON.pointLast người). Cùng hình học với nhãn mục
+  // tiêu (waypoint.js) nhưng tránh luôn khung của nhãn đó; nổi trên đầu con lính khi thấy, ra rìa màn hình kèm mũi tên khi nó ở sau lưng hoặc ngoài khung.
+  // Trận không có blockers() (B20) thì không hiện.
+  frameBlocker(W, H, prim) {
+    const E = this.el, ctx = this.ctx, d = ctx.director, hero = ctx.hero;
+    const list = E.wp2 && d.blockers && hero.alive && !d.over ? d.blockers() : null, b = list && list[0];
+    if (!b) { if (E.wp2 && !E.wp2.hidden) E.wp2.hidden = true; return; }
+    const yaw = ctx.cam.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw), dx = b.x - hero.x, dz = b.z - hero.z;
+    const fwd = dx * fx + dz * fz, rgt = -dx * fz + dz * fx, half = this.wp2Half || 70;
+    const avoid = this.avoid || [];
+    const first = prim ? [{ l: prim.x - (this.wpHalf || 90), r: prim.x + (this.wpHalf || 90), t: prim.y - 62, b: prim.y + 14, side: "r" }] : [];
+    const w = placeWaypoint({ W, H, fwd, rgt, p: fwd > 0 ? ctx.project(b.x, b.y + 2.6, b.z) : null, half, avoid: [...avoid, ...first] });
+    if (E.wp2.hidden) E.wp2.hidden = false;
+    if (E.wp2.dataset.mode !== w.mode) E.wp2.dataset.mode = w.mode;
+    E.wp2.style.transform = `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`;
+    E.wp2dir.style.transform = `rotate(${Math.round(w.rot)}deg)`;
+    if (b.label !== this.wp2Name) { this.wp2Name = b.label; E.wp2name.textContent = b.label; this.wp2Half = 0; }
+    if (!this.wp2Half) this.wp2Half = Math.max(50, ((E.wp2.querySelector(".wp-box").offsetWidth || 120) + 26) / 2);
+    const dist = `${Math.round(Math.hypot(dx, dz))} m`;
+    if (dist !== this.wp2Dist) { this.wp2Dist = dist; E.wp2dist.textContent = dist; }
   }
   hkPulse(g) { this.pulse = 0.6; this.el.hkv.dataset.delta = (g > 0 ? "+" : "") + Math.round(g); }
 
@@ -390,8 +413,9 @@ export function frontRowHTML(F, f, sim) {
   const o = f.order ? `<em>${ORDERS[f.order.id].name} ${Math.ceil(f.order.left)}s</em>` : "";
   const gen = f.general.alive ? "" : "<em class=bad>tướng rút</em>";
   const here = sim.heroFront === F.id ? " here" : "";
+  const door = F.door && sim.bases?.[F.door] ? (supplyOpen(sim, F.id) ? "<em class=door title=\"Cửa ngõ mở: doanh trại cánh này còn của Nguyên, viện binh còn chạy ra tuyến\">Cửa mở</em>" : "<em class=door-shut title=\"Cửa ngõ đóng: hết viện binh cho cánh này\">Cửa đóng</em>") : "";   // đợt 12c: ngắn để hàng không xuống dòng
   return `<div class="front${here}"><b>${F.id}</b><span class="ta">${qt}</span><span class="vs">·</span><span class="dich">${qd}</span>
-        <span class="skv">Sĩ Khí ${Math.round(f.sk.ta)}|${Math.round(f.sk.dich)}</span>${o}${gen}</div>`;
+        <span class="skv">Sĩ Khí ${Math.round(f.sk.ta)}|${Math.round(f.sk.dich)}</span>${o}${gen}${door}</div>`;
 }
 
 // ---- thanh chiêu có icon (dùng chung trận chính và Võ trường) ------------------------------------------------

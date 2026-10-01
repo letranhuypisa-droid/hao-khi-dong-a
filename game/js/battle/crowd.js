@@ -20,8 +20,9 @@ import { blobGeometry, lambert } from "./models.js";
 import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { heightAt, collide } from "./world.js";
 import { surfaceY } from "./ground.js";
-import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
+import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, SUPPLY, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
+import { leashClamp, fleeDir } from "./garrison.js";                                                         // dây xích cứng, hướng rút của quân đồn trú (đợt 12b)
 
 const KIT_IDS = Object.keys(KITS);
 const CAP = 900;                 // mỗi kiểu lính; lính diễn tối đa ~800 + vùng chiến đấu
@@ -80,6 +81,7 @@ export class Crowd {
       slotAng: undefined, blockT: 0, blockCd: 0, evadeT: 0, evadedSwing: -1, chargeT: 0, chargeCd: 2 + this.ctx.rng.next() * 4, chargeHit: false, fleeT: 0,
       hitBy: 0, scale: tier.scale * (K.scale || 1), lvl: o.lvl || 1, fading: 0, tint: o.tint || null, panicT: 0,
       foe: null, retT: 0, duel: false, _eng: 0, slot: undefined, pool: null, partner: null,
+      forced: false, kiting: false, march: false,           // forced: lính diễn "ép" thành thật vì sát tướng (director.updateZone, promotion.js); kiting: đang lùi giữ tầm (gợi ý Cung kỵ, hints.js); march: lính bù xuất từ cửa ngõ đang hành quân ra tuyến (supply.js, đợt 12c)
       // đặt lại khi dùng lại lính trong bể: dấu Binh Thư (core verify mục 2), boong / thuyền (naval.js)
       markT: 0, markMult: 1, deck: null, boat: null, _pins: null,
     });
@@ -268,6 +270,7 @@ export class Crowd {
       a.flash = Math.max(0, a.flash - dt); a.bob += dt * 7; a.atkT += dt; a.flinch = Math.max(0, a.flinch - dt);
       a.blockT = Math.max(0, a.blockT - dt); a.blockCd -= dt; a.chargeCd -= dt;
       if (a.panicT > 0) a.panicT -= dt;
+      a.kiting = false;                  // đặt lại mỗi khung: các nhánh choáng / trúng đòn / bỏ chạy ở dưới `continue` trước chỗ đặt lại đúng giá trị (gợi ý Cung kỵ đọc cờ này)
       if (a.state === "swim") { nav.swim(a, dt); continue; }          // rơi xuống sông (naval.js): bơi vào bờ
       if (a.state === "dead") {
         a.dieT += dt;
@@ -308,23 +311,25 @@ export class Crowd {
       // ---- trạng thái đặc biệt: bỏ chạy, nhảy lùi, lao húc ----
       if (a.fleeT > 0) {
         a.fleeT -= dt; a.target = null; a.token = false; a.ready = false; a.windup = 0;
-        const sp = a.speed * 1.2, ax = -hx / dH, az = -hz / dH;
-        a.x += ax * sp * dt; a.z += az * sp * dt; a.yaw = turn(a.yaw, Math.atan2(ax, az), dt * 8);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.stride(a, px, pz, dt);
+        // lính thường chạy ngược khỏi tướng; quân đồn trú có dây cứng thì rút VỀ đồn (garrison.js fleeDir): trước đợt 12 sĩ quan trấn thủ ngã là
+        // cả đám trong 22 m chạy ra 29–46 m khỏi đồn
+        const sp = a.speed * 1.2, [ax, az] = fleeDir(a, hero);
+        a.x += ax * sp * dt; a.z += az * sp * dt; if (ax || az) a.yaw = turn(a.yaw, Math.atan2(ax, az), dt * 8);
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.leash(a); this.stride(a, px, pz, dt);
         continue;
       }
       if (a.evadeT > 0) {
         a.evadeT -= dt;
         const sp = AI.evadeDist / 0.3;
         a.x += a.evadeX * sp * dt; a.z += a.evadeZ * sp * dt; a.yaw = turn(a.yaw, Math.atan2(hx, hz), dt * 10);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); a.spd = 0;
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.leash(a); a.spd = 0;
         continue;
       }
       if (a.chargeT > 0) {
         a.chargeT -= dt;
         const sp = a.speed * AI.charge.speed;
         a.x += a.chargeX * sp * dt; a.z += a.chargeZ * sp * dt; a.yaw = turn(a.yaw, Math.atan2(a.chargeX, a.chargeZ), dt * 6);
-        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.stride(a, px, pz, dt);
+        [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a); this.leash(a); this.stride(a, px, pz, dt);
         if (hero.alive && dH <= reach + 0.4) { a.chargeT = 0; a.chargeHit = true; a.windup = a.windupT = 0.22; a.fake = false; a.target = hero; }
         else if (a.chargeT <= 0) a.atkCd = Math.max(a.atkCd, 0.8);
         continue;
@@ -441,7 +446,7 @@ export class Crowd {
           if (od > lim) { mvx -= nx * 0.6; mvz -= nz * 0.6; }
         }
       }
-      a.duel = duel;
+      a.duel = duel; a.kiting = kiting;
       // tách nhau
       let sx = 0, sz = 0;
       const pool = a.side === "dich" ? enemies : allies;
@@ -457,6 +462,7 @@ export class Crowd {
       const tf = mvx !== 0 || mvz !== 0 ? speedFactor(a.x, a.z, mvx, mvz) : 1;    // lên dốc chậm, xuống dốc nhanh, bùn lầy
       a.x += (mvx * a.speed * tf + sx * 4) * dt; a.z += (mvz * a.speed * tf + sz * 4) * dt;
       [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a);
+      this.leash(a);
       this.stride(a, px, pz, dt);
 
       // ---- đánh ----
@@ -474,6 +480,10 @@ export class Crowd {
     this.updateArrows(dt);
   }
 
+  // Dây xích cứng của quân đồn trú (đợt 12b, garrison.js leashClamp, số ở tuning.js GARRISON.hardLeash): neo có `hard` thì lính không rời tâm Cứ Điểm quá
+  // bán kính đó, dù đang đuổi tướng, đấu tay đôi hay vỡ trận. Neo không có `hard` (đoàn thuyền B20, toán sự kiện) không đổi.
+  leash(a) { if (a.anchor && a.anchor.hard) [a.x, a.z] = leashClamp(a.x, a.z, a.anchor); }
+
   // Tốc độ thật, hướng đi và pha bước chân lấy từ quãng đã đi (không bước khi bị đẩy, khi đứng); độ dài
   // chu kỳ khớp dáng đi nên bàn chân chống không trượt (soldier-motion.js advanceStride).
   stride(a, px, pz, dt) { advanceStride(a, px, pz, dt); }
@@ -486,8 +496,9 @@ export class Crowd {
     const K = a.K, face = a.side === "ta" ? Math.PI / 2 : -Math.PI / 2, rng = this.ctx.rng;
     const P = a.partner && a.partner.role === "actor" && a.partner.state !== "dead" && a.partner.alive ? a.partner : null;
     a.ready = a.frontRow || (K.ranged && d <= 0.3);
+    if (a.march && d <= SUPPLY.arrive) a.march = false;                   // tới chỗ đứng: hết hành quân, đi bộ như thường
     if (d > 0.3) {
-      const sp = Math.min(a.speed * (d > 3 ? 1 : 0.8), d * 2);
+      const sp = Math.min(Math.min(a.speed * (a.march ? SUPPLY.marchMult : 1), a.march ? SUPPLY.marchMax : 1e9) * (d > 3 ? 1 : 0.8), d * 2);
       a.x += dx / d * sp * dt; a.z += dz / d * sp * dt;
       a.yaw = turn(a.yaw, P && d < 2 ? Math.atan2(P.x - a.x, P.z - a.z) : Math.atan2(dx, dz), dt * 5);
     } else {

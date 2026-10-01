@@ -19,6 +19,7 @@ const LOW_HP = 0.35;                       // Sinh lực dưới mức này (cò
 const SK_LOW = 25, SK_SHIFT = 10, SK_FIRST_AT = 40;   // Sĩ Khí cánh ta dưới 25 → cảnh báo; một cánh lệch ≥ 10 khỏi 50, hoặc sau 40 s → giải thích
 const HICH_AFTER = 30;                     // sau chừng này giây chưa dùng Hịch Tướng Sĩ (E) thì nhắc
 const RED_NEAR = 14, OFFICER_NEAR = 25;    // vòng đỏ gần tướng; sĩ quan gần để nhắc Binh Thư (m)
+const KITE_NEAR = 14, KITE_AFTER = 3;      // cung kỵ lùi giữ tầm trong 14 m quanh tướng liên tục 3 s → dạy cách bắt kịp (đợt 12a)
 
 const vn = (x) => String(x).replace(".", ",");
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -37,6 +38,8 @@ export const HINTS = {
     text: () => { const c = WEAPON_CLASSES.WC01.traits.charge; return `Đại kiếm: giữ {c} thay vì bấm nhanh để tụ lực. Giữ ${vn(c.levels[0])} s lên cấp 2 (sát thương ×${vn(c.mult[1])}), ${vn(c.levels[1])} s lên cấp 3 (×${vn(c.mult[2])}); thanh "Tụ lực" hiện dưới Sinh lực.`; } },
   hich: { prio: 30, ttl: 30, T: 10,
     text: () => { const H = SKILLS.hichTuongSi; return `Bấm {skill}: ${H.name}. Đứng đọc ${H.channel} s (trúng đòn nặng thì bị ngắt), mọi cánh quân ta tăng ${H.siKhi} Sĩ Khí (tinh thần) và Công +${pct(H.allyAtk)} trong ${H.dur} s.`; } },
+  kyLui: { prio: 55, ttl: 6, T: 10, text: () => GLOSS.cungKy.short },
+  cuaNgo: { prio: 65, ttl: 12, T: 11, text: () => GLOSS.cuaNgo.short },        // sang P2 (director.completeMain): doanh trại là cửa ngõ viện binh của cánh
   binhThu: { prio: 30, ttl: 20, T: 10,
     text: () => { const B = SKILLS.binhThu; return `Bấm {skill2}: ${B.name}. Chỉ gươm đánh dấu một đơn vị địch (hoặc Cứ Điểm); ${B.mark} s quân ta đánh nó mạnh hơn ${pct(B.dmgPct)}.`; } },
 };
@@ -73,6 +76,7 @@ export function createHints({ seen = {}, enabled = () => true, gap = GAP_SEC, on
 //   t (giây trong trận) · battle ("B15"…) · hero { id, alive, hpFrac, revives, revive{hp,invuln}, charge (có tụ lực), sk1, sk2, ready1, ready2 }
 //   used { skill, skill2 } (đã bấm E / T lần nào chưa) · pressed (cạnh bấm khung này) · fronts [{ id, ta, dich }] | null (chỉ B15 hiện Sĩ Khí)
 //   target { poiseMax } | null (khung mục tiêu HUD) · redRing (vòng đỏ gần tướng) · officerNear
+//   kiteT (giây cung kỵ thật lùi giữ tầm gần tướng liên tục; bộ gợi ý tự cộng, snapshotOf chỉ cho kiter)
 // → [{ id, info }]: những gợi ý đang đến hạn (chưa lọc cái đã xem — createHints lo).
 export function hintsDue(s) {
   const out = [], h = s.hero;
@@ -91,7 +95,19 @@ export function hintsDue(s) {
   if (h.charge && s.pressed?.c) out.push({ id: "tuLuc", info: {} });
   if (h.sk1 === "hichTuongSi" && h.ready1 && !s.used.skill && s.t >= HICH_AFTER) out.push({ id: "hich", info: {} });
   if (h.sk2 === "binhThu" && h.ready2 && !s.used.skill2 && s.officerNear) out.push({ id: "binhThu", info: {} });
+  if (s.kiteT >= KITE_AFTER) out.push({ id: "kyLui", info: {} });
   return out;
+}
+
+// Có cung kỵ THẬT (trúng đòn được) đang lùi giữ tầm trong KITE_NEAR m quanh tướng không. a.kiting do crowd.update đặt mỗi khung.
+function kiterNear(ctx) {
+  const h = ctx.hero, crowd = ctx.crowd;
+  if (!crowd?.agents) return false;
+  for (const a of crowd.agents) {
+    if (a.side !== "dich" || !a.kiting || !a.K?.mounted || !a.K?.ranged || !crowd.hittable(a)) continue;
+    if ((a.x - h.x) ** 2 + (a.z - h.z) ** 2 < KITE_NEAR * KITE_NEAR) return true;
+  }
+  return false;
 }
 
 // ---- đọc ctx của trận ----------------------------------------------------------------------------------------------------------
@@ -108,13 +124,14 @@ export function snapshotOf(ctx, mem, inp) {
     target: tgt ? { poiseMax: tgt.poiseMax || 0 } : null,
     redRing: (ctx.fx?.teles || []).some((t) => !t.big && live(t.unit) && dist(t.unit) < RED_NEAR),         // big: Tuyệt Kỹ sĩ quan (đã có băng chữ riêng)
     officerNear: (ctx.units || []).some((u) => u.side === "dich" && live(u) && u.awake && dist(u) < OFFICER_NEAR),
+    kiter: kiterNear(ctx),
   };
 }
 
 // Gắn vào vòng lặp trận (battle.js step): update(dt, inp) mỗi khung; event(id) cho việc chỉ director biết (vd đòn đỏ ngắt chiếm: director.onHeroHit).
 export function createHintDriver(ctx, { seen = {}, enabled = () => true, onSeen = null, gap = GAP_SEC } = {}) {
   const hints = createHints({ seen, enabled, gap, onSeen });
-  const mem = { t: 0, acc: 0, used: { skill: false, skill2: false } };
+  const mem = { t: 0, acc: 0, kiteT: 0, used: { skill: false, skill2: false } };
   return {
     hints,
     update(dt, inp) {
@@ -124,10 +141,13 @@ export function createHintDriver(ctx, { seen = {}, enabled = () => true, onSeen 
       const P = inp?.pressed || {};
       if (P.skill) mem.used.skill = true;
       if (P.skill2) mem.used.skill2 = true;
-      if (d.over || !enabled()) return;
+      if (d.over || !enabled()) { mem.acc = 0; mem.kiteT = 0; return; }       // tắt rồi bật lại giữa trận: không dồn thời gian lúc tắt vào đồng hồ lùi giữ tầm
       if (mem.acc >= TICK || P.c) {                                  // cạnh bấm C chỉ tồn tại một khung: đọc ngay khung đó
-        mem.acc = 0;
-        for (const { id, info } of hintsDue(snapshotOf(ctx, mem, inp))) hints.offer(id, info, mem.t);
+        const step = mem.acc; mem.acc = 0;
+        const snap = snapshotOf(ctx, mem, inp);
+        mem.kiteT = snap.kiter ? mem.kiteT + step : 0;               // đứt quãng (hết lùi, lính hạ, xa tướng) thì đếm lại từ đầu
+        snap.kiteT = mem.kiteT;
+        for (const { id, info } of hintsDue(snap)) hints.offer(id, info, mem.t);
       }
       const h = hints.next(mem.t);
       if (h) d.say(h.text, h.T, "tip");

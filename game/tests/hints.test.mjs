@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { GLOSS, CONCEPT_ORDER } from "../js/data/glossary.js";
 import { HINTS, createHints, hintsDue, createHintDriver } from "../js/battle/hints.js";
-import { HERO, HAO_KHI, SIM, DEFENSE, DIFFICULTY, BROKEN_SEC, BROKEN_MULT } from "../js/data/tuning.js";
+import { HERO, HAO_KHI, SIM, DEFENSE, DIFFICULTY, BROKEN_SEC, BROKEN_MULT, KITS, AI } from "../js/data/tuning.js";
 import { SKILLS } from "../js/data/heroes.js";
 import { WEAPON_CLASSES } from "../js/data/weapon-classes.js";
 import { fmtKeys } from "../js/data/controls.js";
@@ -53,6 +53,22 @@ t("Đòn viền đỏ: nói vòng lớn dần cho đầy, cửa sổ phản đò
   const g = GLOSS.doDo.long;
   for (const v of [vn(DEFENSE.redTelegraph), vn(DEFENSE.parryWindow), vn(DEFENSE.counterLockout)]) assert.ok(g.includes(v), v + " ∉ " + g);
   assert.match(g, /đầy/); assert.match(g, /về 0/);
+});
+t("Cung kỵ (đợt 12a): câu dài và câu ngắn lấy tầm bắn, ngưỡng lùi từ tuning; dạy Né rồi chém / Phá Trận; nằm trong thẻ Trong trận", () => {
+  const g = GLOSS.cungKy, back = KITS.NG_KY.range * AI.kite;
+  for (const v of [String(KITS.NG_KY.range), String(back), "Né", "Phá Trận"]) assert.ok(g.long.includes(v), v + " ∉ " + g.long);
+  for (const v of [String(back), "{dodge}", "{skill}", "lao tới"]) assert.ok(g.short.includes(v), v + " ∉ " + g.short);
+  assert.ok(!/{/.test(g.long), "câu dài không có {token} phím");
+  assert.ok(CONCEPT_ORDER.includes("cungKy"));
+});
+t("Cửa ngõ (đợt 12c): nói doanh trại là nguồn viện binh, vệt đỏ trên bản đồ nhỏ, chiếm / vỡ trận thì đóng; có thẻ Trong trận và gợi ý lần đầu", () => {
+  const g = GLOSS.cuaNgo;
+  for (const v of ["Doanh trại", "viện binh", "bản đồ nhỏ"]) assert.ok(g.long.includes(v), v + " ∉ long");
+  assert.match(g.long, /vỡ trận/); assert.match(g.long, /đóng cửa ngõ/);
+  assert.ok(g.short.includes("cửa ngõ") && g.short.includes("viện binh") && !/{[^}]*}/.test(g.short.replace(/{[a-z:A-Z]+}/g, "")));
+  assert.ok(CONCEPT_ORDER.includes("cuaNgo"));
+  const H = createHints({ seen: {} }); assert.equal(H.offer("cuaNgo", {}, 0), true);
+  const h = H.next(0); assert.equal(h.id, "cuaNgo"); assert.equal(h.text, GLOSS.cuaNgo.short);
 });
 t("thẻ 'Trong trận' của bảng đòn lấy thẳng từ GLOSS (một nguồn)", () => {
   const html = movesGuideHTML({ dev: 0 });
@@ -158,6 +174,12 @@ t("siKhiThap: Sĩ Khí cánh TA dưới 25 (không tính cánh địch), nêu c�
   assert.ok(!hintsDue(mod({ fronts: [{ id: "A", ta: 40, dich: 10 }] })).some((x) => x.id === "siKhiThap"));
   assert.ok(!hintsDue(mod({ fronts: [{ id: "A", ta: 25, dich: 50 }] })).some((x) => x.id === "siKhiThap"));
 });
+t("kyLui (đợt 12a): cung kỵ lùi giữ tầm kéo dài từ 3 s mới nhắc; ngắn hơn hoặc ảnh chụp cũ không có kiteT thì im", () => {
+  assert.deepEqual(ids(mod({ kiteT: 3 })), ["kyLui"]);
+  assert.deepEqual(ids(mod({ kiteT: 2.9 })), []);
+  assert.deepEqual(ids(mod({ kiteT: 0 })), []);
+  assert.deepEqual(ids(base()), []);
+});
 t("tuLuc: lần đầu bấm C bằng tướng có tụ lực (đại kiếm); H35 hoặc không bấm thì không", () => {
   assert.deepEqual(ids(h31({ pressed: { c: true } })), ["tuLuc"]);
   assert.deepEqual(ids(mod({ pressed: { c: true } })), []);
@@ -242,6 +264,28 @@ t("vòng đỏ ở gần tướng → gợi ý doDo; vòng đỏ xa thì không;
   let c = fakeCtx({ teles: [far, ult] }), dr = createHintDriver(c.ctx, { seen: {}, enabled: () => true }); run(dr, 3); assert.equal(c.log.length, 0);
   c = fakeCtx({ teles: [near] }); dr = createHintDriver(c.ctx, { seen: {}, enabled: () => true }); run(dr, 1);
   assert.equal(c.log.length, 1); assert.match(c.log[0].text, /Vòng đỏ/);
+});
+const rider = (o = {}) => ({ side: "dich", alive: true, state: "move", role: "zone", K: { mounted: true, ranged: true }, kiting: true, x: 8, z: 0, ...o });
+const withCrowd = (c, agents) => { c.ctx.crowd = { agents, hittable: (a) => a.alive && a.state !== "dead" && a.role !== "actor" }; return c; };
+t("cung kỵ thật lùi giữ tầm gần tướng liên tục 3 s → một dòng 'tip' dạy Né / Phá Trận, rồi không lặp", () => {
+  const c = withCrowd(fakeCtx(), [rider()]), seen = {}, dr = createHintDriver(c.ctx, { seen, enabled: () => true });
+  run(dr, 2); assert.equal(c.log.length, 0);
+  run(dr, 2); assert.equal(c.log.length, 1); assert.equal(c.log[0].kind, "tip"); assert.match(c.log[0].text, /Cung kỵ/); assert.match(c.log[0].text, /{dodge}/);
+  assert.equal(seen.kyLui, true); run(dr, 30); assert.equal(c.log.length, 1);
+});
+t("tắt gợi ý rồi bật lại giữa trận: đồng hồ lùi giữ tầm tính lại từ 0 (không nhắc ngay vì dồn thời gian lúc tắt)", () => {
+  const c = withCrowd(fakeCtx(), [rider()]); let on = false;
+  const dr = createHintDriver(c.ctx, { seen: {}, enabled: () => on });
+  run(dr, 20); on = true; run(dr, 1.5); assert.equal(c.log.length, 0, "mới bật 1,5 s");
+  run(dr, 2); assert.equal(c.log.length, 1);
+});
+t("cung kỵ lùi bị ngắt quãng (hết lùi, xa tướng, lính diễn, bộ binh) thì đồng hồ về 0, không nhắc", () => {
+  const a = rider(), c = withCrowd(fakeCtx(), [a]), dr = createHintDriver(c.ctx, { seen: {}, enabled: () => true });
+  run(dr, 2); a.kiting = false; run(dr, 1); a.kiting = true; run(dr, 2); assert.equal(c.log.length, 0, "đứt quãng làm lại từ đầu");
+  for (const [mod2, why] of [[{ x: 30 }, "xa tướng"], [{ role: "actor" }, "lính diễn không trúng đòn"], [{ K: { mounted: false, ranged: true } }, "cung thủ bộ"], [{ side: "ta" }, "quân ta"]]) {
+    const c2 = withCrowd(fakeCtx(), [rider(mod2)]), d2 = createHintDriver(c2.ctx, { seen: {}, enabled: () => true }); run(d2, 8);
+    assert.equal(c2.log.length, 0, why);
+  }
 });
 t("sĩ quan có thanh Phá Thế hiện trong khung mục tiêu → phaThe; lính (không thanh) thì im", () => {
   let c = fakeCtx({ target: { poiseMax: 0 } }), dr = createHintDriver(c.ctx, { seen: {}, enabled: () => true }); run(dr, 2); assert.equal(c.log.length, 0);

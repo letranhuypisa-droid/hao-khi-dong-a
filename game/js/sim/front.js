@@ -7,7 +7,7 @@
 //   tonThat_A = SIM_LOSS_K * F_B * diaHinh_A * mThu_A
 //   diaHinh_A = công sự Hàm Tử quan × công sự làn đánh (sim/terrain-rules.js earthworkLossMult, khi st.earthworks)
 //   Q_A[i]   -= tonThat_A * Q_A[i] / Q_A * (bị khắc ? 1.25 : 1)
-//   hoiQuan_A = SIM_REGEN * Q0_A * min(2, soDoanhTrai_A) * m_luong_A
+//   hoiQuan_A = SIM_REGEN * Q0_A * min(2, soDoanhTrai_A) * m_luong_A   (địch: 0 khi cửa ngõ của cánh về tay ta — supplyOpen, đợt 12c)
 //   x        += SIM_LINE_V * (F_ta - F_dich) / (F_ta + F_dich) * (TPC ? 3 : 1)
 //   mỗi 10 tick: SK_A += 5 * (F_A - F_B) / (F_A + F_B)
 //   Cứ Điểm tại tuyến: G -= 0.5 * SIM_LOSS_K * F_tấn_công mỗi tick
@@ -48,6 +48,7 @@ export function createSim({ fronts, bases, enemyMix, R = 1, mods = {}, earthwork
       sk: { ta: 50, dich: 50 },
       order: null,                     // { id, left }
       general: { id: f.allyGeneral, alive: true, hp: 1, down: 0 },   // hp là tỉ lệ 0..1
+      door: f.door ?? null,                // cửa ngõ của cánh (id Cứ Điểm, FRONTS[id].door): xem supplyOpen
       collapse: { ta: 0, dich: 0 },
       hqHold: 0, waves: 0,
       pendingKills: { ta: 0, dich: 0 },  // Q phải trừ từ vùng chiến đấu (KO thật)
@@ -65,6 +66,14 @@ export function createSim({ fronts, bases, enemyMix, R = 1, mods = {}, earthwork
     };
   }
   return st;
+}
+
+// Cửa ngõ của cánh (đợt 12c): Cứ Điểm nguồn viện binh — FRONTS[id].door, doanh trại của chính cánh đó. Còn của địch thì cánh địch còn viện binh: hồi quân,
+// đợt tiếp viện +100 mỗi 120 s, và lính ở tuyến được bổ sung (director.js fillActors). Về tay ta — tướng chiếm, hoặc cánh địch vỡ trận (tick dưới) — thì hết cả ba.
+// Không khai cửa ngõ (hoặc id lạ) thì coi như mở: trận khác và các bài thử cũ chạy như trước.
+export function supplyOpen(st, frontId) {
+  const f = st.fronts[frontId], b = f && f.door ? st.bases[f.door] : null;
+  return !b || b.owner === "dich";
 }
 
 export function mSK(sk) {
@@ -254,7 +263,7 @@ export function simTick(st) {
 
     // hồi quân
     for (const side of ["ta", "dich"]) {
-      const regen = SIM.REGEN * f.q0[side] * barracks(st, id, side);
+      const regen = side === "dich" && !supplyOpen(st, id) ? 0 : SIM.REGEN * f.q0[side] * barracks(st, id, side);
       const q = f.q[side], Q = sum(q);
       if (Q < f.q0[side]) addQ(side, f, Math.min(regen, f.q0[side] - Q));
     }
@@ -339,7 +348,7 @@ export function simTick(st) {
     if (st.t % SIM.enemyReinf.every === 0 && f.waves < SIM.enemyReinf.maxWaves) {
       let n = 0;
       for (const bid in st.bases) { const b = st.bases[bid]; if (b.front === id && b.type === "doanh_trai" && b.owner === "dich") n++; }
-      if (n > 0) { addQ("dich", f, SIM.enemyReinf.amount * n); f.waves++; ev.push({ type: "enemyReinf", front: id, amount: 100 * n }); }
+      if (n > 0 && supplyOpen(st, id)) { addQ("dich", f, SIM.enemyReinf.amount * n); f.waves++; ev.push({ type: "enemyReinf", front: id, amount: 100 * n }); }
     }
   }
   return ev;

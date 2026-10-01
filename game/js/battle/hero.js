@@ -23,7 +23,7 @@ import { makeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { HERO, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, GATE_DIV, HAO_KHI, IMPACT } from "../data/tuning.js";
+import { HERO, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, GATE_DIV, HAO_KHI, IMPACT, hitRadius, hitPad } from "../data/tuning.js";
 import { HEROES, SKILLS, CHAINS, movesetOf, moveFlags } from "../data/heroes.js";
 import { WEAPON_CLASSES, poisePerMv, chargeMult, chargeLevel } from "../data/weapon-classes.js";
 import { moveInfoOf, nextHeavy } from "../data/moves-info.js";
@@ -352,7 +352,7 @@ export class Hero {
     // lính
     for (const a of [...ctx.crowd.agents]) {
       if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
-      if (!inShape(a.x, a.z, 0.4)) continue;
+      if (!inShape(a.x, a.z, hitRadius(a))) continue;      // kỵ binh: vòng trúng lớn hơn (tuning.js HIT_R), khớp thân ngựa
       const dx = a.x - this.x, dz = a.z - this.z, d = Math.hypot(dx, dz) || 1;
       const dmg = this.damageTo(a.giap, mv, m.crit, a, F.armorPen);
       const stun = isC && this.mods.cStun && ctx.rng.chance(this.mods.cStun) ? 1.5 : 0;
@@ -466,7 +466,7 @@ export class Hero {
   }
   afterimageBurst(x, z) {
     for (const a of this.ctx.crowd.agents) {
-      if (a.side !== "dich" || !this.ctx.crowd.hittable(a) || Math.hypot(a.x - x, a.z - z) > 3) continue;
+      if (a.side !== "dich" || !this.ctx.crowd.hittable(a) || Math.hypot(a.x - x, a.z - z) > 3 + hitPad(a)) continue;
       this.ctx.crowd.damage(a, this.damageTo(a.giap, 0.5, false, a), { by: "hero", swing: ++this.swingId, knock: 3 });
     }
   }

@@ -3,12 +3,15 @@
 
 import * as THREE from "three";
 import { FRONTS, BASES, BASE_RING, PHASES, EVENTS, ALLY_GENERALS, MAP, lineToX, ENEMY_MIX } from "../data/battle-b15.js";
-import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS, MODES, HERO } from "../data/tuning.js";
+import { SIM, HAO_KHI, QUICK, ZONE, ORDERS, TIERS, MODES, HERO, GARRISON, KITS, SUPPLY } from "../data/tuning.js";
 import { KeSachManager } from "./kesach.js";
 import { PICKUPS, DROPS } from "../data/progression.js";
-import { simTick, issueOrder, triggerTPC, totalQ, snapshot as simSnapshot } from "../sim/front.js";
+import { simTick, issueOrder, triggerTPC, totalQ, supplyOpen, snapshot as simSnapshot } from "../sim/front.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone, raiseTo as hkRaiseTo } from "../sim/haokhi.js";
 import { BigUnit } from "./units.js";
+import { pickPromotions } from "./promotion.js";
+import { classifyGarrison, garrisonHint, nearestBlocker, isLast } from "./garrison.js";
+import { doorSpawnPoint, planRefill, transitCap, tickCap, lineWant } from "./supply.js";
 import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
 import { BannerQueue } from "./banner-queue.js";
@@ -124,7 +127,11 @@ export class Director {
       if (e.type === "baseFlip") {
         ctx.world.setBaseOwner(e.id, e.owner);
         const d = baseDef(e.id);
-        if (e.owner === "dich") { this.hk(d.hk[1], "mất:" + e.id); this.say(`Mất ${d.name}!`, 4, "bad"); ctx.audio.play("horn"); }
+        if (e.owner === "dich") {
+          this.hk(d.hk[1], "mất:" + e.id); this.say(`Mất ${d.name}!`, 4, "bad"); ctx.audio.play("horn");
+          const F = Object.values(FRONTS).find((x) => x.door === e.id);       // doanh trại cửa ngõ về tay địch: viện binh chạy lại (đợt 12c)
+          if (F) this.say(`Cửa ngõ ${F.id} mở lại: quân Nguyên lại có viện binh ở ${FRONTS[F.id].name}.`, 5, "bad");
+        }
         else { this.onBaseTaken(e.id, "sim"); }
       } else if (e.type === "collapse") this.say(`${FRONTS[e.front].name}: cánh ${e.side === "ta" ? "ta" : "địch"} vỡ trận!`, 4, e.side === "ta" ? "bad" : "good");
       else if (e.type === "reinfArrived") this.say(`Tiếp viện ${e.amount} quân tới ${FRONTS[e.front].name}.`, 4, "good");
@@ -163,20 +170,45 @@ export class Director {
       const front = {};           // cột → lính hàng đầu cận chiến, để ghép cặp hai bên
       for (const side of ["ta", "dich"]) {
         const zoneN = crowd.agents.filter((a) => a.front === fid && a.side === side && a.role === "zone" && a.state !== "dead").length;
-        const want = Math.max(0, Math.min(Math.round(budget * w), Math.max(6, Math.round(totalQ(f, side) * this.visR())) - zoneN));
+        const want0 = Math.max(0, Math.min(Math.round(budget * w), Math.max(6, Math.round(totalQ(f, side) * this.visR())) - zoneN));
+        // Đợt 12c: cánh địch có tướng giữ tối thiểu SUPPLY.lineFloor lính ở tuyến ở MỌI mức Số lính (vùng chiến đấu lấy địch từ tuyến; mức Thấp chỉ 17 thì cạn ở 1 lính/s,
+        // trong khi canon đòi kết quả không đổi theo mức); cánh đã kiệt Q thì không giữ sàn
+        const want = side === "dich" ? lineWant(want0, fid === hf && totalQ(f, side) >= 2 * SUPPLY.lineFloor) : want0;
         let actors = crowd.agents.filter((a) => a.role === "actor" && a.front === fid && a.side === side && a.state !== "dead");
-        // bớt người thì bớt từ hàng sau cùng (chỗ số lớn), không bớt bừa
-        if (actors.length > want) {
-          actors.sort((p, q) => (q.slot ?? 1e9) - (p.slot ?? 1e9));
-          for (let i = 0; i < actors.length - want; i++) crowd.release(actors[i]);
-          actors = actors.slice(actors.length - want);
-        }
-        for (let i = actors.length; i < want; i++) {
-          const unit = side === "ta" ? "GIAO_DV" : (rng.next() < ENEMY_MIX.KHIEN_NG ? "KHIEN_NG" : "CUNGKY_NG");
-          const back = instant ? 0 : 18;
-          const a = crowd.spawn({ side, unit, role: "actor", front: fid, x: lx + (side === "ta" ? -back : back), z: F.laneZ + rng.range(-20, 20),
-            legionMult: ctx.stats.legionMult });
-          actors.push(a);
+        // Đợt 12c: lính địch BÙ (không phải dựng tức thì) đi qua cửa ngõ của cánh — xuất ở chỗ xuất quân sau doanh trại rồi hành quân ra tuyến; cửa ngõ về
+        // tay ta thì không bù. Lính đang đi đường không tính vào số lính ở tuyến (want), có trần riêng (SUPPLY.transitMax). Quân ta, và dựng tức thì (đầu trận,
+        // tải lại điểm lưu), giữ cách cũ.
+        const door = side === "dich" && !instant && F.door ? F.door : null;
+        if (!door) {
+          // bớt người thì bớt từ hàng sau cùng (chỗ số lớn), không bớt bừa
+          if (actors.length > want) {
+            actors.sort((p, q) => (q.slot ?? 1e9) - (p.slot ?? 1e9));
+            for (let i = 0; i < actors.length - want; i++) crowd.release(actors[i]);
+            actors = actors.slice(actors.length - want);
+          }
+          for (let i = actors.length; i < want; i++) {
+            const unit = side === "ta" ? "GIAO_DV" : (rng.next() < ENEMY_MIX.KHIEN_NG ? "KHIEN_NG" : "CUNGKY_NG");
+            const back = instant ? 0 : 18;
+            const a = crowd.spawn({ side, unit, role: "actor", front: fid, x: lx + (side === "ta" ? -back : back), z: F.laneZ + rng.range(-20, 20),
+              legionMult: ctx.stats.legionMult });
+            actors.push(a);
+          }
+        } else {
+          let line = actors.filter((a) => !a.march);
+          if (line.length > want) {
+            line.sort((p, q) => (q.slot ?? 1e9) - (p.slot ?? 1e9));
+            const gone = new Set(line.slice(0, line.length - want));
+            for (const a of gone) crowd.release(a);
+            actors = actors.filter((a) => !gone.has(a)); line = line.filter((a) => !gone.has(a));
+          }
+          const p = this.basePos(door), S = doorSpawnPoint(F, p, lx), hero = ctx.hero, vr = this.visR();
+          const n = planRefill({ open: supplyOpen(sim, fid), blocked: hero.alive && Math.hypot(hero.x - S.x, hero.z - S.z) < SUPPLY.minDist,
+            want, arrived: line.length, moving: actors.length - line.length, transitMax: transitCap(vr), perTick: tickCap(vr) });
+          for (let i = 0; i < n; i++) {
+            const unit = rng.next() < ENEMY_MIX.KHIEN_NG ? "KHIEN_NG" : "CUNGKY_NG";
+            const a = crowd.spawn({ side, unit, role: "actor", front: fid, x: S.x + (i % 3) * 1.5, z: S.z + rng.range(-14, 14), legionMult: ctx.stats.legionMult });
+            a.march = true; actors.push(a);
+          }
         }
         front[side] = this.layoutActors(actors, F, lx, side, instant);
       }
@@ -194,8 +226,9 @@ export class Director {
   // chạy lại mỗi giây. Giờ chỗ trống ở hàng trên thì người cùng cột ở hàng dưới bước lên lấp. Trả về hàng đầu cận
   // chiến theo cột (để ghép cặp).
   layoutActors(actors, F, lx, side, instant) {
-    const cols = ACTOR_COLS, dir = side === "ta" ? -1 : 1, pools = { m: [], r: [], k: [] };
+    const cols = ACTOR_COLS, dir = side === "ta" ? -1 : 1, pools = { m: [], r: [], k: [] }, marching = [];
     for (const a of actors) {
+      if (a.march) { marching.push(a); continue; }         // lính bù đang hành quân từ cửa ngõ (đợt 12c): chưa có chỗ trong đội hình, xem cuối hàm
       const pk = a.K.mounted ? "k" : a.K.ranged ? "r" : "m";
       if (a.pool !== pk) { a.pool = pk; a.slot = undefined; }
       pools[pk].push(a);
@@ -229,6 +262,12 @@ export class Director {
       }
       depth += rows * rowGap + (pk === "m" ? 1.6 : 2.4);
     }
+    // Lính đang hành quân không chiếm chỗ của khối nào (nếu có, chỗ trống ở hàng đầu bị giữ cả 20–30 s trong lúc họ đi): đứng chờ ở bãi tập kết sau cùng của
+    // đội hình; tới nơi (crowd.updateActor, SUPPLY.arrive) thì hết cờ hành quân và lần xếp sau mới cho họ chỗ trống ở hàng đầu.
+    for (const a of marching) {                        // ô theo id (không theo thứ tự mảng: một lính khác tới nơi / bị bỏ đi thì cả cột không đổi đích)
+      a.slot = undefined; a.pool = null; a.frontRow = false;
+      a.sx = lx + dir * (depth + 3 + (Math.floor(a.id / cols) % 6) * 2.2); a.sz = F.laneZ - 20 + (a.id % cols) * 4;
+    }
     for (const a of actors) if (!a.frontRow) a.partner = null;
     return frontCols;
   }
@@ -256,7 +295,7 @@ export class Director {
     for (const a of [...crowd.agents]) {
       if (a.state === "dead") continue;
       const d = Math.hypot(a.x - hero.x, a.z - hero.z);
-      if (a.role === "zone" && d > 45 && a.front) { a.role = "actor"; a.token = false; }
+      if (a.role === "zone" && d > 45 && a.front) { a.role = "actor"; a.token = false; a.forced = false; }
       else if (a.role === "zone" && d > 60 && !a.front) crowd.release(a);
       else if (a.role === "garrison" && d > 70) crowd.release(a);
     }
@@ -264,16 +303,26 @@ export class Director {
     // Trần 30 địch / 20 ta là của vùng chiến đấu quanh tướng: chỉ đếm lính thật trong ZONE.countR m. Trước đây
     // đếm cả các toán ở xa (phản công A1, vây tướng, giữ bờ Kế Sách: 22–28 người) nên đứng trong vòng A2 mà
     // quân đồn trú đã hết thì không sinh thêm ai, G không giảm, P2 kẹt (gặp cả khi không bật làn).
-    let enemies = 0, allies = 0;
-    const cR2 = ZONE.countR * ZONE.countR;
-    for (const a of crowd.agents) if (crowd.hittable(a) && (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 < cR2) { if (a.side === "dich") enemies++; else allies++; }
-    // 2) lính diễn trong 25 m → lính thật, gần nhất trước, không vượt trần 30 địch / 20 ta
-    const near = crowd.agents.filter((a) => a.role === "actor" && a.state !== "dead")
-      .map((a) => [a, (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2]).filter(([, d2]) => d2 < R * R).sort((p, q) => p[1] - q[1]);
-    for (const [a] of near) {
-      if (a.side === "dich" ? enemies >= ZONE.enemies : allies >= ZONE.allies) continue;
-      a.role = "zone"; a.token = false;
-      if (a.side === "dich") enemies++; else allies++;
+    // Đợt 12a: lính địch "ép" thành thật (a.forced, xem dưới) KHÔNG tính vào enemies: chúng không chiếm chỗ trần mềm, nên không làm chậm
+    // việc sinh quân đồn trú / khối quân ở tuyến ở các bước sau.
+    let enemies = 0, allies = 0, forcedN = 0;
+    const cR2 = ZONE.countR * ZONE.countR, kR2 = ZONE.forcedKeepR * ZONE.forcedKeepR;
+    for (const a of crowd.agents) {
+      if (!crowd.hittable(a)) continue;
+      const d2 = (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2;
+      if (d2 >= cR2) continue;
+      if (a.side !== "dich") allies++;
+      else if (a.forced) { if (d2 < kR2) forcedN++; }      // lính ép đã lùi ra xa (cung kỵ giữ tầm) không giữ hạn mức của lính diễn sát tướng
+      else enemies++;
+    }
+    // 2) lính diễn trong 25 m → lính thật, gần nhất trước, không vượt trần 30 địch / 20 ta; riêng lính địch sát tướng (ZONE.nearR) thì vẫn
+    // thành lính thật khi trần đầy, tối đa ZONE.forcedMax người (promotion.js): lính diễn không trúng đòn, đứng cạnh tướng là chém xuyên qua
+    const actors = crowd.agents.filter((a) => a.role === "actor" && a.state !== "dead");
+    const pr = pickPromotions(actors, hero, { dich: enemies, ta: allies, forced: forcedN }, ZONE);
+    for (const a of pr.promote) {
+      a.role = "zone"; a.token = false; a.march = false;
+      if (a.fake) { a.windup = 0; a.fake = false; }      // nhát chém GIẢ của lính diễn dở dang: bỏ, không thì thành đòn thật không thẻ, không báo trước
+      if (a.side !== "dich") allies++; else if (pr.forced.includes(a)) a.forced = true; else enemies++;
     }
 
     // 2) quân đồn trú: Cứ Điểm địch có G > 0 trong 45 m
@@ -287,7 +336,7 @@ export class Director {
       for (let i = 0; i < want && enemies < ZONE.enemies + 6; i++) {
         const ang = rng.range(0, Math.PI * 2), rr = rng.range(2, p.r + 3);
         crowd.spawn({ side: "dich", unit: rng.next() < 0.7 ? "KHIEN_NG" : "CUNGKY_NG", tier: rng.next() < 0.15 ? "tinhnhue" : "thuong",
-          role: "garrison", src: id, front: null, x: p.x + Math.cos(ang) * rr, z: p.z + Math.sin(ang) * rr, anchor: { x: p.x, z: p.z, r: p.r } });
+          role: "garrison", src: id, front: null, x: p.x + Math.cos(ang) * rr, z: p.z + Math.sin(ang) * rr, anchor: { x: p.x, z: p.z, r: p.r, hard: p.r + GARRISON.hardLeash } });
         enemies++;
       }
       if (b.keeperAlive && !this.keepers[id]) this.spawnKeeper(id);
@@ -307,20 +356,14 @@ export class Director {
         enemies++;
       }
     }
-    // 3) khối quân địch ở tuyến: bổ sung lính thật từ mép vòng khi thiếu (30 địch nếu Q địch ≥ 30)
+    // 3) khối quân TA ở tuyến: bổ sung lính thật từ mép vòng khi thiếu (đợt 12c bỏ phần của địch: lấy từ lính diễn ở tuyến qua cửa ngõ)
     const hf = sim.heroFront;
     if (hf) {
       const F = FRONTS[hf], f = sim.fronts[hf], lx = lineToX(F, f.x);
       const dMass = Math.hypot(Math.max(0, lx - hero.x, hero.x - (lx + 30)), Math.max(0, Math.abs(hero.z - F.laneZ) - 25));
       if (dMass < 22) {
-        const fromFront = crowd.agents.filter((a) => a.role === "zone" && a.front === hf && a.side === "dich" && a.state !== "dead").length;
-        const want = Math.min(ZONE.enemies, Math.floor(totalQ(f, "dich"))) - fromFront;
-        for (let i = 0; i < want && enemies < ZONE.enemies; i++) {
-          const x = Math.max(lx + 2, hero.x + rng.range(10, 22)), z = hero.z + rng.range(-16, 16);
-          crowd.spawn({ side: "dich", unit: rng.next() < ENEMY_MIX.KHIEN_NG ? "KHIEN_NG" : "CUNGKY_NG", tier: rng.next() < 0.1 ? "tinhnhue" : "thuong",
-            role: "zone", front: hf, x: Math.min(x, MAP.fortWallX - 4), z });
-          enemies++;
-        }
+        // Đợt 12c: bỏ khối quân địch mọc ở hero.x + 10…22 m, z ± 16 (pop-in sát tướng, 17–22 lính/phút, canon 13.1 "đúng 30 địch"): vùng chiến đấu giờ lấy địch
+        // từ lính diễn ở tuyến (bước 2) — lính ấy xuất từ cửa ngõ (fillActors) — và quân đồn trú. Cửa ngõ đóng thì không còn gì bổ sung.
         const allyFront = crowd.agents.filter((a) => a.role === "zone" && a.front === hf && a.side === "ta" && a.state !== "dead").length;
         const wantA = Math.min(ZONE.allies - this.guardCount(), 12) - allyFront;
         for (let i = 0; i < wantA && allies < ZONE.allies; i++) {
@@ -360,19 +403,41 @@ export class Director {
       if (b.type === "cong" || b.type === "ban_doanh") continue;
       if (b.owner !== "dich") { ctx.world.setBaseProgress(id, 0); this.capT[id] = 0; continue; }
       const p = this.basePos(id);
-      const inRing = hero.alive && Math.hypot(hero.x - p.x, hero.z - p.z) < p.r;
-      let garrisonAlive = 0;
-      for (const a of ctx.crowd.agents) if (a.role === "garrison" && a.src === id && ctx.crowd.hittable(a)) garrisonAlive++;
+      const dHero = hero.alive ? Math.hypot(hero.x - p.x, hero.z - p.z) : Infinity, inRing = dHero < p.r;
+      const garrison = [];
+      for (const a of ctx.crowd.agents) if (a.role === "garrison" && a.src === id && ctx.crowd.hittable(a)) garrison.push(a);
+      const garrisonAlive = garrison.length;
       const ready = b.G < 1 && !garrisonAlive && !b.keeperAlive;
       if (inRing && ready) {
         if (this.capPause <= 0) this.capT[id] = (this.capT[id] || 0) + dt * (1 + ctx.stats.mods.capSpeed);
         if (this.capT[id] >= d.cap) this.captureBase(id);
       } else if (!inRing) this.capT[id] = Math.max(0, (this.capT[id] || 0) - dt);
       ctx.world.setBaseProgress(id, (this.capT[id] || 0) / d.cap);
-      // "còn N" lấy số lớn hơn giữa G và lính đồn trú còn đứng: mô phỏng bào mòn G về 0 mà lính còn sống thì trước đây ghi "còn 0"
-      if (inRing && !ready) hint = b.keeperAlive ? `Hạ ${TIERS[d.keeper].name} trấn thủ` : `Hạ quân đồn trú: còn ${Math.max(Math.ceil(b.G), garrisonAlive)}`;
+      // "còn N" lấy số lớn hơn giữa G và lính đồn trú còn đứng: mô phỏng bào mòn G về 0 mà lính còn sống thì trước đây ghi "còn 0".
+      // Đợt 12b: hiện khi tướng cách đồn < GARRISON.hintR (không chỉ trong vòng — trước đây ẩn ~48% trận A1), kèm "a trong đồn · b ngoài đồn" (garrison.js)
+      if (dHero < GARRISON.hintR && !ready) {
+        const c = classifyGarrison(p, garrison);
+        hint = garrisonHint({ G: b.G, keeperAlive: b.keeperAlive, keeperName: TIERS[d.keeper]?.name, inside: c.inside, outside: c.outside });
+      }
     }
     this.baseHint = hint;
+  }
+
+  // Những con lính đồn trú cuối cùng còn chặn việc chiếm, cho HUD chỉ đường (hud.js frameBlocker: mũi tên mép màn hình, nhãn nổi trên đầu) — chỉ khi kho G không còn ai
+  // ra thêm và còn ≤ GARRISON.pointLast người (garrison.js isLast), Cứ Điểm vẫn của địch; trả con gần tướng nhất [{ id, label, x, y, z, r }], không thì []. (Cổng không tính.)
+  blockers() {
+    const ctx = this.ctx, crowd = ctx.crowd, sim = ctx.sim, by = {};
+    for (const a of crowd.agents) {
+      if (a.role !== "garrison" || !a.src || !crowd.hittable(a)) continue;
+      const b = sim.bases[a.src];
+      if (!b || b.owner !== "dich" || b.type === "cong") continue;
+      (by[a.src] = by[a.src] || []).push(a);
+    }
+    const list = [];
+    for (const id in by) if (isLast(sim.bases[id].G, by[id].length)) list.push(...by[id]);       // con cuối của một Cứ Điểm: kho G không còn ai ra thêm (garrison.js isLast)
+    if (!list.length) return [];
+    const a = nearestBlocker(list, ctx.hero);
+    return [{ id: "garrison", label: KITS[a.kit]?.name ?? "Quân đồn trú", x: a.x, y: heightAt(a.x, a.z), z: a.z, r: 2 }];
   }
 
   captureBase(id) {
@@ -395,7 +460,9 @@ export class Director {
       const f = sim.fronts[d.front];
       f.q.ta.GIAO_DV += 50;
       sim.reinf.charges = Math.min(SIM.allyReinf.maxCharges, sim.reinf.charges + 1);
-      this.say("Doanh trại về tay ta: +50 quân, +1 lượt tiếp viện.", 4, "good");
+      const shut = f.door === id;       // cửa ngõ của cánh đóng (đợt 12c): hết hồi quân, hết đợt tiếp viện, hết bù lính ở tuyến
+      this.say(shut ? `Doanh trại về tay ta: +50 quân, +1 lượt tiếp viện. Cánh ${d.front} hết viện binh — quân Nguyên còn lại chỉ vơi đi.` : "Doanh trại về tay ta: +50 quân, +1 lượt tiếp viện.", 5, "good");
+      if (shut) this.banner(`CỬA NGÕ ${d.front} ĐÓNG · HẾT VIỆN BINH`, "#ffd27a", 1.6);
     }
     const p = this.basePos(id);
     this.drop("ruong", p.x, p.z + 2);
@@ -438,7 +505,7 @@ export class Director {
     this.phase = i + 1; this.phaseStart = this.time;
     const P = PHASES[this.phase];
     this.banner(`${P.id} · ${P.name.toUpperCase()}`, "#e6dcc3", 2); ctx.audio.play("drums3");
-    if (this.phase === 1) this.events = { counterA1: { state: "wait" }, surrounded: { state: "wait" } };
+    if (this.phase === 1) { this.events = { counterA1: { state: "wait" }, surrounded: { state: "wait" } }; ctx.hints?.event("cuaNgo"); }
     if (this.phase === 3) this.startBossPhase();
     // kịch bản đảm bảo Hào Khí ở pha boss (P4 hkFloor = 90): đặt trước khi lưu checkpoint để tải lại P4 vẫn có
     const hkAdd = P.hkFloor ? hkRaiseTo(ctx.hk, P.hkFloor, "kịch bản: pha " + P.id) : 0;
