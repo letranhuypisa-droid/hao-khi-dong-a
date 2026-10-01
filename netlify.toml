@@ -1,0 +1,22 @@
+# Netlify xuất bản đúng thư mục `publish`. Trước đây kho không có file này nên Netlify xuất bản CẢ KHO: gốc site trống ("Page not found"),
+# còn design/, comic/, game/tests, game/tools công khai dù kho GitHub riêng tư. Giờ chỉ phần game chạy cần, đặt ở GỐC site.
+#
+# Lệnh dựng (game/tools/build-netlify.mjs) chép index.html, css, js, assets, vendor vào netlify-deploy/ rồi kiểm mọi tên tệp game xin có đúng
+# HOA/THƯỜNG không (Netlify phân biệt, Windows thì không). Kiểm lỗi thì bản dựng hỏng và Netlify giữ nguyên bản đang chạy.
+[build]
+  command = "node game/tools/build-netlify.mjs"
+  publish = "netlify-deploy"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Địa chỉ cũ /game/ (trước khi game nằm ở gốc site) vẫn mở được
+[[redirects]]
+  from = "/game"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/game/*"
+  to = "/:splat"
+  status = 301
