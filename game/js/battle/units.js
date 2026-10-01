@@ -18,7 +18,7 @@ import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import * as THREE from "three";
 import { heightAt, collide } from "./world.js";
-import { TIERS, S, g, heSoGiap, DEFENSE, AI } from "../data/tuning.js";
+import { TIERS, S, g, heSoGiap, DEFENSE, AI, BROKEN_SEC } from "../data/tuning.js";
 import { turn } from "./crowd.js";
 import { speedFactor, hitMult } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 
@@ -117,7 +117,7 @@ export class BigUnit {
       this.noHit += dt;
       if (this.broken > 0) {
         this.broken -= dt;
-        this.setPose(A.stagger(3.5 - this.broken, this.longWeapon), 0.25);     // Vỡ Thế: loạng choạng rồi khuỵu, gục
+        this.setPose(A.stagger(BROKEN_SEC - this.broken, this.longWeapon), 0.25);     // Vỡ Thế: loạng choạng rồi khuỵu, gục
         if (this.broken <= 0) this.poise = this.poiseMax;
         this.place(dt); return;
       }
@@ -373,7 +373,7 @@ export class BigUnit {
     let broke = false;
     if (this.poiseMax > 0 && this.broken <= 0) {
       this.poise -= poiseDmg;
-      if (this.poise <= 0) { this.poise = 0; this.broken = 3.5; this.state = "idle"; broke = true; ctx.director?.onBreak(this); }
+      if (this.poise <= 0) { this.poise = 0; this.broken = BROKEN_SEC; this.state = "idle"; broke = true; ctx.director?.onBreak(this); }
     }
     if (this.hp <= 0) {
       this.hp = 0;

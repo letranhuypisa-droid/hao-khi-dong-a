@@ -18,6 +18,8 @@ import { readComic } from "./ui/comic.js";
 import { runQuiz } from "./ui/quiz.js";
 import { BATTLES, BATTLE_ORDER, loadBattleDef, loadChapterMeta } from "./data/battles.js";
 import { HEROES } from "./data/heroes.js";
+import { DRILL_COUNT, exitLine } from "./data/tutorial-steps.js";
+import { guongDayRow } from "./data/glossary.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
 const DEBUG = /[?&]debug\b/.test(location.search);
@@ -115,7 +117,7 @@ function xuattran() {
         <tr><td>Công</td><td>${n(st.cong)}</td></tr><tr><td>Sinh lực</td><td>${n(st.hp)}</td></tr><tr><td>Giáp</td><td>${n(st.giap)}</td></tr>
         <tr><td>Hệ số binh khí</td><td>×${st.weaponMult.toFixed(2).replace(".", ",")}${st.weaponFloor ? ` <em class="lift">Quân giới cấp phát</em>` : ""}</td></tr>
         <tr><td>Chí mạng</td><td>${Math.round(st.crit * 100)}%</td></tr>
-        <tr><td>Gượng dậy</td><td>${diff.revive} lần</td></tr>
+        <tr><td>Gượng dậy</td><td>${guongDayRow(diff.revive)}</td></tr>
         ${B.ladder ? `<tr><td>Đòn mạnh</td><td>C1–C4${save.hero.level >= MOVES.C5.unlockLv || st.level >= 5 ? ", C5" : ""}${st.level >= MOVES.C6.unlockLv ? ", C6" : ""}</td></tr>`
           : `<tr><td>Binh khí</td><td>${esc(HEROES[heroId].weaponName || "")} <span class="label hc">${HEROES[heroId].weaponLabel || "Hư cấu"}</span></td></tr>
         <tr><td>Khí Lực</td><td>${st.kiBars ?? HEROES[heroId].kiLucBars} vạch</td></tr>`}
@@ -124,6 +126,8 @@ function xuattran() {
         <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => `<option value="${t.id}" ${t.id === save.settings.troops ? "selected" : ""}>${t.name} · ${t.N}</option>`).join("")}</select></label>
         <label class="field">Điều khiển cảm ứng <select data-set="touch">${[["auto", "Tự nhận"], ["on", "Bật"], ["off", "Tắt"]].map(([v, l]) => `<option value="${v}" ${v === save.settings.touch ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label class="field">Bóng <input type="checkbox" data-set="shadows" ${save.settings.shadows ? "checked" : ""}></label>
+        <label class="field">Gợi ý lần đầu giữa trận <input type="checkbox" data-set="hints" ${save.settings.hints !== false ? "checked" : ""}></label>
+        <button data-hintreset style="margin:2px 0 10px">Hiện lại gợi ý đã xem</button>
         <button class="primary go" data-go>VÀO TRẬN</button>
       </div>
     </div>
@@ -165,9 +169,10 @@ function battleCard(id) {
 // Màn huấn luyện có bài tập (chạy trên sân Võ trường, không cần Doanh trại cấp 3) và bảng đòn có icon.
 let guideDev = null;                                      // null: theo cách bạn bấm gần nhất (touchUI), bấm nút Bàn phím / Cảm ứng / Tay cầm thì ghi đè
 const guideDevNow = () => guideDev ?? (touchUI(save.settings) ? 1 : 0);
+let guideHero = "H35";                                    // tướng của bảng đòn (đợt 11): Hưng Đạo vương dùng đại kiếm, Hịch Tướng Sĩ, Binh Thư — trước đây thẻ này luôn là bảng của Trần Quốc Toản
 function tutorialBanner() {
   return `<section class="card tutbanner"><img src="${ICON("n")}" alt=""><div style="flex:1"><h3>Lần đầu ra trận?</h3>
-    <p class="small">11 bài tập ngắn ở Võ trường, chừng bốn phút: chuỗi đòn song đao, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ.</p></div>
+    <p class="small">${DRILL_COUNT} bài tập ngắn ở Võ trường, chừng bốn phút: chuỗi đòn song đao, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ.</p></div>
     <button class="primary" data-tutgo>Vào huấn luyện</button></section>`;
 }
 function huanluyen() {
@@ -178,7 +183,8 @@ function huanluyen() {
       <button class="primary" data-tutgo>${done ? "Tập lại" : "Vào huấn luyện"}</button></section>
     <section class="card"><div class="row" style="justify-content:space-between"><h3>Bảng đòn và điều khiển</h3>
       <div class="row">${["Bàn phím", "Cảm ứng", "Tay cầm"].map((l, i) => `<button data-gdev="${i}" class="${guideDevNow() === i ? "primary" : ""}">${l}</button>`).join("")}</div></div>
-      ${movesGuideHTML({ dev: guideDevNow() })}</section>`;
+      <div class="row" style="margin:2px 0 8px"><span class="small">Tướng</span>${["H35", "H31"].map((h) => `<button data-ghero="${h}" class="${guideHero === h ? "primary" : ""}">${esc(HEROES[h].name)}</button>`).join("")}</div>
+      ${movesGuideHTML({ dev: guideDevNow(), hero: guideHero })}</section>`;
 }
 
 async function startTutorial() {
@@ -192,7 +198,7 @@ async function startTutorial() {
   catch (err) { console.error(err); toast("Lỗi màn huấn luyện: " + err.message, true); }
   stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
   if (res?.done) { save.tutorial = { done: true, at: Date.now() }; persist(); toast("Xong huấn luyện — sẵn sàng ra bến Hàm Tử!"); tab = "xuattran"; }
-  else if (res) toast(`Đã rời huấn luyện ở bài ${Math.max(1, res.reached)} / ${res.total}.`);
+  else if (res) toast(exitLine(res.progress));       // "ở bài k / 11": cùng cách đếm với bảng trong màn (data/tutorial-steps.js tutorialProgress)
   render();
 }
 
@@ -511,6 +517,7 @@ const bind = {
   huanluyen() {
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
     app.querySelectorAll("[data-gdev]").forEach((b) => (b.onclick = () => { guideDev = Number(b.dataset.gdev); render(); }));
+    app.querySelectorAll("[data-ghero]").forEach((b) => (b.onclick = () => { guideHero = b.dataset.ghero; render(); }));
   },
   votruong() {
     app.querySelector("[data-tab-go]")?.addEventListener("click", () => { tab = "doanhtrai"; render(); });
@@ -528,6 +535,7 @@ const bind = {
     app.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { save.settings.mode = b.dataset.mode; persist(); render(); }));
     app.querySelectorAll("[data-diff]").forEach((b) => (b.onclick = () => { pick.difficulty = b.dataset.diff; save.settings.difficulty = pick.difficulty; persist(); render(); }));
     app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
+    app.querySelector("[data-hintreset]")?.addEventListener("click", () => { save.hints = {}; persist(); toast("Các gợi ý lần đầu sẽ hiện lại từ trận sau."); });
     app.querySelector("[data-go]").onclick = () => startBattle(pick.battle);
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
     app.querySelectorAll("[data-comic]").forEach((b) => b.addEventListener("click", async (e) => { e.stopPropagation(); await playComic("open", { ch: e.currentTarget.dataset.ch || CH }); render(); }));

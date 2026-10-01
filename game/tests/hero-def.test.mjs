@@ -217,7 +217,7 @@ t("H35 (def mặc định): M = MOVES, 2 vạch Khí Lực, 2 vệt lưỡi đú
   assert.equal(sl.length, 1); assert.equal(sl[0].name, "Phá Trận"); assert.equal(sl[0].key, "E"); assert.equal(sl[0].ready, true); assert.equal(sl[0].cd, "");
   h.phaTran.left = 2; h.phaTran.window = 4.2; assert.equal(h.skillSlots()[0].cd, "2 lần · 5s");
   h.ki = 150; assert.deepEqual([h.ultInfo().ready, h.ultInfo().cd, h.ultInfo().name], [true, "1/2", "Bóp Nát Quân Thù"]);
-  assert.equal(h.nextHeavyInfo().label, "C1 Phá thế");
+  assert.equal(h.nextHeavyInfo().label, "C1 Phá khiên");
 });
 t("H35: đòn nặng ngắt đòn đang ra; không có tụ lực dù giữ C", () => {
   const ctx = makeCtx({ agents: [soldier(0, 2)] }), h = new Hero(ctx, statsFor("H35"));

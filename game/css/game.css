@@ -139,6 +139,9 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-msgs { position: absolute; left: 14px; top: 90px; width: 380px; display: flex; flex-direction: column; gap: 4px; }
 .msg { background: rgba(21,18,16,.72); border-left: 3px solid var(--vang); padding: 5px 9px; font-size: .82rem; border-radius: 0 6px 6px 0; }
 .msg.bad { border-color: var(--bad); } .msg.good { border-color: var(--good); }
+/* gợi ý lần đầu (battle/hints.js, director.say(…, "tip")): giải thích thuật ngữ đúng lúc gặp */
+.msg.tip { border-color: var(--vang2); background: rgba(34,28,24,.9); }
+.msg.tip::before { content: "GỢI Ý"; display: block; font-size: .6rem; font-weight: 700; letter-spacing: .14em; color: var(--vang2); }
 .hud-events { position: absolute; right: 12px; top: 250px; display: flex; flex-direction: column; gap: 4px; }
 .ev { background: rgba(120,30,20,.8); border: 1px solid var(--bad); border-radius: 6px; padding: 5px 10px; display: flex; gap: 10px; font-size: .8rem; animation: pulse2 1s infinite alternate; }
 @keyframes pulse2 { to { background: rgba(160,40,25,.85); } }
@@ -150,6 +153,9 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-target { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: 360px; opacity: 0; transition: opacity .2s; }
 .hud-target.on { opacity: 1; } .tname { text-align: center; font-family: var(--serif); color: #ffb09a; font-size: .9rem; }
 .bar.thp > div { background: linear-gradient(#c0392b, #7e2419); } .bar.tpo { height: 6px; } .bar.tpo > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
+/* thanh vàng dưới thanh máu mục tiêu là Phá Thế: có nhãn (trước đây chỉ là một thanh không tên) */
+.hud-target .bar.tpo { margin-top: 14px; overflow: visible; } .hud-target .bar.tpo > div { border-radius: inherit; }
+.hud-target .bar.tpo::before { content: "PHÁ THẾ"; position: absolute; left: 2px; top: -11px; font: 700 .58rem var(--sans); letter-spacing: .12em; color: var(--vang2); }
 .hud-target.broken .tname { color: var(--vang2); animation: blink .3s infinite alternate; }
 @keyframes blink { to { opacity: .5; } }
 .hud-hint { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); }
@@ -288,10 +294,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .tut-text { font-size: .9rem; line-height: 1.5; }
 .tut-prog { margin-top: 8px; height: 6px; background: #000; border-radius: 3px; overflow: hidden; } .tut-prog div { height: 100%; background: linear-gradient(90deg, var(--vang), var(--vang2)); transition: width .2s; }
 .tut-goal { font-size: .78rem; color: var(--vang2); margin-top: 4px; min-height: 1em; }
+.tut-pass { display: block; margin-top: 4px; color: var(--vang2); font-weight: 700; }      /* "Qua bài khi: …" ngay trong thẻ (data/tutorial-steps.js passLine) */
+.tut-foot button[hidden] { display: none; } .tut-foot button[data-tut=skip] { border-color: var(--vang); color: var(--vang2); }
 .tut-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
 .tut-foot button { padding: 5px 12px; font-size: .82rem; }
 .tut.done { border-color: var(--good); } .tut.done .tut-goal { color: var(--good); }
 .touchmode .tut { top: 64px; width: min(480px, 70vw); }
+@media (max-width: 480px) { .touchmode .tut-icons { display: none; } .touchmode .tut-text { font-size: .84rem; } }   /* điện thoại dọc: bỏ icon trang trí cho chữ rộng ra, thẻ thấp đi, khỏi che sĩ quan phía trước */
 .hub .tutbanner { display: flex; gap: 14px; align-items: center; border-color: var(--vang); }
 .hub .tutbanner img { width: 72px; height: 72px; border-radius: 12px; border: 2px solid var(--vang); }
 .hub .tutbanner p { margin: 4px 0; }

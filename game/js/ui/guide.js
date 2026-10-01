@@ -4,6 +4,7 @@
 
 import { MOVE_INFO, ICON, moveInfoOf } from "../data/moves-info.js";
 import { guideKeys, seqFor, short } from "../data/controls.js";
+import { GLOSS, CONCEPT_ORDER } from "../data/glossary.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const kbd = (s) => s.split(" · ").map((k) => `<kbd>${esc(k)}</kbd>`).join("");
@@ -15,14 +16,9 @@ export function card(id, dev = 0, extraKey = "", info = MOVE_INFO) {
   return `<div class="gcard"><img src="${ICON(m.icon)}" alt=""><div><b>${esc(m.name)}</b>${key}<small>${esc(m.text)}</small></div></div>`;
 }
 
-// Khái niệm của trận (không có phím riêng): icon mượn của lệnh gần nghĩa nhất.
-const CONCEPTS = [
-  { icon: "tpc", name: "Hào Khí", text: "Thanh trên đỉnh màn. Tăng khi chiếm Cứ Điểm, hạ sĩ quan, làm nhiệm vụ, Kế Sách; giảm khi mất đồn, phải Gượng dậy. Đủ 100 thì kích Tổng Phản Công." },
-  { icon: "giuvung", name: "Cứ Điểm", text: "Đồn, doanh trại có vòng tròn dưới đất. Hạ hết quân đồn trú và sĩ quan trấn thủ, rồi đứng trong vòng cho tới khi chiếm xong." },
-  { icon: "tiencong", name: "Mặt trận", text: "Hai tuyến A (bến trên) và B (bến dưới) tự đánh nhau kể cả khi bạn ở xa. Bản đồ nhỏ góc phải cho biết quân hai bên và Sĩ Khí." },
-  { icon: "dq", name: "Vỡ Thế", text: "Sĩ quan có thanh Phá Thế (vạch vàng). Đánh liên tục cho cạn: hắn loạng choạng 3,5 s, nhận thêm 50% sát thương, mở Đòn Quyết." },
-  { icon: "ct", name: "Đòn viền đỏ", text: "Vòng đỏ dưới chân sĩ quan báo trước 0,6 s. Không đỡ được: né ra, hoặc bấm Đỡ đúng lúc để Phản đòn." },
-];
+// Khái niệm của trận (không có phím riêng): icon mượn của lệnh gần nghĩa nhất. Chữ lấy từ data/glossary.js (cùng nguồn với gợi ý lần đầu
+// giữa trận, battle/hints.js; con số lấy từ tuning.js). Đợt 11 thêm Sĩ Khí, Gượng dậy và gộp Phá Thế với Vỡ Thế.
+const CONCEPTS = CONCEPT_ORDER.map((id) => ({ icon: GLOSS[id].icon, name: GLOSS[id].name, text: GLOSS[id].long }));
 
 // "N", "C" là tên hai nút đánh; dòng này nói rõ phím thật để người chơi bàn phím không đi tìm phím C.
 const bindNote = (dev) => (dev === 1 ? `<p class="gbind">N và C là hai nút đánh ở góc phải màn hình.</p>`

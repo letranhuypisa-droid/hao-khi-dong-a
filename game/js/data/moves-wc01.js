@@ -34,7 +34,7 @@ export const MOVES_WC01 = {
   N5: { mv: 1.49, dur: 0.92, hits: [0.52], stop: 33, shape: "cone", range: 5.2, arc: 100, knock: 4, step: 1.0, armor: [0.15, 0.64] },
   N6: { mv: 2.16, dur: 1.33, hits: [0.58], stop: 67, shape: "ring", range: 5.2, knock: 7, step: 0.6, armor: [0.1, 0.7],
     heavy: true, heavyTell: true, ringFx: true, kiai: true, endsChain: true },
-  // C1 bổ phá thế (phá đỡ, phá khiên) · C2 hất tung · C3 lốc kiếm giữ để kéo dài · C4 xoay rồi bổ đất (Trảm Giang) ·
+  // C1 bổ phá khiên (phá đỡ; tên "Phá Sơn") · C2 hất tung · C3 lốc kiếm giữ để kéo dài · C4 xoay rồi bổ đất (Trảm Giang) ·
   // C5 lao xuyên hàng (cấp 5) · C6 nhảy bổ phá giáp (cấp 10)
   C1: { mv: 2.43, dur: 1.21, hits: [0.55], stop: 67, shape: "cone", range: 5.0, arc: 100, knock: 7, step: 1.2, armor: [0.1, 0.65],
     heavy: true, heavyTell: true, slam: true, kiai: true, charge: true, chargeU: 0.3, guardBreak: true },
@@ -72,7 +72,7 @@ export const HEAVY_MOVES = new Set(Object.keys(MOVES_WC01).filter((k) => MOVES_W
 export const MOVE_INFO_WC01 = {
   N:  { icon: "n",  name: "Tiết chế kiếm pháp", label: "Hư cấu", keys: guideKeys("n"),
         text: "Chuỗi 6 nhát N1–N6 bằng đại kiếm hai tay; khi vung không bị đòn thường ngắt. N6 xoay một vòng rưỡi đẩy lùi mọi kẻ quanh mình." },
-  C1: { icon: "c1", name: "Phá Sơn", label: "Hư cấu", seq: "C (giữ để tụ lực)", text: "Giơ gươm qua đầu bổ thẳng, phá khiên, phá thế đỡ. Giữ C để tụ lực 3 cấp." },
+  C1: { icon: "c1", name: "Phá Sơn", label: "Hư cấu", seq: "C (giữ để tụ lực)", text: "Giơ gươm qua đầu bổ thẳng, phá khiên, phá đỡ. Giữ C để tụ lực 3 cấp." },
   C2: { icon: "c2", name: "Kình Ba", label: "Hư cấu", seq: "N → C", text: "Kéo lưỡi sát đất rồi hất ngược lên, tung địch lên không." },
   C3: { icon: "c3", name: "Cuồng Lan", label: "Hư cấu", seq: "N N → C (giữ)", text: "Xoay đại kiếm liên hồi quanh mình; giữ C để xoay thêm, tới 8 nhát." },
   C4: { icon: "c4", name: "Trảm Giang", label: "Hư cấu", seq: "N N N → C (giữ)", text: "Xoay một vòng lấy đà rồi bổ xuống đất, sóng chấn tròn 5 m. Giữ C để tụ lực." },

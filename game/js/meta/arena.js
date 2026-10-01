@@ -9,13 +9,14 @@
 import { makeRng } from "../core/rng.js";
 import { TIERS, S, g, E, EXP_NEXT, DIFFICULTY, HERO, heSoGiap } from "../data/tuning.js";
 import { WEAPON_TIERS } from "../data/progression.js";
+import { DRILL_COUNT } from "../data/tutorial-steps.js";
 
 export const ARENA_MODES = {
   luyentap: { id: "luyentap", name: "Luyện tập", text: "Chọn bậc địch, đánh bao lâu tùy ý. Không thưởng." },
   duako:    { id: "duako", name: "Đua KO bến Hàm Tử", text: "180 s, chỉ tính KO trong vùng chiến đấu.", dur: 180, medals: { dong: 150, bac: 220, vang: 300 } },
   thoigian: { id: "thoigian", name: "Thử thách thời gian", text: "5 đợt địch sinh theo seed. Hạ hết càng nhanh càng tốt." },
   seedtuan: { id: "seedtuan", name: "Seed tuần", text: "Mọi người chơi cùng một bố cục trong tuần. Đổi lúc 0:00 thứ Hai giờ Việt Nam." },
-  huanluyen: { id: "huanluyen", name: "Huấn luyện", text: "11 bài tập từng thao tác: di chuyển, chuỗi đòn, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ." },
+  huanluyen: { id: "huanluyen", name: "Huấn luyện", text: `${DRILL_COUNT} bài tập từng thao tác: di chuyển, chuỗi đòn, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ.` },
 };
 export const MEDALS = [{ id: "vang", name: "Vàng", tt: 15 }, { id: "bac", name: "Bạc", tt: 10 }, { id: "dong", name: "Đồng", tt: 5 }];
 const MEDAL_ORDER = ["dong", "bac", "vang"];

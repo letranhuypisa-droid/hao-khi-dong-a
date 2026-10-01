@@ -17,7 +17,8 @@ export const LEVEL_CAP = 35;                               // trần R1
 // satThuong = Cong * MV * heSoGiap * chiMang * khacChe * doKho * rand(0.95, 1.05)
 export const heSoGiap = (giapMucTieu, Lkecong) => 1 - giapMucTieu / (giapMucTieu + 120 * g(Lkecong));
 export const CRIT_BASE = 0.05, CRIT_MULT = 1.5, CRIT_CAP = 0.30;
-export const BROKEN_MULT = 1.5;        // mục tiêu Vỡ Thế
+export const BROKEN_MULT = 1.5;        // mục tiêu Vỡ Thế: nhận sát thương ×
+export const BROKEN_SEC = 3.5;         // Vỡ Thế kéo dài (s): loạng choạng, rồi thanh Phá Thế đầy lại (units.js)
 // Tướng người chơi trong Tổng Phản Công: Công +20% (§6.4) — nhân một lần trong hero.effCong (HAO_KHI.tpc.heroAtk). Trước
 // đợt 9 damageTo nhân thêm hằng số TPC_HERO_MULT 1,2 lần nữa (×1,44); hằng số đã bỏ.
 export const GATE_DIV = 3;             // tướng đánh cổng = Cong * MV / 3, bỏ qua giáp

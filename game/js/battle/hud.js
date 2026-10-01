@@ -247,14 +247,7 @@ export class HUD {
     E.sk3.style.display = tpcReady(hk) || hk.tpc ? "" : "none";
     { const kb = E.sk1?.querySelector("b"), want = ctx.touch ? "" : this.sk1Key; if (kb && kb.textContent !== want) kb.textContent = want; }    // lớp cảm ứng bật / tắt theo thiết bị đang dùng
     // mặt trận
-    E.fronts.innerHTML = this.B.hud?.frontsHTML ? this.B.hud.frontsHTML(ctx) : Object.values(FRONTS).map((F) => {
-      const f = sim.fronts[F.id], qt = Math.round(totalQ(f, "ta")), qd = Math.round(totalQ(f, "dich"));
-      const o = f.order ? `<em>${ORDERS[f.order.id].name} ${Math.ceil(f.order.left)}s</em>` : "";
-      const gen = f.general.alive ? "" : "<em class=bad>tướng rút</em>";
-      const here = sim.heroFront === F.id ? " here" : "";
-      return `<div class="front${here}"><b>${F.id}</b><span class="ta">${qt}</span><span class="vs">·</span><span class="dich">${qd}</span>
-        <span class="skv">SK ${Math.round(f.sk.ta)}|${Math.round(f.sk.dich)}</span>${o}${gen}</div>`;
-    }).join("") + (sim.reinf ? `<div class="front reinf">Tiếp viện: ${sim.reinf.charges} lượt${sim.reinf.pending.length ? ` · đang tới ${Math.max(0, Math.ceil(sim.reinf.pending[0].at - sim.t))}s` : ""}${d.followers ? ` · Theo ta ${d.followers.q}` : ""}</div>` : "");
+    E.fronts.innerHTML = this.B.hud?.frontsHTML ? this.B.hud.frontsHTML(ctx) : Object.values(FRONTS).map((F) => frontRowHTML(F, sim.fronts[F.id], sim)).join("") + (sim.reinf ? `<div class="front reinf">Tiếp viện: ${sim.reinf.charges} lượt${sim.reinf.pending.length ? ` · đang tới ${Math.max(0, Math.ceil(sim.reinf.pending[0].at - sim.t))}s` : ""}${d.followers ? ` · Theo ta ${d.followers.q}` : ""}</div>` : "");
     // sự kiện
     E.events.innerHTML = Object.entries(d.events || {}).filter(([, v]) => v.state === "run").map(([k, v]) =>
       `<div class="ev"><b>${EVENTS[k]?.name ?? k}</b><span>${Math.ceil(v.left)} s</span></div>`).join("");
@@ -390,6 +383,17 @@ export class HUD {
   }
 }
 
+// Một hàng của bảng mặt trận ở bản đồ nhỏ (trận dùng bảng mặc định — B15): tên cánh, quân ta · địch, Sĩ Khí ta|địch (0–100; giải thích ở
+// data/glossary.js, gợi ý lần đầu ở battle/hints.js), lệnh đang chạy, tướng rút. Tách ra để kiểm trong Node (tests/hints.test.mjs).
+export function frontRowHTML(F, f, sim) {
+  const qt = Math.round(totalQ(f, "ta")), qd = Math.round(totalQ(f, "dich"));
+  const o = f.order ? `<em>${ORDERS[f.order.id].name} ${Math.ceil(f.order.left)}s</em>` : "";
+  const gen = f.general.alive ? "" : "<em class=bad>tướng rút</em>";
+  const here = sim.heroFront === F.id ? " here" : "";
+  return `<div class="front${here}"><b>${F.id}</b><span class="ta">${qt}</span><span class="vs">·</span><span class="dich">${qd}</span>
+        <span class="skv">Sĩ Khí ${Math.round(f.sk.ta)}|${Math.round(f.sk.dich)}</span>${o}${gen}</div>`;
+}
+
 // ---- thanh chiêu có icon (dùng chung trận chính và Võ trường) ------------------------------------------------
 // Hàng trên: đòn N, đòn C kế tiếp (đổi icon theo chuỗi: N N → C báo "C3 Lốc đao"), Né, Đỡ. Hàng dưới: kỹ năng.
 // slots (hero.skillSlots()) / ult (hero.ultInfo()): không có thì đúng thanh của H35 (Phá Trận E, Tuyệt Kỹ R).
@@ -400,7 +404,7 @@ export function skillBarHTML(full, slots = null, ult = null) {
   // nhãn ô Tuyệt Kỹ: ult.label, không có thì tên chiêu của tướng (H31 "Bạch Đằng Quyết Chiến"); Bóp Nát của H35 giữ chữ "Tuyệt Kỹ"
   const ut = ult ? tile("sk2", "ult", ult.key ?? short("ult"), ult.label ?? ((ult.id && ult.id !== "bopNat" && ult.name) || "Tuyệt Kỹ"), "", "", ult.icon ?? "ult") : tile("sk2", "ult", short("ult"), "Tuyệt Kỹ");
   return `<div class="hud-skills">
-    <div class="skrow atk">${tile("atkN", "N", short("n"), "Đòn N", "")}${tile("atkC", "C1", short("c"), "C1 Phá thế", "")}${tile("atkD", "dodge", short("dodge"), "Né")}${tile("atkB", "block", short("block"), "Đỡ")}</div>
+    <div class="skrow atk">${tile("atkN", "N", short("n"), "Đòn N", "")}${tile("atkC", "C1", short("c"), `C1 ${MOVE_INFO.C1.name}`, "")}${tile("atkD", "dodge", short("dodge"), "Né")}${tile("atkB", "block", short("block"), "Đỡ")}</div>
     <div class="skrow">${sk}${ut}${full ? tile("sk3", "tpc", short("tpc"), "Tổng Phản Công", "", "tpc") + tile("sk4", "cmd", short("cmd"), "Mệnh Lệnh") : ""}</div>
   </div>`;
 }

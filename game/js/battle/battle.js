@@ -17,6 +17,7 @@ import { Atmosphere } from "./atmosphere.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
 import { HUD } from "./hud.js";
+import { createHintDriver } from "./hints.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 import { makeRng } from "../core/rng.js";
 import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js";
@@ -105,6 +106,9 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       return;
     }
     ctx.input = input;                 // director đọc phím giữ (held.interact — Tương tác B20); B15 không đọc
+    // Gợi ý lần đầu giữa trận (hints.js, đợt 11): giải thích thuật ngữ / cơ chế đúng lúc gặp. Cờ đã xem ghi thẳng vào save.hints (lưu qua onSettings),
+    // tắt được ở settings.hints (bảng tạm dừng, màn Xuất trận); hiện qua director.say(…, "tip").
+    ctx.hints = createHintDriver(ctx, { seen: (save.hints ||= {}), enabled: () => settings.hints !== false, onSeen: () => onSettings?.(save.settings) });
     if (location.search.includes("debug")) window.__hk = ctx;   // chỉ để kiểm thử bằng script
     ctx.hitstopT = 0;
     ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
@@ -349,6 +353,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (hudAcc > 0.05) { ctx.hud.update(hudAcc, W, H); hudAcc = 0; }
       if (draw) renderer.render(scene, camera);
       ctx.hud.frame?.(W, H);                       // nhãn chỉ đường bám mục tiêu mỗi khung (hud.js), không đợi nhịp 0,05 s
+      ctx.hints?.update(dt, inp);                  // gợi ý lần đầu (hints.js); đọc cạnh bấm trước input.endFrame()
       const anyKey = Object.keys(inp.pressed).length > 0;     // đọc trước endFrame (inp === input, endFrame xoá pressed)
       input.endFrame();
 
@@ -408,6 +413,7 @@ function pauseHTML(save, heroId = "H35", def = null, dev = 0) {
     <label>Bóng <input type="checkbox" ${s.shadows ? "checked" : ""} data-set="shadows"></label>
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
+    <label>Gợi ý lần đầu <input type="checkbox" ${s.hints !== false ? "checked" : ""} data-set="hints"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
     ${controlsHTML(dev, heroId)}${def?.touch?.interact ? interactNote(def) : ""}
   </div>`;

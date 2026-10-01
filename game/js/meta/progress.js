@@ -18,8 +18,9 @@ export function newSave() {
     ladder: { unlocked: [1], best: {} },          // R → hạng tốt nhất
     battles: { B20: { best: null, cleared: false } },   // trận ngoài thang R (đợt 9: B20 Bạch Đằng — hạng tốt nhất, đã qua)
     firsts: { tinh: false, bao: false, danh: false, rankS: {} },
-    settings: { troops: "vua", difficulty: "quansi", renderScale: 1, shadows: true, volume: 0.7, touch: "auto" },
+    settings: { troops: "vua", difficulty: "quansi", renderScale: 1, shadows: true, volume: 0.7, touch: "auto", hints: true },   // hints: gợi ý lần đầu giữa trận (đợt 11)
     stats: { battles: 0, wins: 0, tpc: 0, ko: 0, bestTime: null },
+    hints: {},                                    // gợi ý lần đầu đã xem { id: true } (battle/hints.js ghi thẳng vào đây; nút "Hiện lại gợi ý" xóa)
     log: [],
   };
 }
@@ -294,6 +295,7 @@ export function migrate(raw) {
   for (const k of ["hero", "weapon", "wallet", "legion", "ladder", "firsts", "settings", "stats"]) out[k] = { ...base[k], ...(raw[k] || {}) };
   out.firsts.rankS = { ...(raw.firsts?.rankS || {}) };
   out.battles = { ...base.battles, ...(raw.battles || {}) };      // bản lưu trước đợt 9 chưa có (B20)
+  out.hints = { ...(raw.hints || {}) };                           // bản lưu trước đợt 11 chưa có; sao chép để không dùng chung đối tượng với bản gốc
   out.v = SAVE_VERSION;
   return out;
 }

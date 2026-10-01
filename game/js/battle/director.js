@@ -650,7 +650,14 @@ export class Director {
     for (const k of DROPS[u.tier] || []) this.drop(k, u.x + ctx.rng.range(-1.5, 1.5), u.z + ctx.rng.range(-1.5, 1.5));
   }
   onBreak(u) { this.ctx.fx.banner("VỠ THẾ · ĐÒN MẠNH ĐỂ RA ĐÒN QUYẾT", "#ffd27a", 1.2); this.ctx.audio.play("parry", u.x, u.z); }
-  onHeroHit(h) { this.capPause = 0.5; if (h.red) for (const k in this.capT) this.capT[k] = 0; }
+  onHeroHit(h) {
+    this.capPause = 0.5;
+    if (h.red) {          // đòn viền đỏ trúng: tiến độ chiếm về 0. Luật này trước đây không chỗ nào nói; gợi ý lần đầu nói đúng lúc nó cắn (hints.js)
+      const capturing = Object.values(this.capT).some((v) => v > 0.5);
+      for (const k in this.capT) this.capT[k] = 0;
+      if (capturing) this.ctx.hints?.event("chiemNgat");
+    }
+  }
   onRevive() { this.hk(HAO_KHI.src.reviveUsed, "gượng dậy"); this.revived = true; }
   onUlt() { }
   ultQ(q) { const hf = this.ctx.sim.heroFront; if (hf) this.ctx.sim.fronts[hf].pendingKills.dich += q; }

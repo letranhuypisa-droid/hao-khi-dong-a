@@ -16,7 +16,7 @@ export const ICON = (id) => `./assets/icons/${id}.webp`;
 export const MOVE_INFO = {
   N:  { icon: "n",  name: "Song đao liên trảm", keys: guideKeys("n"),
         text: "Chuỗi 6 nhát N1–N6 khi bấm liên tiếp. N6 xoay một vòng đẩy lùi mọi kẻ quanh mình." },
-  C1: { icon: "c1", name: "Phá thế", seq: "C", text: "Đâm mạnh phá khiên, lính đỡ không được; đẩy lùi xa." },
+  C1: { icon: "c1", name: "Phá khiên", seq: "C", text: "Đâm mạnh phá khiên, lính đỡ không được; đẩy lùi xa." },    // đợt 11: trước gọi "Phá thế", trùng thanh Phá Thế của sĩ quan
   C2: { icon: "c2", name: "Hất tung", seq: "N → C", text: "Chém hất địch lên không, rơi xuống nằm một lúc." },
   C3: { icon: "c3", name: "Lốc đao", seq: "N N → C", text: "Xoay 5 vòng chém quanh mình, trúng nhiều nhát." },
   C4: { icon: "c4", name: "Chấn địa", seq: "N N N → C", text: "Bổ song đao xuống đất, sóng chấn tròn 5 m đẩy văng." },
