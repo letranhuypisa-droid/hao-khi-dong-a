@@ -860,5 +860,25 @@ console.log("\nCân bằng đợt 9 (Tuyệt Kỹ vào sĩ quan, tên lạc, đ�
   });
 }
 
+console.log("\nMục tiêu pha cho HUD (thẻ nhiệm vụ, nhãn nổi, bản đồ nhỏ)");
+t("mỗi pha B15 có target trỏ tới Cứ Điểm có thật hoặc boss", () => {
+  for (const P of PHASES) {
+    assert.ok(P.target && (P.target.base || P.target.boss), `${P.id} thiếu target`);
+    for (const id of [].concat(P.target.base ?? [])) assert.ok(BASES.some((b) => b.id === id), `${P.id}: không có Cứ Điểm ${id}`);
+  }
+});
+t("target khớp mục tiêu ghi trong chữ: P1 A1, P2 A2, P3 cổng A3 hoặc B3, P4 boss", () => {
+  assert.deepEqual([].concat(PHASES[0].target.base), ["A1"]); assert.ok(PHASES[0].goal.includes("(A1)"));
+  assert.deepEqual([].concat(PHASES[1].target.base), ["A2"]); assert.ok(PHASES[1].goal.includes("(A2)"));
+  assert.deepEqual([].concat(PHASES[2].target.base), ["A3", "B3"]); assert.ok(PHASES[2].goal.includes("A3") && PHASES[2].goal.includes("B3"));
+  assert.equal(PHASES[3].target.boss, true);
+});
+t("mọi pha có câu 'làm thế nào' (tip) cho thẻ nhiệm vụ, và tip không dính chữ phím cứng", () => {
+  for (const P of PHASES) {
+    assert.ok(P.tip && P.tip.length > 20, `${P.id} thiếu tip`);
+    assert.ok(!/\((Tab|F|G|C|K)\)/.test(P.tip), `${P.id}: tip còn chữ phím cứng, dùng {cmd}, {tpc}…: ${P.tip}`);
+  }
+});
+
 console.log(`\n${pass} đạt, ${fail} trượt`);
 process.exit(fail ? 1 : 0);

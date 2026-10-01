@@ -34,7 +34,10 @@
 //   * bed(ctx)                           → { dF, fire } — khoảng cách tới giao tranh (m) và mức lửa trại cho nền tiếng
 //   * music(d, hk)                       → "battle" | "boss" (đổi nhạc khi chưa hết trận)
 //   ? hud                                { bounds{x0,x1,z0,z1}, canvas?{w,h}, drawBase(M, ctx), drawTop(M, ctx),
-//                                          frontsHTML?(ctx) } — bản đồ nhỏ, bảng mặt trận (hud.js). M = {c,W,H,X,Z,sx,sz,t}
+//                                          frontsHTML?(ctx), pinTip? } — bản đồ nhỏ, bảng mặt trận (hud.js). M = {c,W,H,X,Z,sx,sz,t}.
+//                                          pinTip: thẻ nhiệm vụ nằm cột trái và giữ câu tip của PHASES suốt pha (B15; B20 giữ bố cục cũ)
+//   ? Director.objectives()              → [{ id, label, x, y, z, r }] mục tiêu chính của pha: HUD vẽ nhãn chỉ đường (hud.js frame),
+//                                          bản đồ nhỏ nhấp nháy vòng vàng (B15, PHASES[i].target); không có thì không chỉ đường (B20)
 //   ? touch                              { interact?: true } — thêm nút cảm ứng Tương tác (B15 không có)
 //   ? debug                              { objective(ctx) → {x,z}, state(ctx) } — bot kiểm thử (debug.js). B15: null,
 //                                          debug.js giữ __objective / __state của B15
@@ -129,6 +132,11 @@ function drawBase({ c, W, H, X, Z, sx }, ctx) {
     if (b.type === "cong") c.fillRect(X(v.x) - 2, Z(v.z) - sz2, 5, sz2 * 2);
     else c.fillRect(X(v.x) - sz2 / 2, Z(v.z) - sz2 / 2, sz2, sz2);
     c.strokeStyle = "#1d1a17"; c.lineWidth = 1; c.strokeRect(X(v.x) - sz2 / 2, Z(v.z) - sz2 / 2, sz2, sz2);
+    if (b.type !== "ban_doanh") {          // nhãn A1, A2, A3, B1…: để đối chiếu với mục tiêu trên thẻ nhiệm vụ ("Chiếm Đồn bến trên (A1)")
+      c.font = "bold 9px sans-serif"; c.textAlign = "center"; c.lineJoin = "round"; c.lineWidth = 3;
+      c.strokeStyle = "rgba(255,248,230,.9)"; c.strokeText(b.id, X(v.x), Z(v.z) - sz2 / 2 - 2);
+      c.fillStyle = "#1d1a17"; c.fillText(b.id, X(v.x), Z(v.z) - sz2 / 2 - 2); c.textAlign = "start";
+    }
   }
 }
 // sự kiện nhấp nháy, làng và bó tên, thuyền Kế Sách, bến cập
@@ -138,6 +146,11 @@ function drawTop({ c, X, Z, t }, ctx) {
     c.strokeStyle = "#ff5a3a"; c.lineWidth = 2;
     if (d.events.counterA1?.state === "run") { const v = ctx.world.bases.A1; c.beginPath(); c.arc(X(v.x), Z(v.z), 10, 0, 7); c.stroke(); }
     if (d.events.surrounded?.state === "run" && d.generals.H40) { const g = d.generals.H40; c.beginPath(); c.arc(X(g.x), Z(g.z), 10, 0, 7); c.stroke(); }
+  }
+  const objs = d.objectives?.() ?? [];       // mục tiêu chính của pha (P3: cả hai cổng): vòng vàng nhấp nháy
+  if (objs.length) {
+    c.strokeStyle = "#ffd27a"; c.lineWidth = 2.2; const k = 0.5 + 0.5 * Math.sin(t * 6);
+    for (const o of objs) { c.beginPath(); c.arc(X(o.x), Z(o.z), 8 + 2.5 * k, 0, 7); c.stroke(); }
   }
   const ks = d.keSach;
   c.fillStyle = "#8a6a3a"; c.beginPath(); c.arc(X(VILLAGE.x), Z(VILLAGE.z), 5, 0, 7); c.fill();
@@ -180,7 +193,7 @@ export const B15 = {
   },
   // P4 và Tổng Phản Công đổi sang bài trận boss
   music: (d, hk) => (hk.tpc || d.phase === 3 ? "boss" : "battle"),
-  hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, drawTop },
+  hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, drawTop, pinTip: true },   // pinTip: thẻ nhiệm vụ giữ câu "làm thế nào" suốt pha (hud.js)
   debug: null,
 };
 export default B15;

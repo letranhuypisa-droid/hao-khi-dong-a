@@ -269,8 +269,9 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .gcard { display: flex; gap: 10px; align-items: flex-start; background: rgba(0,0,0,.25); border: 1px solid #3e3228; border-radius: 8px; padding: 7px; }
 .gcard img { width: 54px; height: 54px; border-radius: 8px; border: 1px solid #6b4f2e; flex: none; }
 .gcard b { font-family: var(--serif); color: var(--vang2); font-size: .86rem; display: block; }
-.gcard kbd, .tut kbd { display: inline-block; font: 700 .7rem var(--sans); color: var(--then); background: var(--vang2); border-radius: 4px; padding: 0 5px; margin: 2px 3px 2px 0; box-shadow: 0 2px 0 #7a5a2a; }
+.gcard kbd, .tut kbd, .gbind kbd { display: inline-block; font: 700 .7rem var(--sans); color: var(--then); background: var(--vang2); border-radius: 4px; padding: 0 5px; margin: 2px 3px 2px 0; box-shadow: 0 2px 0 #7a5a2a; }
 .gcard small { display: block; font-size: .74rem; color: var(--trung); line-height: 1.35; margin-top: 2px; }
+.gbind { margin: 0 0 8px; font-size: .78rem; color: var(--trung); } .gbind span { margin: 0 6px; color: var(--muted); }
 .guide.compact .gcards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .guide.compact .gcard img { width: 40px; height: 40px; }
 .guide.compact .gcard small { display: none; }
@@ -373,3 +374,59 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
   background: radial-gradient(circle, #ff6a4a 0 2.5px, transparent 3px), linear-gradient(#ff6a4a, #ff6a4a) center/2px 100% no-repeat, linear-gradient(#ff6a4a, #ff6a4a) center/100% 2px no-repeat;
   -webkit-mask: radial-gradient(circle, #000 0 3px, transparent 3.5px 7px, #000 7.5px); mask: radial-gradient(circle, #000 0 3px, transparent 3.5px 7px, #000 7.5px); }
 .touch .sk-binhThu::after { top: 38%; width: 22px; height: 22px; }
+
+/* ---- đợt 10: thẻ nhiệm vụ B15, nhãn chỉ đường, nhắc khóa chuột ---- */
+/* Cột trái (chỉ B15, HUD def.hud.pinTip): thẻ nhiệm vụ rồi khung tin xếp dọc nên không bao giờ đè nhau; thẻ giữ câu "làm thế nào" của pha. */
+.hud-left { position: absolute; left: 14px; top: 10px; width: 310px; display: flex; flex-direction: column; gap: 6px; }
+.hud-left .hud-phase { max-width: none; display: block; }
+.hud-left .hud-phase span { display: block; margin-top: 1px; font-size: .86rem; font-weight: 700; color: #f4ead2; }
+.hud-left .hud-msgs { position: static; left: auto; top: auto; width: auto; }
+.hud-phase small { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; font-size: .75rem; line-height: 1.32; color: var(--trung); }
+.hud-phase small:empty { display: none; }
+.hud-phase.flash { animation: phaseFlash 2.2s ease-out; }
+@keyframes phaseFlash { 0%, 35% { border-color: var(--vang); box-shadow: 0 0 20px rgba(255,210,122,.9); } 100% { border-color: #5a4838; box-shadow: 0 0 0 rgba(255,210,122,0); } }
+.touchmode .hud-left { left: 72px; }
+
+/* Nhãn chỉ đường tới mục tiêu chính (hud.js frame): nổi trên mục tiêu, hoặc ra rìa màn hình kèm mũi tên */
+.hud-wp { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
+.hud-wp[hidden] { display: none; }
+.hud-wp .wp-in { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; }
+.hud-wp[data-mode="on"] .wp-in { transform: translate(-50%, -100%); }
+.hud-wp[data-mode="edge"] .wp-in { transform: translate(-50%, -50%); }
+.wp-box { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: rgba(21,18,16,.86); border: 1px solid var(--vang); border-radius: 9px; padding: 3px 11px; animation: wpGlow 1.2s infinite alternate; }
+.wp-box b { display: block; font-family: var(--serif); color: var(--vang2); font-size: .82rem; }
+.wp-box span { font-size: .74rem; color: var(--trung); }
+.wp-dir { display: none; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 13px solid var(--vang2); filter: drop-shadow(0 1px 2px #000); }
+.hud-wp[data-mode="edge"] .wp-dir { display: block; }
+.wp-tip { width: 0; height: 0; margin-top: 1px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 11px solid var(--vang); filter: drop-shadow(0 1px 2px #000); }
+.hud-wp[data-mode="edge"] .wp-tip { display: none; }
+@keyframes wpGlow { to { box-shadow: 0 0 16px rgba(255,210,122,.85); } }
+
+/* Nhắc khóa chuột (bàn phím + chuột): chỉ hiện khi chuột chưa khóa */
+.hud-lockhint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: min(560px, 86%); text-align: center; background: rgba(21,18,16,.9); border: 1px solid var(--vang); border-radius: 18px; padding: 6px 16px; font-size: .82rem; color: var(--vang2); animation: pulse 1s infinite alternate; }
+.hud-lockhint[hidden] { display: none; }
+.hud-b20 .hud-lockhint { bottom: 218px; }                                  /* trên dòng nhắc Tương tác của B20 (bottom 158 px) */
+
+/* Dưới 1180 px cột trái chạm thanh Hào Khí ở giữa (đo: đè 68 px ở 1024, 36 px ở 1100, hết ở 1180) nên thẻ nhiệm vụ xuống dưới hàng Hào Khí.
+   Giao diện cảm ứng dời cột trái sang phải 72 px nên cần tới 1290 px. */
+@media (max-width: 1180px) {
+  .hud-left { top: 90px; width: 236px; }
+}
+@media (max-width: 1290px) {
+  .touchmode .hud-left { top: 90px; width: 236px; }
+}
+/* 861–1030 px (khung trình duyệt của app thường rộng cỡ này): thanh Hào Khí gọn lại để đồng hồ trận không chui dưới bản đồ nhỏ */
+@media (min-width: 861px) and (max-width: 1030px) {
+  .hud-pin .hk { width: 250px; }
+}
+@media (max-width: 860px) {
+  .hud-left { top: 78px; }
+  .hud-pin .hud-top { left: 8px; transform: scale(.85); transform-origin: top left; }      /* thanh Hào Khí + đồng hồ sát trái: không chui dưới bản đồ nhỏ */
+}
+@media (max-width: 520px) {
+  .hud-pin .hk { width: 160px; } .hud-pin .hud-time span { display: none; }
+  .hud-left { width: 186px; }
+  .hud-left .hud-phase small { display: none; }
+  .hud-lockhint { bottom: 170px; font-size: .74rem; }
+  .wp-box b { font-size: .74rem; }
+}

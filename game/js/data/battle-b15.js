@@ -49,12 +49,15 @@ export const BASES = [
 export const BASE_RING = { don: 10, doanh_trai: 13, cong: 7, ban_doanh: 16 };
 
 // Pha (21.2). Par tính bằng phút (đề xuất trong GDD).
+// target (đợt 10): mục tiêu chính của pha để HUD chỉ đường — base: id Cứ Điểm (nhiều id = làm cái nào cũng được, HUD chỉ cái gần
+// nhất chưa xong), boss: đánh Toa Đô. Thẻ nhiệm vụ (hud.js) giữ goal + tip suốt pha; chữ trong tip viết {tpc}, {Act:cmd}…
+// ("Giữ Tab" / "Chạm nút Lệnh" / "Giữ LT") cho data/controls.js đổi sang phím của thiết bị đang dùng.
 export const PHASES = [
-  { id: "P1", name: "Chiếm bến trên", goal: "Chiếm Đồn bến trên (A1)", par: 2,
+  { id: "P1", name: "Chiếm bến trên", goal: "Chiếm Đồn bến trên (A1)", par: 2, target: { base: "A1" },
     tip: "Đi theo mặt trận A về phía đông. Hạ quân đồn trú và Đội trưởng, rồi đứng trong vòng để chiếm." },
-  { id: "P2", name: "Hai cánh", goal: "Chiếm Doanh trại trên bãi (A2)", par: 3,
-    tip: "Hai mặt trận cùng cần bạn. Mở vòng Mệnh Lệnh (Tab) để giao việc cho quân." },
-  { id: "P3", name: "Hàm Tử quan", goal: "Phá Cổng bắc (A3) hoặc Cổng nam (B3)", par: 3,
+  { id: "P2", name: "Hai cánh", goal: "Chiếm Doanh trại trên bãi (A2)", par: 3, target: { base: "A2" },
+    tip: "Hai mặt trận cùng cần bạn. {Act:cmd} để mở vòng Mệnh Lệnh và giao việc cho quân." },
+  { id: "P3", name: "Hàm Tử quan", goal: "Phá Cổng bắc (A3) hoặc Cổng nam (B3)", par: 3, target: { base: ["A3", "B3"] },
     tip: "Cổng bắc gần hơn. Cổng nam xa hơn, nhưng mở được thì cánh B +15 Sĩ Khí." },
   // hkFloor: kịch bản đảm bảo Hào Khí ≥ 90 ở pha boss (canon VS, systems.md §12 "dạy Tổng Phản Công") — đặt thẳng lúc vào
   // P4, không nhân hệ số, không tính vào Hào Khí gốc (Quân công); đang Tổng Phản Công thì thôi.
@@ -63,7 +66,7 @@ export const PHASES = [
   // Khi Toa Đô mất 30% Sinh lực lần đầu ("Toa Đô núng thế"), kịch bản nâng Hào Khí lên 100 — chỉ khi từ đầu P4 chưa kích
   // Tổng Phản Công, không đang Tổng Phản Công, và Tổng Phản Công kích ở P3 không còn chạy lúc vào P4; đặt thẳng như hkFloor.
   // Người chơi đã tự kiếm đủ 100 thì không đổi gì.
-  { id: "P4", name: "Toa Đô", goal: "Đánh lui Toa Đô", par: 2, hkFloor: 90, hkBoss: { hpBelow: 0.7, value: 100 },
+  { id: "P4", name: "Toa Đô", goal: "Đánh lui Toa Đô", par: 2, target: { boss: true }, hkFloor: 90, hkBoss: { hpBelow: 0.7, value: 100 },
     tip: "Quân Nguyên đổ bộ từ mép nước mỗi 30 giây. Đây là lúc hợp nhất để kích Tổng Phản Công." },
 ];
 
@@ -110,7 +113,7 @@ export const HISTORY_NOTES = [
 export const KE_SACH = {
   coAoTong: {
     id: "coAoTong", name: "Cờ áo Tống", quyMo: "lon", hk: 20, label: "Chính sử", modes: ["nhanh", "chuan"],
-    text: "Hộ tống 2 thuyền quân Triệu Trung cập bến trên, rồi bấm Lệnh Kế Sách.",
+    text: "Hộ tống 2 thuyền quân Triệu Trung cập bến trên, rồi bấm {kesach} (Lệnh Kế Sách).",
     lore: "Quân Trần Nhật Duật có người Tống lưu vong (gia tướng Triệu Trung) mặc áo Tống ra trận khiến quân Nguyên hoảng hốt.",
     unlockBase: "A1", boats: 2, boatSpeed: 3, stopEnemyR: 8, boatHp: 1500, perBoat: 5,
     // đường thuyền dọc sông, cách bờ 8 m; bến trên ngay bắc A1 (vị trí là ĐỀ XUẤT BẢN THỬ)
@@ -122,7 +125,7 @@ export const KE_SACH = {
   },
   muiTenThu: {
     id: "muiTenThu", name: "Mũi tên thư", quyMo: "nho", hk: 10, label: "Tương truyền", modes: ["chuan"],
-    text: "Nhặt 3 bó tên buộc thư ở làng, giao cho Nguyễn Khoái, rồi bấm Lệnh Kế Sách để bắn yểm trợ vào doanh trại Nguyên.",
+    text: "Nhặt 3 bó tên buộc thư ở làng, giao cho Nguyễn Khoái, rồi bấm {kesach} (Lệnh Kế Sách) để bắn yểm trợ vào doanh trại Nguyên.",
     lore: "Thư trên mũi tên: chỉ đánh quân xâm lược, không đánh người bị bắt đi lính.",
     bundles: [{ x: 150, z: 138 }, { x: 176, z: 152 }, { x: 196, z: 134 }],
     deliverTo: "H40", deliverR: 7, targets: ["B2", "A2"], window: 60, retryAfter: 45,

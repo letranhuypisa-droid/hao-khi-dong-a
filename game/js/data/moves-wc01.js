@@ -1,5 +1,5 @@
 // data/moves-wc01.js — bộ đòn WC01 Đại kiếm (H31 Trần Hưng Đạo; H34 Trần Khánh Dư dùng chung, systems §4.4).
-// File này KHÔNG import gì (chạy được trong Node để kiểm thử).
+// File này chỉ import controls.js (thuần, nhãn phím theo thiết bị), nên vẫn chạy được trong Node để kiểm thử.
 //
 // Cùng dạng mục với MOVES (tuning.js, WC03): { mv, dur, hits, stop, stopLast?, shape, range, arc?, width?, knock?, launch?,
 // step?, dash?, crit?, poiseMult?, unlockLv? } — mv ĐÃ nhân hệ số lớp 1,35; dur là giây ở Tốc đánh ×1,0; hits là tỉ lệ
@@ -21,6 +21,8 @@
 // ĐỀ XUẤT BẢN THỬ (toàn bảng): MV = §4.2 × 1,35; thời lượng chuỗi N = (MV chuẩn / 1,6) / 0,75 → ΣMV/Σdur N1–N6 = 8,38 /
 // 5,17 ≈ 1,62 MV/s (§2.2, ±10%); đòn C, lướt = thời lượng WC03 × 1,3 / 0,75; tầm code = tầm chuẩn + 1,2 m (cùng phần bù
 // WC03 đang dùng), đòn vùng lớn giữ bán kính chuẩn. Hit-stop theo §2.5 (N 33, N6 và C1–C5 67, C6 100, Đòn Quyết 167).
+import { guideKeys } from "./controls.js";
+
 
 export const MOVES_WC01 = {
   // N1 chém xéo phải → trái, N2 chém ngược trái → phải, N3 bổ thẳng qua đầu, N4 quét ngang rộng kèm bước, N5 đâm rồi
@@ -68,7 +70,7 @@ export const HEAVY_MOVES = new Set(Object.keys(MOVES_WC01).filter((k) => MOVES_W
 // icon dùng lại bộ có sẵn (assets/icons). Binh Thư: cuộn binh thư (ảnh "kesach"), CSS ghép thêm vòng ngắm đỏ (css/game.css
 // .sk[data-skill=binhThu], .touch .sk-binhThu) để khỏi lẫn với nút Kế Sách.
 export const MOVE_INFO_WC01 = {
-  N:  { icon: "n",  name: "Tiết chế kiếm pháp", label: "Hư cấu", keys: ["J · chuột trái", "nút N", "X"],
+  N:  { icon: "n",  name: "Tiết chế kiếm pháp", label: "Hư cấu", keys: guideKeys("n"),
         text: "Chuỗi 6 nhát N1–N6 bằng đại kiếm hai tay; khi vung không bị đòn thường ngắt. N6 xoay một vòng rưỡi đẩy lùi mọi kẻ quanh mình." },
   C1: { icon: "c1", name: "Phá Sơn", label: "Hư cấu", seq: "C (giữ để tụ lực)", text: "Giơ gươm qua đầu bổ thẳng, phá khiên, phá thế đỡ. Giữ C để tụ lực 3 cấp." },
   C2: { icon: "c2", name: "Kình Ba", label: "Hư cấu", seq: "N → C", text: "Kéo lưỡi sát đất rồi hất ngược lên, tung địch lên không." },
@@ -79,10 +81,10 @@ export const MOVE_INFO_WC01 = {
   D:  { icon: "dash", name: "Lướt kiếm", label: "Hư cấu", seq: "Né → N / C", text: "Vừa né xong bấm N (Lướt N) hoặc C (Lướt C): lao tới chém." },
   DQ: { icon: "dq", name: "Đòn Quyết", seq: "C cạnh kẻ Vỡ Thế", text: "Sĩ quan cạn thanh Phá Thế thì Vỡ Thế: bấm C cạnh người đó để ra Đòn Quyết — hạ đội trưởng; với tướng Nguyên là bắt sống." },
   CT: { icon: "ct", name: "Phản đòn", seq: "Đỡ đúng lúc", text: "Bấm Đỡ đúng lúc đòn viền đỏ sắp trúng: gạt bằng bản gươm rồi chém trả." },
-  skill: { icon: "skill", name: "Hịch Tướng Sĩ", label: "Chính sử", keys: ["E", "nút Hịch", "LB"],
+  skill: { icon: "skill", name: "Hịch Tướng Sĩ", label: "Chính sử", keys: guideKeys("skill", { touch: "nút Hịch" }),
            text: "Cắm gươm đọc hịch 3 s (bị ngắt nếu trúng đòn nặng): mọi cánh quân ta +15 Sĩ Khí, Công quân ta +10% trong 20 s. Hồi 40 s." },
-  skill2: { icon: "kesach", name: "Binh Thư Yếu Lược", label: "Chính sử + Hư cấu", keys: ["T", "nút Binh Thư", "D-pad trái"],
+  skill2: { icon: "kesach", name: "Binh Thư Yếu Lược", label: "Chính sử + Hư cấu", keys: guideKeys("skill2"),
             text: "Chỉ gươm đánh dấu một đơn vị địch hoặc Cứ Điểm: 20 s quân ta đánh mục tiêu +40%. Hồi 35 s." },
-  ult: { icon: "ult", name: "Bạch Đằng Quyết Chiến", label: "Chính sử + Hư cấu", keys: ["R", "nút Tuyệt Kỹ", "B"],
+  ult: { icon: "ult", name: "Bạch Đằng Quyết Chiến", label: "Chính sử + Hư cấu", keys: guideKeys("ult"),
          text: "Tốn một vạch Khí Lực: 12 s bất tử, 3 nhát bổ xuống đất tạo sóng chấn 15 m (nhát 3 phá mọi khiên); xong mọi cánh quân ta Tiến công, +15 Sĩ Khí." },
 };

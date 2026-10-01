@@ -13,12 +13,14 @@ import { totalQ } from "../sim/front.js";
 import { tpcReady } from "../sim/haokhi.js";
 import { heroTerrain } from "../sim/terrain-rules.js";
 import { MOVE_INFO, ICON, nextHeavy } from "../data/moves-info.js";
+import { short } from "../data/controls.js";
+import { placeWaypoint } from "./waypoint.js";
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const ORDER_KEYS = ["tiencong", "giuvung", "theota", "tiepvien"];
 const B15_BOUNDS = { x0: 0, x1: 600, z0: -200, z1: 200 };       // bản đồ nhỏ mặc định: Hàm Tử 600 × 400 m
 const SLOT_TILE = ["sk1", "sk5"];                               // ô kỹ năng 1 (E), ô kỹ năng 2 (T)
-const SLOT_KEY = ["E", "T"];
+const SLOT_KEY = [short("skill"), short("skill2")];
 
 // Ô kỹ năng của tướng: mảng từ hero.skillSlots() (C2), không có thì null (đường H35 cũ: một ô Phá Trận).
 // Mỗi ô: { id, name, icon?, key?, ready?, cd?, text? } — thiếu trường nào thì suy ra như dưới.
@@ -35,11 +37,16 @@ export class HUD {
     this.slots = heroSlots(hero);
     const cv = H.canvas || { w: 240, h: 160 };
     this.mapW = cv.w; this.mapH = cv.h;
+    // H.pinTip (B15): thẻ nhiệm vụ nằm cột trái cùng khung tin và giữ câu "làm thế nào" của pha suốt pha (trước đây câu đó hiện 7 s
+    // rồi mất). Trận khác (B20) giữ bố cục đã chỉnh tay của nó.
+    const pin = this.pin = !!H.pinTip;
+    if (pin) root.classList.add("hud-pin");
+    const card = `<div class="hud-phase"><b data-k="phase"></b><span data-k="goal"></span>${pin ? `<small data-k="tip"></small>` : ""}</div>`;
     root.innerHTML = `
       <div class="fx-hurt"></div><div class="fx-gold"></div><div class="fx-flash"></div><div class="fx-speed" data-k="speed"></div>
       <div class="hud-combo" data-k="combo"><b data-k="combon">0</b><span>ĐÒN LIÊN HOÀN</span></div>
       <div class="hud-top">
-        <div class="hud-phase"><b data-k="phase"></b><span data-k="goal"></span></div>
+        ${pin ? "" : card}
         <div class="hk">
           <div class="hk-label"><span>HÀO KHÍ</span><b data-k="hkv">0</b></div>
           <div class="hk-bar"><div class="hk-fill" data-k="hkfill"></div><div class="hk-over" data-k="hkover"></div>
@@ -62,7 +69,7 @@ export class HUD {
       <div class="hud-map"><canvas width="${cv.w}" height="${cv.h}" data-k="map"${H.canvas ? ` style="width:${cv.w}px;height:${cv.h}px"` : ""}></canvas>
         <div class="fronts" data-k="fronts"></div>
       </div>
-      <div class="hud-msgs" data-k="msgs"></div>
+      ${pin ? `<div class="hud-left" data-k="left">${card}<div class="hud-msgs" data-k="msgs"></div></div>` : `<div class="hud-msgs" data-k="msgs"></div>`}
       <div class="hud-events" data-k="events"></div>
       <div class="hud-ks" data-k="ks"></div>
       <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
@@ -76,10 +83,13 @@ export class HUD {
       </div>
       <div class="hud-prompt" data-k="prompt" hidden><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="bg"></circle><circle cx="18" cy="18" r="15" class="fg" data-k="promptring"></circle></svg><span data-k="prompttext"></span></div>
       <div class="hud-picker" data-k="picker" hidden></div>
+      <div class="hud-wp" data-k="wp" hidden><div class="wp-in"><div class="wp-box"><i class="wp-dir" data-k="wpdir"></i><div><b data-k="wpname"></b><span data-k="wpdist"></span></div></div><i class="wp-tip"></i></div></div>
+      <div class="hud-lockhint" data-k="lockhint" hidden></div>
       <div class="cine" data-k="cine"></div>
       <div class="lockmark" data-k="lockmark">◆</div>`;
     this.el = {};
     root.querySelectorAll("[data-k]").forEach((n) => (this.el[n.dataset.k] = n));
+    this.sk1Key = this.el.sk1?.querySelector("b")?.textContent ?? "";           // chữ phím ô kỹ năng 1, trả lại khi lớp cảm ứng tắt
     this.mapCtx = this.el.map.getContext("2d");
     this.ringFront = "A";
     this.el.ringfront.addEventListener("pointerdown", () => this.swapFront());
@@ -102,6 +112,51 @@ export class HUD {
   setRing(open) {
     if (open && !this.ringOpen) this.ringFront = this.ctx.sim.heroFront || this.ctx.director.lastFront;
     this.ringOpen = open; this.el.ring.classList.toggle("on", open);
+  }
+  // Thẻ nhiệm vụ nháy khi sang pha mới (và lúc vào trận): mắt kéo về mục tiêu và câu "làm thế nào".
+  phaseFlash() {
+    const c = this.el.phase?.parentElement; if (!c) return;
+    c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash");
+  }
+  // Nhắc khóa chuột (bàn phím + chuột): cú bấm đầu, và cú bấm đầu sau khi tạm dừng, chỉ khóa chuột chứ chưa ra đòn. Trình duyệt từ chối
+  // khóa hai lần liền (input.lockFails) thì đổi sang nhắc xoay camera bằng phím ← →.
+  lockHint(ctx, d) {
+    const E = this.el, inp = ctx.input;
+    const msg = !document.pointerLockElement && !ctx.touch && !d.over && inp && inp.enabled !== false && !inp.pad      // tay cầm không cần khóa chuột
+      ? (inp.lockFails >= 2 ? "Trình duyệt không cho khóa chuột — xoay camera bằng phím ← →." : "Bấm vào màn hình để khóa chuột: chuột xoay camera, chuột trái / phải ra đòn.") : "";
+    if (msg === this.lockMsg) return;
+    this.lockMsg = msg; E.lockhint.hidden = !msg; E.lockhint.textContent = msg;
+  }
+  // Vùng HUD mà nhãn chỉ đường phải tránh (cột trái: thẻ nhiệm vụ + tin; bản đồ nhỏ + bảng mặt trận), đo ở nhịp 0,05 s thay vì mỗi khung.
+  measureAvoid() {
+    const base = this.root.getBoundingClientRect(), out = [];
+    for (const n of [this.el.left, this.root.querySelector(".hud-map"), this.el.events, this.el.ks]) {
+      if (!n) continue;
+      const r = n.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;      // bảng sự kiện / Kế Sách rỗng thì cao 0
+      out.push({ l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, side: n === this.el.left ? "l" : "r" });
+    }
+    this.avoid = out;
+  }
+  // Nhãn chỉ đường tới mục tiêu chính của pha (director.objectives()). Gọi mỗi khung hình sau khi vẽ (battle.js) để nhãn bám mục tiêu
+  // khi xoay camera: nổi trên mục tiêu khi nó nằm trong màn hình; ở sau lưng hoặc ngoài khung thì ra rìa màn hình kèm mũi tên;
+  // tắt khi tướng đã vào vòng chiếm. Tự tránh thẻ nhiệm vụ, khung tin và bản đồ nhỏ. Trận không có objectives() (B20) thì không hiện.
+  frame(W, H) {
+    const E = this.el, ctx = this.ctx, d = ctx.director, hero = ctx.hero;
+    const list = d.objectives && hero.alive && !d.over ? d.objectives() : null;
+    let best = null, bd = Infinity;
+    for (const o of list || []) { const dd = Math.hypot(o.x - hero.x, o.z - hero.z); if (dd < bd) { bd = dd; best = o; } }
+    if (!best || bd < best.r) { if (!E.wp.hidden) E.wp.hidden = true; return; }
+    const yaw = ctx.cam.yaw, fx = Math.sin(yaw), fz = Math.cos(yaw), dx = best.x - hero.x, dz = best.z - hero.z;
+    const fwd = dx * fx + dz * fz, rgt = -dx * fz + dz * fx;      // phải của camera = (−cos, sin)
+    const w = placeWaypoint({ W, H, fwd, rgt, p: fwd > 0 ? ctx.project(best.x, best.y + 9, best.z) : null, half: this.wpHalf || 90, avoid: this.avoid || [] });   // hình học: waypoint.js
+    if (E.wp.hidden) E.wp.hidden = false;
+    if (E.wp.dataset.mode !== w.mode) E.wp.dataset.mode = w.mode;
+    E.wp.style.transform = `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`;
+    E.wpdir.style.transform = `rotate(${Math.round(w.rot)}deg)`;
+    if (best.label !== this.wpName) { this.wpName = best.label; E.wpname.textContent = best.label; this.wpHalf = 0; }
+    if (!this.wpHalf) this.wpHalf = Math.max(60, ((E.wp.querySelector(".wp-box").offsetWidth || 180) + 26) / 2);       // đo lại khi đổi chữ
+    const dist = `${Math.round(bd)} m`;
+    if (dist !== this.wpDist) { this.wpDist = dist; E.wpdist.textContent = dist; }
   }
   hkPulse(g) { this.pulse = 0.6; this.el.hkv.dataset.delta = (g > 0 ? "+" : "") + Math.round(g); }
 
@@ -144,11 +199,19 @@ export class HUD {
 
   update(dt, w, h) {
     const ctx = this.ctx, hero = ctx.hero, d = ctx.director, sim = ctx.sim, hk = ctx.hk, E = this.el;
+    const fm = (s) => (ctx.fmt ? ctx.fmt(s) : s);                       // {tpc}, {Act:cmd}… → phím của thiết bị đang dùng (data/controls.js)
     const data = this.B.data || {}, PH = data.PHASES || [], FRONTS = data.FRONTS || {}, EVENTS = data.EVENTS || {};
     this.t += dt; this.pulse = Math.max(0, this.pulse - dt);
     const P = PH[Math.min(d.phase, PH.length - 1)];
     E.phase.textContent = P ? `${P.id} · ${P.name}` : "";
     E.goal.textContent = d.baseHint || P?.goal || "";
+    if (P && P.id !== this.phaseId) { this.phaseId = P.id; this.phaseFlash(); }
+    if (E.tip) {                                              // câu "làm thế nào" của pha, chữ phím theo thiết bị đang dùng
+      const tip = P?.tip ? fm(P.tip) : "";
+      if (tip !== this.tipText) { this.tipText = tip; E.tip.textContent = tip; }
+    }
+    this.lockHint(ctx, d);
+    this.measureAvoid();
     E.time.textContent = fmt(d.time);
     E.time.classList.toggle("late", d.time > (d.M?.par ?? this.parSec));
     // Hào Khí
@@ -158,7 +221,7 @@ export class HUD {
     E.hkfill.parentElement.classList.toggle("ready", tpcReady(hk));
     E.hkfill.parentElement.classList.toggle("tpc", hk.tpc);
     E.hkv.classList.toggle("pulse", this.pulse > 0);
-    E.hkstate.textContent = hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? "Sẵn sàng · bấm F" : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "";
+    E.hkstate.textContent = hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? fm("Sẵn sàng · bấm {tpc}") : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "";
     // tướng
     E.lv.textContent = `Cấp ${ctx.stats.level}`;
     E.hp.style.width = `${(hero.hp / hero.maxHp) * 100}%`;
@@ -182,7 +245,7 @@ export class HUD {
     this.skillTiles(hero, hk, E);
     E.sk3.classList.toggle("ready", tpcReady(hk));
     E.sk3.style.display = tpcReady(hk) || hk.tpc ? "" : "none";
-    if (ctx.touch) { E.sk1.querySelector("b").textContent = ""; }
+    { const kb = E.sk1?.querySelector("b"), want = ctx.touch ? "" : this.sk1Key; if (kb && kb.textContent !== want) kb.textContent = want; }    // lớp cảm ứng bật / tắt theo thiết bị đang dùng
     // mặt trận
     E.fronts.innerHTML = this.B.hud?.frontsHTML ? this.B.hud.frontsHTML(ctx) : Object.values(FRONTS).map((F) => {
       const f = sim.fronts[F.id], qt = Math.round(totalQ(f, "ta")), qd = Math.round(totalQ(f, "dich"));
@@ -197,11 +260,11 @@ export class HUD {
       `<div class="ev"><b>${EVENTS[k]?.name ?? k}</b><span>${Math.ceil(v.left)} s</span></div>`).join("");
     // Kế Sách, rồi các bảng của trận (setPanel)
     let ks = (d.keSach?.hud?.() || []).filter((k) => k.state !== "khoa").map((k) =>
-      `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${k.detail ? " · " + k.detail : ""}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
+      `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${fm(k.word + (k.detail ? " · " + k.detail : ""))}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
     for (const [id, html] of this.panels) ks += `<div class="hud-panel" data-panel="${id}">${html}</div>`;
     if (ks !== this.ksHtml) { E.ks.innerHTML = ks; this.ksHtml = ks; }     // chỉ vẽ lại khi đổi: hoạt ảnh CSS (nhấp nháy Sẵn sàng) chạy liền
     // tin nhắn
-    E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${m.text}</div>`).join("");
+    E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${fm(m.text)}</div>`).join("");
     E.ko.textContent = d.ko;
     // mục tiêu
     const t = hero.lock?.alive && !hero.lock.dead ? hero.lock : this.nearestOfficer();
@@ -333,12 +396,12 @@ export class HUD {
 export function skillBarHTML(full, slots = null, ult = null) {
   const tile = (k, id, key, name, extra = "", cls = "", icon = MOVE_INFO[id].icon, skill = "") => `<div class="sk ${cls}" data-k="${k}"${skill ? ` data-skill="${skill}"` : ""}><img class="ico" src="${ICON(icon)}" alt="" data-k="${k}ic"><b>${key}</b><span data-k="${k}nm">${name}</span><i data-k="${k}cd">${extra}</i></div>`;
   const sk = slots ? slots.map((s, i) => tile(SLOT_TILE[i], "skill", s.key ?? SLOT_KEY[i], s.name ?? s.id, "", "", s.icon ?? MOVE_INFO[s.id]?.icon ?? "skill", s.id)).join("")
-    : tile("sk1", "skill", "E", "Phá Trận");
+    : tile("sk1", "skill", short("skill"), "Phá Trận");
   // nhãn ô Tuyệt Kỹ: ult.label, không có thì tên chiêu của tướng (H31 "Bạch Đằng Quyết Chiến"); Bóp Nát của H35 giữ chữ "Tuyệt Kỹ"
-  const ut = ult ? tile("sk2", "ult", ult.key ?? "R", ult.label ?? ((ult.id && ult.id !== "bopNat" && ult.name) || "Tuyệt Kỹ"), "", "", ult.icon ?? "ult") : tile("sk2", "ult", "R", "Tuyệt Kỹ");
+  const ut = ult ? tile("sk2", "ult", ult.key ?? short("ult"), ult.label ?? ((ult.id && ult.id !== "bopNat" && ult.name) || "Tuyệt Kỹ"), "", "", ult.icon ?? "ult") : tile("sk2", "ult", short("ult"), "Tuyệt Kỹ");
   return `<div class="hud-skills">
-    <div class="skrow atk">${tile("atkN", "N", "J", "Đòn N", "")}${tile("atkC", "C1", "K", "C1 Phá thế", "")}${tile("atkD", "dodge", "Space", "Né")}${tile("atkB", "block", "Shift", "Đỡ")}</div>
-    <div class="skrow">${sk}${ut}${full ? tile("sk3", "tpc", "F", "Tổng Phản Công", "", "tpc") + tile("sk4", "cmd", "Tab", "Mệnh Lệnh") : ""}</div>
+    <div class="skrow atk">${tile("atkN", "N", short("n"), "Đòn N", "")}${tile("atkC", "C1", short("c"), "C1 Phá thế", "")}${tile("atkD", "dodge", short("dodge"), "Né")}${tile("atkB", "block", short("block"), "Đỡ")}</div>
+    <div class="skrow">${sk}${ut}${full ? tile("sk3", "tpc", short("tpc"), "Tổng Phản Công", "", "tpc") + tile("sk4", "cmd", short("cmd"), "Mệnh Lệnh") : ""}</div>
   </div>`;
 }
 const PIPS = ["", "●○○○○○", "●●○○○○", "●●●○○○", "●●●●○○", "●●●●●○", "●●●●●●"];

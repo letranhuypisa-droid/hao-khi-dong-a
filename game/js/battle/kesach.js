@@ -47,7 +47,7 @@ export class KeSachManager {
     const d = this.ctx.director;
     if (id === "coAoTong") {
       this.spawnBoats(k); this.spawnGuards(k);
-      if (k.attempts === 1) { this.ctx.fx.banner("KẾ SÁCH · CỜ ÁO TỐNG", "#f1d98a", 2); d.say(`${k.def.text} Thuyền dừng khi có địch trong ${k.def.stopEnemyR} m — hãy dọn bờ sông.`, 8, "good"); }
+      if (k.attempts === 1) { this.banner("KẾ SÁCH · CỜ ÁO TỐNG", "#f1d98a", 2, true); d.say(`${k.def.text} Thuyền dừng khi có địch trong ${k.def.stopEnemyR} m — hãy dọn bờ sông.`, 8, "good"); }
       else d.say("Thuyền quân Triệu Trung lại xuất bến.", 4, "good");
     }
     if (id === "muiTenThu") {
@@ -205,16 +205,20 @@ export class KeSachManager {
     if (this.carried >= k.def.bundles.length) {
       const gen = ctx.director.generals[k.def.deliverTo];
       if (gen && gen.alive && !gen.dead && Math.hypot(gen.x - h.x, gen.z - h.z) < k.def.deliverR) {
-        ctx.director.say("Đã giao 3 bó tên cho Nguyễn Khoái. Bấm Lệnh Kế Sách (G) để bắn yểm trợ.", 5, "good");
+        ctx.director.say("Đã giao 3 bó tên cho Nguyễn Khoái. Bấm {kesach} (Lệnh Kế Sách) để bắn yểm trợ.", 5, "good");
         this.ready(k);
       }
     }
   }
 
+  // Băng chữ qua hàng đợi của director (fx.banner chỉ giữ một băng: chiếm A1 gọi ba băng cùng nhịp thì chỉ còn băng cuối).
+  // low: băng phụ — luôn hiện sau "CHIẾM ĐỒN" và tên pha mới khi cùng một nhịp
+  banner(text, color, T, low = false) { const d = this.ctx.director; if (d?.banner) d.banner(text, color, T, low); else this.ctx.fx.banner(text, color, T); }
+
   // ---- chung --------------------------------------------------------------------------------------
   ready(k) {
     k.state = "sansang"; k.left = k.def.window * this.windowMult;
-    this.ctx.fx.banner(`KẾ SÁCH SẴN SÀNG · ${k.def.name.toUpperCase()} · G`, "#ffd27a", 1.8);
+    this.banner(`KẾ SÁCH SẴN SÀNG · ${k.def.name.toUpperCase()} · {KESACH}`, "#ffd27a", 1.8);
     this.ctx.audio.play("drums3");
   }
 
@@ -240,7 +244,7 @@ export class KeSachManager {
       if (a.side !== "dich" || a.state === "dead") continue;
       if (Math.hypot(a.x - L.x, a.z - L.z) < E.radius || (a.front === "A" && Math.abs(a.x - lineToX(FRONTS.A, f.x)) < E.radius)) { a.panicT = dur; n++; }
     }
-    ctx.fx.banner("QUÂN NGUYÊN HOANG MANG!", "#ffd27a", 2); ctx.audio.play("horn");
+    this.banner("QUÂN NGUYÊN HOANG MANG!", "#ffd27a", 2); ctx.audio.play("horn");
     ctx.fx.ring(L.x, L.z, E.radius, 0xf1d98a, 1.2);
     for (let i = 0; i < 24; i++) ctx.fx.embers(L.x + (Math.random() - 0.5) * 16, L.z + (Math.random() - 0.5) * 8);
     this.succeed(k, `Cờ áo Tống tung bay trên bến: cánh Nguyên trong ${E.radius} m hoang mang ${Math.round(dur)} s (Sĩ Khí −${E.skPerSec}/s, chính xác −30%).`);
@@ -279,7 +283,7 @@ export class KeSachManager {
     k.state = "thanhcong"; k.success = true;
     this.reward(k, k.def.hk);
     this.ctx.director.say(msg, 6, "good");
-    this.ctx.fx.banner(`KẾ SÁCH THÀNH CÔNG · +${k.def.hk} HÀO KHÍ`, "#f1d98a", 1.8);
+    this.banner(`KẾ SÁCH THÀNH CÔNG · +${k.def.hk} HÀO KHÍ`, "#f1d98a", 1.8);
   }
 
   fail(k, why, retry = true) {
@@ -331,10 +335,10 @@ export class KeSachManager {
     return this.list.map((k) => {
       let detail = "";
       if (k.def.id === "coAoTong" && k.state === "khadung") {
-        detail = this.boats.map((b) => b.dead ? "chìm" : b.landed ? "đã cập bến" : `${Math.round((b.hp / b.maxHp) * 100)}%${b.stopped ? " · dừng" : ""}`).join(" · ");
+        detail = "thuyền " + this.boats.map((b) => b.dead ? "chìm" : b.landed ? "đã cập bến" : `${Math.round((b.hp / b.maxHp) * 100)}%${b.stopped ? " · dừng" : ""}`).join(" · ");
       }
       if (k.def.id === "muiTenThu" && k.state === "khadung") detail = this.carried >= 3 ? "mang tới Nguyễn Khoái" : `bó tên ${this.carried}/3`;
-      if (k.state === "sansang") detail = `bấm G · còn ${Math.ceil(k.left)} s`;
+      if (k.state === "sansang") detail = `bấm {kesach} · còn ${Math.ceil(k.left)} s`;
       if (k.state === "thatbai" && Number.isFinite(k.retryT)) detail = `dựng lại sau ${Math.ceil(k.retryT)} s`;
       return { id: k.def.id, name: k.def.name, quyMo: k.def.quyMo === "lon" ? "Lớn" : "Nhỏ", hk: k.def.hk, got: k.got, state: k.state, word: STATE_WORD[k.state], detail, label: k.def.label };
     });

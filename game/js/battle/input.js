@@ -5,13 +5,17 @@
 // (giữ). Pha D (B20): Tương tác trên tay cầm chuyển từ RT sang D-pad xuống (RT chỉ còn khoá mục tiêu — core verify mục 1);
 // pickMode (battle.js bật khi bảng chọn điểm đến đang mở): D-pad lên/phải/xuống/trái = chọn 1/2/3/4.
 
-const KEYMAP = {
+// KEYMAP, MOUSEMAP xuất ra để tests/controls.test.mjs đối chiếu với bảng nhãn phím (data/controls.js): đổi phím ở đây thì
+// chữ trên màn hình phải đổi theo, bài kiểm tra sẽ báo nếu lệch.
+export const KEYMAP = {
   KeyJ: "n", KeyK: "c", Space: "dodge", KeyL: "block", ShiftLeft: "block", ShiftRight: "block",
   KeyE: "skill", KeyU: "skill", KeyT: "skill2", KeyX: "interact", KeyR: "ult", KeyI: "ult", KeyF: "tpc", KeyQ: "lock", KeyG: "kesach",
   Tab: "cmd", KeyM: "map", Escape: "pause", KeyP: "pause",
   Digit1: "cmd1", Digit2: "cmd2", Digit3: "cmd3", Digit4: "cmd4", KeyZ: "cmdSwap",
   Enter: "next", NumpadEnter: "next",           // màn Huấn luyện: sang bài / bỏ qua
 };
+// nút chuột (khi chuột đã khóa): 0 trái, 1 giữa, 2 phải
+export const MOUSEMAP = { 0: "n", 1: "lock", 2: "c" };
 
 export class Input {
   constructor(canvas) {
@@ -28,13 +32,16 @@ export class Input {
       else this.keys.delete(e.code);
       this.touch = false; this.pad = false; this.keyUsed = true;
     };
+    this.lockFails = 0;                                 // lần khóa chuột bị trình duyệt từ chối liền nhau (HUD đổi dòng nhắc)
+    this.lock = () => {
+      try { canvas.requestPointerLock?.()?.then?.(() => (this.lockFails = 0), () => this.lockFails++); } catch (_) { this.lockFails++; }
+    };
     this.onMouse = (e) => {
       if (!this.enabled || e.pointerType === "touch") return;
       if (e.type === "pointerdown") {
-        if (document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; }
-        if (e.button === 0) this.pressed.n = true;
-        if (e.button === 2) { this.pressed.c = true; this.mouseC = true; }
-        if (e.button === 1) this.pressed.lock = true;
+        if (document.pointerLockElement !== canvas) { this.lock(); return; }   // cú bấm đầu chỉ khóa chuột, chưa ra đòn
+        const a = MOUSEMAP[e.button]; if (a) this.pressed[a] = true;
+        if (e.button === 2) this.mouseC = true;
         this.touch = false;
       } else if (e.type === "pointerup" && e.button === 2) this.mouseC = false;
     };

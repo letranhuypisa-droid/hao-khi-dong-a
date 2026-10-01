@@ -9,6 +9,7 @@ import { ARENA_MODES, MEDALS, isoWeekKey, seedFromKey, arenaRewards, applyArena 
 import { TIERS } from "./data/tuning.js";
 import { HISTORY_NOTES, BOSS } from "./data/battle-b15.js";
 import { movesGuideHTML } from "./ui/guide.js";
+import { touchUI } from "./data/controls.js";
 import { ICON } from "./data/moves-info.js";
 import { COMIC_B15 } from "./data/comic-b15.js";
 import { CARDS, CARD_GROUPS, CARD_BY_ID, QUIZ_B15 } from "./data/suquan-b15.js";
@@ -162,7 +163,8 @@ function battleCard(id) {
 
 // ---- Huấn luyện (đợt 7) ------------------------------------------------------------------------
 // Màn huấn luyện có bài tập (chạy trên sân Võ trường, không cần Doanh trại cấp 3) và bảng đòn có icon.
-let guideDev = matchMedia("(pointer: coarse)").matches ? 1 : 0;
+let guideDev = null;                                      // null: theo cách bạn bấm gần nhất (touchUI), bấm nút Bàn phím / Cảm ứng / Tay cầm thì ghi đè
+const guideDevNow = () => guideDev ?? (touchUI(save.settings) ? 1 : 0);
 function tutorialBanner() {
   return `<section class="card tutbanner"><img src="${ICON("n")}" alt=""><div style="flex:1"><h3>Lần đầu ra trận?</h3>
     <p class="small">11 bài tập ngắn ở Võ trường, chừng bốn phút: chuỗi đòn song đao, né, đỡ, phản đòn, Đòn Quyết, Phá Trận, Tuyệt Kỹ.</p></div>
@@ -175,8 +177,8 @@ function huanluyen() {
       <p class="small">Có thể chơi lại bất cứ lúc nào. Không cần Doanh trại cấp 3.</p></div>
       <button class="primary" data-tutgo>${done ? "Tập lại" : "Vào huấn luyện"}</button></section>
     <section class="card"><div class="row" style="justify-content:space-between"><h3>Bảng đòn và điều khiển</h3>
-      <div class="row">${["Bàn phím", "Cảm ứng", "Tay cầm"].map((l, i) => `<button data-gdev="${i}" class="${guideDev === i ? "primary" : ""}">${l}</button>`).join("")}</div></div>
-      ${movesGuideHTML({ dev: guideDev })}</section>`;
+      <div class="row">${["Bàn phím", "Cảm ứng", "Tay cầm"].map((l, i) => `<button data-gdev="${i}" class="${guideDevNow() === i ? "primary" : ""}">${l}</button>`).join("")}</div></div>
+      ${movesGuideHTML({ dev: guideDevNow() })}</section>`;
 }
 
 async function startTutorial() {

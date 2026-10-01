@@ -270,7 +270,7 @@ function escapeHTML(X, t) {
     <div class="bar esc"><div style="width:${pct(X.value / 100)}"></div></div>
     <div class="row">${hold}<span class="rate">${X.full ? "Hạm đội đã thoát vây" : `+${X.rate.toFixed(1).replace(".", ",")}/s`}</span></div></section>`;
 }
-function ksHTML(list, phase) {
+function ksHTML(list, phase, fmt = (s) => s) {
   return `<section class="b20-sec ksl">` + list.map((k) => {
     const cur = k.phase === phase || k.state === "sansang";
     const left = k.left > 0 ? ` · ${fmtS(k.left)}` : "";
@@ -278,12 +278,12 @@ function ksHTML(list, phase) {
       const w = k.state === "khoa" ? `mở ở ${PHASE_NAMES[k.phase] ?? ""}` : k.word;
       return `<div class="ks mini ${k.state}"><b>${k.name}</b><span>${w}</span><em>${Math.round(k.got)}/${k.hk}</em></div>`;
     }
-    return `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${left}${k.detail ? " · " + k.detail : ""}${k.state === "sansang" && k.id === "kichCoc" ? " · bấm G" : ""}</span>
+    return `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${left}${k.detail ? " · " + k.detail : ""}${k.state === "sansang" && k.id === "kichCoc" ? " · bấm " + fmt("{kesach}") : ""}</span>
       <i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}${k.labelAction ? ` · thao tác ${k.labelAction}` : ""}</em></i></div>`;
   }).join("") + `</section>`;
 }
-function rallyHTML() {
-  return `<section class="b20-sec rally"><header><b>HÀO KHÍ KHÓA 100</b></header><div class="sub">Bấm <kbd>F</kbd> — Tổng Phản Công: lên kỳ hạm, bắt sống Ô Mã Nhi</div></section>`;
+function rallyHTML(fmt = (s) => s) {
+  return `<section class="b20-sec rally"><header><b>HÀO KHÍ KHÓA 100</b></header><div class="sub">Bấm <kbd>${fmt("{tpc}")}</kbd> — Tổng Phản Công: lên kỳ hạm, bắt sống Ô Mã Nhi</div></section>`;
 }
 
 // ---- HUD của trận ------------------------------------------------------------------------------------------------------
@@ -377,8 +377,8 @@ export class HudB20 {
     if (st.escape) html += escapeHTML(st.escape, t);
     if (st.escorts) html += escortsHTML(st.escorts, ph);
     if (st.markers && (ph === 1 || ph === 2)) html += markersHTML(st.markers, st.scout, ph);
-    if (st.hkLock && !this.ctx.hk?.tpc) html += rallyHTML();
-    if (st.ks?.length) html += ksHTML(st.ks, ph);
+    if (st.hkLock && !this.ctx.hk?.tpc) html += rallyHTML(this.ctx.fmt);
+    if (st.ks?.length) html += ksHTML(st.ks, ph, this.ctx.fmt);
     this.hud.setPanel("b20", html || null);
   }
 
@@ -400,7 +400,7 @@ export class HudB20 {
     w.bpo.style.width = b.poiseMax ? pct(b.poise / b.poiseMax) : "0";
     [...w.bpips.children].forEach((p, i) => p.classList.toggle("done", i < (b.phase ?? 1) - 1));
     e.classList.toggle("locked", locked); e.classList.toggle("broken", !!b.broken && !b.captured); e.classList.toggle("captured", !!b.captured);
-    w.bhint.textContent = b.captured ? "ĐÃ BẮT SỐNG" : b.broken ? (this.ctx.touch ? "VỠ THẾ · bấm C: BẮT SỐNG" : "VỠ THẾ · bấm C (K): ĐÒN QUYẾT — BẮT SỐNG")
+    w.bhint.textContent = b.captured ? "ĐÃ BẮT SỐNG" : b.broken ? (this.ctx.fmt ? this.ctx.fmt("VỠ THẾ · bấm {c}: ĐÒN QUYẾT — BẮT SỐNG") : "VỠ THẾ · bấm C: ĐÒN QUYẾT — BẮT SỐNG")
       : locked ? `Sinh lực khóa ở ${b.hpLock}% — đánh cạn Phá Thế để bắt sống` : lock > 0 ? `Bắt sống: đánh tới ${b.hpLock}% rồi cạn Phá Thế` : "Vỡ Thế rồi Đòn Quyết để bắt sống";
     // khung mục tiêu của hud.js trùng boss thì ẩn (thanh boss đã đủ)
     const h = this.ctx.hero, tgt = h?.lock?.alive && !h.lock.dead ? h.lock : this.hud.nearestOfficer?.();

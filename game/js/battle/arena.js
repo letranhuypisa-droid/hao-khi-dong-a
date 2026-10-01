@@ -9,7 +9,8 @@ import { BigUnit } from "./units.js";
 import { FX } from "./fx.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
-import { lerpAngle, buildTouch, controlsHTML, releaseGpu } from "./battle.js";
+import { lerpAngle, setupTouch, controlsHTML, releaseGpu } from "./battle.js";
+import { fmtKeys, devOf } from "../data/controls.js";
 import { HUD, skillBarHTML, updateAttackTiles } from "./hud.js";
 import { TutorialDirector } from "./tutorial.js";
 import { createHaoKhi } from "../sim/haokhi.js";
@@ -232,12 +233,13 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       scene, camera, renderer, R, diff: { ...diff, hp: 1, poise: 1 }, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
       openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music,
     };
+    ctx.fmt = (str) => fmtKeys(str, devOf(ctx));   // chữ phím theo thiết bị đang dùng (data/controls.js), như battle.js
     ctx.world = buildArena(scene, { shadows: settings.shadows });
     ctx.hk = createHaoKhi({ quick: false });
     ctx.sim = { heroFront: null, fronts: {}, bases: {} };
     ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
     music?.play(opts.mode === "luyentap" || opts.mode === "huanluyen" ? "hub" : "boss");
-    ctx.fx = new FX(scene, camera, hudRoot);
+    ctx.fx = new FX(scene, camera, hudRoot); ctx.fx.fmt = ctx.fmt;
     ctx.crowd = new Crowd(scene, ctx);
     // khán giả trên khán đài: quân Trần đứng xem, reo hò khi tướng hạ địch (không đánh, không bị đánh)
     for (const s of ctx.world.spectatorSpots || []) {
@@ -263,7 +265,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", resize); resize();
-    if (settings.touch === "on" || (settings.touch === "auto" && matchMedia("(pointer: coarse)").matches)) buildTouch(touchRoot, input, ctx);
+    const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);   // "Tự nhận" theo cách bạn bấm vào sân, rồi theo thiết bị vừa dùng (xem battle.js)
 
     let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, time = 0, endShown = false;
     // hết lượt (director.over) thì không mở tạm dừng, như battle.js: bảng tạm dừng đè mất bảng kết quả
@@ -271,7 +273,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       if (finished) return;
       paused = on; overlay.classList.toggle("on", on);
       const tut = opts.mode === "huanluyen";
-      overlay.innerHTML = on ? `<div class="panel pause"><h2>${tut ? "HUẤN LUYỆN" : "VÕ TRƯỜNG"} · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">${tut ? "Rời huấn luyện" : "Rời Võ trường"}</button></div>${controlsHTML(ctx.touch)}</div>` : "";
+      overlay.innerHTML = on ? `<div class="panel pause"><h2>${tut ? "HUẤN LUYỆN" : "VÕ TRƯỜNG"} · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">${tut ? "Rời huấn luyện" : "Rời Võ trường"}</button></div>${controlsHTML(devOf(ctx))}</div>` : "";
       if (on) {
         document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
         overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
@@ -301,7 +303,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     };
 
     const step = (dt, inp, draw) => {
-      time += dt; ctx.touch = inp.touch;
+      time += dt; ctx.touch = inp.touch; syncTouch();
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
       ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;

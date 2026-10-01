@@ -1,18 +1,20 @@
 // data/moves-info.js — tên, icon, phím và lời giải thích của từng đòn, kỹ năng, lệnh (đợt 7).
 // Dùng chung cho HUD (thanh kỹ năng, nút cảm ứng, vòng Mệnh Lệnh), màn Huấn luyện và bảng tra cứu ở Doanh trại.
 // Icon: assets/icons/<icon>.webp (GPT Image 2 qua Higgsfield, xem assets/SOURCES.md). Tên đòn C là Hư cấu của game.
-// File này chỉ import moves-wc01.js (thuần, không import gì) nên chạy được trong Node để kiểm thử.
+// File này chỉ import các file thuần (moves-wc01.js, controls.js: nhãn phím theo thiết bị) nên chạy được trong Node để kiểm thử.
 //
 // Theo tướng (đợt 9, lõi nhiều tướng): moveInfoOf(def) — H35 (WC03) dùng MOVE_INFO như cũ; H31 (WC01) = MOVE_INFO đè bằng
 // MOVE_INFO_WC01 (tên đòn đại kiếm, Hịch Tướng Sĩ ở ô "skill", Binh Thư ở ô "skill2", Bạch Đằng Quyết Chiến ở "ult").
 
 import { MOVE_INFO_WC01 } from "./moves-wc01.js";
+import { guideKeys } from "./controls.js";
 
 export const ICON = (id) => `./assets/icons/${id}.webp`;
 
-// keys: [bàn phím, cảm ứng, tay cầm]
+// keys: [bàn phím, cảm ứng, tay cầm] lấy từ bảng nhãn phím (controls.js), không gõ tay. seq: chuỗi đòn viết bằng tên nút (N, C);
+// bảng phím (ui/guide.js) đổi sang phím thật theo thiết bị: bàn phím "J J → K".
 export const MOVE_INFO = {
-  N:  { icon: "n",  name: "Song đao liên trảm", keys: ["J · chuột trái", "nút N", "X"],
+  N:  { icon: "n",  name: "Song đao liên trảm", keys: guideKeys("n"),
         text: "Chuỗi 6 nhát N1–N6 khi bấm liên tiếp. N6 xoay một vòng đẩy lùi mọi kẻ quanh mình." },
   C1: { icon: "c1", name: "Phá thế", seq: "C", text: "Đâm mạnh phá khiên, lính đỡ không được; đẩy lùi xa." },
   C2: { icon: "c2", name: "Hất tung", seq: "N → C", text: "Chém hất địch lên không, rơi xuống nằm một lúc." },
@@ -23,18 +25,18 @@ export const MOVE_INFO = {
   D:  { icon: "dash", name: "Lướt chém", seq: "Né → N / C", text: "Vừa né xong bấm N (Lướt N) hoặc C (Lướt C): lao tới chém." },
   DQ: { icon: "dq", name: "Đòn Quyết", seq: "C cạnh kẻ Vỡ Thế", text: "Sĩ quan cạn thanh Phá Thế thì Vỡ Thế: bấm C cạnh hắn để kết liễu, chắc chắn chí mạng." },
   CT: { icon: "ct", name: "Phản đòn", seq: "Đỡ đúng lúc", text: "Bấm Đỡ đúng lúc đòn viền đỏ sắp trúng: gạt đòn và chém trả." },
-  dodge: { icon: "dodge", name: "Né", keys: ["Space", "nút Né", "A"], text: "Lộn tránh, bất tử 0,25 s. Né 2 lần liền thì phải nghỉ chốc lát." },
-  block: { icon: "block", name: "Đỡ", keys: ["Shift · L (giữ)", "nút Đỡ (giữ)", "RB"], text: "Giữ để đỡ đòn trước mặt. Đòn viền đỏ phá được thế đỡ." },
-  skill: { icon: "skill", name: "Phá Trận", keys: ["E", "nút Phá Trận", "LB"], text: "3 lần lao 18 m trong 6 s, làm choáng lính trên đường. Hồi 20 s." },
-  ult: { icon: "ult", name: "Bóp Nát Quân Thù", keys: ["R", "nút Tuyệt Kỹ", "B"], text: "Tốn một vạch Khí Lực: 10 s bất tử, 24 nhát chém quanh mình, xong cắm cờ tăng Công quân ta." },
-  tpc: { icon: "tpc", name: "Tổng Phản Công", keys: ["F", "nút Phản Công", "D-pad lên"], text: "Hào Khí đủ 100: cả hai mặt trận xông lên 25 s, tướng được một Tuyệt Kỹ Hào Khí." },
-  cmd: { icon: "cmd", name: "Mệnh Lệnh", keys: ["Tab (giữ) + 1–4", "nút Lệnh", "LT (giữ) + D-pad"], text: "Mở vòng lệnh (trận chậm lại ×0,2), ra lệnh cho mặt trận; Z đổi mặt trận." },
+  dodge: { icon: "dodge", name: "Né", keys: guideKeys("dodge"), text: "Lộn tránh, bất tử 0,25 s. Né 2 lần liền thì phải nghỉ chốc lát." },
+  block: { icon: "block", name: "Đỡ", keys: guideKeys("block"), text: "Giữ để đỡ đòn trước mặt. Đòn viền đỏ phá được thế đỡ." },
+  skill: { icon: "skill", name: "Phá Trận", keys: guideKeys("skill"), text: "3 lần lao 18 m trong 6 s, làm choáng lính trên đường. Hồi 20 s." },
+  ult: { icon: "ult", name: "Bóp Nát Quân Thù", keys: guideKeys("ult"), text: "Tốn một vạch Khí Lực: 10 s bất tử, 24 nhát chém quanh mình, xong cắm cờ tăng Công quân ta." },
+  tpc: { icon: "tpc", name: "Tổng Phản Công", keys: guideKeys("tpc"), text: "Hào Khí đủ 100: cả hai mặt trận xông lên 25 s, tướng được một Tuyệt Kỹ Hào Khí." },
+  cmd: { icon: "cmd", name: "Mệnh Lệnh", keys: guideKeys("cmd", { extra: [" + 1–4", "", " + D-pad"] }), text: "Mở vòng lệnh (trận chậm lại ×0,2), ra lệnh cho mặt trận; Z đổi mặt trận." },
   tiencong: { icon: "tiencong", name: "Tiến công", text: "Mặt trận đánh mạnh hơn 20 s (lực ×1,15)." },
   giuvung: { icon: "giuvung", name: "Giữ vững", text: "Mặt trận giữ tuyến 20 s, tổn thất giảm 20%." },
   theota: { icon: "theota", name: "Theo ta", text: "Tối đa 30 quân tách khỏi mặt trận đi theo tướng; bấm lại để trả về." },
   tiepvien: { icon: "tiepvien", name: "Gọi tiếp viện", text: "300 quân tới sau 20 s. Có hạn lượt: chiếm doanh trại được thêm lượt." },
-  kesach: { icon: "kesach", name: "Kế Sách", keys: ["G", "nút Kế Sách", "D-pad phải"], text: "Làm đủ điều kiện thì Kế Sách Sẵn sàng: bấm để thi hành, được nhiều Hào Khí." },
-  lock: { icon: "lock", name: "Khóa mục tiêu", keys: ["Q · chuột giữa", "nút Khóa", "RT"], text: "Khóa sĩ quan gần nhất: camera và đòn đánh bám theo hắn." },
+  kesach: { icon: "kesach", name: "Kế Sách", keys: guideKeys("kesach"), text: "Làm đủ điều kiện thì Kế Sách Sẵn sàng: bấm để thi hành, được nhiều Hào Khí." },
+  lock: { icon: "lock", name: "Khóa mục tiêu", keys: guideKeys("lock"), text: "Khóa sĩ quan gần nhất: camera và đòn đánh bám theo hắn." },
 };
 
 // Bảng tên đòn / kỹ năng theo tướng (def: HEROES[id] hoặc id). Tướng WC01 thiếu mục nào thì lấy mục chung của MOVE_INFO.

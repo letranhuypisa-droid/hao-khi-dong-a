@@ -11,6 +11,7 @@ import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone, rais
 import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
+import { BannerQueue } from "./banner-queue.js";
 
 const baseDef = (id) => BASES.find((b) => b.id === id);
 // Đội hình lính diễn: 11 cột cách 4 m (rộng 40 m); hàng đầu cận chiến đứng cách tuyến 0,95 m nên hai hàng đầu cách
@@ -33,6 +34,7 @@ export class Director {
     this.skSamples = 0; this.skSum = 0; this.counterBoss = 0;
     this.prevQ = {}; this.actorLossAcc = {};
     this.over = false; this.result = null; this.checkpoint = null; this.msgs = [];
+    this.bq = new BannerQueue((text, color, T) => ctx.fx.banner(text, color, T));   // băng chữ giữa màn xếp hàng (banner-queue.js)
     this.lastFront = "A"; this.hqLostT = 0;
     this.selectedFront = "A";
     this.generals = {};
@@ -44,11 +46,12 @@ export class Director {
     this.spawnGuards();
     this.fillActors(true);
     this.saveCheckpoint();
-    this.say(PHASES[0].tip, 7);
   }
 
   // ---- tiện ích ----------------------------------------------------------------------------
-  say(text, T = 4, kind = "info") { this.msgs.push({ text, T, kind, t: 0 }); }
+  say(text, T = 4, kind = "info") { this.msgs.push({ text, T, kind, t: 0 }); }     // chữ phím ({tpc}…) đổi lúc vẽ, hud.js update
+  // Băng chữ giữa màn qua hàng đợi: chiếm Cứ Điểm, sang pha, Kế Sách cùng một nhịp thì lần lượt hiện (fx.banner thay băng cũ ngay).
+  banner(text, color = "#f1d98a", T = 1.2, low = false) { this.bq.push(text, color, T, low); }
   heroFront() {
     const h = this.ctx.hero;
     if (h.x > MAP.fortWallX + 2) return null;
@@ -58,6 +61,23 @@ export class Director {
     return best;
   }
   basePos(id) { const v = this.ctx.world.bases[id]; return { x: v.x, z: v.z, r: v.r }; }
+  // Mục tiêu chính của pha hiện tại cho HUD (hud.js nhãn chỉ đường, b15.js bản đồ nhỏ): [{ id, label, x, y, z, r }]. Nhiều mục khi pha
+  // cho chọn (P3: cổng bắc hoặc nam); cổng đã phá, Cứ Điểm đã chiếm thì bỏ; rỗng khi hết trận hoặc Toa Đô đã rút.
+  objectives() {
+    const P = PHASES[this.phase], T = P?.target, ctx = this.ctx;
+    if (!T || this.over) return [];
+    if (T.boss) {
+      const u = this.boss, b = MAP.beach;
+      if (!u) return [{ id: "X19", label: "Toa Đô", x: b.x, y: heightAt(b.x, b.z), z: b.z, r: b.r }];
+      return u.alive && !u.dead && !u.retreating ? [{ id: "X19", label: "Toa Đô", x: u.x, y: u.y ?? heightAt(u.x, u.z), z: u.z, r: 6 }] : [];
+    }
+    const out = [];
+    for (const id of [].concat(T.base)) {
+      if (ctx.openGates[id] || ctx.sim.bases[id]?.owner === "ta") continue;
+      const v = ctx.world.bases[id]; if (v) out.push({ id, label: `${id} · ${baseDef(id).name}`, x: v.x, y: heightAt(v.x, v.z), z: v.z, r: v.r });
+    }
+    return out;
+  }
   hk(amount, src, optional = false) { const g = gain(this.ctx.hk, amount, src, { optional }); if (g && Math.abs(g) >= 0.5) this.ctx.hud?.hkPulse(g); return g; }
   gatesOpen() { return Object.keys(this.ctx.openGates).filter((k) => this.ctx.openGates[k]).length; }
 
@@ -65,6 +85,7 @@ export class Director {
   update(dt) {
     const ctx = this.ctx, sim = ctx.sim, hero = ctx.hero;
     if (this.over) return;
+    this.bq.update(dt);
     this.time += dt;
     this.capPause = Math.max(0, this.capPause - dt);
     this.qBucket = Math.min(SIM.heroQCap.perSec * SIM.heroQCap.window, this.qBucket + SIM.heroQCap.perSec * dt);
@@ -78,8 +99,8 @@ export class Director {
     if (hkTick(ctx.hk, dt)) this.onTpcEnd();
     const ms = milestone(ctx.hk);
     sim.hk.m25 = ms >= 25 ? ctx.stats.mods.m25 : 0; sim.hk.m50 = ms >= 50; sim.hk.m75 = ms >= 75;
-    if (ms > (this.lastMs || 0) && ms < 100) { ctx.fx.banner(`HÀO KHÍ ${ms}`, "#f1d98a", 1); ctx.audio.play("drum"); }
-    if (ms === 100 && this.lastMs !== 100) { ctx.fx.banner("TỔNG PHẢN CÔNG SẴN SÀNG · F", "#ffd27a", 1.8); ctx.audio.play("drums3"); }
+    if (ms > (this.lastMs || 0) && ms < 100) { this.banner(`HÀO KHÍ ${ms}`, "#f1d98a", 1); ctx.audio.play("drum"); }
+    if (ms === 100 && this.lastMs !== 100) { this.banner("TỔNG PHẢN CÔNG SẴN SÀNG · {TPC}", "#ffd27a", 1.8); ctx.audio.play("drums3"); }
     this.lastMs = ms;
 
     this.updateBases(dt);
@@ -368,7 +389,7 @@ export class Director {
     this.keSach.onBaseTaken(id);
     const optional = id === "B2";
     this.hk(d.hk[0], "chiếm:" + id, optional);
-    ctx.fx.banner(`CHIẾM ${d.name.toUpperCase()}`, "#f1d98a", 1.4); ctx.audio.play("capture");
+    this.banner(`CHIẾM ${d.name.toUpperCase()}`, "#f1d98a", 1.4); ctx.audio.play("capture");
     if (by === "hero") ctx.hero.heal(0.15);
     if (d.type === "doanh_trai") {
       const f = sim.fronts[d.front];
@@ -400,7 +421,7 @@ export class Director {
     const first = this.gatesOpen() === 1;
     this.hk(d.hk[0], "cổng:" + id, !first);
     const f = ctx.sim.fronts[d.front]; f.sk.ta = Math.min(100, f.sk.ta + 15);
-    ctx.fx.banner(`PHÁ ${d.name.toUpperCase()}`, "#f1d98a", 1.5); ctx.audio.play("gateBreak"); ctx.fx.shake(0.8);
+    this.banner(`PHÁ ${d.name.toUpperCase()}`, "#f1d98a", 1.5); ctx.audio.play("gateBreak"); ctx.fx.shake(0.8);
     ctx.fx.dust(g.x, g.z, 3);
     for (const dz of [-5, 0, 5]) ctx.fx.fire(g.x - 0.5, heightAt(g.x, g.z + dz), g.z + dz, 30, 3 + Math.abs(dz) * 0.1);
     this.drop("colenh", g.x - 4, g.z);
@@ -416,8 +437,7 @@ export class Director {
     if (i >= 3) return;
     this.phase = i + 1; this.phaseStart = this.time;
     const P = PHASES[this.phase];
-    ctx.fx.banner(`${P.id} · ${P.name.toUpperCase()}`, "#e6dcc3", 2); ctx.audio.play("drums3");
-    this.say(P.tip, 7);
+    this.banner(`${P.id} · ${P.name.toUpperCase()}`, "#e6dcc3", 2); ctx.audio.play("drums3");
     if (this.phase === 1) this.events = { counterA1: { state: "wait" }, surrounded: { state: "wait" } };
     if (this.phase === 3) this.startBossPhase();
     // kịch bản đảm bảo Hào Khí ở pha boss (P4 hkFloor = 90): đặt trước khi lưu checkpoint để tải lại P4 vẫn có
@@ -474,7 +494,7 @@ export class Director {
     }
     const off = new BigUnit(ctx, { kind: "officer", side: "dich", tier: "doitruong", name: "Đội trưởng phản công", x: sx, z: sz, awake: true, aggro: 60 });
     off.home = { x: p.x, z: p.z }; ctx.units.push(off); ev.officer = off;
-    ctx.fx.banner("SỰ KIỆN · CỨ ĐIỂM BỊ PHẢN CÔNG", "#ff8a6a", 2); ctx.audio.play("horn");
+    this.banner("SỰ KIỆN · CỨ ĐIỂM BỊ PHẢN CÔNG", "#ff8a6a", 2); ctx.audio.play("horn");
     this.say(`Quân Nguyên phản công Đồn bến trên (A1)! Giữ đồn trong ${E.limit} s — tự đánh, hoặc ra lệnh cho mặt trận A.`, 6, "bad");
   }
 
@@ -491,7 +511,7 @@ export class Director {
     }
     const off = new BigUnit(ctx, { kind: "officer", side: "dich", tier: "doitruong", name: "Đội trưởng vây tướng", x: gx + 7, z: gz, awake: true, aggro: 60 });
     off.home = { x: gx, z: gz }; ctx.units.push(off); ev.officer = off;
-    ctx.fx.banner("SỰ KIỆN · TƯỚNG TA BỊ VÂY", "#ff8a6a", 2); ctx.audio.play("horn");
+    this.banner("SỰ KIỆN · TƯỚNG TA BỊ VÂY", "#ff8a6a", 2); ctx.audio.play("horn");
     this.say(`Nguyễn Khoái bị vây gần Doanh trại bến dưới (B2)! ${E.limit} s — sang cứu, hoặc ra lệnh cho mặt trận B.`, 6, "bad");
   }
 
@@ -506,7 +526,7 @@ export class Director {
     // lính còn lại của toán rút đi
     for (const a of ctx.crowd.agents) if (a.role === "squad" && a.src === id && a.state !== "dead") { a.role = "zone"; a.anchor = null; a.front = id === "surrounded" ? "B" : "A"; }
     if (id === "surrounded" && this.generals.H40) { this.generals.H40.inEvent = false; }
-    ctx.fx.banner(ok ? `${E.name.toUpperCase()} · GIỮ ĐƯỢC` : `${E.name.toUpperCase()} · THẤT BẠI`, ok ? "#f1d98a" : "#ff8a6a", 1.8);
+    this.banner(ok ? `${E.name.toUpperCase()} · GIỮ ĐƯỢC` : `${E.name.toUpperCase()} · THẤT BẠI`, ok ? "#f1d98a" : "#ff8a6a", 1.8);
   }
 
   // ---- tướng đồng minh ---------------------------------------------------------------------------
@@ -564,7 +584,7 @@ export class Director {
       bh.done = true;
       const add = !ctx.hk.tpc && ctx.hk.tpcCount === bh.tpc0 ? hkRaiseTo(ctx.hk, B.value, "kịch bản: Toa Đô núng thế") : 0;
       if (add > 0) {
-        ctx.hud?.hkPulse(add); ctx.fx.banner("TOA ĐÔ NÚNG THẾ · HÀO KHÍ DÂNG ĐẦY", "#f1d98a", 1.6); ctx.audio.play("cheer");
+        ctx.hud?.hkPulse(add); this.banner("TOA ĐÔ NÚNG THẾ · HÀO KHÍ DÂNG ĐẦY", "#f1d98a", 1.6); ctx.audio.play("cheer");
         this.say("Toa Đô núng thế! Hào Khí đã đầy — kích Tổng Phản Công.", 4, "good");
       }
     }
@@ -581,7 +601,7 @@ export class Director {
   }
   onBossDefeated(boss) {
     const ctx = this.ctx;
-    ctx.fx.banner("TOA ĐÔ RÚT CHẠY!", "#f1d98a", 2.5); ctx.audio.play("drums3");
+    this.bq.clear(); ctx.fx.banner("TOA ĐÔ RÚT CHẠY!", "#f1d98a", 2.5); ctx.audio.play("drums3");   // băng kết trận hiện ngay, không xếp hàng
     this.main[3] = true; this.hk(HAO_KHI.src.mainMission, "nhiệm vụ chính");
     this.bossDown = true; this.winAt = this.time + 2.5;     // đồng hồ trận, không dùng giờ thật
   }
@@ -770,6 +790,7 @@ export class Director {
     this.spawnGenerals(); this.spawnGuards(); this.fillActors(true);
     if (this.phase === 3) this.startBossPhase();
     this.keSach.restore(c.keSach);
+    this.bq.clear();
     this.say(`Tải lại đầu pha ${PHASES[this.phase].id}.`, 3);
   }
 

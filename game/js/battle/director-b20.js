@@ -184,7 +184,7 @@ export class DirectorB20 {
   }
 
   // ---- tiện ích ------------------------------------------------------------------------------------------------------------
-  say(text, T = 4, kind = "info") { this.msgs.push({ text, T, kind, t: 0 }); }
+  say(text, T = 4, kind = "info") { this.msgs.push({ text, T, kind, t: 0 }); }   // chữ phím ({Act:cmd}, {tpc}…) đổi lúc vẽ, hud.js update
   // Băng chữ giữa màn qua hàng đợi (fx.banner không xếp hàng: hai băng liền nhau đè chữ lên nhau) — cách nhau ≥ T + 0,6 s,
   // bỏ băng trùng, giữ tối đa 3.
   banner(text, color = "#f1d98a", T = 1.2) {
@@ -202,7 +202,7 @@ export class DirectorB20 {
   introP1() {
     this.say(PHASES[0].tip, 9);
     this.later(4, () => { if (this.phase === 0) this.note(0); });
-    this.later(8, () => { if (this.phase === 0) this.say("Mở vòng Mệnh Lệnh (Tab) → cánh Thuyền nhẹ: Tiến công khiêu chiến, Giữ vững giữ khoảng cách, Theo ta lui nhanh.", 9); });
+    this.later(8, () => { if (this.phase === 0) this.say("{Act:cmd} để mở vòng Mệnh Lệnh → cánh Thuyền nhẹ: Tiến công khiêu chiến, Giữ vững giữ khoảng cách, Theo ta lui nhanh.", 9); });
   }
 
   // ---- vòng lặp --------------------------------------------------------------------------------------------------------------
@@ -223,7 +223,7 @@ export class DirectorB20 {
     if (this.hkLock && !hk.tpc && hk.value < 100) raiseTo(hk, 100, "kịch bản: pha 6");
     const ms = milestone(hk);
     if (ms > this.lastMs && ms < 100) { this.banner(`HÀO KHÍ ${ms}`, "#f1d98a", 1); ctx.audio.play("drum"); }
-    if (ms === 100 && this.lastMs !== 100) { this.banner("TỔNG PHẢN CÔNG SẴN SÀNG · F", "#ffd27a", 1.8); ctx.audio.play("drums3"); }
+    if (ms === 100 && this.lastMs !== 100) { this.banner("TỔNG PHẢN CÔNG SẴN SÀNG · {TPC}", "#ffd27a", 1.8); ctx.audio.play("drums3"); }
     this.lastMs = ms;
     st.heroFront = this.heroWing();
     // từng pha
@@ -336,8 +336,8 @@ export class DirectorB20 {
         case "scout": this.spawnScout(e.target); break;
         case "markerExposed": this.onMarkerExposed(e); break;
         case "markerActive": this.say(`Đã mở mốc ${e.id} (${e.active}/${KE_SACH.kichCoc.need}).`, 4, "good"); break;
-        case "ksReady": this.banner("KẾ SÁCH SẴN SÀNG · BẤM G", "#ffd27a", 1.8); ctx.audio.play("drums3");
-          this.say(`Đủ ${KE_SACH.kichCoc.need} mốc: bấm G (Lệnh Kế Sách) để kích hoạt bãi cọc — hoặc mở nốt mốc thứ ba.`, 7, "good"); break;
+        case "ksReady": this.banner("KẾ SÁCH SẴN SÀNG · BẤM {KESACH}", "#ffd27a", 1.8); ctx.audio.play("drums3");
+          this.say(`Đủ ${KE_SACH.kichCoc.need} mốc: bấm {kesach} (Lệnh Kế Sách) để kích hoạt bãi cọc — hoặc mở nốt mốc thứ ba.`, 7, "good"); break;
         case "tideDrop": this.say(`Kế Sách bãi cọc đã chốt: nước bắt đầu rút về 50% trong ${e.sec} s.`, 5); break;
         case "tide50": if (this.phase === 2) this.goPhase(3); break;
         case "tideWarn": this.banner(e.at === "strand" ? "30 S NỮA · CỌC NHÔ" : "30 S NỮA · NƯỚC RÒNG", "#ffd27a", 1.4);
@@ -412,7 +412,7 @@ export class DirectorB20 {
     if (i === 3) {
       this.startEbb();
       this.say("Hộ vệ đợt hai tách khỏi hạm đội chạy ra cửa sông: chặn, chiếm từng thuyền (đò chuyển: giữ Tương tác) — mỗi thuyền hạ kéo Thoát vây −15.", 8, "bad");
-      this.say("Mệnh Lệnh (Tab) → cánh thuyền phục gần nhất: Giữ vững chặn cửa nhánh sông, thanh Thoát vây chậm lại ×0,7.", 8);
+      this.say("{Act:cmd} để mở Mệnh Lệnh → cánh thuyền phục gần nhất: Giữ vững chặn cửa nhánh sông, thanh Thoát vây chậm lại ×0,7.", 8);
     }
     if (i === 4) {
       this.stopFleeing();
@@ -424,7 +424,7 @@ export class DirectorB20 {
     if (i === 5) {
       this.strandFlagship(false); this.spawnX20(); this.sortieToFS();
       this.rallyAt = this.time + 2.5;                   // băng chữ nhắc F sau băng chữ đầu pha (goPhase xoá hàng đợi băng chữ)
-      this.say("Hào Khí đặt 100 và khóa tới khi kích Tổng Phản Công (F). Tuyệt Kỹ đầu tiên trong Tổng Phản Công là bản Hào Khí, không tốn Khí Lực.", 8, "good");
+      this.say("Hào Khí đặt 100 và khóa tới khi kích Tổng Phản Công ({tpc}). Tuyệt Kỹ đầu tiên trong Tổng Phản Công là bản Hào Khí, không tốn Khí Lực.", 8, "good");
       this.say("Lên kỳ hạm theo ván dốc từ bãi bùn. Ô Mã Nhi đánh ở boong dưới rồi lui lên lầu chỉ huy.", 8);
     }
   }
@@ -1272,7 +1272,7 @@ export class DirectorB20 {
     const u20 = this.bosses.X20;
     if (u20 && u20.alive && !u20.captured) this.updateX20(u20, dt);
     if (this.phase === 5 && this.hkLock && !this.ctx.hk.tpc && this.time >= this.rallyAt) {
-      this.rallyAt = this.time + 20; this.banner("HÀO KHÍ 100 · BẤM F: TỔNG PHẢN CÔNG", "#ffd27a", 1.6);
+      this.rallyAt = this.time + 20; this.banner("HÀO KHÍ 100 · BẤM {TPC}: TỔNG PHẢN CÔNG", "#ffd27a", 1.6);
     }
   }
   // Tướng và đơn vị lớn (boss, sĩ quan, người bị bắt, tướng đồng minh) không chồng hình: cùng boong (hay cùng dưới đất), cùng tầng,
@@ -1661,7 +1661,7 @@ export class DirectorB20 {
     this.hero.hkUltReady = true;
     this.tpcLog = this.tpcLog || []; this.tpcLog.push({ at: Math.round(this.time), phase: this.phase });
     ctx.cinematic("TỔNG PHẢN CÔNG", this.hero, true);
-    this.say("Tổng Phản Công: Tuyệt Kỹ đầu tiên (R) là bản Hào Khí — không tốn Khí Lực, vòng chém rộng hơn.", 5, "good");
+    this.say("Tổng Phản Công: Tuyệt Kỹ đầu tiên ({ult}) là bản Hào Khí — không tốn Khí Lực, vòng chém rộng hơn.", 5, "good");
     ctx.audio.play("drums3"); ctx.audio.play("horn");
     return true;
   }

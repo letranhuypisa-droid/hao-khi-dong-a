@@ -158,6 +158,7 @@ export class FX {
     this.teles = [];
     this.ghosts = [];
     this.texts = [];
+    this.fmt = (s) => s;                                // battle.js / arena.js đặt: đổi {tpc}, {c}… trong băng chữ sang phím của thiết bị
     this.planeGeo = new THREE.PlaneGeometry(1, 1); this.planeGeo.rotateX(-Math.PI / 2);
     this.fields = {};                                   // tạo khi dùng lần đầu (Võ trường không dùng)
     preloadFx();
@@ -343,7 +344,7 @@ export class FX {
   banner(s, color = "#f1d98a", T = 1.1) {
     for (const old of this.overlay.querySelectorAll(".fx-banner")) old.remove();
     const el = document.createElement("div");
-    el.className = "fx-banner"; el.textContent = s; el.style.color = color;
+    el.className = "fx-banner"; el.textContent = this.fmt(s); el.style.color = color;
     this.overlay.appendChild(el);
     setTimeout(() => el.remove(), T * 1000 + 400);
   }

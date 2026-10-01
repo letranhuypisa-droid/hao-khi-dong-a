@@ -23,6 +23,7 @@ import { DIFFICULTY, TROOP_LEVELS, HERO, ORDERS, MODES } from "../data/tuning.js
 import { HEROES, SKILLS } from "../data/heroes.js";
 import { heroStats } from "../meta/progress.js";
 import { movesGuideHTML } from "../ui/guide.js";
+import { fmtKeys, devOf, touchUI } from "../data/controls.js";
 import { readComic } from "../ui/comic.js";
 import B15 from "../battles/b15.js";
 
@@ -67,6 +68,9 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       troops: TROOP_LEVELS.find((t) => t.id === settings.troops) || TROOP_LEVELS[1],
       touch: false, mode, music, battle: def, heroDef, quyetSach,
     };
+    // Chữ phím trong gợi ý, băng chữ, HUD: viết {tpc}, {c}, {cmd}… trong câu, ctx.fmt đổi sang phím của thiết bị đang dùng
+    // (bàn phím, cảm ứng, tay cầm — data/controls.js).
+    ctx.fmt = (s) => fmtKeys(s, devOf(ctx));
     let input = null, camBoxes = [];
     try {
       resetGround();
@@ -80,7 +84,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
           diffMult: diff.hk ?? 1 });   // Hào Khí nhận × theo độ khó (§10)
       ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
       music?.play("battle");
-      ctx.fx = new FX(scene, camera, hudRoot);
+      ctx.fx = new FX(scene, camera, hudRoot); ctx.fx.fmt = ctx.fmt;
       ctx.crowd = new Crowd(scene, ctx);
       ctx.hero = new Hero(ctx, stats, heroDef);
       // Hero chưa đọc chỗ xuất hiện của trận (lõi tướng chưa nhận def): đặt theo BattleDef, chỉ cho trận khác B15
@@ -126,8 +130,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     window.addEventListener("resize", resize); resize();
 
     // ---- cảm ứng -------------------------------------------------------------------------
-    const wantTouch = settings.touch === "on" || (settings.touch === "auto" && matchMedia("(pointer: coarse)").matches);
-    if (wantTouch) buildTouch(touchRoot, input, ctx);
+    // "Điều khiển cảm ứng": Tự nhận theo cách bạn bấm VÀO TRẬN rồi đi theo thiết bị vừa dùng (setupTouch), Bật, Tắt
+    const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);
 
     // ---- tạm dừng, kết quả -----------------------------------------------------------------
     let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0;
@@ -136,7 +140,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // mất khoá chuột, ẩn tab); nếu vẫn lọt thì tắt tạm dừng sẽ dựng lại bảng kết quả, "Rút quân" thì rời luôn.
     const pause = (on) => {
       if (finished) return;
-      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle) : ""; overlay.classList.toggle("on", on);
+      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx)) : ""; overlay.classList.toggle("on", on);
       if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
@@ -228,7 +232,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
     const step = (dt, inp, draw) => {
       time += dt;
-      ctx.touch = inp.touch;
+      ctx.touch = inp.touch; syncTouch();
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
       ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;
@@ -344,6 +348,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       hudAcc += dt;
       if (hudAcc > 0.05) { ctx.hud.update(hudAcc, W, H); hudAcc = 0; }
       if (draw) renderer.render(scene, camera);
+      ctx.hud.frame?.(W, H);                       // nhãn chỉ đường bám mục tiêu mỗi khung (hud.js), không đợi nhịp 0,05 s
       const anyKey = Object.keys(inp.pressed).length > 0;     // đọc trước endFrame (inp === input, endFrame xoá pressed)
       input.endFrame();
 
@@ -391,7 +396,7 @@ export function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
-function pauseHTML(save, heroId = "H35", def = null) {
+function pauseHTML(save, heroId = "H35", def = null, dev = 0) {
   const s = save.settings;
   const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? "selected" : ""}>${label}</option>`;
   return `<div class="panel pause">
@@ -404,14 +409,16 @@ function pauseHTML(save, heroId = "H35", def = null) {
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
-    ${controlsHTML(matchMedia("(pointer: coarse)").matches, heroId)}${def?.touch?.interact ? interactNote(def) : ""}
+    ${controlsHTML(dev, heroId)}${def?.touch?.interact ? interactNote(def) : ""}
   </div>`;
 }
 
 // Bảng điều khiển trong bảng tạm dừng: dùng chung bảng hướng dẫn có icon (ui/guide.js), bản gọn. hero: tướng đang ra trận
 // (đợt 9: H31 thấy đòn đại kiếm, Hịch Tướng Sĩ, Binh Thư; mặc định H35 — Võ trường, B15 như cũ).
-export function controlsHTML(touch = false, hero = "H35") {
-  return `<h3>Điều khiển</h3>${movesGuideHTML({ dev: touch ? 1 : 0, compact: true, hero })}`;
+// dev: 0 bàn phím, 1 cảm ứng, 2 tay cầm (devOf(ctx), thiết bị đang dùng). Nhận cả true / false như trước = cảm ứng / bàn phím.
+// Trước đây bảng này hỏi trình duyệt "(pointer: coarse)" nên máy báo cảm ứng luôn thấy bảng cảm ứng dù chơi bằng bàn phím.
+export function controlsHTML(dev = 0, hero = "H35") {
+  return `<h3>Điều khiển</h3>${movesGuideHTML({ dev: typeof dev === "number" ? dev : dev ? 1 : 0, compact: true, hero })}`;
 }
 
 // Trận có Tương tác (B20): một dòng dưới bảng đòn; def.controlsNote (tùy chọn) ghi việc cụ thể của trận. B15 không có.
@@ -423,8 +430,17 @@ const tb = (b, icon, label, cls = "") => `<button data-b="${b}" class="${cls}"><
 // hai (H31 Binh Thư) thêm nút skill2; trận có Tương tác (BattleDef.touch.interact) thêm nút interact.
 // Nhãn nút tròn: tên ngắn SKILLS[id].short (tên đầy đủ "Binh Thư Yếu Lược" bị cắt trong nút 54–58 px), không có thì tên ô.
 const tlabel = (s) => (s ? SKILLS[s.id]?.short ?? s.name : undefined);
-export function buildTouch(root, input, ctx) {
-  root.classList.add("on"); root.parentElement.classList.add("touchmode");
+// Dựng lớp cảm ứng một lần; show = hiện ngay. Trả { shown, set(on) }: set bật / tắt lớp phủ (`.touch.on`, `touchmode` trên khung trận).
+// Lớp phủ kín cả màn hình nên khi hiện nó chặn chuột — người chơi chuột + bàn phím không thể khóa chuột — vì vậy phải ẩn được.
+export function buildTouch(root, input, ctx, show = true) {
+  const ui = {
+    get shown() { return root.classList.contains("on"); },
+    set(on) {
+      root.classList.toggle("on", on); root.parentElement.classList.toggle("touchmode", on);
+      if (on) input.touch = true;       // giao diện cảm ứng đang hiện thì chữ phím theo cảm ứng ngay (trước đây tới lần chạm đầu ctx.touch vẫn false)
+    },
+  };
+  ui.set(show);
   const slots = ctx.hero?.skillSlots?.() || [], s1 = slots[0], s2 = slots[1], ult = ctx.hero?.ultInfo?.();
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
@@ -459,4 +475,17 @@ export function buildTouch(root, input, ctx) {
   camz.addEventListener("pointerdown", (e) => { cid = e.pointerId; lx = e.clientX; ly = e.clientY; camz.setPointerCapture(cid); });
   camz.addEventListener("pointermove", (e) => { if (e.pointerId !== cid) return; input.touchCam(e.clientX - lx, e.clientY - ly); lx = e.clientX; ly = e.clientY; });
   camz.addEventListener("pointerup", () => (cid = null));
+  return ui;
+}
+
+// "Điều khiển cảm ứng" (save.settings.touch): off = không dựng lớp cảm ứng; on = luôn hiện; auto ("Tự nhận") = bắt đầu theo cách bạn bấm VÀO
+// TRẬN (data/controls.js touchUI) rồi đi theo thiết bị vừa dùng: bấm phím / chuột / tay cầm thì ẩn lớp cảm ứng (nó phủ kín màn hình nên chặn
+// chuột, không khóa chuột được), chạm ngón tay lên sân thì hiện lại. Trả hàm đồng bộ, gọi mỗi khung sau input.poll(). Khung trận (container)
+// dựng mới cho mỗi trận nên bộ nghe chạm không cần gỡ.
+export function setupTouch(container, touchRoot, input, ctx, settings) {
+  if (settings.touch === "off") return () => {};
+  const ui = buildTouch(touchRoot, input, ctx, touchUI(settings));
+  if (settings.touch !== "auto") return () => {};
+  container.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" && !ui.shown) input.touch = true; }, true);
+  return () => { if (input.touch !== ui.shown) ui.set(input.touch); };
 }

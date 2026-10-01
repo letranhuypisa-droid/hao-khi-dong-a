@@ -10,22 +10,19 @@
 import * as THREE from "three";
 import { TIERS } from "../data/tuning.js";
 import { MOVE_INFO, ICON } from "../data/moves-info.js";
+import { say, short, seqFor, devOf } from "../data/controls.js";
 import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 
-// phím theo thiết bị: [bàn phím, cảm ứng]
-const KEYS = {
-  move: ["W A S D", "cần gạt trái"], cam: ["di chuột (bấm vào màn để khóa chuột)", "vuốt nửa phải màn hình"],
-  n: ["J / chuột trái", "nút N"], c: ["K / chuột phải", "nút C"], dodge: ["Space", "nút Né"], block: ["Shift", "nút Đỡ"],
-  skill: ["E", "nút Phá Trận"], ult: ["R", "nút Tuyệt Kỹ"], lock: ["Q", "nút Khóa"], next: ["Enter", "chạm Tiếp"],
-  cmd: ["giữ Tab", "nút Lệnh"], tpc: ["F", "nút Phản Công"], kesach: ["G", "nút Kế Sách"],
-};
-const kb = (d, k) => `<kbd>${KEYS[k][d.ctx.touch ? 1 : 0]}</kbd>`;
+// chữ phím theo thiết bị đang dùng (bàn phím, cảm ứng, tay cầm): cùng bảng nhãn với HUD, bảng phím và các dòng gợi ý (data/controls.js)
+const kb = (d, k) => `<kbd>${say(k, devOf(d.ctx))}</kbd>`;
+const verbHold = (d) => (devOf(d.ctx) === 1 ? "Chạm" : "Giữ");        // nút Lệnh cảm ứng là bật / tắt, bàn phím và tay cầm là giữ
+const verbPress = (d) => (devOf(d.ctx) === 1 ? "Chạm" : "Bấm");       // cảm ứng chạm nút, còn lại bấm
 const pct = (v, of) => Math.min(1, v / of);
 
 const STEPS = [
   { id: "intro", title: "Võ trường · Huấn luyện", icons: ["n", "c3", "dodge", "ult"],
-    text: (d) => `Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử. 11 bài ngắn, chừng bốn phút. Trong lúc tập tướng không gục. Bấm ${kb(d, "next")} để bắt đầu; ${d.ctx.touch ? "nút II" : "Esc"} để tạm dừng hoặc rời sân.` },
+    text: (d) => `Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử. 11 bài ngắn, chừng bốn phút. Trong lúc tập tướng không gục. ${verbPress(d)} ${kb(d, "next")} để bắt đầu; ${kb(d, "pause")} để tạm dừng hoặc rời sân.` },
   { id: "move", title: "Bài 1 · Di chuyển", icons: [],
     text: (d) => `Dùng ${kb(d, "move")} chạy tới vòng vàng.`,
     setup: (d) => d.marker(10, -6), check: (d) => (Math.hypot(d.ctx.hero.x - d.mk.x, d.ctx.hero.z - d.mk.z) < 2.3 ? 1 : 0), goal: () => "Tới vòng vàng" },
@@ -39,7 +36,7 @@ const STEPS = [
     check: (d) => (Math.min(3, d.st.kills) + (d.st.maxN >= 4 ? 1 : 0)) / 4,
     goal: (d) => `Hạ lính ${Math.min(3, d.st.kills)}/3 · chuỗi tới N4 ${d.st.maxN >= 4 ? "✓" : "✗"}` },
   { id: "c", title: "Bài 4 · Đòn mạnh C", icons: ["c1", "c2", "c3", "c4"], captions: ["C", "N → C", "N N → C", "N N N → C"],
-    text: (d) => `Bấm ${kb(d, "c")} ngay sau chuỗi N để đổi sang đòn mạnh: bao nhiêu nhát N trước thì ra C kế tiếp. Ô "K" ở góc phải báo đòn C sẽ ra. Thử 3 đòn C khác nhau.`,
+    text: (d) => `Bấm ${kb(d, "c")} ngay sau chuỗi N để đổi sang đòn mạnh: bao nhiêu nhát N trước thì ra C kế tiếp. ${devOf(d.ctx) === 1 ? "Biểu tượng nút C" : `Ô "${short("c")}"`} ở góc phải báo đòn C sẽ ra. Thử 3 đòn C khác nhau.`,
     setup: (d) => { d.passive(); for (let i = 0; i < 6; i++) d.soldier(); },
     tick: (d) => d.keep(5),
     check: (d) => pct(d.cSet().size, 3), goal: (d) => `Đã dùng: ${[...d.cSet()].join(", ") || "chưa có"}` },
@@ -63,7 +60,7 @@ const STEPS = [
     text: (d) => `Đánh liên tục cho cạn thanh vàng (Phá Thế) dưới tên sĩ quan: hắn Vỡ Thế, loạng choạng 3,5 s. Chạy lại gần bấm ${kb(d, "c")}: Đòn Quyết.`,
     setup: (d) => { d.aggressive(1); if (!d.officerAlive()) d.officer("doitruong"); },
     check: (d) => (d.st.moves.has("DQ") || d.st.officerKilled ? 1 : d.st.broke ? 0.6 : 0),
-    goal: (d) => (d.st.broke ? "Vỡ Thế! Bấm C cạnh hắn" : "Làm cạn thanh Phá Thế") },
+    goal: (d) => (d.st.broke ? `Vỡ Thế! Bấm ${say("c", devOf(d.ctx))} cạnh hắn` : "Làm cạn thanh Phá Thế") },
   { id: "skill", title: "Bài 9 · Phá Trận", icons: ["skill"],
     text: (d) => `Bấm ${kb(d, "skill")}: lao 18 m xuyên hàng địch, lính trên đường bị choáng. Bấm thêm trong 6 s để lao tiếp (tối đa 3 lần), rồi hồi 20 s.`,
     setup: (d) => { d.passive(); d.ctx.hero.phaTran.cd = 0; d.ctx.hero.phaTran.left = 0; for (let i = 0; i < 10; i++) d.soldier(8 + i * 1.2); },
@@ -80,13 +77,13 @@ const STEPS = [
     check: (d) => (d.ctx.hero.lock ? 1 : 0), goal: () => "Khóa sĩ quan" },
   { id: "cmd", title: "Trong trận · Mệnh Lệnh", icons: ["cmd", "tiencong", "giuvung", "theota", "tiepvien"],
     captions: ["Mở vòng", "1", "2", "3", "4"],
-    text: (d) => `Trận Hàm Tử có hai mặt trận cách nhau 150 m; bạn không ở cả hai nơi được. ${kb(d, "cmd")} mở vòng Mệnh Lệnh (trận chậm lại ×0,2), bấm 1–4: <b>Tiến công</b>, <b>Giữ vững</b>, <b>Theo ta</b> (quân đi theo tướng), <b>Gọi tiếp viện</b>. Z đổi mặt trận.` },
+    text: (d) => `Trận Hàm Tử có hai mặt trận cách nhau 150 m; bạn không ở cả hai nơi được. ${verbHold(d)} ${kb(d, "cmd")} mở vòng Mệnh Lệnh (trận chậm lại ×0,2), bấm 1–4: <b>Tiến công</b>, <b>Giữ vững</b>, <b>Theo ta</b> (quân đi theo tướng), <b>Gọi tiếp viện</b>. Đổi mặt trận: ${kb(d, "cmdSwap")}.` },
   { id: "hk", title: "Trong trận · Hào Khí", icons: ["tpc"],
     text: (d) => `Thanh Hào Khí ở đỉnh màn tăng khi chiếm Cứ Điểm, hạ sĩ quan, làm nhiệm vụ, thi hành Kế Sách. Đủ 100 thì bấm ${kb(d, "tpc")}: <b>Tổng Phản Công</b> — cả hai mặt trận xông lên 25 s, tướng có thêm một Tuyệt Kỹ Hào Khí.` },
   { id: "base", title: "Trong trận · Cứ Điểm và Kế Sách", icons: ["giuvung", "kesach"], captions: ["Cứ Điểm", "Kế Sách"],
     text: (d) => `Đồn, doanh trại có vòng tròn dưới đất: hạ hết quân đồn trú và sĩ quan trấn thủ, rồi đứng trong vòng cho tới khi chiếm xong. Kế Sách (như "Cờ áo Tống") hiện ở cột phải: làm đủ điều kiện thì bấm ${kb(d, "kesach")}.` },
   { id: "end", title: "Xong huấn luyện!", icons: ["n", "c4", "skill", "ult", "tpc"], final: true,
-    text: (d) => `Bạn đã sẵn sàng ra bến Hàm Tử. Bảng đòn đầy đủ luôn có ở thẻ <b>Huấn luyện</b> và trong bảng tạm dừng. Bấm ${kb(d, "next")} để về Doanh trại.` },
+    text: (d) => `Bạn đã sẵn sàng ra bến Hàm Tử. Bảng đòn đầy đủ luôn có ở thẻ <b>Huấn luyện</b> và trong bảng tạm dừng. ${verbPress(d)} ${kb(d, "next")} để về Doanh trại.` },
 ];
 
 export class TutorialDirector {
@@ -179,16 +176,16 @@ export class TutorialDirector {
 
   // ---- bảng hướng dẫn (ArenaHUD gọi mỗi lần cập nhật) ----------------------------------------------------
   tutorialHUD(E) {
-    const S = this.step, touch = this.ctx.touch;
+    const S = this.step, touch = this.ctx.touch, dev = devOf(this.ctx);
     E.mode.textContent = "VÕ TRƯỜNG · HUẤN LUYỆN";
     const nAct = this.steps.filter((x) => x.check).length, k = this.steps.slice(0, this.i + 1).filter((x) => x.check).length;
     E.big.textContent = S.check ? `Bài ${k} / ${nAct}` : S.final ? "Xong" : "Ghi nhớ";
     E.sub.textContent = `${this.ko} KO`; E.medals.innerHTML = "";
     const el = E.tut; el.style.display = "";
-    const key = `${this.i}|${touch}`;
+    const key = `${this.i}|${dev}`;
     if (key !== this.panelKey) {
       this.panelKey = key;
-      const icons = (S.icons || []).map((ic, j) => `<figure><img src="${ICON(ic)}" alt=""><figcaption>${S.captions?.[j] ?? MOVE_INFO[Object.keys(MOVE_INFO).find((m) => MOVE_INFO[m].icon === ic)]?.name ?? ""}</figcaption></figure>`).join("");
+      const icons = (S.icons || []).map((ic, j) => `<figure><img src="${ICON(ic)}" alt=""><figcaption>${S.captions?.[j] != null ? seqFor(S.captions[j], dev) : MOVE_INFO[Object.keys(MOVE_INFO).find((m) => MOVE_INFO[m].icon === ic)]?.name ?? ""}</figcaption></figure>`).join("");
       el.innerHTML = `<div class="tut-head"><b>${S.title}</b><span>${S.check ? `${k} / ${nAct} bài` : ""}</span></div>
         <div class="tut-body">${icons ? `<div class="tut-icons">${icons}</div>` : ""}<div class="tut-text">${S.text(this)}</div></div>
         ${S.check ? `<div class="tut-prog"><div data-tp></div></div><div class="tut-goal" data-tg></div>` : ""}
@@ -201,8 +198,8 @@ export class TutorialDirector {
       el.querySelector("[data-tp]").style.width = `${Math.round(p * 100)}%`;
       el.querySelector("[data-tg]").textContent = this.completed ? "✓ Xong" : S.goal?.(this) ?? "";
       el.classList.toggle("done", this.completed);
-      el.querySelector("[data-tf]").innerHTML = !this.completed && this.stepT > 25 ? `Kẹt? ${kb(this, "next")} để bỏ qua bài này` : "";
-    } else el.querySelector("[data-tf]").innerHTML = touch ? "" : `hoặc bấm <kbd>Enter</kbd>`;
+      el.querySelector("[data-tf]").innerHTML = !this.completed && this.stepT > 25 && dev !== 1 ? `Kẹt? ${kb(this, "next")} để bỏ qua bài này` : "";   // cảm ứng: bài tập không có nút Tiếp nên không hứa điều không làm được
+    } else el.querySelector("[data-tf]").innerHTML = touch ? "" : `hoặc bấm ${kb(this, "next")}`;
   }
 
   // ---- móc từ tướng, lính, sĩ quan -----------------------------------------------------------------------
@@ -221,7 +218,7 @@ export class TutorialDirector {
   onOfficerKilled(u) { this.ko++; this.st.officerKilled = true; this.ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1); }
   onBossDefeated() { this.ko++; }
   onOfficerAwake() {}
-  onBreak() { this.st.broke = true; this.ctx.fx.banner("VỠ THẾ · BẤM C ĐỂ RA ĐÒN QUYẾT", "#ffd27a", 1.1); this.ctx.audio.play("parry"); }
+  onBreak() { this.st.broke = true; this.ctx.fx.banner("VỠ THẾ · BẤM {C} ĐỂ RA ĐÒN QUYẾT", "#ffd27a", 1.1); this.ctx.audio.play("parry"); }
   onHeroHit() {}
   onRevive() {}
   onUlt() {}

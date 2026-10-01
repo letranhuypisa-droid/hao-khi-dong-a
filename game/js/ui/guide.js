@@ -3,6 +3,7 @@
 // hero (đợt 9): id tướng ("H35" mặc định — bảng như cũ, "H31" đại kiếm + Hịch Tướng Sĩ + Binh Thư + Bạch Đằng Quyết Chiến).
 
 import { MOVE_INFO, ICON, moveInfoOf } from "../data/moves-info.js";
+import { guideKeys, seqFor, short } from "../data/controls.js";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const kbd = (s) => s.split(" · ").map((k) => `<kbd>${esc(k)}</kbd>`).join("");
@@ -10,7 +11,7 @@ const kbd = (s) => s.split(" · ").map((k) => `<kbd>${esc(k)}</kbd>`).join("");
 // dev: 0 bàn phím, 1 cảm ứng, 2 tay cầm
 export function card(id, dev = 0, extraKey = "", info = MOVE_INFO) {
   const m = info[id];
-  const key = m.keys ? kbd(m.keys[dev] || m.keys[0]) : m.seq ? kbd(m.seq) : extraKey ? kbd(extraKey) : "";
+  const key = m.keys ? kbd(m.keys[dev] || m.keys[0]) : m.seq ? kbd(seqFor(m.seq, dev)) : extraKey ? kbd(extraKey) : "";
   return `<div class="gcard"><img src="${ICON(m.icon)}" alt=""><div><b>${esc(m.name)}</b>${key}<small>${esc(m.text)}</small></div></div>`;
 }
 
@@ -23,10 +24,16 @@ const CONCEPTS = [
   { icon: "ct", name: "Đòn viền đỏ", text: "Vòng đỏ dưới chân sĩ quan báo trước 0,6 s. Không đỡ được: né ra, hoặc bấm Đỡ đúng lúc để Phản đòn." },
 ];
 
+// "N", "C" là tên hai nút đánh; dòng này nói rõ phím thật để người chơi bàn phím không đi tìm phím C.
+const bindNote = (dev) => (dev === 1 ? `<p class="gbind">N và C là hai nút đánh ở góc phải màn hình.</p>`
+  : `<p class="gbind"><kbd>N</kbd> = ${kbd(guideKeys("n")[dev])} <span>·</span> <kbd>C</kbd> = ${kbd(guideKeys("c")[dev])}</p>`);
+const padNote = (wc01) => { const P = (a) => short(a, 2);
+  return `Tay cầm: ${P("n")} đòn N · ${P("c")} đòn C${wc01 ? " (giữ để tụ lực)" : ""} · ${P("dodge")} né · ${P("block")} đỡ · ${P("skill")} ${wc01 ? "Hịch Tướng Sĩ" : "Phá Trận"}${wc01 ? ` · ${P("skill2")} Binh Thư` : ""} · ${P("ult")} Tuyệt Kỹ · ${P("cmd")} giữ = Mệnh Lệnh · ${P("tpc")} Tổng Phản Công · ${P("kesach")} Kế Sách. `; };
+
 export function movesGuideHTML({ dev = 0, compact = false, hero = "H35" } = {}) {
   const I = moveInfoOf(hero), wc01 = I !== MOVE_INFO, c = (k) => card(k, dev, "", I);
-  const mv = dev === 1 ? "cần gạt trái" : dev === 2 ? "cần trái" : "W A S D";
-  const cam = dev === 1 ? "vuốt nửa phải màn hình" : dev === 2 ? "cần phải" : "chuột (bấm vào màn để khóa chuột) · ← →";
+  const mv = guideKeys("move")[dev];
+  const cam = dev === 0 ? "chuột (bấm vào màn để khóa chuột) · ← →" : guideKeys("cam")[dev];
   return `<div class="guide${compact ? " compact" : ""}">
     <h4>Di chuyển</h4>
     <div class="gcards">
@@ -35,12 +42,13 @@ export function movesGuideHTML({ dev = 0, compact = false, hero = "H35" } = {}) 
       ${c("lock")}
     </div>
     <h4>Đòn đánh · ${wc01 ? "đại kiếm" : "song đao"}</h4>
+    ${bindNote(dev)}
     <div class="gcards">${["N", "C1", "C2", "C3", "C4", "C5", "C6", "D", "DQ", "CT"].map(c).join("")}</div>
     <h4>Phòng thủ và kỹ năng</h4>
     <div class="gcards">${["dodge", "block", "skill", ...(I.skill2 ? ["skill2"] : []), "ult", "tpc"].map(c).join("")}</div>
     <h4>Chỉ huy</h4>
     <div class="gcards">${["cmd", "tiencong", "giuvung", "theota", "tiepvien", "kesach"].map((k) => card(k, dev)).join("")}</div>
     ${compact ? "" : `<h4>Trong trận</h4><div class="gcards">${CONCEPTS.map((c) => `<div class="gcard"><img src="${ICON(c.icon)}" alt=""><div><b>${c.name}</b><small>${c.text}</small></div></div>`).join("")}</div>`}
-    <p class="small">${dev === 2 ? "" : wc01 ? "Tay cầm: X đòn N · Y đòn C (giữ để tụ lực) · A né · RB đỡ · LB Hịch Tướng Sĩ · D-pad trái Binh Thư · B Tuyệt Kỹ · LT giữ = Mệnh Lệnh · D-pad lên Tổng Phản Công · D-pad phải Kế Sách. " : "Tay cầm: X đòn N · Y đòn C · A né · RB đỡ · LB Phá Trận · B Tuyệt Kỹ · LT giữ = Mệnh Lệnh · D-pad lên Tổng Phản Công · D-pad phải Kế Sách. "}M bản đồ lớn · Esc tạm dừng.</p>
+    <p class="small">${dev === 2 ? "" : padNote(wc01)}M bản đồ lớn · Esc tạm dừng.</p>
   </div>`;
 }
