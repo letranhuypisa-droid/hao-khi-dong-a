@@ -15,6 +15,7 @@ import { doorSpawnPoint, planRefill, transitCap, tickCap, lineWant } from "./sup
 import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
 import { BannerQueue } from "./banner-queue.js";
+import { gateTarget, gateGoal, gateGoalShort, GATE_PHASE } from "./gatebar.js";
 
 const baseDef = (id) => BASES.find((b) => b.id === id);
 // Đội hình lính diễn: 11 cột cách 4 m (rộng 40 m); hàng đầu cận chiến đứng cách tuyến 0,95 m nên hai hàng đầu cách
@@ -474,11 +475,33 @@ export class Director {
   damageGate(id, dmg) {
     const ctx = this.ctx, b = ctx.sim.bases[id];
     if (!b || b.open) return;
-    if (this.phase < 2) { this.gateNag = (this.gateNag || 0) + 1; if (this.gateNag % 20 === 1) this.say("Cổng Hàm Tử quan chưa phá được — chiếm Doanh trại trên bãi (A2) trước.", 3); return; }
+    this.gateHit = { id, t: this.time };            // lần trúng cuối, cả khi còn khóa: ô mục tiêu hiện cổng 3 s (gatebar.js) — khóa thì kèm vì sao
+    if (this.phase < GATE_PHASE) { this.gateNag = (this.gateNag || 0) + 1; if (this.gateNag % 20 === 1) this.say("Cổng Hàm Tử quan chưa phá được — chiếm Doanh trại trên bãi (A2) trước.", 3); return; }
     b.gate = Math.max(0, b.gate - dmg);
     const g = ctx.world.gates[id]; g.shake = 0.25;
     ctx.audio.play("gate", g.x, g.z);
+    // số độ bền mất bật lên ở mặt cổng (đợt 15a); ba chỗ lệch z xoay vòng để nhát liền nhau không đè chữ — không dùng ctx.rng (trận xác định)
+    this.gateHits = (this.gateHits || 0) + 1;
+    ctx.fx.text(g.x - 1.8, g.z + ((this.gateHits % 3) - 1) * 1.4, `−${Math.round(dmg)}`, "#ffd27a");
     if (b.gate <= 0) this.openGate(id);
+  }
+  // Cổng Hàm Tử quan cho gatebar.js: [{ id, name, x, z, hp, max, open }] (độ bền sim.bases b.gate / b.gate0, chỗ đứng world.gates).
+  gateList() {
+    const ctx = this.ctx, out = [];
+    for (const id in ctx.world.gates) {
+      const g = ctx.world.gates[id], b = ctx.sim.bases[id];
+      if (b) out.push({ id, name: `${id} · ${baseDef(id).name}`, x: g.x, z: g.z, hp: b.gate, max: b.gate0, open: !!(b.open || ctx.openGates[id]) });
+    }
+    return out;
+  }
+  // Ô mục tiêu của HUD (hud.js): cổng vừa bị đánh (≤ 3 s) hoặc cổng chưa mở trong 25 m — tên, độ bền, khóa thì vì sao; null nếu không có.
+  gateTarget() { return gateTarget({ gates: this.gateList(), hero: this.ctx.hero, phase: this.phase, now: this.time, lastHit: this.gateHit }); }
+  // Thẻ nhiệm vụ P3: mục tiêu kèm phần trăm độ bền còn lại của từng cổng (gatebar.js gateGoal); pha khác null — hud.js dùng PHASES[].goal.
+  // short: thẻ một dòng của HUD gọn đang gập → "Phá A3 64% hoặc B3 100%" (gateGoalShort), cho vừa cả hai phần trăm.
+  goalText(short = false) {
+    if (this.phase !== GATE_PHASE) return null;
+    const gs = this.gateList();
+    return (short && gateGoalShort(gs)) || gateGoal(PHASES[this.phase].goal, gs);
   }
 
   openGate(id) {
@@ -849,7 +872,7 @@ export class Director {
     Object.assign(ctx.sim, clone(c.sim)); Object.assign(ctx.hk, clone(c.hk));
     this.phase = c.phase; this.phaseStart = c.phaseStart; this.time = c.time; this.p2Start = c.p2Start;
     this.main = [...c.main]; this.side = { ...c.side }; this.ko = c.ko; this.koMs = c.koMs; this.chestCoins = c.chestCoins; this.counterBoss = c.counterBoss;
-    this.events = clone(c.events); this.followers = null; this.capT = {};
+    this.events = clone(c.events); this.followers = null; this.capT = {}; this.gateHit = null;
     for (const id in ctx.openGates) ctx.openGates[id] = !!c.openGates[id];
     for (const id in ctx.world.gates) ctx.world.gates[id].broken = !!c.openGates[id];
     for (const id in ctx.sim.bases) ctx.world.setBaseOwner(id, ctx.sim.bases[id].owner);

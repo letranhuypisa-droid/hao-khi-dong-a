@@ -173,6 +173,26 @@
 .bar.hpo { height: 5px; margin-top: 3px; } .bar.hpo[hidden] { display: none; } .bar.hpo > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
 .sk.locked { opacity: .35; filter: grayscale(1); }
 
+/* ô mục tiêu là cổng Hàm Tử quan (đợt 15a, hud.js gateBox): thanh độ bền màu gỗ, cao hơn để số "7.340 / 11.000" nằm trên thanh; còn khóa
+   (trước P3) thì thanh xám, tên nhạt, một dòng vì sao dưới thanh. Máy tính: dòng vì sao treo xuống khoảng trống dưới ô (ô neo đáy 96 px), để ô
+   không cao hơn ô sĩ quan và không chạm nhắc khóa chuột (đáy 150 px). HUD gọn: ô cổng neo đáy 22 px, trên dòng buffs của tướng (đáy 6–19 px,
+   nằm ngang tới giữa màn — "Liên hoàn ×2 · Tụ lực 1" chui dưới thanh nếu ô neo 8 px như ô sĩ quan); thanh cổng khi ấy ngang hàng thanh máu sĩ
+   quan. Dòng vì sao nằm trong ô dưới thanh, một dòng giữa ô và được rộng hơn ô: ô chỉ 30vw (200 px ở 667 px) mà câu cần ~230 px. */
+.hud-target .tnum, .hud-target .twhy { display: none; }
+.hud-target.gate .tname { color: #f0c98a; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.7); }
+.hud-target.gate .bar.thp { height: 16px; }
+.hud-target.gate .bar.thp > div { background: linear-gradient(#d6954a, #8a5222); }
+.hud-target.gate .tnum { display: block; position: absolute; inset: 0; font: 700 .72rem/16px var(--sans); text-align: center; color: #fff4dc; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.hud-target.gate.locked .tname { color: #ddd5c4; }
+.hud-target.gate.locked .bar.thp > div { background: linear-gradient(#8f897e, #5a554d); }
+.hud-target.gate.locked .twhy { display: block; position: absolute; left: 50%; top: calc(100% + 5px); transform: translateX(-50%); width: max-content; max-width: 100%;
+  box-sizing: border-box; padding: 1px 9px; border-radius: 8px; background: rgba(21,18,16,.8); font-size: .74rem; color: var(--vang2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage.compact .hud-target.gate { bottom: calc(22px + var(--sb)); }
+.stage.compact .hud-target.gate .bar.thp { height: 13px; }
+.stage.compact .hud-target.gate .tnum { font-size: .62rem; line-height: 13px; }
+.stage.compact .hud-target.gate.locked .twhy { position: relative; top: auto; margin: 2px 0 0; max-width: calc(100vw - 16px); padding: 0 7px; font-size: .64rem; }
+
 /* bảng tạm dừng: sổ tin trong trận */
 .msglog { margin: 10px 0 4px; }
 .msglog ol { list-style: none; margin: 6px 0 0; padding: 0; max-height: 28vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }

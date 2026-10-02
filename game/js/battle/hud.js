@@ -80,7 +80,7 @@ export class HUD {
       <div class="hud-events" data-k="events"></div>
       <div class="hud-ks" data-k="ks"></div>
       <button class="hud-sit" data-k="sit" hidden aria-label="Tình hình: Kế Sách và bảng của trận"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><em data-k="sitn"></em></button>
-      <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
+      <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div><span class="tnum" data-k="tnum"></span></div><div class="bar tpo"><div data-k="tpo"></div></div><div class="twhy" data-k="twhy"></div></div>
       <div class="hud-hint" data-k="hint"></div>
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
       ${skillBarHTML(true, this.slots, hero?.ultInfo?.())}
@@ -252,7 +252,10 @@ export class HUD {
     this.t += dt; this.pulse = Math.max(0, this.pulse - dt);
     const P = PH[Math.min(d.phase, PH.length - 1)];
     E.phase.textContent = P ? `${P.id} · ${P.name}` : "";
-    E.goal.textContent = d.baseHint || P?.goal || "";
+    // P3: mục tiêu kèm phần trăm độ bền từng cổng (director.goalText, đợt 15a) — HUD gọn khi thẻ gập dùng dạng ngắn cho thấy cả hai phần trăm;
+    // trận không có goalText (Tự do, B20, Võ trường) như cũ
+    const goal = d.baseHint || d.goalText?.(this.compact && this.openT <= 0) || P?.goal || "";
+    if (goal !== this.goalStr) { this.goalStr = goal; E.goal.textContent = goal; }
     if (P && P.id !== this.phaseId) { this.phaseId = P.id; this.phaseFlash(); }
     if (E.tip) {                                              // câu "làm thế nào" của pha, chữ phím theo thiết bị đang dùng
       const tip = P?.tip ? fm(P.tip) : "";
@@ -332,16 +335,21 @@ export class HUD {
     // nút ☰ của lớp cảm ứng sáng khi có việc ở trong (Tổng Phản Công sẵn sàng, Kế Sách sẵn sàng)
     this.menuEl ??= this.root.parentElement?.querySelector(".touch .tmenu") || null;
     if (this.menuEl) { const al = tpcReady(hk) || kl.some((k) => k.state === "sansang"); if (al !== this.menuAlert) { this.menuAlert = al; this.menuEl.classList.toggle("alert", al); } }
-    // mục tiêu
-    const t = hero.lock?.alive && !hero.lock.dead ? hero.lock : this.nearestOfficer();
+    // mục tiêu: sĩ quan đang khóa > cổng vừa bị đánh (≤ 3 s) > sĩ quan thức gần nhất (18 m) > cổng trong 25 m (đợt 15a: cổng Hàm Tử quan
+    // hiện độ bền — director.gateTarget, gatebar.js). Trận không có gateTarget (Tự do, B20, Võ trường) thì như cũ.
+    const lk = hero.lock?.alive && !hero.lock.dead ? hero.lock : null;
+    const gt = lk ? null : d.gateTarget?.() ?? null;
+    const t = lk || (gt?.hit ? null : this.nearestOfficer());
     if (t) {
-      E.target.classList.add("on");
-      E.tname.textContent = t.name + (t.broken > 0 ? " · VỠ THẾ" : "");
+      E.target.classList.add("on"); E.target.classList.remove("gate", "locked");
+      const nm = t.name + (t.broken > 0 ? " · VỠ THẾ" : "");
+      if (nm !== this.tgtName) { this.tgtName = nm; E.tname.textContent = nm; }
       E.thp.style.width = `${(t.hp / t.maxHp) * 100}%`;
       E.tpo.style.width = t.poiseMax ? `${(t.poise / t.poiseMax) * 100}%` : "0";
       E.tpo.parentElement.style.display = t.poiseMax ? "" : "none";
       E.target.classList.toggle("broken", t.broken > 0);
-    } else E.target.classList.remove("on");
+    } else if (gt) this.gateBox(gt, E);
+    else E.target.classList.remove("on");
     // dấu khóa mục tiêu
     if (hero.lock?.alive && !hero.lock.dead) {
       const p = ctx.project(hero.lock.x, hero.lock.y + 3.2 * hero.lock.rig.scale, hero.lock.z);
@@ -405,6 +413,19 @@ export class HUD {
     const m = t && t.mud >= TERRAIN.tag.mud ? `Bùn lầy −${Math.round((1 - t.run) * 100)}% tốc chạy` : "";
     if (E.ttag.textContent !== h) { E.ttag.textContent = h; E.ttag.classList.toggle("down", pct < 0); }
     if (E.tmud.textContent !== m) E.tmud.textContent = m;
+  }
+
+  // Ô mục tiêu là cổng Hàm Tử quan (đợt 15a): tên, thanh độ bền (không có Phá Thế), số "7.340 / 11.000" trên thanh; chưa tới P3 thì thanh xám
+  // kèm dòng vì sao (css/hud.css .hud-target.gate). Chữ chỉ ghi khi đổi (nhịp HUD 0,05 s).
+  gateBox(g, E) {
+    const c = E.target.classList;
+    c.add("on", "gate"); c.toggle("locked", g.locked); c.remove("broken");
+    if (g.name !== this.tgtName) { this.tgtName = g.name; E.tname.textContent = g.name; }
+    if (g.text !== this.tnumText) { this.tnumText = g.text; E.tnum.textContent = g.text; }
+    const why = g.why || "";
+    if (why !== this.twhyText) { this.twhyText = why; E.twhy.textContent = why; }
+    E.thp.style.width = `${g.max > 0 ? Math.max(0, Math.min(100, (g.hp / g.max) * 100)) : 0}%`;
+    E.tpo.parentElement.style.display = "none";
   }
 
   nearestOfficer() {
