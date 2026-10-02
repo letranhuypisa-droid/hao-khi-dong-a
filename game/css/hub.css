@@ -54,8 +54,46 @@ body { background: radial-gradient(130% 70% at 0% 0%, rgba(155,45,32,.16), trans
   .hub .tutbanner > button { flex: 1 1 100%; }
 }
 
-/* ---- Tự do (đang dựng ở đợt 13) ---- */
-.tudo-wip { border-color: #6b4f2e; }
+/* ---- Tự do: binh nghiệp người lính (đợt 14, main.js tudo) ---- */
+/* dấu bậc: ấn triện son, bậc càng cao viền càng đậm vàng */
+.rk-seal { display: inline-grid; place-items: center; padding: 3px 10px; border-radius: 6px; font: 900 .8rem var(--serif); letter-spacing: .04em; color: #ffeab0;
+  background: linear-gradient(#a8331f, #7a2216); border: 1px solid #c9a14a88; transform: rotate(-3deg); white-space: nowrap; }
+.rk-seal.big { width: 92px; min-height: 92px; padding: 10px 8px; font-size: 1rem; line-height: 1.15; white-space: normal; text-align: center; border-radius: 12px; border-width: 2px; box-shadow: inset 0 0 0 3px rgba(122,34,22,.9), inset 0 0 0 4px rgba(255,226,150,.35), 0 8px 24px rgba(0,0,0,.45); }
+.rk-seal.r0 { background: linear-gradient(#5a4838, #3a2e25); border-color: #8a7a5a; }
+.rk-seal.r3 { border-color: var(--vang); } .rk-seal.r4 { border-color: #ffd27a; box-shadow: 0 0 22px rgba(255,210,122,.45), inset 0 0 0 3px rgba(122,34,22,.9); }
+.td-head { display: grid; grid-template-columns: auto 1fr; gap: 14px 24px; align-items: center; }
+.td-id { display: flex; gap: 16px; align-items: center; } .td-id h2 { margin: 0; font-size: 1.5rem; }
+.td-rep b { font-family: var(--serif); color: var(--vang2); }
+.td-bar { height: 9px; margin: 6px 0; } .td-bar div { background: linear-gradient(90deg, #8a2618, #c0392b 50%, var(--vang2)); }
+.td-h { margin: 18px 2px 8px; }
+.td-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.td-mission { display: flex; flex-direction: column; gap: 4px; margin: 0; border-color: #6b4f2e; }
+.td-mission header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.td-type { font: 900 1.1rem var(--serif); color: var(--vang2); }
+.td-mission p { margin: 2px 0; }
+.td-side { margin: 4px 0; padding-left: 18px; font-size: .84rem; } .td-side em { font-style: normal; color: var(--vang); font-size: .74rem; }
+.td-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line2); }
+.td-ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.td-ladder li { display: grid; grid-template-columns: 96px 56px 1fr; gap: 8px; align-items: baseline; font-size: .82rem; padding: 4px 8px; border-radius: 8px; color: var(--muted); }
+.td-ladder li b { font-family: var(--serif); color: var(--trung); } .td-ladder li small { color: var(--muted); }
+.td-ladder li.on { background: rgba(155,45,32,.28); color: var(--trung); } .td-ladder li.on b { color: var(--vang2); }
+.td-ladder li.done b { color: var(--vang); }
+.td-create h2 { margin-top: 0; }
+.td-create input[type=text] { background: var(--then2); color: var(--trung); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; min-width: 0; width: min(260px, 52vw); }
+.td-weapons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 4px; }
+.td-w { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 12px; }
+.td-w b { font: 900 1.05rem var(--serif); color: var(--vang2); } .td-w span { font-size: .8rem; color: var(--trung); }
+.td-w.on { border-color: var(--vang); background: rgba(155,45,32,.35); }
+.td-intro .sheet, .td-promo .sheet { text-align: center; }
+.td-tattoo { font: 900 3.4rem/1.1 "Noto Serif", serif; color: #1d2a3a; text-shadow: 0 0 1px #4a6a8a; letter-spacing: .1em; padding: 10px 0 4px;
+  background: radial-gradient(ellipse at center, #d9b48c 0 55%, transparent 72%); border-radius: 50%; }
+.td-promo .rk-seal { margin: 10px auto 4px; }
+.td-result .rank-seal { font-size: 2rem; }
+@media (max-width: 860px) {
+  .td-head { grid-template-columns: 1fr; }
+  .td-weapons { grid-template-columns: 1fr; }
+  .td-ladder li { grid-template-columns: 84px 1fr; } .td-ladder li span { grid-column: 1 / -1; }
+}
 
 /* ---- bảng Cài đặt ---- */
 .sheet-wrap { position: fixed; inset: 0; z-index: 70; background: rgba(8,6,5,.6); display: grid; place-items: center; padding: 16px; }

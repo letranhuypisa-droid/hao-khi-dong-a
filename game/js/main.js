@@ -21,6 +21,9 @@ import { HEROES } from "./data/heroes.js";
 import { DRILL_COUNT, exitLine } from "./data/tutorial-steps.js";
 import { guongDayRow } from "./data/glossary.js";
 import { NAV, SUBTABS, groupOf, navBadge } from "./ui/layout.js";
+import { RANKS as CAREER_RANKS, rankOf, nextRank, RANK_PERKS, PICKS, GEAR, gearCost, QUE, suggestName, MISSION_MULT } from "./data/career.js";
+import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS } from "./meta/career.js";
+import { MISSIONS, SITES, missionBoard } from "./data/skirmish.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
 const DEBUG = /[?&]debug\b/.test(location.search);
@@ -76,7 +79,7 @@ const NAV_ICON = {
   quandoanh: SVG(`<path d="M2.5 20.5L12 5l9.5 15.5z"/><path d="M9 20.5l3-6 3 6"/><path d="M12 5V2.5l3.5 1.2L12 5"/>`),
   hoso: SVG(`<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>`),
 };
-const GEAR = SVG(`<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/><circle cx="12" cy="12" r="6.6"/>`);
+const GEAR_ICON = SVG(`<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/><circle cx="12" cy="12" r="6.6"/>`);
 const lastSub = { quandoanh: "huanluyen" };          // mục con Quân doanh mở gần nhất
 function render() {
   const h = save.hero, w = save.wallet;
@@ -90,14 +93,14 @@ function render() {
   <div class="hub g-${group}">
     <header class="hub-head">
       <div class="brand"><h1>HÀO KHÍ ĐÔNG A</h1><p>Nam Quốc Sơn Hà · Quyển Nhà Trần · bản thử B15 Hàm Tử, B20 Bạch Đằng</p></div>
-      <div class="herochip"><b>Trần Quốc Toản</b><span>Cấp ${h.level}${h.level >= LEVEL_CAP ? " (trần R1)" : ""} · Doanh trại cấp ${save.camp}</span>
+      ${group === "tudo" && save.career ? tdHeroChip(save.career) : `<div class="herochip"><b>Trần Quốc Toản</b><span>Cấp ${h.level}${h.level >= LEVEL_CAP ? " (trần R1)" : ""} · Doanh trại cấp ${save.camp}</span>
         <div class="exp"><div style="width:${expPct}%"></div></div><small>${h.level >= LEVEL_CAP ? "Đã đạt trần" : `${n(h.exp)} / ${n(EXP_NEXT(h.level))} EXP`}</small></div>
       <div class="purse">
         <span class="chip tien" title="Tiền (quan tiền)">${n(w.tien)}<small>Tiền</small></span>
         <span class="chip tt" title="Tinh thiết">${n(w.tt)}<small>Tinh thiết</small></span>
         <span class="chip qc" title="Quân công">${n(w.qc)}<small>Quân công</small></span>
-      </div>
-      <button class="gear" data-settings title="Cài đặt" aria-label="Cài đặt">${GEAR}</button>
+      </div>`}
+      <button class="gear" data-settings title="Cài đặt" aria-label="Cài đặt">${GEAR_ICON}</button>
     </header>
     <nav class="navbar" aria-label="Mục chính">${NAV.map((g) => { const b = navBadge(g.id, info);
       return `<button data-nav="${g.id}" class="${group === g.id ? "on" : ""}"${group === g.id ? ` aria-current="page"` : ""}><i class="nav-ic">${NAV_ICON[g.id]}</i><span>${g.name}</span>${b ? `<em>${b}</em>` : ""}</button>`; }).join("")}</nav>
@@ -145,12 +148,134 @@ function openSettings() {
   d.querySelector("[data-close]").focus();
 }
 
-// ---- Tự do (đợt 14) ------------------------------------------------------------------------------
-const tudoBadge = () => "";
+// ---- Tự do (đợt 14): binh nghiệp người lính ---------------------------------------------------------
+// save.career (meta/career.js): một người lính một lúc, lưu riêng (không chung ví, cấp với Trần Quốc Toản). Chưa có thì trang tạo lính;
+// có rồi thì trang binh nghiệp: bậc + thanh danh tiếng, bảng nhiệm vụ (data/skirmish.js missionBoard: 1 · 2 · 2 · 3 · 3 lựa chọn theo
+// bậc, đổi sau mỗi trận), quân nhu (nâng binh khí / giáp bằng tiền thưởng, đổi Song đao ↔ Đại đao), thang bậc, sổ trận, giải ngũ.
+const tudoBadge = () => (save.career === undefined && !save.veterans?.length ? "mới" : "");
+let tdForm = { name: "", que: QUE[0], weapon: "WC03", seed: Date.now() & 0xffffff };
+const fmtSec = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const rankSeal = (i, big = false) => `<span class="rk-seal r${i}${big ? " big" : ""}">${CAREER_RANKS[i].name}</span>`;
+// dải đầu khi đang ở mục Tự do: người lính thay cho Trần Quốc Toản, ví là tiền thưởng riêng của lính
+function tdHeroChip(c) {
+  const i = rankOf(c.rep), nx = nextRank(c.rep);
+  return `<div class="herochip"><b>${esc(c.name)}</b><span>${CAREER_RANKS[i].name} · danh tiếng ${n(c.rep)}</span>
+      <div class="exp"><div style="width:${nx ? Math.round(nx.pct * 100) : 100}%"></div></div><small>${nx ? `còn ${n(nx.need)} tới ${nx.name}` : "Bậc cao nhất"}</small></div>
+    <div class="purse"><span class="chip tien" title="Tiền thưởng của người lính">${n(c.tien)}<small>Tiền thưởng</small></span></div>`;
+}
 function tudo() {
-  return `<section class="card tudo-wip"><h3>Tự do · Binh nghiệp người lính</h3>
-    <p>Nhập vai một người lính thường của nhà Trần, lập công qua các trận giao tranh để lên Tinh nhuệ, Đội trưởng, Phó tướng rồi Tướng.</p>
-    <p class="small">Đang dựng.</p></section>`;
+  const c = save.career;
+  if (!c) return tudoCreate();
+  const i = rankOf(c.rep), nx = nextRank(c.rep), board = missionBoard(c.seed, c.battles, i), W = WEAPONS[c.weapon];
+  const missionCard = (s, k) => {
+    const M = MISSIONS[s.type], site = SITES[s.siteId];
+    return `<article class="card td-mission">
+      <header><span class="td-type">${esc(M.name)}</span><span class="small">${esc(site?.name || "")} · ${fmtSec(s.timeLimit)}</span></header>
+      <p>${esc(M.goal)}.</p>
+      <p class="small">${esc(M.how)}</p>
+      <ul class="td-side">${s.side.map((x) => `<li>${esc(x.name)} <em>+30</em></li>`).join("")}</ul>
+      <div class="td-foot"><span class="small">Địch ~${s.enemyTotal} lính${s.officers.length ? ` · ${s.officers.length} sĩ quan` : ""} · danh tiếng ~${Math.round(M.base * MISSION_MULT[i])}+</span>
+        <button class="primary" data-td-go="${k}">Ra trận</button></div></article>`;
+  };
+  return `
+  <section class="card td-head">
+    <div class="td-id">${rankSeal(i, true)}<div><h2>${esc(c.name)}</h2><p class="small">Quê ${esc(c.que)} · ${esc(W.name)} <span class="label hc">Hư cấu</span> · ${c.battles} trận, thắng ${c.wins}</p></div></div>
+    <div class="td-rep"><div class="row" style="justify-content:space-between"><b>Danh tiếng ${n(c.rep)}</b><span class="small">${nx ? `còn ${n(nx.need)} tới ${nx.name}` : "Bậc cao nhất"}</span></div>
+      <div class="exp td-bar"><div style="width:${nx ? Math.round(nx.pct * 100) : 100}%"></div></div>
+      <p class="small">${esc(RANK_PERKS[i])}</p></div>
+  </section>
+  <h3 class="td-h">${PICKS[i] === 1 ? "Đội trưởng giao nhiệm vụ" : `Chọn 1 trong ${board.length} nhiệm vụ`}</h3>
+  <section class="td-board">${board.map(missionCard).join("")}</section>
+  <section class="grid2">
+    <div class="card"><h3>Quân nhu · tiền thưởng ${n(c.tien)}</h3>
+      ${["weapon", "armor"].map((k) => { const lv = c.gear[k], cost = lv < GEAR.max ? gearCost(lv + 1) : null;
+        return `<div class="field"><span>${GEAR.names[k]} bậc ${lv}/${GEAR.max} <small class="small">${k === "weapon" ? `Công +${Math.round(lv * GEAR.weaponPct * 100)}%` : `Sinh lực, Giáp +${Math.round(lv * GEAR.armorPct * 100)}%`}</small></span>
+          ${cost ? `<button data-td-gear="${k}" ${c.tien < cost ? "disabled" : ""}>Nâng · ${n(cost)}</button>` : `<span class="small">Tốt nhất</span>`}</div>`; }).join("")}
+      <div class="field"><span>Binh khí</span><div class="row">${Object.values(WEAPONS).map((w) => `<button data-td-weapon="${w.id}" class="${c.weapon === w.id ? "primary" : ""}">${esc(w.name)}</button>`).join("")}</div></div>
+      <p class="small">${esc(W.text)} Đổi binh khí không mất gì.</p>
+      <p class="small">Chỉ số vào trận: Công ${n(soldierStats(c).cong)} · Sinh lực ${n(soldierStats(c).hp)} · Giáp ${n(soldierStats(c).giap)}.</p>
+    </div>
+    <div class="card"><h3>Thang bậc</h3><ol class="td-ladder">${CAREER_RANKS.map((r, k) => `<li class="${k === i ? "on" : k < i ? "done" : ""}"><b>${r.name}</b><small>${n(r.rep)}</small><span>${esc(RANK_PERKS[k])}</span></li>`).join("")}</ol></div>
+  </section>
+  <section class="grid2">
+    <div class="card"><h3>Sổ trận</h3><table class="stat">${c.log.slice(0, 6).map((l) => `<tr><td>${esc(MISSIONS[l.type]?.name || l.type)}</td><td>${l.won ? "Thắng" : "Thua"} · ${fmtSec(l.timeSec)}</td><td>${l.rep >= 0 ? "+" : ""}${n(l.rep)} danh tiếng</td></tr>`).join("") || `<tr><td>Chưa đánh trận nào.</td></tr>`}</table></div>
+    <div class="card"><h3>Giải ngũ</h3><p class="small">Cho người lính này về quê và làm lại một người lính mới. Lính đã giải ngũ được ghi tên ở đây.</p>
+      ${(save.veterans || []).slice(0, 5).map((v) => `<p class="small">${esc(v.name)} · ${esc(v.rank)} · ${v.battles} trận</p>`).join("")}
+      <button class="danger" data-td-retire>Giải ngũ</button></div>
+  </section>`;
+}
+function tudoCreate() {
+  const f = tdForm;
+  return `
+  <section class="card td-create">
+    <h2>Nhập ngũ</h2>
+    <p>Năm Ất Dậu (1285), quân Nguyên tràn xuống. Bạn là một người lính thường của nhà Trần: lập công qua từng trận giao tranh trên đất Hàm Tử để lên Tinh nhuệ, Đội trưởng, Phó tướng rồi Tướng.</p>
+    <p class="small"><span class="label hc">Hư cấu</span> người lính và các trận giao tranh. <span class="label cs">Chính sử</span> quân sĩ thích hai chữ "Sát Thát" lên cánh tay.</p>
+    <label class="field">Tên <span class="row"><input type="text" maxlength="32" data-td-name value="${esc(f.name)}" placeholder="${esc(suggestName(f.seed))}"><button data-td-suggest>Gợi ý</button></span></label>
+    <label class="field">Quê <select data-td-que>${QUE.map((q) => `<option ${q === f.que ? "selected" : ""}>${esc(q)}</option>`).join("")}</select></label>
+    <div class="td-weapons">${Object.values(WEAPONS).map((w) => `<button class="td-w ${f.weapon === w.id ? "on" : ""}" data-td-pickw="${w.id}"><b>${esc(w.name)}</b><span>${esc(w.text)}</span></button>`).join("")}</div>
+    <button class="primary go" data-td-create>Nhập ngũ</button>
+  </section>
+  ${save.veterans?.length ? `<section class="card"><h3>Lính đã giải ngũ</h3>${save.veterans.map((v) => `<p class="small">${esc(v.name)} · quê ${esc(v.que)} · ${esc(v.rank)} · ${v.battles} trận, thắng ${v.wins}</p>`).join("")}</section>` : ""}`;
+}
+// Cảnh mở đầu (một lần, sau khi nhập ngũ): thích chữ "Sát Thát" — Chính sử (Toàn thư, 1285).
+function tudoIntro(c) {
+  const d = document.createElement("div"); d.className = "sheet-wrap td-intro";
+  d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="td-tattoo" aria-hidden="true">殺韃</div>
+    <h2>Sát Thát</h2>
+    <p>Bến đò đầu làng ${esc(c.que)}. Người thợ chấm mực, kim đâm từng nhát lên cánh tay ${esc(c.name)}: hai chữ "Sát Thát" — giết giặc Thát. Cả đội cùng thích, không ai lùi.</p>
+    <p class="small"><span class="label cs">Chính sử</span> năm 1285 quân sĩ nhà Trần thích chữ "Sát Thát" lên tay. <span class="label hc">Hư cấu</span> người lính, bến đò, người thợ.</p>
+    <p>Đội trưởng gọi tên: trận đầu tiên đang chờ.</p>
+    <div class="row center"><button class="primary" data-close>Nhận lệnh</button></div></div>`;
+  document.body.appendChild(d);
+  d.querySelector("[data-close]").onclick = () => { d.remove(); c.introSeen = true; persist(); };
+}
+async function startSkirmish(sk) {
+  const c = save.career; if (!c) return;
+  app.innerHTML = `<div class="loading"><h2>${esc(sk.name)} · ${esc(SITES[sk.siteId]?.name || "")}</h2><p>${esc(sk.goal)}.</p><div class="spin"></div><p class="small">${esc(sk.how)}</p></div>`;
+  await new Promise((r) => setTimeout(r, 60));
+  const [{ runBattle }, { makeTD }] = await Promise.all([import("./battle/battle.js"), import("./battles/td.js")]);
+  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
+  app.style.display = "none";
+  let res = null;
+  try {
+    res = await runBattle({ container: stage, save, R: sk.R, difficulty: "quansi", mode: "nhanh", music, onSettings: () => persist(),
+      battle: makeTD(sk, c), heroDef: soldierDef(c), stats: soldierStats(c) });
+  } catch (err) { console.error(err); toast("Lỗi khi chạy giao tranh: " + err.message, true); }
+  stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
+  if (!res) { tab = "tudo"; render(); return; }
+  showTdResult(res, sk);
+}
+function showTdResult(res, sk) {
+  const before = save.career.rep, rec = recordBattle(save, { ...res, base: sk.base, at: Date.now() }); persist();
+  const c = save.career, i = rec.rankAfter, nx = nextRank(c.rep);
+  app.innerHTML = `
+  <div class="results ${res.won ? "win" : "lose"} td-result">
+    <div class="rank-seal">${res.won ? "Thắng" : "Thua"}</div>
+    <h1>${esc(sk.name)}</h1><p>${esc(res.why)}</p>
+    <div class="grid2">
+      <div class="card"><h3>Danh tiếng ${rec.applied.gained >= 0 ? "+" : ""}${n(rec.applied.gained)}</h3><table class="stat">
+        ${rec.rep.parts.map((p) => `<tr><td>${esc(p.label)}</td><td>+${n(p.rep)}</td></tr>`).join("") || `<tr><td>Không có</td><td>0</td></tr>`}
+        ${rec.applied.penalty ? `<tr><td>Thua trận: trừ 3% danh tiếng tích lũy</td><td class="bad">−${n(rec.applied.penalty)}</td></tr>` : ""}
+        ${!res.won ? `<tr><td colspan="2" class="small">Thua chỉ giữ 25% danh tiếng của trận; không bao giờ rớt bậc.</td></tr>` : ""}
+        <tr><td>Tiền thưởng</td><td>+${n(rec.pay)}</td></tr></table>
+        <div class="exp td-bar"><div style="width:${nx ? Math.round(nx.pct * 100) : 100}%"></div></div>
+        <p class="small">Danh tiếng ${n(before)} → ${n(c.rep)} · ${nx ? `còn ${n(nx.need)} tới ${nx.name}` : "bậc cao nhất"}</p></div>
+      <div class="card"><h3>Mục phụ ${res.side}/${res.sideList.length}</h3><ul class="rb-list">${res.sideList.map((x) => `<li class="${x.ok ? "ok" : ""}"><i class="rb-tick ${x.ok ? "ok" : "no"}">${x.ok ? "✓" : "–"}</i><b>${esc(x.name)}</b></li>`).join("")}</ul>
+        <table class="stat"><tr><td>Thời gian</td><td>${fmtSec(res.timeSec)}</td></tr><tr><td>Hạ địch</td><td>${res.ko}</td></tr>${res.squad ? `<tr><td>Lính còn</td><td>${res.squad.alive}/${res.squad.total}</td></tr>` : ""}</table></div>
+    </div>
+    <div class="row center"><button class="primary" data-td-back>Về binh nghiệp</button></div>
+  </div>`;
+  app.querySelector("[data-td-back]").onclick = () => { tab = "tudo"; render(); window.scrollTo(0, 0); };
+  if (rec.promoted) tdPromotion(i);
+}
+// Màn thăng bậc: dấu son lớn + những gì vừa mở.
+function tdPromotion(i) {
+  const d = document.createElement("div"); d.className = "sheet-wrap td-promo";
+  d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${rankSeal(i, true)}<h2>Thăng bậc · ${CAREER_RANKS[i].name}</h2>
+    <p>${esc(RANK_PERKS[i])}</p><div class="row center"><button class="primary" data-close>Nhận</button></div></div>`;
+  document.body.appendChild(d); music.play("victory", { loop: false, then: "hub" });
+  d.querySelector("[data-close]").onclick = () => d.remove();
 }
 
 // ---- Xuất trận --------------------------------------------------------------------------------
@@ -574,6 +699,27 @@ function lockedCard(name, lv) {
 
 // ---- gắn sự kiện ------------------------------------------------------------------------------
 const bind = {
+  tudo() {
+    const c = save.career;
+    if (!c) {
+      const nameEl = app.querySelector("[data-td-name]");
+      nameEl.oninput = () => (tdForm.name = nameEl.value);
+      app.querySelector("[data-td-suggest]").onclick = (e) => { e.preventDefault(); tdForm.seed = (Math.imul(tdForm.seed, 1103515245) + 12345) & 0xffffff; tdForm.name = suggestName(tdForm.seed); render(); };
+      app.querySelector("[data-td-que]").onchange = (e) => (tdForm.que = e.target.value);
+      app.querySelectorAll("[data-td-pickw]").forEach((b) => (b.onclick = () => { tdForm.weapon = b.dataset.tdPickw; render(); }));
+      app.querySelector("[data-td-create]").onclick = () => {
+        save.career = newCareer({ name: tdForm.name.trim() || nameEl.placeholder, que: tdForm.que, weapon: tdForm.weapon, seed: tdForm.seed });
+        persist(); render(); window.scrollTo(0, 0);              // bind.tudo của lần vẽ này mở cảnh "Sát Thát" (introSeen chưa đặt)
+      };
+      return;
+    }
+    const board = missionBoard(c.seed, c.battles, rankOf(c.rep));
+    app.querySelectorAll("[data-td-go]").forEach((b) => (b.onclick = () => startSkirmish(board[Number(b.dataset.tdGo)])));
+    app.querySelectorAll("[data-td-gear]").forEach((b) => (b.onclick = () => act(buyGear(c, b.dataset.tdGear), "Đã nâng quân nhu.")));
+    app.querySelectorAll("[data-td-weapon]").forEach((b) => (b.onclick = () => { c.weapon = b.dataset.tdWeapon; persist(); render(); }));
+    app.querySelector("[data-td-retire]").onclick = () => { if (confirm(`Cho ${c.name} giải ngũ? Không hoàn tác được.`)) { retire(save); persist(); render(); } };
+    if (!c.introSeen) tudoIntro(c);
+  },
   huanluyen() {
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
     app.querySelectorAll("[data-gdev]").forEach((b) => (b.onclick = () => { guideDev = Number(b.dataset.gdev); render(); }));
@@ -811,6 +957,6 @@ if (location.search.includes("debug")) {
   import("./debug.js");
   // kịch bản kiểm thử màn Chương (comic, kết quả, kết chương, Quiz) không cần đánh hết trận
   // startBattle(id), pick (trận / tướng đang chọn), ensureMeta(chương) cho kịch bản nhiều trận (đợt 9)
-  window.__main = { afterBattle, showResults, endChapter, startQuiz, playComic, render, startBattle, ensureMeta, pick,
+  window.__main = { afterBattle, showResults, endChapter, startQuiz, playComic, render, startBattle, ensureMeta, pick, startSkirmish, missionBoard, showTdResult,
     get save() { return save; }, set tab(v) { tab = v; } };
 }
