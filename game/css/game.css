@@ -41,15 +41,10 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; }
 .hub { max-width: 1180px; margin: 0 auto; padding: 16px; }
 .hub-head { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center; border-bottom: 2px solid var(--son); padding-bottom: 12px;
   background: radial-gradient(ellipse at 10% 0, rgba(155,45,32,.25), transparent 60%); }
-.brand h1 { font-size: 1.9rem; letter-spacing: .12em; margin: 0; color: var(--vang2); text-shadow: 0 2px 0 #000; }
-.brand p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
-@media (max-width: 420px) { .brand h1 { font-size: 1.3rem; letter-spacing: .06em; white-space: nowrap; } }   /* điện thoại dọc: tên game không gãy dòng */
 .purse { display: flex; gap: 8px; }
 .chip { display: flex; flex-direction: column; align-items: center; min-width: 78px; padding: 6px 10px; background: var(--then2); border: 1px solid #4a3b2e; border-radius: 8px; font-weight: 700; font-size: 1.05rem; }
 .chip small { font-weight: 400; font-size: .7rem; color: var(--muted); }
 .chip.tien { color: var(--vang2); } .chip.tt { color: #c9d4dc; } .chip.qc { color: #f0a58a; }
-.herochip { min-width: 200px; } .herochip b { font-family: var(--serif); color: var(--vang2); display: block; }
-.herochip span { font-size: .82rem; color: var(--muted); }
 .exp { height: 6px; background: #000; border-radius: 3px; overflow: hidden; margin: 4px 0 2px; } .exp div { height: 100%; background: linear-gradient(90deg, var(--vang), var(--vang2)); }
 .tabs { display: flex; gap: 4px; margin: 14px 0; flex-wrap: wrap; }
 .tabs button { border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; background: transparent; }
@@ -261,7 +256,6 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .cine::before { content: ""; position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; transform: translate(-50%, -50%); background: url(../assets/fx/seal.webp) center/contain no-repeat; opacity: .55; z-index: -1; }
 .cine.on::before { animation: cineseal 1.7s ease-out; }
 @keyframes cineseal { from { transform: translate(-50%, -50%) rotate(-40deg) scale(.6); } to { transform: translate(-50%, -50%) rotate(20deg) scale(1.15); } }
-.brand h1 { padding-left: 52px; position: relative; } .brand h1::before { content: ""; position: absolute; left: 0; top: 50%; width: 44px; height: 44px; transform: translateY(-50%); background: url(../assets/fx/seal.webp) center/contain no-repeat; }
 .loading h2::before { content: ""; display: block; width: 120px; height: 120px; margin: 0 auto 12px; background: url(../assets/fx/seal.webp) center/contain no-repeat; animation: sealspin2 8s linear infinite; }
 @keyframes sealspin2 { to { transform: rotate(360deg); } }
 
