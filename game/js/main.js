@@ -20,6 +20,7 @@ import { BATTLES, BATTLE_ORDER, loadBattleDef, loadChapterMeta } from "./data/ba
 import { HEROES } from "./data/heroes.js";
 import { DRILL_COUNT, exitLine } from "./data/tutorial-steps.js";
 import { guongDayRow } from "./data/glossary.js";
+import { NAV, SUBTABS, groupOf, navBadge } from "./ui/layout.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
 const DEBUG = /[?&]debug\b/.test(location.search);
@@ -64,28 +65,92 @@ function toast(msg, bad = false) {
 const act = (r, okMsg) => { if (r.ok) { persist(); toast(okMsg); } else toast(r.why, true); render(); };
 
 // ---- khung hub -------------------------------------------------------------------------------
+// Đợt 13: thanh 5 mục (ui/layout.js NAV) — dưới đáy trên điện thoại dọc, cột trái trên điện thoại ngang, hàng trên màn rộng
+// (css/hub.css). Mục Quân doanh gom 6 thẻ cũ thành hàng mục con; `tab` vẫn là thẻ lá như trước (lockedCard, kết quả… đặt thẳng).
+// Phần đầu là một dải mỏng: tên game, tướng + EXP, ví, nút Cài đặt (các tùy chọn "Hiển thị" cũ của Xuất trận).
+const SVG = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const NAV_ICON = {
+  xuattran: SVG(`<path d="M4.5 4.5l11 11M19.5 4.5l-11 11"/><path d="M14 17.5l3.5-3.5M6.5 14l3.5 3.5M15.5 15.5l3 3M8.5 15.5l-3 3"/>`),
+  tudo: SVG(`<path d="M3 11.5h18L12 3.5z"/><path d="M8 11.5v1.5a4 4 0 0 0 8 0v-1.5"/><path d="M7 21c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/>`),
+  suquan: SVG(`<path d="M7 4h10.5A2.5 2.5 0 0 1 20 6.5V17a3 3 0 0 1-3 3H7"/><path d="M7 4a2.5 2.5 0 0 0-2.5 2.5V8H9.5V6.5A2.5 2.5 0 0 0 7 4z"/><path d="M9.5 8v10a2 2 0 0 1-2.5 2"/><path d="M12.5 9h4.5M12.5 12.5h4.5M12.5 16h3"/>`),
+  quandoanh: SVG(`<path d="M2.5 20.5L12 5l9.5 15.5z"/><path d="M9 20.5l3-6 3 6"/><path d="M12 5V2.5l3.5 1.2L12 5"/>`),
+  hoso: SVG(`<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>`),
+};
+const GEAR = SVG(`<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/><circle cx="12" cy="12" r="6.6"/>`);
+const lastSub = { quandoanh: "huanluyen" };          // mục con Quân doanh mở gần nhất
 function render() {
   const h = save.hero, w = save.wallet;
   const expPct = h.level >= LEVEL_CAP ? 100 : (h.exp / EXP_NEXT(h.level)) * 100;
-  const tabs = [["xuattran", "Xuất trận"], ["huanluyen", "Huấn luyện"], ["suquan", "Sử quán"], ["votruong", "Võ trường"], ["truongsoai", "Trướng soái"], ["loren", "Lò rèn"], ["luyenbinh", "Luyện binh"], ["doanhtrai", "Doanh trại"], ["hoso", "Hồ sơ"]];
-  const unread = unreadCards().length;
+  const group = groupOf(tab);
+  if (group === "quandoanh") lastSub.quandoanh = tab;
+  const info = { unread: unreadCards().length, points: P.freePoints(save), tutorialNew: !save.tutorial?.done, tudo: tudoBadge() };
+  const subBadge = (k) => (k === "truongsoai" && info.points > 0 ? String(info.points) : k === "huanluyen" && info.tutorialNew ? "mới" : "");
+  const QD = NAV.find((g) => g.id === "quandoanh");
   app.innerHTML = `
-  <div class="hub">
+  <div class="hub g-${group}">
     <header class="hub-head">
       <div class="brand"><h1>HÀO KHÍ ĐÔNG A</h1><p>Nam Quốc Sơn Hà · Quyển Nhà Trần · bản thử B15 Hàm Tử, B20 Bạch Đằng</p></div>
+      <div class="herochip"><b>Trần Quốc Toản</b><span>Cấp ${h.level}${h.level >= LEVEL_CAP ? " (trần R1)" : ""} · Doanh trại cấp ${save.camp}</span>
+        <div class="exp"><div style="width:${expPct}%"></div></div><small>${h.level >= LEVEL_CAP ? "Đã đạt trần" : `${n(h.exp)} / ${n(EXP_NEXT(h.level))} EXP`}</small></div>
       <div class="purse">
         <span class="chip tien" title="Tiền (quan tiền)">${n(w.tien)}<small>Tiền</small></span>
         <span class="chip tt" title="Tinh thiết">${n(w.tt)}<small>Tinh thiết</small></span>
         <span class="chip qc" title="Quân công">${n(w.qc)}<small>Quân công</small></span>
       </div>
-      <div class="herochip"><b>Trần Quốc Toản</b><span>Cấp ${h.level}${h.level >= LEVEL_CAP ? " (trần R1)" : ""} · Doanh trại cấp ${save.camp}</span>
-        <div class="exp"><div style="width:${expPct}%"></div></div><small>${h.level >= LEVEL_CAP ? "Đã đạt trần" : `${n(h.exp)} / ${n(EXP_NEXT(h.level))} EXP`}</small></div>
+      <button class="gear" data-settings title="Cài đặt" aria-label="Cài đặt">${GEAR}</button>
     </header>
-    <nav class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}${k === "truongsoai" && P.freePoints(save) > 0 ? ` <em>${P.freePoints(save)}</em>` : ""}${k === "huanluyen" && !save.tutorial?.done ? ` <em>mới</em>` : ""}${k === "suquan" && unread ? ` <em>${unread}</em>` : ""}</button>`).join("")}</nav>
-    <main class="hub-body">${{ xuattran, huanluyen, suquan, votruong, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
+    <nav class="navbar" aria-label="Mục chính">${NAV.map((g) => { const b = navBadge(g.id, info);
+      return `<button data-nav="${g.id}" class="${group === g.id ? "on" : ""}"${group === g.id ? ` aria-current="page"` : ""}><i class="nav-ic">${NAV_ICON[g.id]}</i><span>${g.name}</span>${b ? `<em>${b}</em>` : ""}</button>`; }).join("")}</nav>
+    ${group === "quandoanh" ? `<nav class="subtabs" aria-label="Quân doanh">${QD.tabs.map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${SUBTABS[k]}${subBadge(k) ? ` <em>${subBadge(k)}</em>` : ""}</button>`).join("")}</nav>` : ""}
+    <main class="hub-body">${{ xuattran, tudo, huanluyen, suquan, votruong, truongsoai, loren, luyenbinh, doanhtrai, hoso }[tab]()}</main>
   </div>`;
+  app.querySelectorAll("[data-nav]").forEach((b) => (b.onclick = () => {
+    const g = NAV.find((x) => x.id === b.dataset.nav);
+    tab = g.id === "quandoanh" ? lastSub.quandoanh : g.tabs[0]; render(); window.scrollTo(0, 0);
+  }));
   app.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); }));
+  app.querySelector("[data-settings]").onclick = openSettings;
   bind[tab]?.();
+}
+
+// Cài đặt (nút ⚙ ở dải đầu): các tùy chọn "Hiển thị" trước đây nằm ở Xuất trận, thêm âm lượng. Bảng trượt từ đáy trên điện
+// thoại, hộp giữa màn trên màn rộng (css/hub.css). Đổi là lưu ngay.
+function openSettings() {
+  const s = save.settings;
+  const opt = (v, cur, l) => `<option value="${v}" ${v === cur ? "selected" : ""}>${l}</option>`;
+  const d = document.createElement("div"); d.className = "sheet-wrap";
+  d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Cài đặt">
+    <div class="sheet-head"><h3>Cài đặt</h3><button data-close aria-label="Đóng">✕</button></div>
+    <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
+    <label class="field">Điều khiển cảm ứng <select data-set="touch">${[["auto", "Tự nhận"], ["on", "Bật"], ["off", "Tắt"]].map(([v, l]) => opt(v, s.touch, l)).join("")}</select></label>
+    <label class="field">Bóng <input type="checkbox" data-set="shadows" ${s.shadows ? "checked" : ""}></label>
+    <label class="field">Gợi ý lần đầu giữa trận <input type="checkbox" data-set="hints" ${s.hints !== false ? "checked" : ""}></label>
+    <label class="field">Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
+    <label class="field">Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume ?? 0.8}" data-set="volume"></label>
+    <button data-hintreset>Hiện lại gợi ý đã xem</button>
+    <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng cho cùng kết quả ở mọi mức. "Tự nhận": giao diện cảm ứng theo cách bạn bấm gần nhất.</p>
+  </div>`;
+  document.body.appendChild(d);
+  const close = () => { d.remove(); removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  addEventListener("keydown", onKey);
+  d.onclick = (e) => { if (e.target === d) close(); };
+  d.querySelector("[data-close]").onclick = close;
+  d.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => {
+    const k = el.dataset.set, v = el.type === "checkbox" ? el.checked : el.type === "range" ? Number(el.value) : el.value;
+    save.settings[k] = v; persist();
+    if (k === "music") music.setVolume(v);
+  }));
+  d.querySelector("[data-hintreset]").onclick = () => { save.hints = {}; persist(); toast("Các gợi ý lần đầu sẽ hiện lại từ trận sau."); };
+  d.querySelector("[data-close]").focus();
+}
+
+// ---- Tự do (đợt 14) ------------------------------------------------------------------------------
+const tudoBadge = () => "";
+function tudo() {
+  return `<section class="card tudo-wip"><h3>Tự do · Binh nghiệp người lính</h3>
+    <p>Nhập vai một người lính thường của nhà Trần, lập công qua các trận giao tranh để lên Tinh nhuệ, Đội trưởng, Phó tướng rồi Tướng.</p>
+    <p class="small">Đang dựng.</p></section>`;
 }
 
 // ---- Xuất trận --------------------------------------------------------------------------------
@@ -111,7 +176,7 @@ function xuattran() {
     <div class="ladder">${modes.map((m) => `<button data-mode="${m.id}" class="${curMode === m.id ? "on" : ""}">${m.name}<small>par ${Math.round((B.par?.[m.id] ?? m.par) / 60)} phút · ${m.id === "nhanh" ? `Hào Khí ×1,3 · thưởng ×0,6 · ${B.keSach?.nhanh ?? 1} Kế Sách` : `thưởng ×1 · ${B.keSach?.chuan ?? 2} Kế Sách`}</small></button>`).join("")}</div>
     <h3>Độ khó</h3>
     <div class="ladder">${DIFFICULTY.map((d) => `<button data-diff="${d.id}" class="${pick.difficulty === d.id ? "on" : ""}">${d.name}<small>${d.tokens} lính đánh cùng lúc · thưởng ×${d.reward}</small></button>`).join("")}</div>
-    <div class="grid2">
+    <div class="grid2 setup-foot">
       <div><h3>Vào trận với${B.ladder ? "" : ` ${esc(HEROES[heroId].name)}`}</h3><table class="stat">
         <tr><td>Cấp</td><td>${st.level}${st.floorLifted ? ` <em class="lift">nâng từ ${save.hero.level}</em>` : ""}</td></tr>
         <tr><td>Công</td><td>${n(st.cong)}</td></tr><tr><td>Sinh lực</td><td>${n(st.hp)}</td></tr><tr><td>Giáp</td><td>${n(st.giap)}</td></tr>
@@ -122,13 +187,8 @@ function xuattran() {
           : `<tr><td>Binh khí</td><td>${esc(HEROES[heroId].weaponName || "")} <span class="label hc">${HEROES[heroId].weaponLabel || "Hư cấu"}</span></td></tr>
         <tr><td>Khí Lực</td><td>${st.kiBars ?? HEROES[heroId].kiLucBars} vạch</td></tr>`}
       </table></div>
-      <div><h3>Hiển thị</h3>
-        <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => `<option value="${t.id}" ${t.id === save.settings.troops ? "selected" : ""}>${t.name} · ${t.N}</option>`).join("")}</select></label>
-        <label class="field">Điều khiển cảm ứng <select data-set="touch">${[["auto", "Tự nhận"], ["on", "Bật"], ["off", "Tắt"]].map(([v, l]) => `<option value="${v}" ${v === save.settings.touch ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <label class="field">Bóng <input type="checkbox" data-set="shadows" ${save.settings.shadows ? "checked" : ""}></label>
-        <label class="field">Gợi ý lần đầu giữa trận <input type="checkbox" data-set="hints" ${save.settings.hints !== false ? "checked" : ""}></label>
-        <button data-hintreset style="margin:2px 0 10px">Hiện lại gợi ý đã xem</button>
-        <button class="primary go" data-go>VÀO TRẬN</button>
+      <div class="gobar"><p class="small">${esc(B.title)} · ${MODES[curMode].name} · ${diff.name}. Số lính hiển thị, cảm ứng, bóng, gợi ý: nút Cài đặt ở dải trên.</p>
+        <button class="primary go" data-go>VÀO TRẬN · ${esc(B.name)}</button>
       </div>
     </div>
   </section>`;
@@ -145,7 +205,7 @@ function battleCard(id) {
   if (id === "B15") return `<section class="card battle pickable${on}" data-bpick="B15">
     <div class="battle-art"><div class="seal">B15</div><div><h2>Trận Hàm Tử</h2><p>Tháng 4 năm Ất Dậu · 1285 · bến Hàm Tử, sông Hồng</p></div></div>
     <p class="lead">Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.</p>
-    <ul class="notes">${HISTORY_NOTES.map((x) => `<li><span class="label ${labelCls(x.label)}">${x.label}</span>${esc(x.text)}</li>`).join("")}</ul>
+    <details class="notes-d"><summary>Ghi chú sử liệu · ${HISTORY_NOTES.length}</summary><ul class="notes">${HISTORY_NOTES.map((x) => `<li><span class="label ${labelCls(x.label)}">${x.label}</span>${esc(x.text)}</li>`).join("")}</ul></details>
     ${chapterState(save, CH).openSeen ? `<div class="row" style="margin-top:10px"><button data-comic="open" data-ch="B15">Xem comic mở chương</button>
       <span class="small">Lần đầu vào trận, comic mở chương tự phát (bỏ qua được). Đọc lại mọi lúc ở Sử quán.</span></div>`
       : `<p class="small" style="margin-top:10px">Trước trận đầu tiên có comic mở chương (6 khung, chừng 40 giây, bỏ qua được).</p>`}
@@ -534,8 +594,6 @@ const bind = {
     app.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => { pick.R = Number(b.dataset.r); render(); }));
     app.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { save.settings.mode = b.dataset.mode; persist(); render(); }));
     app.querySelectorAll("[data-diff]").forEach((b) => (b.onclick = () => { pick.difficulty = b.dataset.diff; save.settings.difficulty = pick.difficulty; persist(); render(); }));
-    app.querySelectorAll("[data-set]").forEach((el) => (el.onchange = () => { save.settings[el.dataset.set] = el.type === "checkbox" ? el.checked : el.value; persist(); }));
-    app.querySelector("[data-hintreset]")?.addEventListener("click", () => { save.hints = {}; persist(); toast("Các gợi ý lần đầu sẽ hiện lại từ trận sau."); });
     app.querySelector("[data-go]").onclick = () => startBattle(pick.battle);
     app.querySelector("[data-tutgo]")?.addEventListener("click", startTutorial);
     app.querySelectorAll("[data-comic]").forEach((b) => b.addEventListener("click", async (e) => { e.stopPropagation(); await playComic("open", { ch: e.currentTarget.dataset.ch || CH }); render(); }));
