@@ -9,7 +9,8 @@ import { BigUnit } from "./units.js";
 import { FX } from "./fx.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
-import { lerpAngle, setupTouch, controlsHTML, releaseGpu } from "./battle.js";
+import { lerpAngle, setupTouch, controlsHTML, releaseGpu, syncCompact, logHTML, rotateBlocked } from "./battle.js";
+import { compactMsg, logMsgs } from "../ui/layout.js";
 import { fmtKeys, devOf } from "../data/controls.js";
 import { HUD, skillBarHTML, updateAttackTiles } from "./hud.js";
 import { TutorialDirector } from "./tutorial.js";
@@ -194,7 +195,10 @@ class ArenaHUD {
     E1.sk1.classList.toggle("ready", h.phaTran.cd <= 0); E1.sk1cd.textContent = h.phaTran.left > 0 ? `${h.phaTran.left} lần` : h.phaTran.cd > 0 ? Math.ceil(h.phaTran.cd) : "";
     E1.sk2.classList.toggle("ready", h.ki >= 100); E1.sk2cd.textContent = `${Math.floor(h.ki / 100)}/2`;
     E1.ko.textContent = d.ko;
-    E1.msgs.innerHTML = d.msgs.slice(-3).map((m) => `<div class="msg ${m.kind}">${m.text}</div>`).join("");
+    // HUD gọn (đợt 13): một tin ≤ 5 s như trận; sổ tin đọc lại ở bảng tạm dừng
+    logMsgs((this.log ||= []), d.msgs, (this.seenMsgs ||= new WeakSet()));
+    if (this.root.parentElement?.classList.contains("compact")) { const c = compactMsg(d.msgs); E1.msgs.innerHTML = c ? `<div class="msg ${c.m.kind}" style="opacity:${c.alpha}">${c.m.text}</div>` : ""; }
+    else E1.msgs.innerHTML = d.msgs.slice(-3).map((m) => `<div class="msg ${m.kind}">${m.text}</div>`).join("");
     let t = h.lock?.alive && !h.lock.dead ? h.lock : null, bd = 18 * 18;
     if (!t) for (const u of ctx.units) { if (!u.alive || u.dead || u.retreating) continue; const d2 = (u.x - h.x) ** 2 + (u.z - h.z) ** 2; if (d2 < bd) { bd = d2; t = u; } }
     if (t) {
@@ -263,9 +267,11 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       W = container.clientWidth; H = container.clientHeight;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * (settings.renderScale || 1));
       renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+      syncCompact(container);
     };
     window.addEventListener("resize", resize); resize();
     const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);   // "Tự nhận" theo cách bạn bấm vào sân, rồi theo thiết bị vừa dùng (xem battle.js)
+    syncCompact(container);                                                      // HUD gọn khi cảm ứng / khung hẹp (đợt 13)
 
     let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, time = 0, endShown = false;
     // hết lượt (director.over) thì không mở tạm dừng, như battle.js: bảng tạm dừng đè mất bảng kết quả
@@ -273,7 +279,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       if (finished) return;
       paused = on; overlay.classList.toggle("on", on);
       const tut = opts.mode === "huanluyen";
-      overlay.innerHTML = on ? `<div class="panel pause"><h2>${tut ? "HUẤN LUYỆN" : "VÕ TRƯỜNG"} · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">${tut ? "Rời huấn luyện" : "Rời Võ trường"}</button></div>${controlsHTML(devOf(ctx))}</div>` : "";
+      overlay.innerHTML = on ? `<div class="panel pause"><h2>${tut ? "HUẤN LUYỆN" : "VÕ TRƯỜNG"} · TẠM DỪNG</h2><div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="quit">${tut ? "Rời huấn luyện" : "Rời Võ trường"}</button></div>${logHTML(ctx.hud?.log)}${controlsHTML(devOf(ctx))}</div>` : "";
       if (on) {
         document.exitPointerLock?.(); ctx.audio.suspend(); music?.pause();
         overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
@@ -346,7 +352,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       if (d.over && !endShown) { endShown = true; if (d.result?.tutorial) setTimeout(() => finish(d.result), 400); else setTimeout(() => showEnd(d.result), 900); }
     };
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => { for (let t = 0; t < sec && !finished; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); if (paused) break; } };
-    const frame = (now) => { raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now; if (paused || finished) return; step(dt, input.poll(), true); };
+    const frame = (now) => { raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now; if (paused || finished || rotateBlocked(container)) return; step(dt, input.poll(), true); };   // cầm dọc: chờ xoay ngang (battle.js)
     raf = requestAnimationFrame(frame);
   });
 }

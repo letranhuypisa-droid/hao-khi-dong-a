@@ -46,18 +46,18 @@ t("N = J / chuột trái và C = K / chuột phải (không còn chữ 'C' trầ
 console.log("Nhãn theo thiết bị");
 t("say ghép bằng 'hoặc', short lấy cái đầu, mỗi thiết bị một nhãn", () => {
   assert.equal(say("n", 0), "J hoặc chuột trái"); assert.equal(say("n", 1), "nút N"); assert.equal(say("n", 2), "X");
-  assert.equal(say("tpc", 0), "F"); assert.equal(say("tpc", 1), "nút Phản Công"); assert.equal(say("tpc", 2), "D-pad lên");
+  assert.equal(say("tpc", 0), "F"); assert.equal(say("tpc", 1), "nút Phản Công (trong ☰)"); assert.equal(say("tpc", 2), "D-pad lên");
   assert.equal(short("block", 0), "Shift"); assert.equal(short("cmd", 0), "Tab"); assert.equal(short("dodge", 0), "Space");
 });
 t("mọi hành động có đủ nhãn cho cả ba thiết bị", () => {
   for (const [id, a] of Object.entries(ACTIONS)) for (const d of ["kb", "touch", "pad"]) assert.ok(a[d]?.length > 0, `${id}.${d}`);
 });
-t("guideKeys giữ nguyên chữ cũ của thẻ bảng phím", () => {
+t("guideKeys giữ nguyên chữ cũ của thẻ bảng phím (đợt 13: nút hệ thống cảm ứng nằm trong ☰)", () => {
   assert.deepEqual(guideKeys("n"), ["J · chuột trái", "nút N", "X"]);
   assert.deepEqual(guideKeys("dodge"), ["Space", "nút Né", "A"]);
   assert.deepEqual(guideKeys("block"), ["Shift · L (giữ)", "nút Đỡ (giữ)", "RB (giữ)"]);
-  assert.deepEqual(guideKeys("cmd", { extra: [" + 1–4", "", " + D-pad"] }), ["Tab (giữ) + 1–4", "nút Lệnh", "LT (giữ) + D-pad"]);
-  assert.deepEqual(guideKeys("lock"), ["Q · chuột giữa", "nút Khóa", "RT"]);
+  assert.deepEqual(guideKeys("cmd", { extra: [" + 1–4", "", " + D-pad"] }), ["Tab (giữ) + 1–4", "nút Lệnh (trong ☰)", "LT (giữ) + D-pad"]);
+  assert.deepEqual(guideKeys("lock"), ["Q · chuột giữa", "nút Khóa (trong ☰)", "RT"]);
 });
 t("thẻ bảng phím đang dùng (moves-info) lấy chữ từ bảng nhãn: không còn bản sao tay", () => {
   for (const id of ["N", "dodge", "block", "skill", "ult", "tpc", "kesach", "lock"]) {
@@ -89,9 +89,9 @@ t("Né / Đỡ trong chuỗi đổi theo thiết bị, chữ khác giữ nguyên
 console.log("Thay nhãn trong câu (fmtKeys)");
 t("{tpc} theo thiết bị; viết hoa khi token viết hoa; token lạ giữ nguyên", () => {
   assert.equal(fmtKeys("Sẵn sàng · bấm {tpc}", 0), "Sẵn sàng · bấm F");
-  assert.equal(fmtKeys("Sẵn sàng · bấm {tpc}", 1), "Sẵn sàng · bấm nút Phản Công");
+  assert.equal(fmtKeys("Sẵn sàng · bấm {tpc}", 1), "Sẵn sàng · bấm nút Phản Công (trong ☰)");
   assert.equal(fmtKeys("Sẵn sàng · bấm {tpc}", 2), "Sẵn sàng · bấm D-pad lên");
-  assert.equal(fmtKeys("TỔNG PHẢN CÔNG SẴN SÀNG · {TPC}", 1), "TỔNG PHẢN CÔNG SẴN SÀNG · NÚT PHẢN CÔNG");
+  assert.equal(fmtKeys("TỔNG PHẢN CÔNG SẴN SÀNG · {TPC}", 1), "TỔNG PHẢN CÔNG SẴN SÀNG · NÚT PHẢN CÔNG (TRONG ☰)");
   assert.equal(fmtKeys("VỠ THẾ · BẤM {C}", 0), "VỠ THẾ · BẤM K HOẶC CHUỘT PHẢI");
   assert.equal(fmtKeys("không {có} gì", 0), "không {có} gì");
   assert.equal(fmtKeys("{xyz} và {tpc}", 0), "{xyz} và F");
@@ -99,19 +99,19 @@ t("{tpc} theo thiết bị; viết hoa khi token viết hoa; token lạ giữ ng
 });
 t("nhiều token trong một câu", () => {
   assert.equal(fmtKeys("Giữ {cmd} rồi bấm 1–4; {cmdswap} đổi mặt trận.", 0), "Giữ Tab rồi bấm 1–4; Z đổi mặt trận.");
-  assert.equal(fmtKeys("Giữ {cmd} rồi bấm 1–4; {cmdSwap} đổi mặt trận.", 1), "Giữ nút Lệnh rồi bấm 1–4; chạm tên mặt trận đổi mặt trận.");
+  assert.equal(fmtKeys("Giữ {cmd} rồi bấm 1–4; {cmdSwap} đổi mặt trận.", 1), "Giữ nút Lệnh (trong ☰) rồi bấm 1–4; chạm tên mặt trận đổi mặt trận.");
 });
 
 console.log("Động từ theo thiết bị ({act:…})");
 t("act: giữ / chạm / bấm lấy từ cờ hold của bảng (nút Lệnh cảm ứng là bật / tắt nên 'chạm')", () => {
-  assert.equal(act("cmd", 0), "giữ Tab"); assert.equal(act("cmd", 1), "chạm nút Lệnh"); assert.equal(act("cmd", 2), "giữ LT");
-  assert.equal(act("tpc", 0), "bấm F"); assert.equal(act("tpc", 1), "bấm nút Phản Công"); assert.equal(act("tpc", 2), "bấm D-pad lên");
+  assert.equal(act("cmd", 0), "giữ Tab"); assert.equal(act("cmd", 1), "chạm nút Lệnh (trong ☰)"); assert.equal(act("cmd", 2), "giữ LT");
+  assert.equal(act("tpc", 0), "bấm F"); assert.equal(act("tpc", 1), "bấm nút Phản Công (trong ☰)"); assert.equal(act("tpc", 2), "bấm D-pad lên");
   assert.equal(act("block", 0), "giữ Shift"); assert.equal(act("block", 1), "giữ nút Đỡ");
   assert.equal(act("c", 0), "bấm K hoặc chuột phải");
 });
 t("{act:cmd} trong câu; viết hoa chữ đầu với {Act:cmd}, viết hoa cả với {ACT:CMD}", () => {
   assert.equal(fmtKeys("Hai mặt trận cùng cần bạn. {Act:cmd} để mở vòng Mệnh Lệnh.", 0), "Hai mặt trận cùng cần bạn. Giữ Tab để mở vòng Mệnh Lệnh.");
-  assert.equal(fmtKeys("{Act:cmd} để mở vòng Mệnh Lệnh.", 1), "Chạm nút Lệnh để mở vòng Mệnh Lệnh.");
+  assert.equal(fmtKeys("{Act:cmd} để mở vòng Mệnh Lệnh.", 1), "Chạm nút Lệnh (trong ☰) để mở vòng Mệnh Lệnh.");
   assert.equal(fmtKeys("{act:cmd} để mở vòng", 2), "giữ LT để mở vòng");
   assert.equal(fmtKeys("SẴN SÀNG · {ACT:TPC}", 0), "SẴN SÀNG · BẤM F");
   assert.equal(fmtKeys("{act:nope} và {act:tpc}", 0), "{act:nope} và bấm F");

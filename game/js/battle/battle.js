@@ -26,6 +26,7 @@ import { heroStats } from "../meta/progress.js";
 import { movesGuideHTML } from "../ui/guide.js";
 import { fmtKeys, devOf, touchUI } from "../data/controls.js";
 import { readComic } from "../ui/comic.js";
+import { isCompact, touchArc, touchUnit } from "../ui/layout.js";
 import B15 from "../battles/b15.js";
 
 const STEP = 1 / 60;
@@ -130,12 +131,14 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       W = container.clientWidth; H = container.clientHeight;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * (save.settings.renderScale || 1));
       renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+      syncCompact(container);
     };
     window.addEventListener("resize", resize); resize();
 
     // ---- cảm ứng -------------------------------------------------------------------------
     // "Điều khiển cảm ứng": Tự nhận theo cách bạn bấm VÀO TRẬN rồi đi theo thiết bị vừa dùng (setupTouch), Bật, Tắt
     const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);
+    syncCompact(container);
 
     // ---- tạm dừng, kết quả -----------------------------------------------------------------
     let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0;
@@ -144,7 +147,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // mất khoá chuột, ẩn tab); nếu vẫn lọt thì tắt tạm dừng sẽ dựng lại bảng kết quả, "Rút quân" thì rời luôn.
     const pause = (on) => {
       if (finished) return;
-      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx)) : ""; overlay.classList.toggle("on", on);
+      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx), ctx.hud?.log) : ""; overlay.classList.toggle("on", on);
       if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
@@ -227,6 +230,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       // dấu giờ rAF có thể sớm hơn last (đặt sau khi dựng trận xong): dt âm làm bộ tích lũy âm, trận đứng ~0,5 s đầu
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
       if (paused || finished) return;
+      if (rotateBlocked(container)) return;          // điện thoại cầm dọc: màn nhắc xoay ngang che trận (css/hud.css) — trận đứng chờ
       step(dt, input.poll(), true);
       input.pickMode = !!ctx.hud?.pickerOpen;   // bảng chọn điểm đến mở: D-pad tay cầm chọn 1–4 (input.js)
     };
@@ -401,12 +405,19 @@ export function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
-function pauseHTML(save, heroId = "H35", def = null, dev = 0) {
+// log: sổ tin của HUD (hud.js, ui/layout.js logMsgs) — HUD gọn chỉ hiện một tin 5 s nên tin đã trôi đọc lại ở đây, mới nhất trên cùng.
+export function logHTML(log) {
+  if (!log?.length) return "";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  return `<details class="msglog"${log.length ? " open" : ""}><summary>Tin trong trận · ${log.length}</summary><ol>${log.slice().reverse().map((m) => `<li class="${m.kind}">${esc(m.text)}</li>`).join("")}</ol></details>`;
+}
+function pauseHTML(save, heroId = "H35", def = null, dev = 0, log = null) {
   const s = save.settings;
   const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? "selected" : ""}>${label}</option>`;
   return `<div class="panel pause">
     <h2>TẠM DỪNG</h2>
     <div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="retry">Tải lại đầu pha</button><button data-a="quit">Rút quân</button></div>
+    ${logHTML(log)}
     <h3>Cài đặt (đổi được giữa trận)</h3>
     <label>Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
     <label>Tỉ lệ render <input type="range" min="0.5" max="1" step="0.05" value="${s.renderScale}" data-set="renderScale"></label>
@@ -430,8 +441,20 @@ export function controlsHTML(dev = 0, hero = "H35") {
 // Trận có Tương tác (B20): một dòng dưới bảng đòn; def.controlsNote (tùy chọn) ghi việc cụ thể của trận. B15 không có.
 const interactNote = (def) => `<p class="small"><b>Tương tác</b>: giữ <b>X</b> (tay cầm: D-pad xuống; nút cảm ứng Tương tác) — ${def.controlsNote || "thao tác theo chỗ đứng: chiếm thuyền, lên boong, mở mốc cọc, gọi đò chuyển"}.</p>`;
 
-// nút cảm ứng có icon chiêu (nút C đổi icon theo đòn C kế tiếp, hud.js)
-const tb = (b, icon, label, cls = "") => `<button data-b="${b}" class="${cls}"><img src="./assets/icons/${icon}.webp" alt=""><em>${label}</em></button>`;
+// Bố cục gọn (đợt 13, css/hud.css): khung trận mang .compact khi lớp cảm ứng đang hiện hoặc khung hẹp / thấp (ui/layout.js isCompact),
+// --u = cỡ nút cảm ứng theo chiều cao màn (touchUnit). Gọi lúc dựng, lúc đổi cỡ và khi lớp cảm ứng bật / tắt.
+// Màn nhắc xoay ngang đang che trận (cùng điều kiện với css/hud.css, b20.css): giao diện cảm ứng (hoặc B20) trên điện thoại dọc ≤ 600 px.
+const PORTRAIT = typeof matchMedia === "function" ? matchMedia("(orientation: portrait) and (max-width: 600px)") : null;
+export const rotateBlocked = (container) => !!PORTRAIT?.matches && (container.classList.contains("touchmode") || container.classList.contains("b20"));
+export function syncCompact(container) {
+  const W = container.clientWidth, H = container.clientHeight;
+  container.classList.toggle("compact", isCompact({ w: W, h: H, touch: container.classList.contains("touchmode") }));
+  container.style.setProperty("--u", `${touchUnit(H)}px`);
+}
+
+// nút cảm ứng có icon chiêu (nút C đổi icon theo đòn C kế tiếp, hud.js); p: vị trí trên cung quanh N (ui/layout.js touchArc, đơn vị u)
+const tb = (b, icon, label, cls = "", p = null) => `<button data-b="${b}" class="${cls}"${p ? ` style="--x:${p.x.toFixed(3)};--y:${p.y.toFixed(3)};--s:${p.s}"` : ""}><img src="./assets/icons/${icon}.webp" alt=""><em>${label}</em></button>`;
+const MENU_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>`;
 // Ô kỹ năng theo tướng (hero.skillSlots(), hero.ultInfo()): H35 đúng hai nút Phá Trận, Tuyệt Kỹ như cũ; tướng có ô thứ
 // hai (H31 Binh Thư) thêm nút skill2; trận có Tương tác (BattleDef.touch.interact) thêm nút interact.
 // Nhãn nút tròn: tên ngắn SKILLS[id].short (tên đầy đủ "Binh Thư Yếu Lược" bị cắt trong nút 54–58 px), không có thì tên ô.
@@ -444,24 +467,40 @@ export function buildTouch(root, input, ctx, show = true) {
     set(on) {
       root.classList.toggle("on", on); root.parentElement.classList.toggle("touchmode", on);
       if (on) input.touch = true;       // giao diện cảm ứng đang hiện thì chữ phím theo cảm ứng ngay (trước đây tới lần chạm đầu ctx.touch vẫn false)
+      syncCompact(root.parentElement);  // cảm ứng luôn dùng HUD gọn
     },
   };
   ui.set(show);
   const slots = ctx.hero?.skillSlots?.() || [], s1 = slots[0], s2 = slots[1], ult = ctx.hero?.ultInfo?.();
+  // Cụm nút hình cung quanh N ở góc phải dưới (ui/layout.js touchArc): vòng trong C / Đỡ / Né, vòng ngoài kỹ năng, Tuyệt Kỹ, Tương tác.
+  // Nút hệ thống (Kế Sách, Lệnh, Phản Công, Khóa, tạm dừng) gom sau nút ☰ trên cần điều khiển; ☰ sáng khi có việc trong đó (hud.js).
+  const ids = ["c", "dodge", "block", "skill", "ult", ...(s2 ? ["skill2"] : []), ...(ctx.battle?.touch?.interact ? ["interact"] : [])];
+  const arc = touchArc(ids);
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
     <div class="camzone" data-t="cam"></div>
     <div class="tbtns">
-      ${tb("n", "n", "N", "big")}${tb("c", "c1", "C", "mid")}
-      ${tb("dodge", "dodge", "Né")}${tb("block", "block", "Đỡ")}
-      ${tb("skill", s1?.icon ?? "skill", tlabel(s1) ?? "Phá Trận")}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ")}${s2 ? tb("skill2", s2.icon ?? "skill", tlabel(s2) ?? s2.id, "sk-" + s2.id) : ""}
-      ${ctx.battle?.touch?.interact ? tb("interact", "kesach", "Tương tác", "act") : ""}
+      ${tb("n", "n", "N", "big", { x: 0, y: 0, s: 1.6 })}${tb("c", "c1", "C", "mid", arc.c)}
+      ${tb("dodge", "dodge", "Né", "", arc.dodge)}${tb("block", "block", "Đỡ", "", arc.block)}
+      ${tb("skill", s1?.icon ?? "skill", tlabel(s1) ?? "Phá Trận", "", arc.skill)}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ", "", arc.ult)}${s2 ? tb("skill2", s2.icon ?? "skill", tlabel(s2) ?? s2.id, "sk-" + s2.id, arc.skill2) : ""}
+      ${ctx.battle?.touch?.interact ? tb("interact", "kesach", "Tương tác", "act", arc.interact) : ""}
     </div>
-    <div class="tsys">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div>`;
+    <div class="tsys"><button class="tmenu" data-menu aria-label="Lệnh, Kế Sách, Phản Công, Khóa, tạm dừng" aria-expanded="false">${MENU_SVG}</button>
+      <div class="tfan">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div></div>`;
+  // ☰: mở / gập quạt nút hệ thống; tự gập sau 5 s (trừ lúc vòng Mệnh Lệnh đang mở) và sau khi bấm một nút trong quạt
+  const sys = root.querySelector(".tsys"), menu = sys.querySelector("[data-menu]");
+  let fanTimer = 0;
+  const fan = (open) => {
+    sys.classList.toggle("open", open); menu.setAttribute("aria-expanded", String(open)); clearTimeout(fanTimer);
+    if (open) fanTimer = setTimeout(function tick() { if (input.touchHeld.cmd) fanTimer = setTimeout(tick, 1000); else fan(false); }, 5000);
+  };
+  menu.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); ctx.audio.unlock(); fan(!sys.classList.contains("open")); });
+  // chọn lệnh trong vòng Mệnh Lệnh (hud.issue) bằng cảm ứng: đóng vòng (đồng hồ trận về ×1) và gập quạt
+  if (ctx.hud) ctx.hud.onIssue = () => { if (input.touchHeld.cmd) { input.touchButton("cmd", false); sys.querySelector("[data-b=cmd]")?.classList.remove("on"); } fan(false); };
   root.querySelectorAll("[data-b]").forEach((b) => {
-    const name = b.dataset.b;
-    const down = (e) => { e.preventDefault(); ctx.audio.unlock(); if (name === "cmd") { input.touchButton("cmd", !input.touchHeld.cmd); return; } input.touchButton(name, true); b.classList.add("on"); };
-    const up = (e) => { e.preventDefault(); if (name === "cmd") return; input.touchButton(name, false); b.classList.remove("on"); };
+    const name = b.dataset.b, inFan = !!b.closest(".tfan");
+    const down = (e) => { e.preventDefault(); ctx.audio.unlock(); if (name === "cmd") { const on = !input.touchHeld.cmd; input.touchButton("cmd", on); b.classList.toggle("on", on); if (!on) fan(false); return; } input.touchButton(name, true); b.classList.add("on"); };
+    const up = (e) => { e.preventDefault(); if (name === "cmd") return; input.touchButton(name, false); b.classList.remove("on"); if (inFan && e.type === "pointerup") fan(false); };
     b.addEventListener("pointerdown", down); b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("pointerleave", up);
   });
   const stick = root.querySelector("[data-t=stick]"), knob = stick.querySelector(".knob");
@@ -469,7 +508,7 @@ export function buildTouch(root, input, ctx, show = true) {
   stick.addEventListener("pointerdown", (e) => { sid = e.pointerId; const r = stick.getBoundingClientRect(); ox = r.left + r.width / 2; oy = r.top + r.height / 2; stick.setPointerCapture(sid); move(e); });
   const move = (e) => {
     if (e.pointerId !== sid) return;
-    let dx = e.clientX - ox, dy = e.clientY - oy; const R = 55, l = Math.hypot(dx, dy);
+    let dx = e.clientX - ox, dy = e.clientY - oy; const R = stick.clientWidth * 0.42 || 55, l = Math.hypot(dx, dy);
     if (l > R) { dx *= R / l; dy *= R / l; }
     knob.style.transform = `translate(${dx}px, ${dy}px)`; input.setStick(dx / R, -dy / R);
   };

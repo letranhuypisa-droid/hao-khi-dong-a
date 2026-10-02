@@ -15,6 +15,12 @@ import { heroTerrain } from "../sim/terrain-rules.js";
 import { MOVE_INFO, ICON, nextHeavy } from "../data/moves-info.js";
 import { short } from "../data/controls.js";
 import { placeWaypoint } from "./waypoint.js";
+import { compactMsg, logMsgs } from "../ui/layout.js";
+
+// HUD gọn (đợt 13, css/hud.css; khung trận mang lớp .compact khi cảm ứng hoặc khung hẹp — battle.js syncCompact): thẻ nhiệm vụ
+// thành một dòng (chạm để mở đủ 5 s), tin nhắn chỉ một tin ở mép trên (tự tắt sau 5 s; sổ tin đọc lại ở bảng tạm dừng), bản đồ
+// nhỏ chạm để mở to kèm bảng mặt trận, Kế Sách và bảng riêng của trận (B20) gom vào ngăn "Tình hình" mở bằng nút có số báo.
+const OPEN_SEC = 5;
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const ORDER_KEYS = ["tiencong", "giuvung", "theota", "tiepvien"];
@@ -54,7 +60,7 @@ export class HUD {
           <div class="hk-state" data-k="hkstate"></div>
           <div class="hk-widget" data-k="topw" hidden></div>
         </div>
-        <div class="hud-time"><b data-k="time">0:00</b><span>${MODES[mode].name} · par ${fmt(par)}</span></div>
+        <div class="hud-time"><b data-k="time">0:00</b><span>${MODES[mode].name} · par ${fmt(par)}</span><small class="hud-kos" data-k="kos"></small></div>
       </div>
       <div class="hud-hero">
         <div class="portrait"><span>${hd?.portrait ?? "H35"}</span><em data-k="lv"></em></div>
@@ -72,6 +78,7 @@ export class HUD {
       ${pin ? `<div class="hud-left" data-k="left">${card}<div class="hud-msgs" data-k="msgs"></div></div>` : `<div class="hud-msgs" data-k="msgs"></div>`}
       <div class="hud-events" data-k="events"></div>
       <div class="hud-ks" data-k="ks"></div>
+      <button class="hud-sit" data-k="sit" hidden aria-label="Tình hình: Kế Sách và bảng của trận"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><em data-k="sitn"></em></button>
       <div class="hud-target" data-k="target"><div class="tname" data-k="tname"></div><div class="bar thp"><div data-k="thp"></div></div><div class="bar tpo"><div data-k="tpo"></div></div></div>
       <div class="hud-hint" data-k="hint"></div>
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
@@ -98,7 +105,19 @@ export class HUD {
     this.ringOpen = false; this.lastCombo = 0; this.nextC = "";
     this.panels = new Map(); this.topHtml = null; this.promptKey = null;
     this.pickerOpen = false; this.pickItems = null; this.onPick = null;
+    // HUD gọn: sổ tin, thẻ nhiệm vụ mở tạm, ngăn Tình hình, bản đồ to (chỉ bấm được khi .compact — css/hud.css bật pointer-events)
+    this.log = []; this.seenMsgs = new WeakSet(); this.openT = 0;
+    const card0 = this.el.phase.parentElement;
+    card0.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.openCard(this.openT <= 0); });
+    root.querySelector(".hud-map").addEventListener("pointerdown", (e) => { e.stopPropagation(); this.toggleMap(); });
+    this.el.sit.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.toggleSit(); });
   }
+  get compact() { return !!this.root.parentElement?.classList.contains("compact"); }
+  // thẻ nhiệm vụ một dòng → mở đủ (mục tiêu, câu "làm thế nào") OPEN_SEC giây; chạm lần nữa thì gập
+  // mở cái này thì gập hai cái kia (thẻ nhiệm vụ, bản đồ to, ngăn Tình hình chồng lên nhau ở giữa / bên phải màn)
+  openCard(on) { this.openT = on ? OPEN_SEC : 0; this.el.phase.parentElement.classList.toggle("open", on); if (on) { this.root.classList.remove("bigmap", "sit-open"); } }
+  toggleMap(on = !this.root.classList.contains("bigmap")) { this.root.classList.toggle("bigmap", on); if (on) { this.root.classList.remove("sit-open"); if (this.openT > 0) this.openCard(false); } this.ctx.audio?.play?.("ui"); }
+  toggleSit(on = !this.root.classList.contains("sit-open")) { this.root.classList.toggle("sit-open", on); if (on) { this.root.classList.remove("bigmap"); if (this.openT > 0) this.openCard(false); } }
   // vệt tốc độ quanh mép màn (Phá Trận, Tuyệt Kỹ)
   speedLines(T) { const e = this.el.speed; e.classList.remove("on"); void e.offsetWidth; e.style.animationDuration = `${T}s`; e.classList.add("on"); }
 
@@ -108,7 +127,7 @@ export class HUD {
     if (!ids.length) return;
     this.ringFront = ids[(ids.indexOf(this.ringFront) + 1) % ids.length];
   }
-  issue(k) { this.ctx.director.order(this.ringFront, k); this.ctx.audio.play("ui"); }
+  issue(k) { this.ctx.director.order(this.ringFront, k); this.ctx.audio.play("ui"); this.onIssue?.(k); }   // onIssue: lớp cảm ứng đóng vòng lệnh (battle.js buildTouch)
   setRing(open) {
     if (open && !this.ringOpen) this.ringFront = this.ctx.sim.heroFront || this.ctx.director.lastFront;
     this.ringOpen = open; this.el.ring.classList.toggle("on", open);
@@ -128,12 +147,17 @@ export class HUD {
     this.lockMsg = msg; E.lockhint.hidden = !msg; E.lockhint.textContent = msg;
   }
   // Vùng HUD mà nhãn chỉ đường phải tránh (cột trái: thẻ nhiệm vụ + tin; bản đồ nhỏ + bảng mặt trận), đo ở nhịp 0,05 s thay vì mỗi khung.
+  // HUD gọn: cột trái là display: contents (khung 0 × 0) nên đo từng mảnh — thẻ nhiệm vụ, tin, nút Tình hình, cụm nút cảm ứng,
+  // cần điều khiển, thanh máu.
   measureAvoid() {
-    const base = this.root.getBoundingClientRect(), out = [];
-    for (const n of [this.el.left, this.root.querySelector(".hud-map"), this.el.events, this.el.ks]) {
+    const base = this.root.getBoundingClientRect(), out = [], st = this.root.parentElement;
+    const list = [this.el.left, this.el.phase.parentElement, this.el.msgs, this.root.querySelector(".hud-map"), this.el.events, this.el.ks, this.el.sit];
+    if (this.compact && st) list.push(st.querySelector(".touch.on .tbtns"), st.querySelector(".touch.on .stick"), st.querySelector(".touch.on .tsys"), this.root.querySelector(".hud-hero"));
+    for (const n of list) {
       if (!n) continue;
       const r = n.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;      // bảng sự kiện / Kế Sách rỗng thì cao 0
-      out.push({ l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, side: n === this.el.left ? "l" : "r" });
+      const l = r.left - base.left;
+      out.push({ l, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, side: l + r.width / 2 < base.width / 2 ? "l" : "r" });
     }
     this.avoid = out;
   }
@@ -252,13 +276,24 @@ export class HUD {
     E.events.innerHTML = Object.entries(d.events || {}).filter(([, v]) => v.state === "run").map(([k, v]) =>
       `<div class="ev"><b>${EVENTS[k]?.name ?? k}</b><span>${Math.ceil(v.left)} s</span></div>`).join("");
     // Kế Sách, rồi các bảng của trận (setPanel)
-    let ks = (d.keSach?.hud?.() || []).filter((k) => k.state !== "khoa").map((k) =>
+    const kl = (d.keSach?.hud?.() || []).filter((k) => k.state !== "khoa");
+    let ks = kl.map((k) =>
       `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${fm(k.word + (k.detail ? " · " + k.detail : ""))}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
     for (const [id, html] of this.panels) ks += `<div class="hud-panel" data-panel="${id}">${html}</div>`;
-    if (ks !== this.ksHtml) { E.ks.innerHTML = ks; this.ksHtml = ks; }     // chỉ vẽ lại khi đổi: hoạt ảnh CSS (nhấp nháy Sẵn sàng) chạy liền
-    // tin nhắn
-    E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${fm(m.text)}</div>`).join("");
+    if (ks !== this.ksHtml) { E.ks.innerHTML = ks; this.ksHtml = ks; this.sitBadge(kl.length); }     // chỉ vẽ lại khi đổi: hoạt ảnh CSS (nhấp nháy Sẵn sàng) chạy liền
+    // tin nhắn: sổ tin (bảng tạm dừng) + HUD gọn một tin ≤ 5 s, bố cục máy tính 4 tin như cũ
+    logMsgs(this.log, d.msgs, this.seenMsgs, fm);
+    const compact = this.compact;
+    if (compact) {
+      const c = compactMsg(d.msgs), html = c ? `<div class="msg ${c.m.kind}" style="opacity:${c.alpha}">${fm(c.m.text)}</div>` : "";
+      if (html !== this.msgHtml) { E.msgs.innerHTML = html; this.msgHtml = html; }
+    } else { E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${fm(m.text)}</div>`).join(""); this.msgHtml = null; }
+    if (this.openT > 0 && (this.openT -= dt) <= 0) this.openCard(false);
     E.ko.textContent = d.ko;
+    E.kos.textContent = `${d.ko} KO`;
+    // nút ☰ của lớp cảm ứng sáng khi có việc ở trong (Tổng Phản Công sẵn sàng, Kế Sách sẵn sàng)
+    this.menuEl ??= this.root.parentElement?.querySelector(".touch .tmenu") || null;
+    if (this.menuEl) { const al = tpcReady(hk) || kl.some((k) => k.state === "sansang"); if (al !== this.menuAlert) { this.menuAlert = al; this.menuEl.classList.toggle("alert", al); } }
     // mục tiêu
     const t = hero.lock?.alive && !hero.lock.dead ? hero.lock : this.nearestOfficer();
     if (t) {
@@ -286,6 +321,18 @@ export class HUD {
     }
     E.hint.textContent = hero.alive ? "" : "";
     this.drawMap();
+  }
+
+  // Nút "Tình hình" (HUD gọn): hiện khi ngăn có gì; số báo = số Kế Sách đang theo dõi + số bảng của trận (B20: Nghi binh, hộ vệ,
+  // mốc cọc, Thoát vây…); nhấp nháy khi có việc gấp (Kế Sách sẵn sàng, Nghi binh quá sát, Thoát vây ≥ 80, tướng địch đứng mốc…).
+  sitBadge(nKs) {
+    const E = this.el, secs = E.ks.querySelectorAll(".b20-sec:not(.ksl), .ksl .ks:not(.mini)").length;
+    const n = nKs + secs + E.ks.querySelectorAll(".hud-panel:not([data-panel=b20])").length;
+    const hot = !!E.ks.querySelector(".ks.sansang, .b20-sec.lure.near, .b20-sec.escape.hot, .mchip.danger, .b20-sec.rally, .b20-sec .sub.warn");
+    E.sit.hidden = !E.ks.innerHTML.trim();
+    E.sitn.textContent = n > 0 ? String(n) : "";
+    E.sit.classList.toggle("hot", hot);
+    if (E.sit.hidden) this.toggleSit(false);
   }
 
   // Ô kỹ năng (E, T) và ô Tuyệt Kỹ (R). H35 không có skillSlots / ultInfo: đúng chữ, đúng trạng thái như trước.

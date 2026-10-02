@@ -11,6 +11,7 @@ const DEV_KEY = ["kb", "touch", "pad"];
 
 // kb: phím / nút chuột (cái đầu là chính); touch: nút trên màn hình; pad: nút tay cầm.
 // hold: [bàn phím, cảm ứng, tay cầm] — giữ phím mới có tác dụng (nút Lệnh cảm ứng là bật / tắt nên không "giữ").
+// Đợt 13: trên cảm ứng Kế Sách, Lệnh, Phản Công, Khóa, tạm dừng nằm trong nút ☰ (battle.js buildTouch) — nhãn ghi "(trong ☰)".
 // free: không qua KEYMAP (di chuyển, camera). say: chữ riêng trong câu thay cho chip ghép bằng "hoặc", theo thiết bị.
 export const ACTIONS = {
   move:     { free: true, kb: ["W A S D"], touch: ["cần gạt trái"], pad: ["cần trái"] },
@@ -22,13 +23,13 @@ export const ACTIONS = {
   skill:    { kb: ["E"], touch: ["nút Phá Trận"], pad: ["LB"] },
   skill2:   { kb: ["T"], touch: ["nút Binh Thư"], pad: ["D-pad trái"] },
   ult:      { kb: ["R"], touch: ["nút Tuyệt Kỹ"], pad: ["B"] },
-  tpc:      { kb: ["F"], touch: ["nút Phản Công"], pad: ["D-pad lên"] },
-  cmd:      { kb: ["Tab"], touch: ["nút Lệnh"], pad: ["LT"], hold: [1, 0, 1] },
+  tpc:      { kb: ["F"], touch: ["nút Phản Công (trong ☰)"], pad: ["D-pad lên"] },
+  cmd:      { kb: ["Tab"], touch: ["nút Lệnh (trong ☰)"], pad: ["LT"], hold: [1, 0, 1] },
   cmdSwap:  { kb: ["Z"], touch: ["chạm tên mặt trận"], pad: ["LB"] },
-  kesach:   { kb: ["G"], touch: ["nút Kế Sách"], pad: ["D-pad phải"] },
-  lock:     { kb: ["Q", "chuột giữa"], touch: ["nút Khóa"], pad: ["RT"], say: { kb: "Q" } },
+  kesach:   { kb: ["G"], touch: ["nút Kế Sách (trong ☰)"], pad: ["D-pad phải"] },
+  lock:     { kb: ["Q", "chuột giữa"], touch: ["nút Khóa (trong ☰)"], pad: ["RT"], say: { kb: "Q" } },
   interact: { kb: ["X"], touch: ["nút Tương tác"], pad: ["D-pad xuống"], hold: [1, 1, 1] },
-  pause:    { kb: ["Esc", "P"], touch: ["nút II"], pad: ["Start"], say: { kb: "Esc" } },
+  pause:    { kb: ["Esc", "P"], touch: ["nút II (trong ☰)"], pad: ["Start"], say: { kb: "Esc" } },
   next:     { kb: ["Enter"], touch: ["nút Tiếp"], pad: ["Back"] },
 };
 
