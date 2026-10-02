@@ -2,7 +2,7 @@
 //
 // Hai tầng tác tử gần (mục 15.2):
 //   - actor: lính diễn đứng theo đội hình ở tuyến mặt trận, chỉ diễn lại kết quả mô phỏng.
-//     Không trúng đòn, không gây đòn.
+//     Không trúng đòn, không gây đòn — trừ đòn của tướng người chơi: chạm vào là thành lính thật ngay (strikeable / enlist, đợt 15b).
 //   - zone / garrison / squad / landing / guard / follow: lính thật trong vùng r 25 m quanh
 //     tướng người chơi — trúng đòn, gây đòn, KO của chúng trừ Q hoặc G.
 // Mỗi binh chủng chia thành vài kiểu lính (KITS: đao, thương, cung, lực sĩ, nỏ…) khác vũ khí, tầm
@@ -23,6 +23,7 @@ import { surfaceY } from "./ground.js";
 import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, SUPPLY, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 import { leashClamp, fleeDir } from "./garrison.js";                                                         // dây xích cứng, hướng rút của quân đồn trú (đợt 12b)
+import { enemyActor, enlistActor } from "./promotion.js";                                                    // đòn tướng chạm lính diễn địch (đợt 15b)
 
 const KIT_IDS = Object.keys(KITS);
 const CAP = 900;                 // mỗi kiểu lính; lính diễn tối đa ~800 + vùng chiến đấu
@@ -100,6 +101,11 @@ export class Crowd {
   }
 
   hittable(a) { return a.alive && a.state !== "dead" && HITTABLE.has(a.role); }
+  // Đòn của tướng người chơi (hero.js, hero-skills.js — đợt 15b): trúng cả lính diễn phe địch còn đứng, vì họ vẽ y như lính thật. Vòng sát thương gọi
+  // enlist(a) NGAY TRƯỚC damage (damage chỉ nhận lính trúng đòn được): lính diễn thành lính thật như lính "ép" của director.updateZone (promotion.js).
+  // Quân ta, lính địch, director vẫn dùng hittable.
+  strikeable(a) { return this.hittable(a) || enemyActor(a); }
+  enlist(a) { return enlistActor(a); }
 
   // Sát thương vào lính. opt.by: 'hero' | 'ally' | 'enemy'; opt.src: lính ra đòn (để quay lại đánh trả). Trả về true nếu hạ.
   damage(a, dmg, opt = {}) {

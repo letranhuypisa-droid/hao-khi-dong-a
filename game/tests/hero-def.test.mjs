@@ -183,6 +183,7 @@ function makeCtx({ agents = [], units = [], director = {} } = {}) {
     fx: noop, audio: noop, hud: null, cinematic() {}, hitstop() {}, slowmo() {},
     crowd: {
       agents, hittable: (a) => a.alive && a.hp > 0, rout: () => 0,
+      strikeable: (a) => a.alive && a.hp > 0, enlist: () => false,          // đòn của tướng (đợt 15b): lính giả ở đây không có lính diễn
       damage(a, dmg, opt) { if (a.markT > ctx.clock && opt.by !== "enemy") dmg *= a.markMult; a.hp -= dmg; a.hits = (a.hits || 0) + 1; a.lastOpt = opt; if (a.hp <= 0) a.alive = false; return a.hp <= 0; },
     },
     director: {

@@ -6,6 +6,8 @@
 // tick chạy mỗi bước mô phỏng ở chỗ hero.update trước đây đếm hồi chiêu Phá Trận (giữ nguyên thứ tự cho B15).
 //
 // H35 (B15): phaTran, bopNat — chép NGUYÊN VĂN từ hero.js đợt 9a (cùng thứ tự gọi ctx.rng, cùng số): B15 phải chạy y hệt.
+// Đợt 15b: mọi vòng sát thương của tướng lên đám lính (Phá Trận, Bóp Nát, Bạch Đằng) dùng crowd.strikeable + crowd.enlist — lính diễn phe địch bị
+// chạm thì thành lính thật rồi nhận đòn, như nhát chém thường (hero.js applyHits).
 // H31 (B20): hichTuongSi, binhThu, bachDang — cơ chế Hư cấu theo systems §4.1 / §4.5 (số ở data/heroes.js SKILLS).
 // Hiệu ứng toàn quân đi qua móc của director (B20 dựng; director B15 không có thì dùng bản dự phòng gọn ở đây):
 //   director.onArmyBuff?.({ src, skAll, congPct, sec, x, z })          — Hịch Tướng Sĩ đọc xong
@@ -55,9 +57,9 @@ const phaTran = {
     h.x += Math.sin(h.yaw) * sp * dt; h.z += Math.cos(h.yaw) * sp * dt;
     let hit = false;
     for (const a of ctx.crowd.agents) {
-      if (a.side !== "dich" || !ctx.crowd.hittable(a) || h.dashHit.has(a)) continue;
+      if (a.side !== "dich" || !ctx.crowd.strikeable(a) || h.dashHit.has(a)) continue;
       if (Math.hypot(a.x - h.x, a.z - h.z) > 2.2 + hitPad(a)) continue;
-      h.dashHit.add(a);
+      h.dashHit.add(a); ctx.crowd.enlist(a);       // lính diễn trên đường lao: thành lính thật rồi nhận đòn (đợt 15b; trước đây lao xuyên qua)
       const kx = Math.cos(h.yaw), kz = -Math.sin(h.yaw), side = ((a.x - h.x) * kx + (a.z - h.z) * kz) >= 0 ? 1 : -1;
       const died = ctx.crowd.damage(a, h.damageTo(a.giap, HERO.phaTran.mv, false, a), { by: "hero", swing: h.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
       ctx.fx.impact(a.x, heightAt(a.x, a.z) + 1.15 * a.scale, a.z, kx * side, kz * side, { kill: died, full: h.dashHit.size < 6 });
@@ -118,9 +120,10 @@ const bopNat = {
         h.x += Math.sin(h.yaw) * step; h.z += Math.cos(h.yaw) * step;
       }
       for (const a of ctx.crowd.agents) {
-        if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
+        if (a.side !== "dich" || !ctx.crowd.strikeable(a)) continue;
         const dx = a.x - h.x, dz = a.z - h.z, dd = Math.hypot(dx, dz);
         if (dd > h.ultR + hitPad(a)) continue;
+        ctx.crowd.enlist(a);                       // lính diễn trong vòng: thành lính thật (đợt 15b)
         const died = ctx.crowd.damage(a, h.damageTo(a.giap, h.ultMv, false, a), { by: "hero", swing: h.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: h.ultHits % 6 === 0 });
         if (Math.random() < 0.5) ctx.fx.impact(a.x, heightAt(a.x, a.z) + 1.15 * a.scale, a.z, dx / (dd || 1), dz / (dd || 1), { heavy: h.ultHits % 6 === 0, kill: died, full: Math.random() < 0.4 });
       }
@@ -323,9 +326,10 @@ function bachDangChop(h, c, i, last) {
   h.swingId++;
   let n = 0, kills = 0;
   for (const a of [...ctx.crowd.agents]) {
-    if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
+    if (a.side !== "dich" || !ctx.crowd.strikeable(a)) continue;
     const dx = a.x - gx, dz = a.z - gz, d = Math.hypot(dx, dz);
     if (d > r + hitPad(a)) continue;
+    ctx.crowd.enlist(a);                           // lính diễn trong vòng sóng chấn: thành lính thật (đợt 15b)
     const k = d || 1;
     const died = ctx.crowd.damage(a, h.damageTo(a.giap, mv, false, a), { by: "hero", swing: h.swingId, kx: dx / k, kz: dz / k,
       knock: hard ? 9 : 4.5, launch: hard && d < r * 0.7, heavy: true });

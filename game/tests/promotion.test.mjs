@@ -4,6 +4,8 @@
 //     tối đa ZONE.forcedMax người — không để kẻ đứng cạnh tướng mà chém xuyên qua.
 // (2) tuning.js: vòng trúng của kỵ binh lớn hơn bộ binh (hitRadius / hitPad), khớp thân ngựa dài ~2 m quanh điểm lính.
 // (3) Director.updateZone trên Crowd thật (Node, không WebGL): cung kỵ diễn đứng cạnh tướng khi vùng chiến đấu đã đủ 30 địch phải thành lính thật.
+// (4) Đợt 15b: đòn của tướng chạm lính diễn phe địch thì người đó thành lính thật ngay và nhận đòn — enlistActor / enemyActor (thuần), Crowd.strikeable /
+//     Crowd.enlist, rồi Hero thật trên Crowd thật: nhát N, nón chém tính bề ngang thân, Phá Trận, Bóp Nát, Bạch Đằng, ảnh lướt né, tự nhắm.
 //   node hao-khi-viet/game/tests/promotion.test.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
@@ -219,6 +221,175 @@ t("vùng chiến đấu còn thưa: lính diễn trong 25 m thành lính thật 
   const a = spawnEnemy(crowd, "actor", "CUNGKY_NG", h.x + 20, h.z), b = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 30, h.z);
   d.updateZone(0.3);
   assert.equal(a.role, "zone"); assert.equal(b.role, "actor");
+});
+
+// (4) Đợt 15b — đòn CỦA NGƯỜI CHƠI chạm lính diễn phe địch: người đó thành lính thật ngay và nhận đòn. Trước đây còn lọt khi hạn mức ép đầy (đứng sâu
+//     trong khối, hàng sau bước lên lấp chỗ), khi Phá Trận lao 9–11 m giữa hai nhịp updateZone, và tự nhắm bỏ qua người trông gần nhất.
+console.log("enlistActor / enemyActor (thuần) — đòn tướng chạm lính diễn");
+const { enlistActor, enemyActor } = await import("../js/battle/promotion.js");
+const actorOf = (extra = {}) => ({ id: 1, role: "actor", side: "dich", alive: true, state: "move", token: true, march: true, forced: false, windup: 0, fake: false, ...extra });
+t("lính diễn địch: đổi đúng như nhánh ép của updateZone — zone, bỏ thẻ, hết hành quân, mang cờ forced; trả true", () => {
+  const a = actorOf();
+  assert.equal(enlistActor(a), true);
+  assert.deepEqual([a.role, a.token, a.march, a.forced], ["zone", false, false, true]);
+});
+t("đang vung nhát chém GIẢ thì bỏ nhát đó (windup 0, fake false); nhát thật không đụng", () => {
+  const a = actorOf({ windup: 0.3, fake: true }); enlistActor(a);
+  assert.equal(a.windup, 0); assert.equal(a.fake, false);
+  const b = actorOf({ windup: 0.3, fake: false }); enlistActor(b);
+  assert.equal(b.windup, 0.3);
+});
+t("lính không phải lính diễn (zone, garrison, squad) thì không đụng, trả false", () => {
+  for (const role of ["zone", "garrison", "squad", "guard"]) {
+    const a = actorOf({ role, token: true, forced: false }), before = { ...a };
+    assert.equal(enlistActor(a), false, role); assert.deepEqual(a, before, role);
+  }
+});
+t("lính diễn phe ta không bao giờ bị đòn của tướng đổi", () => {
+  const a = actorOf({ side: "ta" }), before = { ...a };
+  assert.equal(enemyActor(a), false); assert.equal(enlistActor(a), false); assert.deepEqual(a, before);
+});
+t("lính diễn đã ngã (state dead) hoặc đã trả về bể (alive false) thì không đổi", () => {
+  for (const extra of [{ state: "dead" }, { alive: false }]) {
+    const a = actorOf(extra), before = { ...a };
+    assert.equal(enemyActor(a), false); assert.equal(enlistActor(a), false); assert.deepEqual(a, before);
+  }
+});
+t("enemyActor: lính diễn địch còn đứng → true; null / không có trường → false", () => {
+  assert.equal(enemyActor(actorOf()), true); assert.equal(enemyActor(null), false); assert.equal(enemyActor({}), false);
+});
+
+console.log("Crowd.strikeable / Crowd.enlist (Node)");
+t("strikeable = hittable, thêm lính diễn địch còn đứng; lính diễn ta, lính đã ngã thì không", () => {
+  const { crowd, h } = zoneWorld();
+  const act = spawnEnemy(crowd, "actor", "CUNGKY_NG", h.x + 3, h.z), zone = spawnEnemy(crowd, "zone", "KHIEN_NG", h.x + 4, h.z);
+  const ally = crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "actor", front: "A", x: h.x - 3, z: h.z });
+  const dead = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 5, h.z); dead.state = "dead";
+  assert.equal(crowd.hittable(act), false); assert.equal(crowd.strikeable(act), true);
+  assert.equal(crowd.strikeable(zone), true); assert.equal(crowd.strikeable(ally), false); assert.equal(crowd.strikeable(dead), false);
+});
+t("enlist rồi damage: lính diễn thành lính thật, trúng đòn được; enlist lính thật trả false", () => {
+  const { crowd, h } = zoneWorld();
+  const a = spawnEnemy(crowd, "actor", "CUNGKY_NG", h.x + 3, h.z), z = spawnEnemy(crowd, "zone", "KHIEN_NG", h.x + 4, h.z);
+  assert.equal(crowd.damage(a, 1, { by: "hero" }), false); assert.equal(a.hp, a.maxHp, "tiền đề: damage tự bỏ qua lính diễn");
+  assert.equal(crowd.enlist(a), true); assert.ok(crowd.hittable(a)); assert.ok(a.forced);
+  crowd.damage(a, 1, { by: "hero" }); assert.ok(a.hp < a.maxHp);
+  assert.equal(crowd.enlist(z), false); assert.equal(z.forced, false);
+});
+
+console.log("Đòn của tướng (Hero thật, Crowd thật) chạm lính diễn địch");
+const { Hero } = await import("../js/battle/hero.js");
+const { SKILL_IMPL } = await import("../js/battle/hero-skills.js");
+const { HEROES } = await import("../js/data/heroes.js");
+const { MOVES } = await import("../js/data/tuning.js");
+const Prog = await import("../js/meta/progress.js");
+const NOOP = new Proxy({}, { get: () => () => {} });
+// tướng H35 (hoặc H31) đứng ở (150, -75) quay mặt về +x (yaw π/2), Crowd thật; director chỉ có các móc tướng gọi tới
+function strikeWorld(id = "H35") {
+  const ctx = { R: 1, rng: makeRng(11), diff: DIFFICULTY[1], units: [], clock: 0, openGates: {}, world: { colliders: [], gates: {}, bases: {} }, fx: NOOP, audio: NOOP,
+    hk: { tpc: false }, troops: { N: 200, r: 0.35 }, stats: { legionMult: 1, mods: {} }, battle: { id: "B15", heroSpawn: { x: 150, z: -75, yaw: Math.PI / 2 } },
+    scene: new THREE.Scene(), cam: { yaw: 0 }, hud: null, cinematic() {}, hitstop() {}, slowmo() {},
+    director: { onHeroAction() {}, onSoldierKilled() {}, damageGate() {}, plantFlag() {}, onUlt() {}, ultQ() {}, onHeroHit() {} } };
+  ctx.crowd = new Crowd(ctx.scene, ctx);
+  const s = Prog.newSave(), stats = id === "H35" ? Prog.heroStats(s, 1) : Prog.heroStats(s, 25, id, { level: 25 });
+  const h = id === "H35" ? new Hero(ctx, stats) : new Hero(ctx, stats, HEROES[id]);
+  ctx.hero = h;
+  return { ctx, h, crowd: ctx.crowd };
+}
+const hurt = (a) => a.hp < a.maxHp;
+t("N1 chém cung kỵ diễn đứng ngay trước mặt 2 m: thành lính thật và trúng đòn (trước: chém xuyên)", () => {
+  const { h, crowd } = strikeWorld();
+  const a = spawnEnemy(crowd, "actor", "CUNGKY_NG", h.x + 2, h.z);
+  h.applyHits("N1", MOVES.N1, true);
+  assert.equal(a.role, "zone"); assert.ok(a.forced); assert.ok(hurt(a), "trúng đòn");
+});
+t("N1 không đổi lính diễn ngoài tầm, sau lưng, hay lính diễn phe ta trước mặt", () => {
+  const { h, crowd } = strikeWorld();
+  const far = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 6, h.z), back = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x - 2, h.z);
+  const ally = crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "actor", front: "A", x: h.x + 2, z: h.z + 0.5 });
+  h.applyHits("N1", MOVES.N1, true);
+  for (const a of [far, back, ally]) { assert.equal(a.role, "actor"); assert.equal(a.hp, a.maxHp); }
+});
+t("nón chém tính bề ngang thân: cung kỵ lệch 85° ở 3 m (tâm ngoài nón 150°) vẫn trúng, bộ binh cùng chỗ thì không", () => {
+  const { h, crowd } = strikeWorld();
+  const ang = h.yaw - 85 * Math.PI / 180;
+  const horse = spawnEnemy(crowd, "zone", "CUNGKY_NG", h.x + Math.sin(ang) * 3, h.z + Math.cos(ang) * 3);
+  h.applyHits("N1", MOVES.N1, true);
+  assert.ok(hurt(horse), "cung kỵ trúng");
+  const w2 = strikeWorld(), foot = spawnEnemy(w2.crowd, "zone", "KHIEN_NG", w2.h.x + Math.sin(ang) * 3, w2.h.z + Math.cos(ang) * 3);
+  w2.h.applyHits("N1", MOVES.N1, true);
+  assert.equal(foot.hp, foot.maxHp, "bộ binh trượt");
+});
+// Phần nới góc chỉ dành cho thân LÍNH (thiết kế đã duyệt). Cổng (bán kính 3,5 m) và đơn vị lớn (sĩ quan, Toa Đô: u.radius) giữ đúng luật cũ: bán kính
+// chỉ cộng vào tầm, góc xét theo tâm — nới cho cổng thì nhát chém lính quay lưng đi gần 130° vẫn trừ độ bền cổng (P3 phá cổng ngắn đi).
+const offAt = (h, deg, d) => { const a = h.yaw - deg * Math.PI / 180; return [h.x + Math.sin(a) * d, h.z + Math.cos(a) * d]; };
+t("nón chém với cổng giữ luật cũ: tâm cổng lệch 110° ở 2,5 m thì không trừ độ bền; lệch 70° hay thẳng trước ở tầm + 3,5 m thì trừ", () => {
+  const reach = MOVES.N1.range;
+  for (const [deg, d, want] of [[110, 2.5, false], [-110, 2.5, false], [70, 2.5, true], [0, reach + 3.5 - 0.1, true], [0, reach + 3.5 + 0.1, false]]) {
+    const { ctx, h } = strikeWorld(), hits = [];
+    const [px, pz] = offAt(h, deg, d);
+    ctx.world.gates.g1 = { x: px + 1.6, z: pz };                   // applyHits xét điểm (gt.x − 1,6, gt.z)
+    ctx.director.damageGate = (id) => hits.push(id);
+    h.applyHits("N1", MOVES.N1, true);
+    assert.equal(hits.length > 0, want, `cổng lệch ${deg}° ở ${d.toFixed(1)} m`);
+  }
+});
+t("nón chém với sĩ quan (đơn vị lớn) giữ luật cũ: tâm lệch 85° ở 2 m thì trượt; thẳng trước ở tầm + bán kính thì trúng", () => {
+  const reach = MOVES.N1.range;
+  for (const [deg, d, want] of [[85, 2, false], [-85, 2, false], [70, 2, true], [0, reach + 1.2 - 0.1, true], [0, reach + 1.2 + 0.1, false]]) {
+    const { ctx, h } = strikeWorld();
+    const [x, z] = offAt(h, deg, d);
+    const u = { side: "dich", alive: true, dead: false, retreating: false, isBig: true, x, z, y: 0, radius: 1.2, giap: 10, rig: { scale: 1 }, hits: 0,
+      takeHeroHit() { this.hits++; return { broke: false, killed: false }; } };
+    ctx.units.push(u);
+    h.applyHits("N1", MOVES.N1, true);
+    assert.equal(u.hits > 0, want, `sĩ quan lệch ${deg}° ở ${d.toFixed(1)} m`);
+  }
+});
+t("Phá Trận lao xuyên khối lính diễn: mọi người trên đường lao (2,2 m + bán kính) đều thành lính thật và trúng", () => {
+  const { h, crowd } = strikeWorld();
+  const line = [3, 6, 9, 12, 15].map((dx, i) => spawnEnemy(crowd, "actor", i % 2 ? "CUNGKY_NG" : "KHIEN_NG", h.x + dx, h.z + (i % 2 ? 1.2 : -0.6)));
+  const off = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 8, h.z + 5);
+  assert.equal(SKILL_IMPL.phaTran.start(h), true);
+  for (let i = 0; i < 20 && h.state === "skill"; i++) SKILL_IMPL.phaTran.update(h, 1 / 30);
+  for (const a of line) { assert.equal(a.role, "zone", "lính ở " + (a.x - 150).toFixed(0) + " m"); assert.ok(hurt(a)); }
+  assert.equal(off.role, "actor", "lính cách đường lao 5 m không bị đổi");
+});
+t("Tuyệt Kỹ Bóp Nát Quân Thù: lính diễn trong vòng 3,5 m thành lính thật và trúng", () => {
+  const { h, crowd } = strikeWorld();
+  const a = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 2.5, h.z + 1), far = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 12, h.z);
+  h.ki = 200;
+  assert.equal(SKILL_IMPL.bopNat.start(h), true);
+  for (let i = 0; i < 30; i++) SKILL_IMPL.bopNat.update(h, 1 / 30);
+  assert.equal(a.role, "zone"); assert.ok(hurt(a)); assert.equal(far.role, "actor");
+});
+t("Tuyệt Kỹ Bạch Đằng (H31): nhát bổ đầu trúng lính diễn trong vòng sóng chấn", () => {
+  const { h, crowd } = strikeWorld("H31");
+  const a = spawnEnemy(crowd, "actor", "CUNGKY_NG", h.x + 6, h.z + 2);
+  h.ki = h.kiMax;
+  assert.equal(SKILL_IMPL.bachDang.start(h), true);
+  for (let i = 0; i < 40; i++) SKILL_IMPL.bachDang.update(h, 1 / 30);
+  assert.equal(a.role, "zone"); assert.ok(hurt(a));
+});
+t("ảnh lướt né (afterimage): lính diễn trong 3 m thành lính thật và trúng", () => {
+  const { h, crowd } = strikeWorld();
+  const a = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 2, h.z);
+  h.afterimageBurst(h.x, h.z);
+  assert.equal(a.role, "zone"); assert.ok(hurt(a));
+});
+t("tự nhắm: lính diễn địch trong 4 m là mục tiêu (trước: không thấy ai, tướng chém theo hướng cũ); ngoài 4 m thì không", () => {
+  const { h, crowd } = strikeWorld();
+  const a = spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 2, h.z + 2);
+  assert.equal(h.autoTarget(), a);
+  const w2 = strikeWorld(); spawnEnemy(w2.crowd, "actor", "KHIEN_NG", w2.h.x + 4.5, w2.h.z);
+  assert.equal(w2.h.autoTarget(), null);
+  const w3 = strikeWorld(); w3.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "actor", front: "A", x: w3.h.x + 2, z: w3.h.z });
+  assert.equal(w3.h.autoTarget(), null, "lính diễn phe ta không phải mục tiêu");
+});
+t("nearestEnemy giữ nguyên: chỉ thấy lính trúng đòn được (Khí Lực, bot, Tuyệt Kỹ bước tới)", () => {
+  const { h, crowd } = strikeWorld();
+  spawnEnemy(crowd, "actor", "KHIEN_NG", h.x + 2, h.z);
+  assert.equal(h.nearestEnemy(12), null);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

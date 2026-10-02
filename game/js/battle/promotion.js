@@ -43,3 +43,20 @@ export function pickPromotions(actors, hero, real, caps) {
   }
   return { promote, forced, blocked };
 }
+
+// Đợt 15b — đòn CỦA NGƯỜI CHƠI chạm lính diễn phe địch thì người đó thành lính thật ngay và nhận đòn (crowd.strikeable / crowd.enlist, gọi từ hero.js,
+// hero-skills.js). Luật trên chỉ chạy theo nhịp 0,25 s của director.updateZone và tới hạn mức forcedMax, nên còn lọt: đứng sâu trong khối thì hạn mức đầy,
+// hàng sau bước lên lấp chỗ; Phá Trận lao 9–11 m giữa hai nhịp — chém xuyên người trong đội hình.
+// enemyActor(a): lính diễn phe địch còn đứng (đòn của tướng chạm được). Lính diễn phe ta không bao giờ bị đòn của tướng đổi.
+export function enemyActor(a) {
+  return !!a && a.role === "actor" && a.side === "dich" && a.alive !== false && a.state !== "dead";
+}
+// enlistActor(a): đổi trường đúng như nhánh "ép" (forced) của director.updateZone — zone, bỏ thẻ, hết hành quân, mang cờ forced (tính vào hạn mức ép trong
+// ZONE.forcedKeepR, không chiếm trần mềm; tướng đi xa > 45 m thì updateZone bước 1 trả về lính diễn như mọi lính ép); nhát chém GIẢ dở dang thì bỏ.
+// → true nếu đã đổi; không phải lính diễn địch còn đứng thì không đụng, trả false.
+export function enlistActor(a) {
+  if (!enemyActor(a)) return false;
+  a.role = "zone"; a.token = false; a.march = false; a.forced = true;
+  if (a.fake) { a.windup = 0; a.fake = false; }
+  return true;
+}

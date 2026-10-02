@@ -33,10 +33,14 @@ import { ANIMS } from "./hero-anim.js";
 import { POSES_WC01 } from "./anim-wc01.js";
 import { SKILL_IMPL } from "./hero-skills.js";
 import { BladeTrail } from "./trail.js";
+import { inCone } from "./hitshape.js";
 import * as THREE from "three";
 
 const _b = new THREE.Vector3(), _t = new THREE.Vector3(), _s = new THREE.Vector3();
 const NO_IK = { ik: false };           // đang leo boong: chân không bám đất (rig-motion.js)
+// Tự nhắm thấy cả lính diễn phe địch trong chừng này m (đợt 15b, ĐỀ XUẤT BẢN THỬ): đứng trong khối quân Nguyên, người trông gần nhất thường là lính
+// diễn — trước đây tự nhắm bỏ qua họ nên tướng quay đi chém người khác; nay nhát chém chạm vào là họ thành lính thật (crowd.enlist).
+const AUTO_ACTOR_R = 4;
 
 // Tư thế ngoài đòn theo lớp: WC03 là bộ song đao của anim.js (như cũ), WC01 bộ đại kiếm của anim-wc01.js.
 const POSES = {
@@ -332,15 +336,13 @@ export class Hero {
     let hitAny = false, heavy = F.heavy;
     const isC = F.isC;
     const poiseMult = (m.poiseMult || (isC ? C_POISE_MULT : 1)) * (1 + this.mods.poisePct);
-    const inShape = (tx, tz, rad) => {
+    // body: thân LÍNH (hitRadius) — nón chém nới góc theo bề ngang thân. Sĩ quan và cổng giữ luật cũ: bán kính chỉ cộng vào tầm, góc xét theo tâm
+    // (nới cho cổng 3,5 m thì nhát chém lính quay lưng đi gần 130° vẫn trừ độ bền cổng).
+    const inShape = (tx, tz, rad, body = false) => {
       const dx = tx - this.x, dz = tz - this.z, d = Math.hypot(dx, dz);
       if (m.shape === "ring") return d <= reach + rad;
-      if (m.shape === "cone") {
-        if (d > reach + rad) return false;
-        if (d < 0.8) return true;
-        const cos = (dx * fx + dz * fz) / d;
-        return cos >= Math.cos((m.arc / 2) * Math.PI / 180);
-      }
+      // nón: lính tính cả bề ngang thân (rad) ở hai mép nón, không chỉ góc của tâm người (đợt 15b, hitshape.js); rad 0 = luật cũ
+      if (m.shape === "cone") return body ? inCone(dx, dz, fx, fz, reach, m.arc, rad) : inCone(dx, dz, fx, fz, reach + rad, m.arc, 0);
       // line: đòn lao — dải từ 0,6 tầm sau lưng (quãng vừa lao qua) tới 0,4 tầm trước mặt
       const px = tx - (this.x - fx * reach * 0.6), pz = tz - (this.z - fz * reach * 0.6);
       const t = px * fx + pz * fz, perp = Math.abs(px * fz - pz * fx);
@@ -349,10 +351,11 @@ export class Hero {
     const mv = m.mv * this.chargeMul, full3 = this.chargeLv >= 3;      // tụ lực cấp 3: đẩy lùi +2, hất tung
     const knock = full3 ? (m.knock || 2.2) + 2 : m.knock, launch = full3 || m.launch;
     let nHit = 0, crit = false, kills = 0;
-    // lính
+    // lính — cả lính diễn phe địch: nhát chém chạm vào là thành lính thật rồi nhận đòn (crowd.strikeable / enlist, đợt 15b)
     for (const a of [...ctx.crowd.agents]) {
-      if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
-      if (!inShape(a.x, a.z, hitRadius(a))) continue;      // kỵ binh: vòng trúng lớn hơn (tuning.js HIT_R), khớp thân ngựa
+      if (a.side !== "dich" || !ctx.crowd.strikeable(a)) continue;
+      if (!inShape(a.x, a.z, hitRadius(a), true)) continue;      // kỵ binh: vòng trúng lớn hơn (tuning.js HIT_R), khớp thân ngựa
+      ctx.crowd.enlist(a);
       const dx = a.x - this.x, dz = a.z - this.z, d = Math.hypot(dx, dz) || 1;
       const dmg = this.damageTo(a.giap, mv, m.crit, a, F.armorPen);
       const stun = isC && this.mods.cStun && ctx.rng.chance(this.mods.cStun) ? 1.5 : 0;
@@ -466,7 +469,8 @@ export class Hero {
   }
   afterimageBurst(x, z) {
     for (const a of this.ctx.crowd.agents) {
-      if (a.side !== "dich" || !this.ctx.crowd.hittable(a) || Math.hypot(a.x - x, a.z - z) > 3 + hitPad(a)) continue;
+      if (a.side !== "dich" || !this.ctx.crowd.strikeable(a) || Math.hypot(a.x - x, a.z - z) > 3 + hitPad(a)) continue;
+      this.ctx.crowd.enlist(a);                                    // lính diễn chạm ảnh lướt: thành lính thật (đợt 15b)
       this.ctx.crowd.damage(a, this.damageTo(a.giap, 0.5, false, a), { by: "hero", swing: ++this.swingId, knock: 3 });
     }
   }
@@ -642,7 +646,12 @@ export class Hero {
       if (Math.abs(da) > 1.2 && d > 2) return;
       const s = d + Math.abs(da) * 2 - bonus; if (s < bs) { bs = s; best = t; }
     };
-    for (const a of this.ctx.crowd.agents) if (a.side === "dich" && this.ctx.crowd.hittable(a)) consider(a, 0);
+    const crowd = this.ctx.crowd, R2 = AUTO_ACTOR_R * AUTO_ACTOR_R;
+    for (const a of crowd.agents) {
+      if (a.side !== "dich") continue;
+      if (crowd.hittable(a)) consider(a, 0);
+      else if (crowd.strikeable(a) && (a.x - this.x) ** 2 + (a.z - this.z) ** 2 < R2) consider(a, 0);    // lính diễn địch sát tướng (đợt 15b)
+    }
     for (const u of this.ctx.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating) consider(u, 1.5);
     return best;
   }
