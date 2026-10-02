@@ -1,6 +1,6 @@
 # GLB tạo bằng Meshy
 
-Mẫu 3D tĩnh (chưa rig) tạo bằng Meshy API từ đúng prompt trong `design/glb-prompts.md`. Nhân vật và vũ khí là **tệp riêng**: nhân vật tay không, vũ khí là một vật đứng một mình.
+Mẫu 3D tĩnh tạo bằng Meshy API từ đúng prompt trong `design/glb-prompts.md`. Nhân vật và vũ khí là **tệp riêng**: nhân vật tay không, vũ khí là một vật đứng một mình.
 
 | Thư mục | Chứa | Tiền tố tệp |
 | --- | --- | --- |
@@ -43,6 +43,25 @@ Tệp gốc (texture PNG 2048, nặng) không đưa vào git. Công cụ nén ch
 - Giảm lưới nếu Meshy trả quá dải tam giác của bảng mục 1.
 
 Không đổi đơn vị, không xoay, không lượng tử hoá lưới. Chiều cao còn theo đơn vị của Meshy; chuẩn hoá mét, hướng +Z, gốc và trục vũ khí, `grip2` làm khi rig (mục 0.3 của `glb-prompts.md`).
+
+## Đưa vào game: rig và nướng (`design/tools/glb-bake.mjs`)
+
+Game không nạp GLB lúc chạy (bản deploy không có `GLTFLoader`). Công cụ nướng đọc `design/glb/*.glb` và ghi `game/assets/models/` (tệp `.hkm` lưới nhị phân + texture WebP, `index.json` liệt kê). Không cần mạng, không tốn credit.
+
+```bash
+cd design/tools && npm i && cd ../..
+node design/tools/glb-bake.mjs all                 # hoặc char | kit | wpn, thêm --only H35,DV_GIAO
+```
+
+Bảng chọn cỡ lưới, texture, chỗ cầm vũ khí: `design/tools/bake/catalog.mjs`.
+
+| Loại | Gắn vào | Cách làm (tệp trong `design/tools/bake/`) |
+| --- | --- | --- |
+| Tướng, sĩ quan, cận vệ, người lính Tự do (17) | 15 khớp của rig tướng (`battle/models.js` `makeRig`), cùng hoạt ảnh như trước | `landmarks.mjs` dò khớp trên lưới (đo đường dọc mặt lưới từ đầu ngón tay, nên tay đưa trước ngực, áo dài không lẫn), `human.mjs` dựng khung gắn theo dáng tay của mẫu và trọng số da, `char.mjs` ghi lưới da + vị trí vai, khuỷu, cổ tay, cổ riêng của mẫu. Lưới hàn đỉnh, giảm đúng ngân sách, trải UV lại và nướng texture mới (`rebake.mjs`): tướng chơi được, người lính Tự do 9 nghìn tam giác, texture 1024; tướng khác, sĩ quan 5–6 nghìn, boss 7,5 nghìn, cận vệ 5 nghìn, texture 512 |
+| Lính đám đông (8 kiểu, gồm cung kỵ) | Bộ khúc instanced (`soldier-motion.js`), vẽ bằng `soldiers.js` `glbKit` | `kit.mjs` đưa mẫu về tư thế nghỉ của bộ khúc, mỗi đỉnh ≤ 2 khúc, ghép vũ khí vào cẳng tay. 3 mức chi tiết: LOD0 (< 18 m) ~550–640 tam giác, trải UV lại bằng xatlas và nướng texture 512 riêng (`rebake.mjs`); LOD1 (< 40 m) ~250–310, LOD2 ~100–145, tô màu đỉnh |
+| Vũ khí (13) + mũi tên | Tay rig tướng, cẳng tay lính | `wpn.mjs` đặt gốc ở chỗ nắm, cán theo +Z, đúng chiều dài thật |
+
+Lúc chạy, `game/js/battle/glb.js` nạp mô hình trong màn tải trận (`main.js` `loadModels`: tướng người chơi, lính, vũ khí, cận vệ, sĩ quan trước; phần còn lại tải ngầm). Mô hình nào chưa nạp được thì game dựng hình bằng code như cũ. Soát nhanh: `game/lab.html?view=state&s=idle&lod=0` (lính đám đông, `lod=1`, `2` cho mức xa), `lab.html?view=rigs` (tướng).
 
 ## Tạo thêm hoặc làm lại
 

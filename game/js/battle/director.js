@@ -657,7 +657,7 @@ export class Director {
   // ---- boss Toa Đô (P4) --------------------------------------------------------------------------
   startBossPhase() {
     const ctx = this.ctx, b = MAP.beach;
-    const boss = new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", name: "Toa Đô", x: b.x + 10, z: b.z - 10, awake: false, aggro: 45 });
+    const boss = new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", rigKey: "X19", name: "Toa Đô", x: b.x + 10, z: b.z - 10, awake: false, aggro: 45 });
     boss.retreatTo = { x: 540, z: MAP.riverNorthZ - 6 };
     ctx.units.push(boss); this.boss = boss; this.bossSpawned = true; this.landT = 8;
     // "Toa Đô núng thế" (PHASES[3].hkBoss): nhớ số lần Tổng Phản Công lúc vào P4 (cả khi tải lại checkpoint P4); Tổng Phản

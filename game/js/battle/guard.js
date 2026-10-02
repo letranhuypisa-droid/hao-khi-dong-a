@@ -23,7 +23,9 @@ const POISE_PER_MV = 14;              // Phá Thế mỗi MV của đòn cận v
 // ---- dáng cận vệ theo lớp (đăng ký vào RIGS như battle/soldier.js) ----------------------------------------------------------------
 export function guardRigKey(clsId) {
   const C = GUARD_CLASSES[clsId] || GUARD_CLASSES.khien, key = `cv_${C.id}`;
-  if (!RIGS[key]) RIGS[key] = { scale: 1.04, cloth: 0x7a2418, armor: 0x4a3a2a, trim: PAL.vang, hat: C.hat, weapon: C.weapon, shield: !!C.shield, skirt: 0x5a2014 };
+  // mô hình GLB CV_<lớp>; Khiên thủ cầm khiên nhật quân Trần phóng ×1,2 (design/glb-prompts.md F1), khác khiên tròn của Đội trưởng Nguyên
+  if (!RIGS[key]) RIGS[key] = { model: "CV_" + C.id, scale: 1.04, cloth: 0x7a2418, armor: 0x4a3a2a, trim: PAL.vang, hat: C.hat, weapon: C.weapon, shield: !!C.shield,
+    skirt: 0x5a2014, shieldKind: "nhat", shieldScale: 1.2 };
   return key;
 }
 

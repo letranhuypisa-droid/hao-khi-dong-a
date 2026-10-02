@@ -25,6 +25,7 @@ export function soldierRigKey(weapon, rank) {
   if (!RIGS[key]) {
     const officer = rank >= 2;
     RIGS[key] = {
+      model: rank >= 2 ? "LINH_r24" : "LINH_r01",           // mô hình GLB: bậc Lính, Tinh nhuệ / Đội trưởng trở lên
       scale: 1.0 + 0.02 * rank, cloth: rank >= 3 ? PAL.sonDam : 0x8a2a1e, armor: officer ? PAL.then : 0x3a2c22, trim: officer ? PAL.vang : 0x8a6a3a,
       hat: officer ? "mutuong" : "non", weapon: weapon === "WC01" ? "daikiem" : "songdao",
       cape: rank >= 4 ? PAL.son : null, capeScale: rank >= 4 ? [0.62, 0.72] : null,

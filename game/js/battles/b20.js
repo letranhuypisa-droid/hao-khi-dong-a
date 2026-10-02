@@ -161,7 +161,7 @@ class NavalSandbox extends DirectorB20Stub {
   // bắt sống: một tướng Nguyên (dáng tướng) đứng trên boong dưới kỳ hạm, bị bắt; quân ta cầm giáo đứng vây quanh
   capture() {
     const ctx = this.ctx, nav = ctx.naval, D = this.flag.deck, W = D.toWorld(0, 6, {});
-    const u = new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", name: "Phàn Tiếp", id: "X24", x: W.x, z: W.z, yaw: D.yaw, defeatMeans: "bị bắt", hpLockPct: 10 });
+    const u = new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", rigKey: "X24", name: "Phàn Tiếp", id: "X24", x: W.x, z: W.z, yaw: D.yaw, defeatMeans: "bị bắt", hpLockPct: 10 });
     ctx.units.push(u); nav.board(u, D); u.capture({ finisher: true });
     for (let k = 0; k < 6; k++) {
       const a = k * Math.PI / 3 + 0.3, P = D.toWorld(Math.sin(a) * 2.6, 6 + Math.cos(a) * 2.6, {});

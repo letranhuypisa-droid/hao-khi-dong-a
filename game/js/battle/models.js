@@ -5,6 +5,7 @@
 // không chỉ bằng màu, vì PT-A chấm cả qua bộ lọc mù màu (21.9).
 
 import * as THREE from "three";
+import { model, applyRest, bodyMesh, weaponMesh } from "./glb.js";
 
 export const PAL = {
   son: 0x9b2d20, sonDam: 0x6e1d15, then: 0x1d1a17, vang: 0xc9a14a, trung: 0xe6dcc3,
@@ -158,10 +159,15 @@ const I4 = new THREE.Matrix4();
 // chung lưới hai mặt với vạt áo. Trước đây mỗi mảnh một Mesh: tướng 27 lưới (47 lượt vẽ kể cả bóng), Phó tướng,
 // Toa Đô 22 (41), nay 2 lưới + lá cờ (tướng): 4–6 lượt vẽ mỗi rig. Hộp bao: cầu cố định đủ rộng cho mọi tư thế (vũ
 // khí dài, lộn né, nằm) nên vẫn bị loại khi ngoài khung nhìn, ngoài hộp bóng (áo choàng trước đây tắt loại bỏ).
+// Mô hình GLB (cfg.model, glb.js): có trong đệm thì thân là một lưới da GLB gắn vào chính các khớp này (vị trí vai, khuỷu, cổ tay,
+// cổ, bề ngang chân đặt theo mô hình), vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo
+// (vạt áo nằm trong lưới, đi theo hông và chân). Áo choàng, cờ lưng, tua giáo, dải khăn vẫn dựng bằng code như cũ.
 export function makeRig(cfg = {}) {
   const { scale = 1, cloth = PAL.son, armor = PAL.then, trim = PAL.vang, skin = PAL.da,
     hat = "tocbui", weapon = "songdao", cape = null, flag = null, shield = false,
     skirt = null, beard = null, heavy = false, capeScale = null } = cfg;        // skirt: màu vạt áo (mặc định cloth); beard: màu râu; heavy: giáp nặng
+  const M = cfg.model ? model("char/" + cfg.model) : null;
+  const WM = (k) => (M ? model("wpn/" + k) : null);
   // capeScale: [rộng, dài] của áo choàng (H31: áo choàng hẹp, ngắn cho thấy giáp then viền vàng — review B20)
   const flapCol = skirt ?? cloth;
   const root = new THREE.Group(), p = {};
@@ -172,17 +178,20 @@ export function makeRig(cfg = {}) {
   const bones = [], parts = [[], []];
   const boneOf = (j) => { let i = bones.indexOf(j); if (i < 0) { i = bones.length; bones.push(j); } return i; };
   const add = (j, fn, two = false) => parts[two ? 1 : 0].push([fn, boneOf(j)]);
+  const addBody = M ? () => {} : add;                       // khối hình thân: bỏ khi có lưới GLB
+  const weapons = [];                                        // lưới vũ khí GLB (con của khớp tay), để ẩn khi bị bắt
+  const wpn = (j, m, place) => { const w = weaponMesh(m, place); j.add(w); weapons.push(w); return w; };
 
   p.hips = joint(root, 0, 0.92, 0);
   p.torso = joint(p.hips, 0, 0.04, 0);
-  add(p.torso, () => merge([
+  addBody(p.torso, () => merge([
     part(box(0.48, 0.52, 0.3), cloth, { y: 0.3 }),
     part(box(0.52, 0.36, 0.33), armor, { y: 0.38 }),
     part(box(0.54, 0.08, 0.34), trim, { y: 0.1 }),
     part(box(0.5, 0.08, 0.32), trim, { y: 0.56 }),
   ]));
   // Giáp nặng (H31): hộ tâm kính vàng trước ngực, cổ giáp, khoá đai (chỉ có khi cfg.heavy — rig khác giữ nguyên hình)
-  if (heavy) add(p.torso, () => merge([
+  if (heavy) addBody(p.torso, () => merge([
     part(cyl(0.1, 0.1, 0.03, 8), trim, { y: 0.4, z: 0.175, rx: Math.PI / 2 }),
     part(cyl(0.065, 0.065, 0.034, 8), armor, { y: 0.4, z: 0.178, rx: Math.PI / 2 }),
     part(box(0.56, 0.1, 0.36), armor, { y: 0.24 }),                         // lá giáp bụng
@@ -191,8 +200,8 @@ export function makeRig(cfg = {}) {
     part(box(0.12, 0.09, 0.04), trim, { y: 0.1, z: 0.18 }), part(box(0.06, 0.05, 0.03), PAL.son, { y: 0.1, z: 0.2 }),   // khoá đai
   ]));
   // Cạp áo gắn vào hông (thân xoắn không kéo vạt theo), 4 vạt treo dưới cạp, viền vàng ở gấu.
-  add(p.hips, () => merge([part(cyl(0.245, 0.255, 0.14, 8), cloth, { y: 0.045 })]));
-  for (const f of FLAPS) {
+  addBody(p.hips, () => merge([part(cyl(0.245, 0.255, 0.14, 8), cloth, { y: 0.045 })]));
+  if (!M) for (const f of FLAPS) {
     const j = joint(p.hips, Math.sin(f.yaw) * f.r0, FLAP_Y, Math.cos(f.yaw) * f.r0);
     j.rotation.order = "YXZ"; j.rotation.y = f.yaw;           // Ry đặt quanh thân, Rx xoè ra ngoài (−), Rz đưa ngang
     const tl = Math.PI / 2 + 0.16, hr = f.r1 - (f.r1 - f.r0) * (0.05 / f.h);
@@ -204,7 +213,7 @@ export function makeRig(cfg = {}) {
     dyn.flaps.push({ j, yaw: f.yaw, r0: f.r0, r1: f.r1, h: f.h });
   }
   p.head = joint(p.torso, 0, 0.68, 0);
-  add(p.head, () => {
+  addBody(p.head, () => {
     const headParts = [part(ico(0.16, 1), skin, { y: 0.1 })];
     if (hat === "tocbui") headParts.push(part(ico(0.1, 0), PAL.toc, { y: 0.28, z: -0.03 }), part(box(0.34, 0.06, 0.3), PAL.son, { y: 0.16 }),
       part(box(0.1, 0.07, 0.05), PAL.son, { y: 0.155, z: -0.16 }));          // nút buộc khăn sau gáy
@@ -232,27 +241,28 @@ export function makeRig(cfg = {}) {
     const side = s < 0 ? "L" : "R";
     const sh = joint(p.torso, 0.3 * s, 0.52, 0);
     sh.rotation.order = "YXZ";          // quay cánh tay sang ngang sau khi giơ (xem anim.js)
-    add(sh, () => merge([part(box(0.15, 0.36, 0.16), armor, { y: -0.16 }), part(box(0.2, 0.12, 0.2), trim, { y: 0.02 })]));
+    addBody(sh, () => merge([part(box(0.15, 0.36, 0.16), armor, { y: -0.16 }), part(box(0.2, 0.12, 0.2), trim, { y: 0.02 })]));
     // giáp nặng: kiên giáp hai lớp sơn then viền vàng, chếch xuống ngoài vai
-    if (heavy) add(sh, () => merge([
+    if (heavy) addBody(sh, () => merge([
       part(box(0.27, 0.07, 0.26), armor, { x: 0.02 * s, y: 0.06, rz: -0.22 * s }), part(box(0.28, 0.025, 0.27), trim, { x: 0.02 * s, y: 0.02, rz: -0.22 * s }),
       part(box(0.25, 0.07, 0.24), armor, { x: 0.05 * s, y: -0.05, rz: -0.32 * s }), part(box(0.26, 0.025, 0.25), trim, { x: 0.05 * s, y: -0.09, rz: -0.32 * s }),
     ]));
     const el = joint(sh, 0, -0.34, 0);
-    add(el, () => merge([part(box(0.13, 0.32, 0.14), cloth, { y: -0.15 }), part(ico(0.07, 0), skin, { y: -0.34 })]));
+    addBody(el, () => merge([part(box(0.13, 0.32, 0.14), cloth, { y: -0.15 }), part(ico(0.07, 0), skin, { y: -0.34 })]));
     const hand = joint(el, 0, -0.36, 0.02);
     p["sh" + side] = sh; p["el" + side] = el; p["hand" + side] = hand;
 
     const hip = joint(p.hips, 0.12 * s, -0.02, 0);
-    add(hip, () => merge([part(box(0.17, 0.46, 0.19), cloth, { y: -0.22 })]));
+    addBody(hip, () => merge([part(box(0.17, 0.46, 0.19), cloth, { y: -0.22 })]));
     const knee = joint(hip, 0, -LEG.L1, 0);
-    add(knee, () => merge([part(box(0.15, 0.44, 0.17), PAL.then, { y: -0.2 })]));
-    if (heavy) add(knee, () => merge([part(box(0.17, 0.09, 0.05), trim, { y: -0.02, z: 0.095 }), part(box(0.16, 0.24, 0.03), armor, { y: -0.2, z: 0.095 })]));   // bịt gối, ống giáp
+    addBody(knee, () => merge([part(box(0.15, 0.44, 0.17), PAL.then, { y: -0.2 })]));
+    if (heavy) addBody(knee, () => merge([part(box(0.17, 0.09, 0.05), trim, { y: -0.02, z: 0.095 }), part(box(0.16, 0.24, 0.03), armor, { y: -0.2, z: 0.095 })]));   // bịt gối, ống giáp
     // cổ chân: bàn giày quay quanh đây để đế nằm theo mặt dốc (rig-motion.js)
     const ankle = joint(knee, 0, -LEG.L2, 0);
-    add(ankle, () => merge([part(box(0.16, LEG.sole, 0.26), PAL.then, { y: -LEG.sole / 2, z: LEG.footZ })]));
+    addBody(ankle, () => merge([part(box(0.16, LEG.sole, 0.26), PAL.then, { y: -LEG.sole / 2, z: LEG.footZ })]));
     p["hip" + side] = hip; p["knee" + side] = knee; p["ankle" + side] = ankle;
   }
+  if (M) applyRest(p, M);                                    // vai, khuỷu, cổ tay, cổ, bề ngang chân theo mô hình
 
   const blade = (len, w, col) => merge([
     part(box(0.05, 0.05, 0.22), PAL.then, { z: 0.02 }),
@@ -288,23 +298,43 @@ export function makeRig(cfg = {}) {
   }
 
   let reach = 1.2;                                        // tầm vũ khí tính từ bàn tay (cầu bao)
+  // vũ khí GLB (khung chuẩn bake/wpn.mjs: gốc chỗ nắm, cán +Z) thay khối hình khi có; điểm mũi / đuôi (edge) theo dài thật
+  const tipZ = (m) => m.meta.hi[2], buttZ = (m) => m.meta.lo[2];
   if (weapon === "songdao") {
-    add(p.handR, () => blade(0.9, 0.08, PAL.sat));
-    add(p.handL, () => blade(0.9, 0.08, PAL.sat));
-    edge(p.handR, "handRx", 0, 0.02, 1.06); edge(p.handL, "handLx", 0, 0.02, 1.06);
+    const m = WM("songdao");
+    if (m) { wpn(p.handR, m); wpn(p.handL, m, { mirror: true }); }
+    else { add(p.handR, () => blade(0.9, 0.08, PAL.sat)); add(p.handL, () => blade(0.9, 0.08, PAL.sat)); }
+    const z = m ? tipZ(m) : 1.06;
+    edge(p.handR, "handRx", 0, 0.02, z); edge(p.handL, "handLx", 0, 0.02, z);
   } else if (weapon === "giao") {
-    add(p.handR, () => merge([part(cyl(0.03, 0.03, 3.0, 5), PAL.go, { z: 0.6, rx: Math.PI / 2 }), part(cone(0.07, 0.4, 4), PAL.sat, { z: 2.25, rx: Math.PI / 2 }), part(box(0.1, 0.1, 0.06), PAL.son, { z: 1.98 })]));
-    tassel(p.handR, 0, -0.03, 1.98);                     // tua lông ngựa đỏ dưới mũi giáo
-    edge(p.handR, "handRx", 0, 0, 2.45, 0, 0, -0.9); reach = 2.5;
+    const m = WM("giao_dv");
+    if (m) wpn(p.handR, m);
+    else add(p.handR, () => merge([part(cyl(0.03, 0.03, 3.0, 5), PAL.go, { z: 0.6, rx: Math.PI / 2 }), part(cone(0.07, 0.4, 4), PAL.sat, { z: 2.25, rx: Math.PI / 2 }), part(box(0.1, 0.1, 0.06), PAL.son, { z: 1.98 })]));
+    const tz = m ? tipZ(m) - 0.32 : 1.98;
+    tassel(p.handR, 0, -0.03, tz);                       // tua lông ngựa đỏ dưới mũi giáo
+    edge(p.handR, "handRx", 0, 0, m ? tipZ(m) : 2.45, 0, 0, m ? buttZ(m) : -0.9); reach = m ? tipZ(m) + 0.05 : 2.5;
   } else if (weapon === "cung") {
-    add(p.handL, () => merge([part(box(0.05, 1.5, 0.06), PAL.go, { z: 0.1 }), part(box(0.015, 1.4, 0.015), PAL.trung, { z: -0.05 })]));
+    const m = WM("cung_viet");
+    if (m) wpn(p.handL, m, { p: [0, 0, 0.06], r: [-Math.PI / 2, 0, 0] });     // cánh cung theo Y, dây cung về −Z (phía người bắn)
+    else add(p.handL, () => merge([part(box(0.05, 1.5, 0.06), PAL.go, { z: 0.1 }), part(box(0.015, 1.4, 0.015), PAL.trung, { z: -0.05 })]));
   } else if (weapon === "dadao") {
-    add(p.handR, () => merge([part(cyl(0.035, 0.035, 2.2, 5), PAL.go, { z: 0.4, rx: Math.PI / 2 }), part(box(0.05, 0.28, 0.8), PAL.sat, { z: 1.7, y: 0.1 }), part(box(0.2, 0.08, 0.08), trim, { z: 1.3 })]));
+    const m = WM("dadao");
+    if (m) wpn(p.handR, m);
+    else add(p.handR, () => merge([part(cyl(0.035, 0.035, 2.2, 5), PAL.go, { z: 0.4, rx: Math.PI / 2 }), part(box(0.05, 0.28, 0.8), PAL.sat, { z: 1.7, y: 0.1 }), part(box(0.2, 0.08, 0.08), trim, { z: 1.3 })]));
     tassel(p.handR, 0, -0.04, 1.3);                      // tua ở chân lưỡi đại đao
-    edge(p.handR, "handRx", 0, -0.04, 2.1, 0, 0.24, 2.1, 0, 0, -0.7); reach = 2.2;
+    const z = m ? tipZ(m) - 0.05 : 2.1;
+    edge(p.handR, "handRx", 0, -0.04, z, 0, 0.24, z, 0, 0, m ? buttZ(m) : -0.7); reach = z + 0.1;
   } else if (weapon === "dao") {
-    add(p.handR, () => blade(1.0, 0.1, PAL.sat));
-    edge(p.handR, "handRx", 0, 0.02, 1.16);
+    const m = WM("dao");
+    if (m) wpn(p.handR, m); else add(p.handR, () => blade(1.0, 0.1, PAL.sat));
+    edge(p.handR, "handRx", 0, 0.02, m ? tipZ(m) : 1.16);
+  } else if (weapon === "daikiem" && WM("daikiem")) {
+    // Gươm Tiết chế GLB: gốc ngay dưới chắn tay như rig, tay trái nắm dưới 0,2 (dyn.grip)
+    const m = WM("daikiem");
+    wpn(p.handR, m);
+    const z = tipZ(m);
+    edge(p.handR, "handRx", 0, 0, z, 0, 0.065, z - 0.2, 0, -0.065, z - 0.2, 0, 0, buttZ(m)); reach = z + 0.05;
+    dyn.grip = { j: p.handR, local: new THREE.Vector3(0, 0, -0.2) };
   } else if (weapon === "daikiem") {
     // Đại kiếm hai tay "Gươm Tiết chế" (H31; canon: bản rộng, chuôi quấn dây đỏ — Hư cấu): cả thanh gắn tay phải, tay phải
     // nắm sát chắn tay (z 0), tay trái nắm dưới (z −0,2) do rig-motion.js giải IK (dyn.grip). Chuôi −0,28…0,10 quấn dây
@@ -321,7 +351,10 @@ export function makeRig(cfg = {}) {
     edge(p.handR, "handRx", 0, 0, 1.3, 0, 0.065, 1.1, 0, -0.065, 1.1, 0, 0, -0.32); reach = 1.35;
     dyn.grip = { j: p.handR, local: new THREE.Vector3(0, 0, -0.2) };
   }
-  if (shield) add(p.elL, () => merge([part(cyl(0.38, 0.38, 0.06, 10), PAL.nau, { y: -0.2, z: 0.16, rx: Math.PI / 2 }), part(cyl(0.1, 0.1, 0.08, 6), trim, { y: -0.2, z: 0.2, rx: Math.PI / 2 })]));
+  // khiên: tròn (phe Nguyên, mặc định) hoặc khiên nhật quân Trần (cfg.shieldKind "nhat", cận vệ Khiên thủ, phóng cfg.shieldScale)
+  const SM = shield ? WM(cfg.shieldKind === "nhat" ? "khien_nhat" : "khien_tron") : null;
+  if (SM) wpn(p.elL, SM, { p: [0, -0.2, 0.16], s: cfg.shieldScale ?? 1 });
+  else if (shield) add(p.elL, () => merge([part(cyl(0.38, 0.38, 0.06, 10), PAL.nau, { y: -0.2, z: 0.16, rx: Math.PI / 2 }), part(cyl(0.1, 0.1, 0.08, 6), trim, { y: -0.2, z: 0.2, rx: Math.PI / 2 })]));
   if (cape) {
     // CAPE.h.length xương nối bản lề (xương dưới là con xương trên, gốc ở mép trên khúc), bọc da liền mặt (capeGeometry).
     const joints = [], ch = capeScale ? CAPE.h.map((h) => h * capeScale[1]) : CAPE.h;
@@ -352,7 +385,7 @@ export function makeRig(cfg = {}) {
   }
 
   // ---- lưới da ----
-  const key = JSON.stringify(cfg);
+  const key = JSON.stringify(cfg) + (M ? "|glb" : "") + weapons.length;
   let G = RIG_GEO.get(key);
   if (!G) {
     const build = (list) => (list.length ? skinMerge(list.map(([fn, b]) => [fn(), b])) : null);
@@ -366,6 +399,12 @@ export function makeRig(cfg = {}) {
   const skeleton = new THREE.Skeleton(bones, bones.map(() => I4));
   const R = 0.75 + Math.max(1.44 + reach, flag ? 2.6 : 0) + 0.1;
   const mats = [], meshes = [];
+  if (M) {
+    const body = bodyMesh(p, M);
+    body.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.92, 0), R);
+    root.add(body); mats.push(body.material); meshes.push(body);
+  }
+  for (const w of weapons) mats.push(w.material);
   for (const [geo, two] of [[G.solid, false], [G.dbl, true]]) {
     if (!geo) continue;
     const m = new THREE.SkinnedMesh(geo, lambert(two ? { side: THREE.DoubleSide } : {}));
@@ -380,7 +419,7 @@ export function makeRig(cfg = {}) {
   }
   for (const b of segBones) b.scale.setScalar(0);
   root.scale.setScalar(scale);
-  return { root, p, scale, dyn, skeleton, mats, meshes };
+  return { root, p, scale, dyn, skeleton, mats, meshes, weapons, glb: !!M };
 }
 
 // Giải phóng phần riêng của một thể hiện rig: gỡ khỏi cảnh, texture xương của khung xương, vật liệu. Hình học dùng
@@ -394,28 +433,31 @@ export function disposeRig(rig) {
 }
 
 // Cấu hình rig theo vai (tướng người chơi, sĩ quan, boss, tướng đồng minh). units.js, hero.js, lab.js dùng chung.
+// model: mô hình GLB (assets/models/char/<model>.hkm, design/glb-prompts.md) — màu, mũ ở đây chỉ còn dùng khi chưa nạp được mô hình.
 export const RIGS = {
-  hero:      { scale: 1.08, cloth: PAL.son, armor: PAL.then, trim: PAL.vang, hat: "tocbui", weapon: "songdao",
+  hero:      { model: "H35", scale: 1.08, cloth: PAL.son, armor: PAL.then, trim: PAL.vang, hat: "tocbui", weapon: "songdao",
     flag: { text: "破強敵報皇恩", bg: "#9b2d20", fg: "#f1d98a" } },
-  doitruong: { scale: 1.12, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dao", shield: true },
-  photuong:  { scale: 1.22, cloth: PAL.cham, armor: PAL.then, trim: PAL.xam, hat: "mulong", weapon: "dadao", cape: 0x3b4a5a },
-  tuong:     { scale: 1.38, cloth: 0x3a2f3a, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x4a2f2a },
-  H33:       { scale: 1.15, cloth: 0x2f4a6a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "giao", cape: PAL.son },
-  H40:       { scale: 1.15, cloth: 0x4a5a2a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "cung", cape: PAL.sonDam },
+  doitruong: { model: "OFF_doitruong", scale: 1.12, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dao", shield: true },
+  photuong:  { model: "OFF_photuong", scale: 1.22, cloth: PAL.cham, armor: PAL.then, trim: PAL.xam, hat: "mulong", weapon: "dadao", cape: 0x3b4a5a },
+  tuong:     { model: "OFF_tuong", scale: 1.38, cloth: 0x3a2f3a, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x4a2f2a },
+  H33:       { model: "H33", scale: 1.15, cloth: 0x2f4a6a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "giao", cape: PAL.son },
+  H40:       { model: "H40", scale: 1.15, cloth: 0x4a5a2a, armor: PAL.then, trim: PAL.vang, hat: "mutuong", weapon: "cung", cape: PAL.sonDam },
   // Boss B20 (cùng họ rig với Toa Đô "tuong": đại đao — lớp địch EWC02 Kích / đại phủ; màu, mũ, cờ lưng riêng — Hư cấu):
   // Phàn Tiếp (X24): tướng thủy quân cẩn trọng — áo chàm, giáp thép, mũ trụ Nguyên nhọn, áo choàng chàm sẫm, cờ lưng chữ 樊.
   // Ô Mã Nhi (X20): vạn hộ thủy quân, chỉ huy kỳ hạm — áo then sẫm, giáp then viền vàng, mũ lông, áo choàng đỏ sẫm (viền đỏ
   // như kỳ hạm), râu đen, cờ lưng ghi đủ tên 烏馬兒 (canon) nền đỏ sẫm chữ vàng — một chữ 烏 đứng riêng đọc là "con quạ" (review B20).
-  X24:       { scale: 1.34, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dadao", cape: 0x27324a, beard: 0x2a2522,
+  X24:       { model: "X24", scale: 1.34, cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dadao", cape: 0x27324a, beard: 0x2a2522,
     flag: { text: "樊", bg: "#27324a", fg: "#e6dcc3" } },
-  X20:       { scale: 1.42, cloth: 0x2a2630, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x6a2420, beard: 0x1e1a18,
+  X20:       { model: "X20", scale: 1.42, cloth: 0x2a2630, armor: PAL.then, trim: PAL.vang, hat: "mulong", weapon: "dadao", cape: 0x6a2420, beard: 0x1e1a18,
     heavy: true, flag: { text: "烏馬兒", bg: "#6a2420", fg: "#f1d98a" } },
   // H31 Trần Hưng Đạo (người chơi ở B20): tướng chỉ huy lão luyện — to hơn H35, giáp nặng sơn then viền vàng, vạt giáp
   // then, áo choàng son, mũ trụ Tiết chế, râu bạc, đại kiếm hai tay (WC01). Không cờ sau lưng. Áo choàng hẹp 0,62, ngắn 0,72
   // (review B20: áo choàng cỡ chung phủ kín thân giáp — nhìn từ sau chỉ thấy một tấm đỏ giữa quân ta cũng áo đỏ).
-  H31:       { scale: 1.12, cloth: PAL.sonDam, armor: PAL.then, trim: PAL.vang, skirt: PAL.then, hat: "tietche", beard: 0xc9c3b6,
+  H31:       { model: "H31", scale: 1.12, cloth: PAL.sonDam, armor: PAL.then, trim: PAL.vang, skirt: PAL.then, hat: "tietche", beard: 0xc9c3b6,
     heavy: true, weapon: "daikiem", cape: PAL.son, capeScale: [0.62, 0.72] },
 };
+// Toa Đô (X19, boss B15): cùng rig "Tướng Nguyên" (đại đao, áo choàng, cỡ ×1,38) nhưng mô hình riêng (râu điểm bạc, giáp trầy).
+RIGS.X19 = { ...RIGS.tuong, model: "X19" };
 
 // Lá cờ viết chữ dọc (Cờ sáu chữ của Trần Quốc Toản là Chính sử theo canon).
 export function flagTexture(text, bg = "#9b2d20", fg = "#f1d98a") {

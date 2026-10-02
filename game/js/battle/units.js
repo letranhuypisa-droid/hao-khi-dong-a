@@ -14,6 +14,7 @@
 // B15 không có các trường này nên mọi nhánh mới không chạy.
 
 import { makeRig, disposeRig, RIGS } from "./models.js";
+import { model, weaponMesh } from "./glb.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import * as THREE from "three";
@@ -26,7 +27,17 @@ const STRAFE_SPEED = 1.5;     // m/s, đi vòng thăm dò quanh tướng
 const NO_IK = { ik: false };  // đang leo boong: chân không bám đất
 
 // Vũ khí đặt dưới chân người bị bắt (đạo cụ đơn giản, nằm ngang trước mũi chân, trục x cục bộ): đại đao, giáo, đao, cung.
+// Có lưới GLB của vũ khí đó (glb.js) thì đặt chính lưới ấy nằm dẹt: cán theo x, bề rộng lưỡi nằm ngang (z), giữa thanh ở gốc.
+const WPN_GLB = { dadao: "dadao", giao: "giao_dv", cung: "cung_viet", dao: "dao", daikiem: "daikiem", songdao: "songdao" };
+const FLAT = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)));
 function weaponProp(kind, s = 1) {
+  const m = model("wpn/" + (WPN_GLB[kind] || ""));
+  if (m) {
+    const g = new THREE.Group(), w = weaponMesh(m);
+    w.quaternion.copy(FLAT); w.position.set(-(m.meta.lo[2] + m.meta.hi[2]) / 2, 0.04, 0);
+    g.add(w); g.scale.setScalar(s); g.name = "captured-weapon";
+    return g;
+  }
   const g = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x6a4a2e }), steel = new THREE.MeshLambertMaterial({ color: 0xb8bcc0 });
   const bar = (len, r, mat, x) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat); m.rotation.z = Math.PI / 2; m.position.x = x; m.castShadow = true; g.add(m); };
   const blade = (len, w, x) => { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.04, w), steel); m.position.x = x; m.castShadow = true; g.add(m); };
@@ -96,8 +107,11 @@ export class BigUnit {
     if (this.captured) return;
     const ctx = this.ctx;
     this.captured = true; this.state = "captured"; this.st = 0; this.broken = 0; this.retreating = true; this.hp = Math.max(this.hp, 1);
-    this.rig.p.handR.scale.setScalar(0.001);
-    if (this.weaponKind === "cung") this.rig.p.handL.scale.setScalar(0.001);
+    if (this.rig.glb) for (const w of this.rig.weapons) w.visible = false;      // thân GLB: thu nhỏ khớp tay sẽ bóp méo bàn tay
+    else {
+      this.rig.p.handR.scale.setScalar(0.001);
+      if (this.weaponKind === "cung") this.rig.p.handL.scale.setScalar(0.001);
+    }
     this.prop = weaponProp(this.weaponKind, this.rig.scale); ctx.scene.add(this.prop);
     if (ctx.hero?.lock === this) ctx.hero.lock = null;
     ctx.fx?.banner?.("BẮT SỐNG", "#f1d98a");

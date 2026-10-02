@@ -41,3 +41,11 @@ Mặt trống đồng là hình vẽ gợi Đông Sơn, không chép hoa văn c�
 | `comic/B15/*.avif`, `*.webp` (13 khung của biến thể VS: O1–O5, D2, D3, K1–K6) | Nano Banana Pro 2K qua Higgsfield CLI, sinh ngày 29/09/2026 cho comic chương mẫu (xem `hao-khi-viet/comic/B15-ham-tu/NGUON-GOC.md`: prompt, ảnh bị loại, ảnh chỉnh tay) | `tools/bake-comic.py`: cắt 2,5% mỗi cạnh (viền khung AI tự vẽ), cắt đúng tỉ lệ khung, thu về cạnh dài 1552 px, lọc lacquer v1 (bản numpy của bộ lọc SVG trong viewer mẫu + lớp giấy dó), AVIF q52 (2,79 MB cả Chương) + WebP q76 dự phòng. Mỗi ảnh có XMP `DigitalSourceType = compositeWithTrainedAlgorithmicMedia` và mô tả nguồn (sha256 ảnh gốc) — dấu nhận biết nội dung AI máy đọc được (GDD 22.7) |
 
 Ảnh không có chữ. Lời dẫn, bóng thoại, nhãn sử liệu và sáu chữ 破強敵報皇恩 trên cờ do engine vẽ đè từ dữ liệu. Khung K1 thêm chữ trên cờ ngày 30/09/2026 (trước chỉ có sáu ô vàng trống): cờ nghiêng, hai ô cuối khuất sau đầu người lính nên chỉ vẽ bốn chữ đầu.
+
+## Mô hình 3D (02/10/2026)
+
+| Thư mục | Nguồn | Ghi chú |
+| --- | --- | --- |
+| `models/char/*` (17 nhân vật), `models/kit/*` (8 kiểu lính đám đông), `models/wpn/*` (14 vũ khí, mũi tên) | Meshy API (khoá API của người dùng), mẫu gốc trong `design/glb/` (prompt, mã task, model từng tệp: `design/glb/manifest.json`) | `design/tools/glb-bake.mjs`: chuẩn hoá cỡ, hướng; dò khớp và gắn trọng số da theo rig của game; giảm lưới theo ngân sách (design/systems.md §13.3); lính đám đông 3 mức chi tiết, mức gần trải UV lại bằng xatlas và nướng texture riêng, mức xa tô màu đỉnh; texture WebP q82. Định dạng `.hkm` (lưới nhị phân, đọc bằng `js/battle/glb.js`) |
+
+Tệp tạo bằng gói Meshy trả phí thuộc người tạo; nếu là gói miễn phí thì theo CC BY 4.0 — ghi công: mô hình 3D tạo bằng Meshy (meshy.ai).

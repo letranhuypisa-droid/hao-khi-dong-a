@@ -1,11 +1,13 @@
 {
   "private": true,
-  "description": "Phụ thuộc của meshy.mjs (chỉ để nén GLB). Cài: cd design/tools && npm i",
+  "description": "Phụ thuộc của meshy.mjs (nén GLB) và glb-bake.mjs (rig, nướng mô hình cho game). Cài: cd design/tools && npm i",
   "dependencies": {
     "@gltf-transform/core": "^4.2.0",
     "@gltf-transform/extensions": "^4.2.0",
     "@gltf-transform/functions": "^4.2.0",
-    "meshoptimizer": "^0.22.0",
-    "sharp": "^0.35.5"
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
+    "three-mesh-bvh": "^0.9.15",
+    "xatlas-wasm": "^0.1.3"
   }
 }
