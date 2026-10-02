@@ -22,7 +22,8 @@ import { DRILL_COUNT, exitLine } from "./data/tutorial-steps.js";
 import { guongDayRow } from "./data/glossary.js";
 import { NAV, SUBTABS, groupOf, navBadge } from "./ui/layout.js";
 import { RANKS as CAREER_RANKS, rankOf, nextRank, RANK_PERKS, PICKS, GEAR, gearCost, QUE, suggestName, MISSION_MULT } from "./data/career.js";
-import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS } from "./meta/career.js";
+import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS, careerGuards, recruitGuard, editGuard, dismissGuard } from "./meta/career.js";
+import { GUARD_CLASSES, GUARD_NAME_MAX, guardSlots, guardStats } from "./data/guards.js";
 import { MISSIONS, SITES, missionBoard } from "./data/skirmish.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
@@ -154,6 +155,8 @@ function openSettings() {
 // bậc, đổi sau mỗi trận), quân nhu (nâng binh khí / giáp bằng tiền thưởng, đổi Song đao ↔ Đại đao), thang bậc, sổ trận, giải ngũ.
 const tudoBadge = () => (save.career === undefined && !save.veterans?.length ? "mới" : "");
 let tdForm = { name: "", que: QUE[0], weapon: "WC03", seed: Date.now() & 0xffffff };
+// thẻ Cận vệ (đợt 15c): đang chiêu mộ (mode "new") hoặc sửa (mode "edit", id) một người — null khi không mở biểu mẫu
+let gdForm = null;
 const fmtSec = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const rankSeal = (i, big = false) => `<span class="rk-seal r${i}${big ? " big" : ""}">${CAREER_RANKS[i].name}</span>`;
 // dải đầu khi đang ở mục Tự do: người lính thay cho Trần Quốc Toản, ví là tiền thưởng riêng của lính
@@ -186,6 +189,7 @@ function tudo() {
   </section>
   <h3 class="td-h">${PICKS[i] === 1 ? "Đội trưởng giao nhiệm vụ" : `Chọn 1 trong ${board.length} nhiệm vụ`}</h3>
   <section class="td-board">${board.map(missionCard).join("")}</section>
+  ${guardCard(c, i)}
   <section class="grid2">
     <div class="card"><h3>Quân nhu · tiền thưởng ${n(c.tien)}</h3>
       ${["weapon", "armor"].map((k) => { const lv = c.gear[k], cost = lv < GEAR.max ? gearCost(lv + 1) : null;
@@ -203,6 +207,41 @@ function tudo() {
       ${(save.veterans || []).slice(0, 5).map((v) => `<p class="small">${esc(v.name)} · ${esc(v.rank)} · ${v.battles} trận</p>`).join("")}
       <button class="danger" data-td-retire>Giải ngũ</button></div>
   </section>`;
+}
+// ---- Cận vệ (đợt 15c): 4 ô — có người (xem / sửa / cho về), trống (chiêu mộ: tên + lớp), khóa (mở ở bậc nào) ----------------------------------
+function guardCard(c, i) {
+  const list = careerGuards(c), slots = guardSlots(i), base = { ...soldierStats(c), move: 0 };
+  const statLine = (cls) => { const g = guardStats(base, cls), P = GUARD_CLASSES[cls].pct; return `Công ${n(g.cong)} · Sinh lực ${n(g.hp)} · Giáp ${n(g.giap)} <span class="small">(${Math.round(P.cong * 100)}/${Math.round(P.hp * 100)}/${Math.round(P.giap * 100)}% của bạn)</span>`; };
+  const form = (title, okLabel) => {
+    const C = GUARD_CLASSES[gdForm.cls];
+    return `<article class="card gd-card gd-form"><h4>${title}</h4>
+      <label class="field">Tên <span class="row"><input type="text" maxlength="${GUARD_NAME_MAX}" data-gd-name value="${esc(gdForm.name)}" placeholder="Để trống: tên gợi ý"><button data-gd-suggest>Gợi ý</button></span></label>
+      <div class="gd-classes">${Object.values(GUARD_CLASSES).map((K) => `<button class="td-w ${gdForm.cls === K.id ? "on" : ""}" data-gd-cls="${K.id}"><b>${esc(K.name)}</b><span>${esc(K.text)}</span><small>Chiêu: ${esc(K.skill.name)}</small></button>`).join("")}</div>
+      <p class="small"><b>${esc(C.name)}</b>: ${statLine(C.id)}</p>
+      <p class="small">Chiêu <b>${esc(C.skill.name)}</b> (hồi ${C.skill.cd} s): ${esc(C.skill.text)}</p>
+      <div class="row"><button class="primary" data-gd-save>${okLabel}</button><button data-gd-cancel>Thôi</button></div></article>`;
+  };
+  const cards = [];
+  for (let k = 0; k < 4; k++) {
+    const g = list[k];
+    if (g && gdForm?.mode === "edit" && gdForm.id === g.id) { cards.push(form(`Sửa · ${esc(g.name)}`, "Lưu")); continue; }
+    if (g) {
+      const C = GUARD_CLASSES[g.cls] || GUARD_CLASSES.khien;
+      cards.push(`<article class="card gd-card"><header><b>${esc(g.name)}</b><span>${esc(C.name)}</span></header>
+        <p class="small">${statLine(C.id)}</p><p class="small">Chiêu <b>${esc(C.skill.name)}</b>: ${esc(C.skill.text)}</p>
+        <p class="small">${g.battles} trận · hạ ${n(g.ko)} địch</p>
+        <div class="row"><button data-gd-edit="${g.id}">Sửa tên, lớp</button><button class="danger" data-gd-dismiss="${g.id}">Cho về</button></div></article>`);
+    } else if (k < slots) {
+      cards.push(gdForm?.mode === "new" && gdForm.slot === k ? form("Chiêu mộ cận vệ", "Nhận vào đội")
+        : `<article class="card gd-card gd-empty"><p>Chỗ trống</p><button class="primary" data-gd-new="${k}">Chiêu mộ</button></article>`);
+    } else {
+      const at = CAREER_RANKS.findIndex((_, r) => guardSlots(r) > k);
+      cards.push(`<article class="card gd-card gd-lock"><p>Mở ở bậc <b>${at >= 0 ? CAREER_RANKS[at].name : "?"}</b></p></article>`);
+    }
+  }
+  return `<h3 class="td-h">Cận vệ · ${list.length}/${slots} <span class="label hc">Hư cấu</span></h3>
+  <p class="small td-gd-note">Cận vệ theo bạn vào trận (trừ Đấu tướng). Chỉ số bằng 50–75% chỉ số của bạn tùy lớp, mạnh lên cùng bạn. Ra lệnh bằng vòng Mệnh Lệnh: Xung trận · Giữ chỗ · Theo ta · Tung chiêu. Gục thì đứng cạnh để đỡ dậy; hết trận ai cũng lành.</p>
+  <section class="gd-list">${cards.join("")}</section>`;
 }
 function tudoCreate() {
   const f = tdForm;
@@ -240,7 +279,7 @@ async function startSkirmish(sk) {
   let res = null;
   try {
     res = await runBattle({ container: stage, save, R: sk.R, difficulty: "quansi", mode: "nhanh", music, onSettings: () => persist(),
-      battle: makeTD(sk, c), heroDef: soldierDef(c), stats: soldierStats(c) });
+      battle: makeTD(sk, c), heroDef: { ...soldierDef(c), ...(sk.type === "dautuong" ? { guards: 0 } : {}) }, stats: soldierStats(c) });     // Đấu tướng: cận vệ ở lại doanh — ẩn nút Lệnh
   } catch (err) { console.error(err); toast("Lỗi khi chạy giao tranh: " + err.message, true); }
   stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
   if (!res) { tab = "tudo"; render(); return; }
@@ -262,7 +301,8 @@ function showTdResult(res, sk) {
         <div class="exp td-bar"><div style="width:${nx ? Math.round(nx.pct * 100) : 100}%"></div></div>
         <p class="small">Danh tiếng ${n(before)} → ${n(c.rep)} · ${nx ? `còn ${n(nx.need)} tới ${nx.name}` : "bậc cao nhất"}</p></div>
       <div class="card"><h3>Mục phụ ${res.side}/${res.sideList.length}</h3><ul class="rb-list">${res.sideList.map((x) => `<li class="${x.ok ? "ok" : ""}"><i class="rb-tick ${x.ok ? "ok" : "no"}">${x.ok ? "✓" : "–"}</i><b>${esc(x.name)}</b></li>`).join("")}</ul>
-        <table class="stat"><tr><td>Thời gian</td><td>${fmtSec(res.timeSec)}</td></tr><tr><td>Hạ địch</td><td>${res.ko}</td></tr>${res.squad ? `<tr><td>Lính còn</td><td>${res.squad.alive}/${res.squad.total}</td></tr>` : ""}</table></div>
+        <table class="stat"><tr><td>Thời gian</td><td>${fmtSec(res.timeSec)}</td></tr><tr><td>Hạ địch</td><td>${res.ko}</td></tr>
+          ${(res.guards || []).map((g) => `<tr><td>Cận vệ ${esc(g.name)} · ${esc(g.cls)}</td><td>${g.up ? "đứng vững" : "gục"} · hạ ${g.ko}</td></tr>`).join("")}</table></div>
     </div>
     <div class="row center"><button class="primary" data-td-back>Về binh nghiệp</button></div>
   </div>`;
@@ -273,7 +313,7 @@ function showTdResult(res, sk) {
 function tdPromotion(i) {
   const d = document.createElement("div"); d.className = "sheet-wrap td-promo";
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${rankSeal(i, true)}<h2>Thăng bậc · ${CAREER_RANKS[i].name}</h2>
-    <p>${esc(RANK_PERKS[i])}</p><div class="row center"><button class="primary" data-close>Nhận</button></div></div>`;
+    <p>${esc(RANK_PERKS[i])}</p>${guardSlots(i) > guardSlots(i - 1) ? `<p class="small">Có thêm một chỗ cận vệ: chiêu mộ ở trang Tự do (đặt tên, chọn lớp).</p>` : ""}<div class="row center"><button class="primary" data-close>Nhận</button></div></div>`;
   document.body.appendChild(d); music.play("victory", { loop: false, then: "hub" });
   d.querySelector("[data-close]").onclick = () => d.remove();
 }
@@ -717,7 +757,22 @@ const bind = {
     app.querySelectorAll("[data-td-go]").forEach((b) => (b.onclick = () => startSkirmish(board[Number(b.dataset.tdGo)])));
     app.querySelectorAll("[data-td-gear]").forEach((b) => (b.onclick = () => act(buyGear(c, b.dataset.tdGear), "Đã nâng quân nhu.")));
     app.querySelectorAll("[data-td-weapon]").forEach((b) => (b.onclick = () => { c.weapon = b.dataset.tdWeapon; persist(); render(); }));
-    app.querySelector("[data-td-retire]").onclick = () => { if (confirm(`Cho ${c.name} giải ngũ? Không hoàn tác được.`)) { retire(save); persist(); render(); } };
+    app.querySelector("[data-td-retire]").onclick = () => { if (confirm(`Cho ${c.name} giải ngũ? Không hoàn tác được.`)) { retire(save); gdForm = null; persist(); render(); } };
+    // cận vệ
+    app.querySelectorAll("[data-gd-new]").forEach((b) => (b.onclick = () => { gdForm = { mode: "new", slot: Number(b.dataset.gdNew), name: "", cls: "khien", seed: (Date.now() & 0xffffff) }; render(); }));
+    app.querySelectorAll("[data-gd-edit]").forEach((b) => (b.onclick = () => { const g = careerGuards(c).find((x) => x.id === Number(b.dataset.gdEdit)); if (g) { gdForm = { mode: "edit", id: g.id, name: g.name, cls: g.cls, seed: g.id * 7919 }; render(); } }));
+    app.querySelectorAll("[data-gd-dismiss]").forEach((b) => (b.onclick = () => { const g = careerGuards(c).find((x) => x.id === Number(b.dataset.gdDismiss)); if (g && confirm(`Cho ${g.name} về quê? Số trận, số địch đã hạ của người này mất theo.`)) { gdForm = null; act(dismissGuard(c, g.id), `${g.name} đã về quê.`); } }));
+    const gdName = app.querySelector("[data-gd-name]");
+    if (gdName) gdName.oninput = () => (gdForm.name = gdName.value);
+    app.querySelector("[data-gd-suggest]")?.addEventListener("click", (e) => { e.preventDefault(); gdForm.seed = (Math.imul(gdForm.seed, 1103515245) + 12345) & 0xffffff; gdForm.name = suggestName(gdForm.seed); render(); });
+    app.querySelectorAll("[data-gd-cls]").forEach((b) => (b.onclick = () => { gdForm.cls = b.dataset.gdCls; render(); }));
+    app.querySelector("[data-gd-cancel]")?.addEventListener("click", () => { gdForm = null; render(); });
+    app.querySelector("[data-gd-save]")?.addEventListener("click", () => {
+      const F = gdForm; if (!F) return;
+      const r = F.mode === "new" ? recruitGuard(c, { name: F.name, cls: F.cls }) : editGuard(c, F.id, { name: F.name, cls: F.cls });
+      if (r.ok) gdForm = null;
+      act(r, F.mode === "new" ? `${r.guard?.name ?? ""} đã vào đội cận vệ.` : "Đã lưu cận vệ.");
+    });
     if (!c.introSeen) tudoIntro(c);
   },
   huanluyen() {

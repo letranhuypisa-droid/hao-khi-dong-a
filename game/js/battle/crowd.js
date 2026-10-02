@@ -84,7 +84,7 @@ export class Crowd {
       foe: null, retT: 0, duel: false, _eng: 0, slot: undefined, pool: null, partner: null,
       forced: false, kiting: false, march: false,           // forced: lính diễn "ép" thành thật vì sát tướng (director.updateZone, promotion.js); kiting: đang lùi giữ tầm (gợi ý Cung kỵ, hints.js); march: lính bù xuất từ cửa ngõ đang hành quân ra tuyến (supply.js, đợt 12c)
       // đặt lại khi dùng lại lính trong bể: dấu Binh Thư (core verify mục 2), boong / thuyền (naval.js)
-      markT: 0, markMult: 1, deck: null, boat: null, _pins: null,
+      markT: 0, markMult: 1, tauntT: 0, tauntBy: null, deck: null, boat: null, _pins: null,
     });
     if (!a.pose) a.pose = new Float32Array(NCH);
     resetMotion(a);                  // lò xo vạt áo, dây tua, trọng số IK của lần dùng trước (pool)
@@ -217,7 +217,7 @@ export class Crowd {
   // Đối thủ còn đánh được: lính phe kia còn sống trong vùng chiến đấu, hoặc tướng đồng minh còn đứng.
   validFoe(a, f) {
     if (!f) return false;
-    if (f.isBig) return f.alive && !f.dead && f.side !== a.side;
+    if (f.isBig) return f.alive && !f.dead && !f.down && f.side !== a.side;
     return f.side !== a.side && this.hittable(f) && f.fleeT <= 0;
   }
 
@@ -257,7 +257,7 @@ export class Crowd {
     for (const a of this.agents) if (this.hittable(a)) (a.side === "dich" ? enemies : allies).push(a);
     // đối thủ của địch: lính ta và tướng đồng minh; đếm lại số người đang nhắm mỗi đối thủ
     const allyFoes = allies.slice();
-    for (const u of ctx.units) if (u.side === "ta" && u.alive && !u.dead) { u._eng = 0; allyFoes.push(u); }
+    for (const u of ctx.units) if (u.side === "ta" && u.alive && !u.dead && !u.down) { u._eng = 0; allyFoes.push(u); }     // down: cận vệ Tự do đang gục
     for (const a of enemies) a._eng = 0;
     for (const a of allies) a._eng = 0;
     for (const a of enemies) if (a.foe && this.validFoe(a, a.foe) && this.leashOk(a, a.foe)) a.foe._eng++; else a.foe = null;
@@ -358,11 +358,14 @@ export class Crowd {
         const aggro = a.role === "garrison" ? 20 : a.role === "squad" ? 14 : 60;
         const heroNear = hero.alive && dH < aggro;
         const siege = a.anchor?.target && a.anchor.target.alive && !a.anchor.target.dead;     // toán vây tướng đồng minh
-        if (!(a.token && heroNear) && !siege && (a.retT <= 0 || !a.foe)) {
+        // bị cận vệ Khiên thủ khiêu khích (chiêu Hộ chủ, battle/guard.js — chỉ có ở Tự do): đánh người khiêu khích tới hết giờ, bỏ thẻ đánh tướng
+        const taunt = a.tauntT > ctx.clock && this.validFoe(a, a.tauntBy) ? a.tauntBy : null;
+        if (taunt) { a.foe = taunt; a.token = false; }
+        if (!taunt && !(a.token && heroNear) && !siege && (a.retT <= 0 || !a.foe)) {
           a.retT = rng.range(AI.duel.retarget[0], AI.duel.retarget[1]);
           a.foe = this.pickFoe(a, allyFoes, ranged ? range : AI.duel.engageR + (a.foe ? 2 : 0));
         }
-        if (a.foe && !(a.token && heroNear) && !siege) {
+        if (a.foe && (taunt || (!(a.token && heroNear) && !siege))) {
           // giáp lá cà với lính ta / tướng đồng minh
           const f = a.foe, fr = f.isBig ? f.radius : 0;
           target = f; tx = f.x; tz = f.z; duel = true;
@@ -560,8 +563,9 @@ export class Crowd {
       ctx.hero.receiveHit({ dmg: raw * (a.chargeHit ? AI.charge.dmg : 1) * (0.95 + 0.1 * ctx.rng.next()) * hitMult(a, ctx.hero), x: a.x, z: a.z, red: false, src: a, heavy: !!a.K.heavy, knockdown: a.chargeHit });
       a.chargeHit = false;
     } else if (t.isBig) {
-      // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s
-      t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * 0.2, x: a.x, z: a.z, src: a });
+      // lính đánh tướng đồng minh ×0,2 (ĐỀ XUẤT BẢN THỬ): 24 lính vây Nguyễn Khoái thì ông trụ ~60 s. Cận vệ Tự do (battle/guard.js) đặt
+      // t.meleeMult riêng (data/guards.js GUARD_HIT).
+      t.receiveHit?.({ dmg: a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (t.meleeMult ?? 0.2), x: a.x, z: a.z, src: a });
     } else if (t.alive) {
       const dmg = a.cong * tier.mv * heSoGiap(t.giap, ctx.R) * (a.side === "ta" ? 0.8 : 0.6) * hitMult(a, t) * (a.duel ? AI.duel.dmg[a.side] : 1) * this.flagMult(a);
       this.damage(t, dmg, { kx: dx / (d || 1), kz: dz / (d || 1), knock: a.K.heavy ? 3.5 : 1.5, by: a.side === "ta" ? "ally" : "enemy", src: a });
@@ -637,7 +641,8 @@ export class Crowd {
     }
     if (!hero.alive) return;
     // lính đang giáp lá cà với quân ta được thẻ sau (xa thêm 5 m): quân ta cầm chân được địch, tướng bớt bị vây
-    const cand = enemies.filter((e) => !e.token).map((e) => [e, (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 + (e.foe ? 25 : 0)]).sort((a, b) => a[1] - b[1]);
+    const clk = this.ctx.clock;
+    const cand = enemies.filter((e) => !e.token && !(e.tauntT > clk)).map((e) => [e, (e.x - hero.x) ** 2 + (e.z - hero.z) ** 2 + (e.foe ? 25 : 0)]).sort((a, b) => a[1] - b[1]);
     for (const [e, d2] of cand) {
       if (isR(e)) { if (heldR < NR && d2 < 22 * 22) { e.token = true; heldR++; } }
       else if (held < N && d2 < 81) { e.token = true; held++; }

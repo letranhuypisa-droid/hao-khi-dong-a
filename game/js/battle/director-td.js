@@ -4,18 +4,21 @@
 // flags, order, tryTPC, objectives, lose, restoreCheckpoint, fillActors, các móc on*.
 //
 // Luật chung: địch kéo tới từ cửa vào (cờ chàm) — không bật ra cạnh người chơi; thua khi gục hết lượt Gượng dậy, hết giờ, hoặc theo
-// nhiệm vụ. Từ Đội trưởng có lính theo (data/career.js SQUAD) và 4 lệnh của vòng Mệnh Lệnh: Tiến công (xông về mục tiêu), Giữ vững
-// (đứng giữ chỗ), Theo ta (bám theo), Gọi tiếp viện (Tướng: 6 lính, 2 lượt; Phó tướng 1 lượt). Phó tướng có Kế Sách nhỏ "Phục binh":
-// 8 lính ta đánh úp từ sườn. Tướng có Hào Khí (hạ địch, xong mục tiêu) và Tổng Phản Công.
+// nhiệm vụ. Từ Tinh nhuệ có cận vệ (đợt 15c, thay "lính theo" và Gọi tiếp viện của đợt 14 — battle/guard.js, data/guards.js): 1 · 2 · 3 · 4
+// người theo bậc, vòng Mệnh Lệnh ra lệnh cho cận vệ (Xung trận · Giữ chỗ · Theo ta · Tung chiêu; người nhận: cả đội hoặc từng người), cận vệ
+// gục thì người lính đứng cạnh đỡ dậy. Phó tướng có Kế Sách nhỏ "Phục binh": 8 lính ta đánh úp từ sườn. Tướng có Hào Khí (hạ địch, xong
+// mục tiêu) và Tổng Phản Công.
 // Mọi số ở đây là ĐỀ XUẤT BẢN THỬ.
 
 import * as THREE from "three";
 import { BigUnit } from "./units.js";
+import { Guard } from "./guard.js";
 import { heightAt } from "./world.js";
 import { BannerQueue } from "./banner-queue.js";
 import { gain as hkGain, tick as hkTick, activate as hkActivate, tpcReady } from "../sim/haokhi.js";
 import { TIERS } from "../data/tuning.js";
-import { can, SQUAD, RANKS, KILL_REP, MISSION_MULT } from "../data/career.js";
+import { can, RANKS, KILL_REP, MISSION_MULT } from "../data/career.js";
+import { GUARD_ORDERS, REVIVE, guardSlots, guardStats, formationSlot, reviveStep } from "../data/guards.js";
 import { SITES } from "../data/skirmish.js";
 
 const HOLD = { ringPad: 2, drainPer: 2.2, drainEmpty: 5 };       // Giữ đồn: %/s mỗi lính địch hơn số người giữ, %/s khi đồn trống
@@ -36,16 +39,16 @@ export class TDDirector {
     this.bq = new BannerQueue((t, c, T) => ctx.fx.banner(t, c, T));
     this.keSach = { hud: () => this.ksHud(), trigger: () => this.ksTrigger(), boats: [], bundles: [], list: [] };
     this.ks = can(this.rank, "keSach") ? { used: false } : null;
-    this.reinfLeft = can(this.rank, "squad2") ? 2 : can(this.rank, "keSach") ? 1 : 0;
-    ctx.sim.reinf = { charges: this.reinfLeft, pending: [] }; ctx.sim.cooldowns = {};
-    this.squad = []; this.squadTotal = 0; this.squadOrder = "theota";
+    ctx.sim.reinf = { charges: 0, pending: [] }; ctx.sim.cooldowns = {};
+    this.guards = []; this.ringTarget = "all"; this.prQ = null;
     this.props = new THREE.Group(); ctx.scene.add(this.props);
     this.waveQ = (sk.waves || []).map((w) => ({ ...w, done: false }));
     this.officerUnits = [];
     this.flag(sk.entry, COL.dich, 7);                                // cửa vào của địch: cờ chàm
     this.setup = { giudon: this.setupHold, danhup: this.setupRaid, chantiepte: this.setupConvoy, hotong: this.setupEscort, cuudongdoi: this.setupRescue, dautuong: this.setupDuel }[sk.type];
     this.setup.call(this);
-    if (SQUAD[this.rank] && sk.type !== "dautuong") this.spawnSquad(SQUAD[this.rank]);   // Đấu tướng: một chọi một, lính đứng xem
+    if (sk.type !== "dautuong") this.spawnGuards();                  // Đấu tướng: một chọi một — cận vệ ở lại doanh
+    else if (career.guards?.length && guardSlots(this.rank)) this.say("Đấu tướng là một chọi một: cận vệ ở lại doanh.", 5);
     this.say(`${sk.name} · ${sk.goal}.`, 7);
     this.say(sk.how, 9);
     this.bq.push(sk.name.toUpperCase(), "#f1d98a", 1.4);
@@ -119,36 +122,80 @@ export class TDDirector {
   }
   routeLen(route) { let L = 0; for (let i = 0; i < route.length - 1; i++) L += Math.hypot(route[i + 1].x - route[i].x, route[i + 1].z - route[i].z); return L; }
 
-  // ---- lính theo (Đội trưởng trở lên) ---------------------------------------------------------------------------------------
-  spawnSquad(n) {
+  // ---- cận vệ (đợt 15c) -----------------------------------------------------------------------------------------------------
+  // Cận vệ trong lưu (career.guards, đủ số chỗ của bậc) ra trận ở chỗ đứng đội hình quanh người lính. Chỉ số = data/guards.js guardStats của chỉ
+  // số người lính lúc vào trận (ctx.stats: bậc + quân nhu), tốc chạy bằng người lính.
+  spawnGuards() {
+    const ctx = this.ctx, h = this.hero, list = (this.career.guards || []).slice(0, guardSlots(this.rank));
+    const base = { cong: ctx.stats.cong, hp: ctx.stats.hp, giap: ctx.stats.giap, move: h.def.move };
+    list.forEach((g, i) => {
+      const p = formationSlot(i, h.yaw), u = new Guard(ctx, g, guardStats(base, g.cls), i, h.x + p.x, h.z + p.z, h.yaw);
+      ctx.units.push(u); this.guards.push(u);
+    });
+  }
+  guardsUp() { return this.guards.filter((g) => g.alive && !g.down).length; }
+  // người nhận lệnh: "all" hoặc "g<id>" (hud.js vòng qua ringTargets bằng Z / LB / chạm tên)
+  ringTargets() {
+    if (!this.guards.length) return [{ id: "all", name: this.type === "dautuong" ? "Cận vệ ở lại doanh" : "Chưa có cận vệ" }];
+    return [{ id: "all", name: "Cả đội cận vệ" }, ...this.guards.map((g) => ({ id: "g" + g.gid, name: g.name }))];
+  }
+  ringItems() { return GUARD_ORDERS; }
+  ringHint() { return this.guards.length > 1 ? "(Z / chạm tên để đổi người nhận)" : ""; }
+  picked(target) { return target === "all" || !target ? this.guards : this.guards.filter((g) => "g" + g.gid === target); }
+  // chữ nhỏ dưới mỗi ô lệnh: ai đang theo lệnh đó / mấy người có chiêu sẵn
+  ringStatus(k, target) {
+    const gs = this.picked(target).filter((g) => g.alive && !g.down);
+    if (!gs.length) return "";
+    if (k === "tungchieu") { const r = gs.filter((g) => g.skillCd <= 0).length; return gs.length === 1 ? (r ? "sẵn sàng" : `${Math.ceil(gs[0].skillCd)}s`) : `${r}/${gs.length} sẵn`; }
+    const n = gs.filter((g) => g.order === k).length;
+    return n === gs.length ? "đang theo" : n ? `${n}/${gs.length}` : "";
+  }
+  // vòng Mệnh Lệnh (hud.issue → order(người nhận, lệnh))
+  order(target, k) {
+    const ctx = this.ctx;
+    if (!this.guards.length) {
+      this.say(this.type === "dautuong" ? "Đấu tướng là một chọi một: cận vệ ở lại doanh." : can(this.rank, "squad") ? "Chưa có cận vệ — chiêu mộ ở trang Tự do." : `Lên ${RANKS[1].name} mới có cận vệ để ra lệnh.`, 4);
+      return { ok: false };
+    }
+    const gs = this.picked(target).filter((g) => g.alive), up = gs.filter((g) => !g.down);
+    const who = target === "all" || !target ? (this.guards.length > 1 ? "Cả đội" : this.guards[0].name) : gs[0]?.name ?? "";
+    if (!up.length) { this.say(`${who}: đang gục, chưa nhận lệnh được.`, 2.5, "bad"); return { ok: false }; }
+    if (k === "tungchieu") {
+      let n = 0; for (const g of up) if (g.startSkill(true)) n++;
+      const wait = up.filter((g) => !g.sk && g.skillCd > 0);
+      if (n) this.say(`${who}: tung chiêu!`, 2, "good");
+      else if (wait.length) this.say(`Chiêu chưa hồi (${Math.ceil(Math.min(...wait.map((g) => g.skillCd)))} s).`, 2.5);
+      return { ok: n > 0 };
+    }
+    const O = GUARD_ORDERS.find((o) => o.k === k); if (!O) return { ok: false };
+    for (const g of up) { g.order = k; g.hold = k === "giucho" ? { x: g.x, z: g.z } : null; g.foe = null; g.retT = 0; }
+    this.say(`${who}: ${O.name}.`, 2.5, "good"); ctx.audio.play("drum");
+    this.orders = (this.orders || 0) + 1;
+    return { ok: true };
+  }
+  // khung cận vệ trên HUD (hud.js): mỗi người một dòng; sel: đang là người nhận lệnh của vòng Mệnh Lệnh
+  guardHud(target) {
+    if (!this.guards.length) return null;
+    return this.guards.map((g) => ({ id: g.gid, name: g.name, cls: g.C.name, hp: g.hp, maxHp: g.maxHp, down: g.down, used: g.rev.used,
+      order: GUARD_ORDERS.find((o) => o.k === g.order)?.name ?? "", skill: g.C.skill.name, cd: g.skillCd, sel: !target || target === "all" || target === "g" + g.gid }));
+  }
+  onGuardDown(g) { if (g.rev.used) { this.say(`${g.name} gục — đã được đỡ một lần, hết trận mới lành.`, 5, "bad"); return; } this.say(`${g.name} gục! Đứng cạnh ${String(REVIVE.sec).replace(".", ",")} s (không có địch kề bên) để đỡ dậy.`, 5, "bad"); }
+  onGuardSkill() {}
+  // gục / đỡ dậy (data/guards.js reviveStep); tên đã bắn vẫn bay tới
+  updateGuards(dt) {
     const h = this.hero;
-    for (let i = 0; i < n; i++) {
-      const a = h.yaw + Math.PI + (i - (n - 1) / 2) * 0.35, r = 3 + (i % 3);
-      this.squad.push(this.spawnAlly(h.x + Math.sin(a) * r, h.z + Math.cos(a) * r, { role: "follow" }));
+    for (const g of this.guards) {
+      g.tickPending();
+      if (!g.alive || !g.down) continue;
+      const near = h.alive && this.dist(h, g) < REVIVE.r, blocked = near && this.enemiesNear(g, REVIVE.clear) > 0;
+      const st = reviveStep(g.rev, dt, { near, blocked });
+      g.rev.p = st.p;
+      if (st.done) { g.rev.p = 0; g.rev.used = true; g.standUp(REVIVE.hpPct); this.banner(`${g.name.toUpperCase()} ĐỨNG DẬY`, "#dff0c8", 0.9); continue; }
+      if (near) this.wantPrompt(g.rev.used ? `${g.name} đã được đỡ một lần — hết trận mới lành` : blocked ? `Địch kề bên — dẹp chúng rồi đỡ ${g.name} dậy` : `Đỡ ${g.name} dậy`, g.rev.used ? 0 : g.rev.p);
     }
-    this.squadTotal += n;
   }
-  squadAlive() { return this.squad.filter((a) => this.alive(a)).length; }
-  // vòng Mệnh Lệnh (hud.issue → order(mặt trận, lệnh)): Tiến công / Giữ vững / Theo ta / Gọi tiếp viện
-  order(_front, k) {
-    const ctx = this.ctx, h = this.hero, sim = ctx.sim;
-    if (!can(this.rank, "squad")) { this.say("Lên Đội trưởng mới có lính theo để ra lệnh.", 4); return; }
-    if ((sim.cooldowns[k] || 0) > 0) return;
-    if (k === "tiepvien") {
-      if (this.reinfLeft <= 0) { this.say("Hết lượt gọi tiếp viện.", 3, "bad"); return; }
-      this.reinfLeft--; sim.reinf.charges = this.reinfLeft; this.spawnSquad(6); this.banner("TIẾP VIỆN", "#e6dcc3", 1); sim.cooldowns[k] = 8; return;
-    }
-    const obj = this.objectivePoint() || h;
-    for (const a of this.squad) {
-      if (!this.alive(a)) continue;
-      if (k === "theota") a.role = "follow";
-      else if (k === "giuvung") { a.role = "squad"; a.sx = h.x + (a.id % 5 - 2) * 1.6; a.sz = h.z + ((a.id >> 2) % 3 - 1) * 1.6; }
-      else if (k === "tiencong") { a.role = "zone"; a.sx = obj.x + (a.id % 5 - 2) * 2; a.sz = obj.z + ((a.id >> 2) % 3 - 1) * 2; }
-      a.foe = null; a.retT = 0;
-    }
-    this.squadOrder = k; sim.cooldowns[k] = 2;
-    this.say(`Lệnh: ${{ theota: "Theo ta", giuvung: "Giữ vững", tiencong: "Tiến công" }[k]}.`, 2.5, "good");
-  }
+  // nhắc tương tác giữa đáy màn: việc của nhiệm vụ (châm lều, cởi trói) trước, đỡ cận vệ sau — gom trong một bước rồi mới vẽ
+  wantPrompt(text, p) { if (!this.prQ) this.prQ = { text, p }; }
   addFlag(x, z, r, atk, dur) { this.flags.push({ x, z, r, atk, left: dur }); }
   plantFlag(x, z, r, atk, dur) { this.addFlag(x, z, r, atk, dur); this.ctx.fx.ring(x, z, r, 0xf1d98a, 0.8); }
 
@@ -187,7 +234,15 @@ export class TDDirector {
     if (this.over) return [];
     if (this.type === "giudon") return [P("don", this.siteName, s.site, s.ring + 1)];
     if (this.type === "danhup") { const t = this.tents.filter((x) => !x.burnt).sort((a, b) => this.dist(a, h) - this.dist(b, h))[0]; return t ? [P("leu", "Lều lương", t, 2.4)] : []; }
-    if (this.type === "chantiepte") { const c = this.carts.filter((x) => x.live && !x.stopped).sort((a, b) => this.dist(a, h) - this.dist(b, h))[0]; return c ? [P("xe", "Xe lương địch", c, 5)] : []; }
+    if (this.type === "chantiepte") {
+      const c = this.carts.filter((x) => x.live && !x.stopped).sort((a, b) => this.dist(a, h) - this.dist(b, h))[0];
+      if (!c) return [];
+      // người kéo bỏ xe đi đánh nhau (xe đứng yên): chỉ thẳng vào người kéo — trước đây nhãn chỉ vào xe, người kéo đứng kẹt cách xe 10+ m thì
+      // không ai hạ, hết giờ (đợt 15c đo: không còn 8 / 16 lính theo dọn hộ)
+      const pl = c.puller, hitch = { x: c.x + Math.sin(c.yaw) * CART.hitch, z: c.z + Math.cos(c.yaw) * CART.hitch };
+      if (pl && this.alive(pl) && this.dist(pl, hitch) > CART.pullR + 1.5) return [P("keo", "Người kéo xe địch", pl, 2)];
+      return [P("xe", "Xe lương địch", c, 5)];
+    }
     if (this.type === "hotong") return [P("xe", "Xe lương ta", this.cart, 7)];
     if (this.type === "cuudongdoi") {
       const c = this.captives.filter((x) => !x.freed).sort((a, b) => this.dist(a.a, h) - this.dist(b.a, h))[0];
@@ -269,7 +324,10 @@ export class TDDirector {
       this.say(this.type === "giudon" ? "Một toán quân Nguyên kéo tới từ cửa vào." : "Quân cứu viện của địch kéo tới.", 3.5, "bad");
       ctx.audio.play("horn");
     }
+    this.prQ = null;
     this["step_" + this.type](dt);
+    this.updateGuards(dt);
+    if (!this.over) this.ctx.hud.prompt(this.prQ ? this.prQ.text : null, this.prQ?.p ?? 0);
     this.updateEvents(dt);
     if (this.time >= this.sk.timeLimit && !this.over) this.timeUp();
   }
@@ -284,6 +342,7 @@ export class TDDirector {
     this.holdT += dt;
     const foes = this.enemiesNear(s.site, R);
     let def = 0; for (const a of this.ctx.crowd.agents) if (a.side === "ta" && this.alive(a) && this.dist(a, s.site) < R) def++;
+    for (const g of this.guards) if (g.alive && !g.down && this.dist(g, s.site) < R) def += 2;     // cận vệ giữ đồn: mỗi người tính 2 (đợt 15c)
     if (h.alive && this.dist(h, s.site) < R) def += 2;
     if (foes > 0) this.keep = Math.max(0, this.keep - (def === 0 ? HOLD.drainEmpty : Math.max(0, foes - def) * HOLD.drainPer / 2) * dt);
     const left = Math.max(0, s.hold - this.holdT);
@@ -306,7 +365,7 @@ export class TDDirector {
         }
       }
     }
-    this.ctx.hud.prompt(prompt ? prompt.text : null, prompt?.p ?? 0);
+    if (prompt) this.wantPrompt(prompt.text, prompt.p);
     this.baseHint = `Đã đốt ${this.burnt}/${this.tents.length} lều`;
     if (this.burnt >= this.tents.length) { this.ctx.hud.prompt(null); this.finish(true, "Trại lương của địch đã cháy."); }
   }
@@ -377,10 +436,10 @@ export class TDDirector {
         const blocked = this.enemiesNear(c.a, CLEAR_R) > 0;
         if (!blocked) c.p += dt / C.freeSec;
         prompt = { text: blocked ? "Địch kề bên — dẹp chúng rồi cởi trói" : "Cởi trói cho đồng đội", p: c.p };
-        if (c.p >= 1) { c.freed = true; c.a.role = "follow"; c.a.foe = null; this.banner("CỞI TRÓI", "#dff0c8", 0.9); this.hk(6, "Cứu đồng đội"); this.squad.push(c.a); this.squadTotal++; }
+        if (c.p >= 1) { c.freed = true; c.a.role = "follow"; c.a.foe = null; this.banner("CỞI TRÓI", "#dff0c8", 0.9); this.hk(6, "Cứu đồng đội"); }
       }
     }
-    this.ctx.hud.prompt(prompt ? prompt.text : null, prompt?.p ?? 0);
+    if (prompt) this.wantPrompt(prompt.text, prompt.p);
     const freed = this.captives.filter((c) => c.freed && !c.lost && this.alive(c.a)).length, tied = this.captives.filter((c) => !c.freed).length;
     this.baseHint = tied ? `Đã cởi trói ${this.captives.length - tied}/${this.captives.length}` : `Đưa ${freed} người về chỗ hẹn`;
     if (!tied && freed === 0) return this.finish(false, "Không cứu được ai về.");
@@ -414,14 +473,18 @@ export class TDDirector {
     if (opt.by === "hero") { this.kills[a.tier === "tinhnhue" ? "tinhnhue" : "thuong"]++; this.ko++; this.hk(a.tier === "tinhnhue" ? 1.5 : 0.5, "Hạ địch"); }
     if (this.type === "chantiepte") for (const c of this.carts) if (c.escorts.includes(a)) this.escortsKilled++;
   }
-  onOfficerKilled(u) {
-    this.kills[u.tier] = (this.kills[u.tier] || 0) + 1; this.ko++;
-    this.ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1.1); this.hk(8, "Hạ sĩ quan");
+  // Sĩ quan do cận vệ ra đòn cuối (opt.by "guard", đợt 15c): người lính được nửa phần (danh tiếng, Hào Khí) — công của cả đội, nhưng lính
+  // thường do cận vệ hạ thì không tính cho người lính (như lính theo của đợt 14). ĐỀ XUẤT BẢN THỬ.
+  onOfficerKilled(u, opt = {}) {
+    const k = opt.by === "guard" ? 0.5 : 1;
+    this.kills[u.tier] = (this.kills[u.tier] || 0) + k; this.ko++;
+    this.ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1.1); this.hk(8 * k, "Hạ sĩ quan");
     if (this.type === "dautuong" && u === this.duelist) this.finish(true, `Thắng trận thách đấu với ${u.name}.`);
     if (u === this.keeper) this.keeperDown = true;
   }
-  onBossDefeated(u) {
-    this.kills.tuong++; this.ko++; this.ctx.fx.banner("TƯỚNG NGUYÊN RÚT CHẠY", "#f1d98a", 1.4); this.hk(15, "Đánh lui tướng");
+  onBossDefeated(u, opt = {}) {
+    const k = opt.by === "guard" ? 0.5 : 1;
+    this.kills.tuong += k; this.ko++; this.ctx.fx.banner("TƯỚNG NGUYÊN RÚT CHẠY", "#f1d98a", 1.4); this.hk(15 * k, "Đánh lui tướng");
     if (this.type === "dautuong" && u === this.duelist) this.finish(true, `${u.name} thua trận thách đấu, rút chạy.`);
   }
   onCaptured(u) { this.onBossDefeated(u); }
@@ -450,7 +513,7 @@ export class TDDirector {
     this.result = {
       td: true, battle: "TD", won, why, canRetry: false, type: this.type, name: this.sk.name, base: this.sk.base, rank: this.rank,
       kills: { ...this.kills }, ko: this.ko, side: sideList.filter((x) => x.ok).length, sideList,
-      squad: this.squadTotal ? { total: this.squadTotal, alive: this.squadAlive() } : null, timeSec: this.time, mode: this.ctx.mode, R: this.ctx.R,
+      guards: this.guards.map((g) => ({ id: g.gid, name: g.name, cls: g.C.name, ko: g.ko, up: g.alive && !g.down })), timeSec: this.time, mode: this.ctx.mode, R: this.ctx.R,
     };
     if (won) { this.bq.push("THẮNG TRẬN", "#f1d98a", 1.6); this.ctx.audio.play("victory"); }
   }

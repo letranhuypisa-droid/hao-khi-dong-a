@@ -282,6 +282,11 @@ export class BigUnit {
       if (d > r) continue;
       ctx.crowd.damage(a, this.cong * mv * heSoGiap(a.giap, ctx.R), { kx: dx / (d || 1), kz: dz / (d || 1), knock: 4, by: this.side === "ta" ? "ally" : "enemy" });
     }
+    // cận vệ Tự do (battle/guard.js, đợt 15c) đứng trong tầm quét của sĩ quan địch cũng trúng, × meleeMult như lính địch chém (B15/B20 không có)
+    if (this.side === "dich") for (const u of ctx.units) {
+      if (!u.isGuard || !u.alive || u.down || Math.hypot(u.x - this.x, u.z - this.z) > r + u.radius) continue;
+      u.receiveHit({ dmg: this.cong * mv * heSoGiap(u.giap, ctx.R) * u.meleeMult, x: this.x, z: this.z, src: this });
+    }
   }
 
   updateAlly(dt) {
@@ -377,7 +382,7 @@ export class BigUnit {
     }
     if (this.hp <= 0) {
       this.hp = 0;
-      if (this.tier === "tuong") { this.retreating = true; this.retreatT = 0; ctx.director?.onBossDefeated(this); }
+      if (this.tier === "tuong") { this.retreating = true; this.retreatT = 0; ctx.director?.onBossDefeated(this, opt); }
       else { this.dead = 0.001; ctx.director?.onOfficerKilled(this, opt); ctx.crowd?.rout(this.x, this.z, AI.rout.officerR); }
       return { killed: true, broke };
     }

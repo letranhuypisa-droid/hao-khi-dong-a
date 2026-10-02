@@ -2,9 +2,10 @@
 // tiền thưởng và trang bị, chỉ số người lính, tạo lính. Thuần (data/career.js, meta/career.js). Chạy trong Node:
 //   node game/tests/career.test.mjs
 import assert from "node:assert/strict";
-import { RANKS, rankOf, nextRank, can, UNLOCK, PICKS, SQUAD, KILL_REP, MISSION_MULT, SIDE_REP, LOSE, battleRep, applyRep, GEAR, gearCost, payOf, QUE, suggestName } from "../js/data/career.js";
+import { RANKS, rankOf, nextRank, can, UNLOCK, PICKS, KILL_REP, MISSION_MULT, SIDE_REP, LOSE, battleRep, applyRep, GEAR, gearCost, payOf, QUE, suggestName } from "../js/data/career.js";
 import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS } from "../js/meta/career.js";
 import { heroStats } from "../js/meta/progress.js";
+import { guardSlots } from "../js/data/guards.js";
 import { newSave } from "../js/meta/progress.js";
 
 let pass = 0, fail = 0;
@@ -25,16 +26,16 @@ t("nextRank: còn thiếu bao nhiêu, phần trăm trong bậc; bậc cuối th�
   assert.equal(n.i, 2); assert.equal(n.need, 450); assert.ok(Math.abs(n.pct - 0.5) < 1e-9);
   assert.equal(nextRank(8000), null);
 });
-t("mở theo bậc: Lính chỉ đòn cơ bản; Tinh nhuệ C3–C4 + Đòn Quyết; Đội trưởng Phá Thế, lính theo, Phá Trận; Phó tướng kỹ năng 2 + Kế Sách nhỏ; Tướng Tuyệt Kỹ + Hào Khí", () => {
+t("mở theo bậc: Lính chỉ đòn cơ bản; Tinh nhuệ C3–C4 + Đòn Quyết + lệnh cận vệ (đợt 15c); Đội trưởng Phá Thế, Phá Trận; Phó tướng kỹ năng 2 + Kế Sách nhỏ; Tướng Tuyệt Kỹ + Hào Khí", () => {
   assert.equal(can(0, "c34"), false); assert.equal(can(0, "dq"), false); assert.equal(can(0, "skill1"), false);
-  assert.equal(can(1, "c34"), true); assert.equal(can(1, "dq"), true); assert.equal(can(1, "squad"), false);
-  for (const f of ["poise", "squad", "skill1"]) { assert.equal(can(2, f), true, f); assert.equal(can(1, f), false, f); }
+  assert.equal(can(1, "c34"), true); assert.equal(can(1, "dq"), true); assert.equal(can(0, "squad"), false); assert.equal(can(1, "squad"), true);
+  for (const f of ["poise", "skill1"]) { assert.equal(can(2, f), true, f); assert.equal(can(1, f), false, f); }
   for (const f of ["skill2", "keSach"]) { assert.equal(can(3, f), true, f); assert.equal(can(2, f), false, f); }
   for (const f of ["ult", "haoKhi"]) { assert.equal(can(4, f), true, f); assert.equal(can(3, f), false, f); }
   for (const k in UNLOCK) assert.ok(UNLOCK[k] >= 0 && UNLOCK[k] < RANKS.length, k);
 });
-t("số nhiệm vụ được chọn 1 · 2 · 2 · 3 · 3; lính theo 0 · 0 · 8 · 8 · 16", () => {
-  assert.deepEqual(PICKS, [1, 2, 2, 3, 3]); assert.deepEqual(SQUAD, [0, 0, 8, 8, 16]);
+t("số nhiệm vụ được chọn 1 · 2 · 2 · 3 · 3; cận vệ 0 · 1 · 2 · 3 · 4 (đợt 15c thay lính theo 0 · 0 · 8 · 8 · 16)", () => {
+  assert.deepEqual(PICKS, [1, 2, 2, 3, 3]); assert.deepEqual(RANKS.map((_, i) => guardSlots(i)), [0, 1, 2, 3, 4]);
 });
 
 console.log("Danh tiếng mỗi trận");
@@ -47,9 +48,9 @@ t("thắng: nhiệm vụ × hệ số bậc + hạ địch theo bậc địch + 
   assert.ok(r.parts.every((p) => p.label && Number.isFinite(p.rep)));
 });
 t("hạ địch: lính 1, tinh nhuệ 3, đội trưởng 15, phó tướng 40, tướng 100", () => assert.deepEqual(KILL_REP, { thuong: 1, tinhnhue: 3, doitruong: 15, photuong: 40, tuong: 100 }));
-t("từ Đội trưởng: giữ được lính của mình thì có thêm (tỉ lệ còn sống)", () => {
-  const a = battleRep({ won: true, base: 70, rankIdx: 2, kills: {}, side: 0, squad: { total: 8, alive: 8 } });
-  const b = battleRep({ won: true, base: 70, rankIdx: 2, kills: {}, side: 0, squad: { total: 8, alive: 4 } });
+t("từ Tinh nhuệ: cận vệ còn đứng cuối trận thì có thêm (tỉ lệ còn đứng)", () => {
+  const a = battleRep({ won: true, base: 70, rankIdx: 2, kills: {}, side: 0, guards: { total: 2, alive: 2 } });
+  const b = battleRep({ won: true, base: 70, rankIdx: 2, kills: {}, side: 0, guards: { total: 2, alive: 1 } });
   const c = battleRep({ won: true, base: 70, rankIdx: 2, kills: {}, side: 0 });
   assert.ok(a.total > b.total && b.total > c.total);
 });
@@ -80,7 +81,7 @@ t("nhịp lên bậc (trận trung bình: thắng 3/4 trận, ~1 mục phụ, h�
   while (rankOf(c.rep) < 4 && n < 500) {
     const i = rankOf(c.rep); n++;
     const won = n % 4 !== 0;
-    applyRep(c, battleRep({ won, base: 72, rankIdx: i, kills: avgKills[i], side: 1, squad: SQUAD[i] ? { total: SQUAD[i], alive: SQUAD[i] * 0.7 } : null }));
+    applyRep(c, battleRep({ won, base: 72, rankIdx: i, kills: avgKills[i], side: 1, guards: guardSlots(i) ? { total: guardSlots(i), alive: guardSlots(i) * 0.7 } : null }));
     if (!toTn && rankOf(c.rep) >= 1) toTn = n;
   }
   assert.ok(toTn >= 3 && toTn <= 6, `lên Tinh nhuệ sau ${toTn} trận`);

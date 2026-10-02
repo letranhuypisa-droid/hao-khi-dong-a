@@ -253,10 +253,10 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         ctx.hud.setRing(inp.cmdHeld);
         if (inp.cmdHeld) {
           if (inp.pressed.cmdSwap || inp.pressed.lock) ctx.hud.swapFront();
-          ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
+          ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(ctx.hud.ringKey(i)); });   // phím 1–4 → 4 ô của vòng (B15/B20: lệnh mặt trận; Tự do: lệnh cận vệ)
           inp.pressed.lock = false;
         } else if (ctx.hud.pickerOpen) ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.pick(i); });   // bảng chọn điểm đến (hud.picker)
-        else ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(["tiencong", "giuvung", "theota", "tiepvien"][i]); });
+        else ["cmd1", "cmd2", "cmd3", "cmd4"].forEach((k, i) => { if (inp.pressed[k]) ctx.hud.issue(ctx.hud.ringKey(i)); });   // phím 1–4 → 4 ô của vòng (B15/B20: lệnh mặt trận; Tự do: lệnh cận vệ)
         if (inp.pressed.tpc) d.tryTPC();
         if (inp.pressed.kesach) d.keSach?.trigger();
         if (inp.pressed.lock) ctx.hero.toggleLock();

@@ -8,7 +8,8 @@ import { TDDirector } from "../battle/director-td.js";
 import { SoldierHero } from "../battle/soldier.js";
 import { MAP } from "../data/battle-b15.js";
 import B15 from "./b15.js";
-import { RANKS, nextRank, SQUAD } from "../data/career.js";
+import { RANKS, nextRank } from "../data/career.js";
+import { guardSlots } from "../data/guards.js";
 import { createHaoKhi } from "../sim/haokhi.js";
 
 const COL = { land: "#cdb888", water: "#2f5d62", fort: "#b39a6a", wall: "#5a4632", don: "#8a7a5a", gold: "#f1d98a", dich: "#2c3e55", ta: "#c0392b", ink: "#1d1a17" };
@@ -59,13 +60,13 @@ export function makeTD(sk, career) {
     return { label: "DANH TIẾNG", value: `+${live}`, pct: nx ? Math.round(nx.pct * 100) : 100,
       state: nx ? `${RANKS[rank].name} · còn ${Math.max(0, nx.need)} tới ${nx.name}` : RANKS[rank].name };
   }
-  // bảng dưới bản đồ to: lính theo, lệnh đang dùng, tiếp viện
+  // bảng dưới bản đồ to: cận vệ (đợt 15c — thay lính theo / tiếp viện của đợt 14), Phục binh
   function frontsHTML(ctx) {
-    const d = ctx.director;
-    if (!SQUAD[rank]) return `<div class="front"><b>${RANKS[rank].name}</b><span class="vs">đánh lẻ · lên Đội trưởng để có lính theo</span></div>`;
-    const ord = { theota: "Theo ta", giuvung: "Giữ vững", tiencong: "Tiến công" }[d.squadOrder] || "";
-    return `<div class="front here"><b>Đội</b><span class="ta">${d.squadAlive()}</span><span class="vs">/ ${d.squadTotal} lính</span><em>${ord}</em></div>
-      <div class="front reinf">Tiếp viện: ${d.reinfLeft} lượt${d.ks ? ` · Phục binh: ${d.ks.used ? "đã dùng" : "sẵn sàng"}` : ""}</div>`;
+    const d = ctx.director, n = d.guards?.length || 0;
+    if (!guardSlots(rank)) return `<div class="front"><b>${RANKS[rank].name}</b><span class="vs">đánh lẻ · lên Tinh nhuệ để có cận vệ</span></div>`;
+    const ks = d.ks ? `<div class="front reinf">Phục binh: ${d.ks.used ? "đã dùng" : "sẵn sàng"}</div>` : "";
+    if (!n) return `<div class="front"><b>Cận vệ</b><span class="vs">${sk.type === "dautuong" ? "ở lại doanh (đấu một chọi một)" : "chưa chiêu mộ ai"}</span></div>` + ks;
+    return `<div class="front here"><b>Cận vệ</b><span class="ta">${d.guardsUp()}</span><span class="vs">/ ${n} đứng</span></div>` + ks;
   }
 
   class Director extends TDDirector { constructor(ctx) { super(ctx, sk, career); } }

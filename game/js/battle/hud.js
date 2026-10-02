@@ -7,6 +7,9 @@
 // nextHeavyInfo() (ô C). Thiếu móc nào thì dùng đúng cách của B15 / H35 như trước.
 // Ô chung cho widget của trận khác (B15 không gọi): setTopWidget (dưới thanh Hào Khí), setPanel (cột phải, dưới bảng Kế
 // Sách), prompt (nhắc tương tác giữa đáy màn, vòng giữ phím), picker (chọn ≤ 4 điểm đến bằng phím 1–4 / chạm).
+// Vòng Mệnh Lệnh theo trận (đợt 15c): director có ringItems() → [{ k, name, icon }] thì vòng dùng 4 lệnh đó thay 4 lệnh mặt trận; ringTargets() →
+// [{ id, name }] là danh sách người nhận (Z / chạm tên vòng qua — thay mặt trận A ↔ B), ringStatus(k, người nhận) chữ nhỏ dưới ô, ringHint() chữ
+// hướng dẫn. guardHud(người nhận) → khung cận vệ ở góc trái dưới (Tự do).
 
 import { ORDERS, HERO, MODES, TERRAIN } from "../data/tuning.js";
 import { totalQ, supplyOpen } from "../sim/front.js";
@@ -31,6 +34,7 @@ const SLOT_KEY = [short("skill"), short("skill2")];
 // Ô kỹ năng của tướng: mảng từ hero.skillSlots() (C2), không có thì null (đường H35 cũ: một ô Phá Trận).
 // Mỗi ô: { id, name, icon?, key?, ready?, cd?, text? } — thiếu trường nào thì suy ra như dưới.
 const heroSlots = (h) => { const s = h?.skillSlots?.(); return Array.isArray(s) && s.length ? s.slice(0, 2) : null; };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 export class HUD {
   constructor(root, ctx) {
@@ -73,6 +77,7 @@ export class HUD {
           <div class="ttags"><span class="ttag" data-k="ttag"></span><span class="ttag mud" data-k="tmud"></span></div>
         </div>
       </div>
+      <div class="hud-guards" data-k="guards" hidden></div>
       <div class="hud-map"><canvas width="${cv.w}" height="${cv.h}" data-k="map"${H.canvas ? ` style="width:${cv.w}px;height:${cv.h}px"` : ""}></canvas>
         <div class="fronts" data-k="fronts"></div>
       </div>
@@ -85,8 +90,8 @@ export class HUD {
       <div class="hud-ko"><b data-k="ko">0</b><span>KO</span></div>
       ${skillBarHTML(true, this.slots, hero?.ultInfo?.())}
       <div class="ring" data-k="ring">
-        <div class="ring-title">MỆNH LỆNH · <span data-k="ringfront"></span> <small>(Z / chạm để đổi mặt trận)</small></div>
-        <div class="ring-grid">${ORDER_KEYS.map((k, i) => `<button data-order="${k}"><img class="ric" src="${ICON(MOVE_INFO[k].icon)}" alt=""><b>${i + 1}</b><span>${ORDERS[k].name}</span><i data-k="cd_${k}"></i></button>`).join("")}</div>
+        <div class="ring-title">MỆNH LỆNH · <span data-k="ringfront"></span> <small data-k="ringhint">(Z / chạm để đổi mặt trận)</small></div>
+        <div class="ring-grid" data-k="ringgrid"></div>
         <div class="ring-foot" data-k="ringfoot"></div>
       </div>
       <div class="hud-prompt" data-k="prompt" hidden><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="bg"></circle><circle cx="18" cy="18" r="15" class="fg" data-k="promptring"></circle></svg><span data-k="prompttext"></span></div>
@@ -102,7 +107,8 @@ export class HUD {
     this.mapCtx = this.el.map.getContext("2d");
     this.ringFront = "A";
     this.el.ringfront.addEventListener("pointerdown", () => this.swapFront());
-    root.querySelectorAll("[data-order]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.issue(b.dataset.order); }));
+    this.buildRing(ORDER_KEYS.map((k) => ({ k, name: ORDERS[k].name, icon: MOVE_INFO[k].icon })));
+    this.ringCustom = false; this.guardHtml = null;
     this.t = 0; this.pulse = 0;
     this.ringOpen = false; this.lastCombo = 0; this.nextC = "";
     this.panels = new Map(); this.topHtml = null; this.promptKey = null;
@@ -123,15 +129,29 @@ export class HUD {
   // vệt tốc độ quanh mép màn (Phá Trận, Tuyệt Kỹ)
   speedLines(T) { const e = this.el.speed; e.classList.remove("on"); void e.offsetWidth; e.style.animationDuration = `${T}s`; e.classList.add("on"); }
 
-  // Z / chạm tên mặt trận: vòng qua mọi mặt trận của trận (B15: A ↔ B)
+  // 4 ô của vòng Mệnh Lệnh: items [{ k, name, icon }] theo phím 1–4
+  buildRing(items) {
+    this.ringKeys = items.map((o) => o.k);
+    this.el.ringgrid.innerHTML = items.map((o, i) => `<button data-order="${o.k}"><img class="ric" src="${ICON(o.icon)}" alt=""><b>${i + 1}</b><span>${o.name}</span><i data-k="cd_${o.k}"></i></button>`).join("");
+    this.el.ringgrid.querySelectorAll("[data-k]").forEach((n) => (this.el[n.dataset.k] = n));
+    this.el.ringgrid.querySelectorAll("[data-order]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.issue(b.dataset.order); }));
+  }
+  ringKey(i) { return this.ringKeys[i]; }                               // phím 1–4 → lệnh (battle.js)
+  // Z / chạm tên mặt trận: vòng qua mọi mặt trận của trận (B15: A ↔ B), hoặc mọi người nhận của trận (Tự do: cả đội → từng cận vệ)
   swapFront() {
-    const ids = Object.keys(this.B.data?.FRONTS || {});
+    const d = this.ctx.director, ids = d?.ringTargets ? d.ringTargets().map((t) => t.id) : Object.keys(this.B.data?.FRONTS || {});
     if (!ids.length) return;
     this.ringFront = ids[(ids.indexOf(this.ringFront) + 1) % ids.length];
+    if (d?.ringTargets) d.ringTarget = this.ringFront;
   }
   issue(k) { this.ctx.director.order(this.ringFront, k); this.ctx.audio.play("ui"); this.onIssue?.(k); }   // onIssue: lớp cảm ứng đóng vòng lệnh (battle.js buildTouch)
   setRing(open) {
-    if (open && !this.ringOpen) this.ringFront = this.ctx.sim.heroFront || this.ctx.director.lastFront;
+    const d = this.ctx.director;
+    if (open && !this.ringOpen) {
+      if (d?.ringItems && !this.ringCustom) { this.buildRing(d.ringItems()); this.ringCustom = true; }
+      if (d?.ringTargets) { const ids = d.ringTargets().map((t) => t.id); if (!ids.includes(this.ringFront)) this.ringFront = ids[0]; d.ringTarget = this.ringFront; }
+      else this.ringFront = this.ctx.sim.heroFront || d.lastFront;
+    }
     this.ringOpen = open; this.el.ring.classList.toggle("on", open);
   }
   // Thẻ nhiệm vụ nháy khi sang pha mới (và lúc vào trận): mắt kéo về mục tiêu và câu "làm thế nào".
@@ -250,6 +270,8 @@ export class HUD {
     const fm = (s) => (ctx.fmt ? ctx.fmt(s) : s);                       // {tpc}, {Act:cmd}… → phím của thiết bị đang dùng (data/controls.js)
     const data = this.B.data || {}, PH = data.PHASES || [], FRONTS = data.FRONTS || {}, EVENTS = data.EVENTS || {};
     this.t += dt; this.pulse = Math.max(0, this.pulse - dt);
+    // vòng lệnh theo trận (Tự do): dựng 4 ô và chọn người nhận đầu tiên ngay khi director có — phím 1–4 dùng được cả khi chưa mở vòng
+    if (!this.ringCustom && d.ringItems) { this.buildRing(d.ringItems()); this.ringCustom = true; this.ringFront = d.ringTargets?.()[0]?.id ?? this.ringFront; }
     const P = PH[Math.min(d.phase, PH.length - 1)];
     E.phase.textContent = P ? `${P.id} · ${P.name}` : "";
     // P3: mục tiêu kèm phần trăm độ bền từng cổng (director.goalText, đợt 15a) — HUD gọn khi thẻ gập dùng dạng ngắn cho thấy cả hai phần trăm;
@@ -358,15 +380,47 @@ export class HUD {
     } else E.lockmark.style.display = "none";
     // vòng lệnh
     if (this.ringOpen) {
-      E.ringfront.textContent = FRONTS[this.ringFront]?.name ?? "";
-      for (const k of ORDER_KEYS) {
-        const cd = sim.cooldowns?.[k] ?? 0;
-        E["cd_" + k].textContent = k === "tiepvien" ? `${sim.reinf?.charges ?? 0} lượt${cd > 0 ? " · " + Math.ceil(cd) + "s" : ""}` : k === "theota" && d.followers ? "đang theo" : cd > 0 ? Math.ceil(cd) + "s" : "";
+      if (d.ringTargets) {
+        E.ringfront.textContent = d.ringTargets().find((t) => t.id === this.ringFront)?.name ?? "";
+        const hint = d.ringHint?.() ?? ""; if (E.ringhint.textContent !== hint) E.ringhint.textContent = hint;
+        for (const k of this.ringKeys) E["cd_" + k].textContent = d.ringStatus?.(k, this.ringFront) ?? "";
+      } else {
+        E.ringfront.textContent = FRONTS[this.ringFront]?.name ?? "";
+        for (const k of ORDER_KEYS) {
+          const cd = sim.cooldowns?.[k] ?? 0;
+          E["cd_" + k].textContent = k === "tiepvien" ? `${sim.reinf?.charges ?? 0} lượt${cd > 0 ? " · " + Math.ceil(cd) + "s" : ""}` : k === "theota" && d.followers ? "đang theo" : cd > 0 ? Math.ceil(cd) + "s" : "";
+        }
       }
       E.ringfoot.textContent = "Đồng hồ trận chậm ×0,2 khi vòng mở. Phím 1–4 hoặc chạm.";
     }
+    this.guardFrame(d, E);
     E.hint.textContent = hero.alive ? "" : "";
     this.drawMap();
+  }
+
+  // Khung cận vệ (Tự do, đợt 15c): mỗi người một dòng — tên, thanh máu, lệnh đang theo (gục thì "gục"), chiêu (sẵn / số giây hồi). Dòng sáng là
+  // người nhận lệnh của vòng Mệnh Lệnh. Dựng khung một lần (dựng lại khi đổi người), mỗi nhịp chỉ sửa tại chỗ phần đổi — thanh máu giữ
+  // phần tử nên chuyển động .15s của CSS chạy được.
+  guardFrame(d, E) {
+    const rows = d.guardHud?.(d.ringTargets ? this.ringFront : undefined);
+    if (!rows) { if (this.guardHtml !== null) { E.guards.hidden = true; E.guards.innerHTML = ""; this.guardHtml = null; this.guardEls = null; } return; }
+    const key = rows.map((g) => g.id + "|" + g.name).join("¦");
+    if (key !== this.guardHtml) {
+      this.guardHtml = key; E.guards.hidden = false;
+      E.guards.innerHTML = rows.map((g) => `<div class="gd"><b>${esc(g.name)}</b><i class="gh"><s></s></i><em></em><u></u></div>`).join("");
+      this.guardEls = [...E.guards.children].map((el) => ({ el, bar: el.querySelector(".gh"), s: el.querySelector("s"), em: el.querySelector("em"), u: el.querySelector("u"), v: {} }));
+    }
+    rows.forEach((g, i) => {
+      const R = this.guardEls[i], v = R.v;
+      const pct = g.down ? 0 : Math.max(1, Math.round((g.hp / g.maxHp) * 100)), low = !g.down && pct < 30;
+      const st = g.down ? (g.used ? "gục" : "gục · đỡ dậy") : g.order, sk = g.cd > 0 ? `${Math.ceil(g.cd)}s` : g.skill;
+      if (v.pct !== pct) { v.pct = pct; R.s.style.width = pct + "%"; }
+      if (v.low !== low) { v.low = low; R.bar.classList.toggle("low", low); }
+      if (v.down !== g.down) { v.down = g.down; R.el.classList.toggle("down", g.down); }
+      if (v.sel !== g.sel) { v.sel = g.sel; R.el.classList.toggle("sel", g.sel); }
+      if (v.st !== st) { v.st = st; R.em.textContent = st; }
+      if (v.sk !== sk) { v.sk = sk; R.u.textContent = sk; R.u.classList.toggle("ok", !(g.cd > 0)); }
+    });
   }
 
   // Nút "Tình hình" (HUD gọn): hiện khi ngăn có gì; số báo = số Kế Sách đang theo dõi + số bảng của trận (B20: Nghi binh, hộ vệ,

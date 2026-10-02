@@ -89,6 +89,17 @@ body { background: radial-gradient(130% 70% at 0% 0%, rgba(155,45,32,.16), trans
   background: radial-gradient(ellipse at center, #d9b48c 0 55%, transparent 72%); border-radius: 50%; }
 .td-promo .rk-seal { margin: 10px auto 4px; }
 .td-result .rank-seal { font-size: 2rem; }
+/* thẻ Cận vệ (đợt 15c): 4 ô — có người / trống / khóa; biểu mẫu chiêu mộ, sửa (tên + 5 lớp) */
+.td-gd-note { margin: -4px 0 8px; }
+.gd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.gd-card { margin: 0; display: flex; flex-direction: column; gap: 4px; border-color: #6b4f2e; }
+.gd-card header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; } .gd-card header b { font: 900 1.05rem var(--serif); color: var(--vang2); }
+.gd-card header span { font-size: .8rem; color: var(--muted); } .gd-card p { margin: 2px 0; } .gd-card .row { margin-top: auto; padding-top: 6px; }
+.gd-empty, .gd-lock { align-items: center; justify-content: center; text-align: center; min-height: 120px; border-style: dashed; }
+.gd-lock { opacity: .6; }
+.gd-form { grid-column: 1 / -1; border-color: var(--vang); }
+.gd-classes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 6px 0 4px; }
+.gd-classes .td-w { padding: 9px; } .gd-classes .td-w b { font-size: .95rem; } .gd-classes .td-w span { font-size: .74rem; } .gd-classes .td-w small { font-size: .72rem; color: #ffd27a; }
 @media (max-width: 860px) {
   .td-head { grid-template-columns: 1fr; }
   .td-weapons { grid-template-columns: 1fr; }

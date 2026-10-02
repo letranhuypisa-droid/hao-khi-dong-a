@@ -34,8 +34,8 @@ export function soldierRigKey(weapon, rank) {
 }
 
 // ---- kỹ năng riêng ---------------------------------------------------------------------------------------------------------
-// Hô quân (Phó tướng): hô một tiếng 0,7 s, quân ta trong 18 m Công +25% trong 12 s (cờ trong director.flags, crowd.flagMult), lính
-// theo hồi 20% Sinh lực, địch thường trong 6 m khựng. Hồi 35 s.
+// Hô quân (Phó tướng): hô một tiếng 0,7 s, quân ta trong 18 m Công +25% trong 12 s (cờ trong director.flags, crowd.flagMult; cận vệ: guard.js
+// flagMult), lính ta và cận vệ (đợt 15c, trừ người đang gục) hồi 20% Sinh lực, địch thường trong 6 m khựng. Hồi 35 s.
 const HO = { cd: 35, cast: 0.7, r: 18, atk: 0.25, dur: 12, heal: 0.2, stunR: 6, stun: 0.8 };
 const hoQuan = {
   slot: 2,
@@ -62,6 +62,7 @@ const hoQuan = {
         if (a.side === "ta" && d < HO.r) a.hp = Math.min(a.maxHp, a.hp + a.maxHp * HO.heal);
         else if (a.side === "dich" && d < HO.stunR && a.tier === "thuong") a.stun = Math.max(a.stun, HO.stun);
       }
+      for (const g of ctx.director?.guards || []) if (g.alive && !g.down && Math.hypot(g.x - h.x, g.z - h.z) < HO.r) g.hp = Math.min(g.maxHp, g.hp + g.maxHp * HO.heal);
     }
     if (h.st >= HO.cast) { h.state = "free"; h.skillActive = null; }
   },
@@ -96,7 +97,7 @@ export class SoldierHero extends Hero {
     if (id === "skill") return !can(r, "skill1");
     if (id === "skill2") return !can(r, "skill2");
     if (id === "ult") return !can(r, "ult");
-    if (id === "cmd") return !can(r, "squad");
+    if (id === "cmd") return !can(r, "squad") || !(this.def.guards > 0);          // vòng Mệnh Lệnh ra lệnh cho cận vệ (đợt 15c): chưa chiêu mộ ai thì ẩn
     if (id === "kesach") return !can(r, "keSach");
     if (id === "tpc") return !can(r, "haoKhi");
     return false;

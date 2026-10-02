@@ -104,6 +104,10 @@
 .stage.compact .tname { font-size: .74rem; }
 .stage.compact .hud-target .bar.thp { height: 8px; } .stage.compact .hud-target .bar.tpo { height: 4px; margin-top: 11px; }
 .stage.compact .hud-target .bar.tpo::before { font-size: .5rem; top: -9px; }
+/* khung cận vệ gọn: cột trái trên cần điều khiển, chỉ tên + thanh máu + chiêu (bỏ chữ lệnh) */
+.stage.compact .hud-guards { left: calc(8px + var(--sl)); bottom: calc(66px + var(--u) * 2.2 + var(--sb)); width: min(170px, 24vw); gap: 2px; }
+.stage.compact .hud-guards .gd { grid-template-columns: minmax(0, 62px) 1fr auto; gap: 4px; padding: 1px 5px; font-size: .58rem; }
+.stage.compact .hud-guards em { display: none; } .stage.compact .hud-guards .gh { height: 5px; }
 .stage.compact .hud-prompt { bottom: calc(52px + var(--sb)); font-size: .78rem; }
 .stage.compact .hud-prompt.quiet { bottom: calc(52px + var(--sb)); }
 .stage.compact .hud-ko { display: none; }
