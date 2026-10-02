@@ -2,6 +2,8 @@
 
 Tài liệu này gom prompt để bạn tạo mẫu 3D (GLB) bằng công cụ AI (Meshy, Tripo, Rodin, Hunyuan3D…) cho mọi nhân vật đang có trong game **Hào Khí Đông A**. Bạn gửi tệp GLB, Claude sẽ rig, làm hoạt ảnh và thay khối hình dựng bằng code hiện nay.
 
+**Đã tạo bằng Meshy API (2026-10-02):** 40 tệp game hiện cần nằm ở `design/glb/` (nhân vật, vũ khí, đạo cụ, thú cưỡi để thư mục riêng), tạo bằng `design/tools/meshy.mjs` từ đúng các PROMPT dưới đây; xem `design/glb/README.md` cho tình trạng từng tệp.
+
 Ngoại hình và màu bám theo cách game đang vẽ: `game/js/battle/models.js` (RIGS: tướng, sĩ quan, cận vệ, người lính Tự do) và `game/js/battle/soldiers.js` (lính đám đông, ngựa, dân làng). Chỗ game còn thiếu thì lấy từ `design/canon.json` và truyện tranh (`comic/_shared/bible.json`). Chi tiết mà không nguồn nào ghi thì tài liệu tự chọn và đánh dấu **(đề xuất)** ở phần tiếng Việt.
 
 ---

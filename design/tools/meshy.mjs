@@ -5,13 +5,19 @@
 //   cd design/tools && npm i                                  # gltf-transform, sharp, meshoptimizer (chỉ để nén)
 //   node design/tools/meshy.mjs list    [--set thu|can|tat-ca] [--only H35,WPN_songdao]
 //   node design/tools/meshy.mjs balance
-//   node design/tools/meshy.mjs run     [--set ...] [--only ...] [--model latest] [--model-vk meshy-5] [--jobs 3] [--dry]
-//     --model cho nhân vật, lính, ngựa; --model-vk cho vũ khí và đạo cụ (hình đơn giản, model rẻ hơn vẫn rõ). Mặc định: cùng --model.
+//   node design/tools/meshy.mjs run     [--set ...] [--only ...] [--model latest] [--model-linh meshy-5] [--model-vk meshy-5]
+//                                       [--jobs 3] [--dry] [--stage luoi] [--redo H35,WPN_songdao]
+//     --model cho tướng, sĩ quan, người lính Tự do, cận vệ, ngựa; --model-linh cho lính đám đông và dân làng (nhóm C, D, J:
+//     hàng trăm người ở xa, lưới chỉ 3k); --model-vk cho vũ khí và đạo cụ. Hai tuỳ chọn sau mặc định bằng --model.
+//     Mẫu đã có lưới thì giữ model của lưới đó; muốn đổi thì --redo.
+//     --stage luoi chỉ dựng lưới xám (preview) và tải ảnh lưới; soát xong mới chạy lại không có --stage để tô texture,
+//     nên mẫu hỏng chỉ tốn tiền lưới. --redo bỏ kết quả cũ của các mã đó và dựng lại từ đầu.
+//   node design/tools/meshy.mjs sheet   <ra.png> [--set ...] [--only ...] [--size 256] [--cols 6]   # ghép ảnh Meshy thành một tờ
 //   node design/tools/meshy.mjs post    [--only ...]          # nén lại từ bản gốc đã tải, không tốn credit
 //
 // Mỗi mẫu: preview (lưới) → refine (texture màu phẳng, không PBR, bỏ sáng in sẵn) → tải GLB gốc vào design/glb/_raw/
 // (ngoài git) → nén vào design/glb/<nhóm>/: nhân vật và lính ở nhan-vat/, vũ khí ở vu-khi/, đạo cụ ở dao-cu/,
-// ngựa và voi ở thu-cuoi/. Nén chỉ đổi texture sang WebP (1024, tướng và người lính Tự do 2048), đặt gốc dưới chân,
+// ngựa và voi ở thu-cuoi/. Nén chỉ đổi texture sang WebP (1024; H35, H31 và người lính Tự do 2048), đặt gốc dưới chân,
 // và giảm lưới nếu Meshy trả quá dải tam giác của bảng mục 1. Không lượng tử hoá lưới: game/js/riglab/autorig.js đọc
 // thẳng position.array kiểu Float32.
 // Trạng thái từng mẫu (mã task, số tam giác, dung lượng) ghi ở design/glb/manifest.json, nên chạy lại chỉ làm phần còn thiếu.
@@ -93,12 +99,45 @@ function loadAssets() {
     if (r.code.startsWith("MOUNT_ngua")) negative += ", rider, person";
     if (r.code === "MOUNT_voi_chien") negative += ", rider, person, howdah, saddle";
     if (r.code === "NG_KY") negative += ", horse, saddle, sitting, mounted";
-    const hero = r.group === "A" || r.group === "B" || r.group === "E";
+    // Texture 2048 chỉ cho nhân vật người chơi điều khiển, nhìn gần cả trận (hai tướng chơi được, người lính Tự do); còn lại 1024.
+    const hero = r.code === "H35" || r.code === "H31" || r.group === "E";
     if (r.code.startsWith("MOUNT_ngua")) s.sym = "on"; // mục 0.2: bật đối xứng cho ngựa
     out.push({ ...r, ...s, kind, negative, person: kind === "nhan-vat", tris: targetTris(r.range), tex: hero ? 2048 : 1024 });
   }
   return out;
 }
+
+// Bản prompt gửi API. API v2 của Meshy bỏ qua negative_prompt, nên các ý chặn quan trọng nhất của khối NEGATIVE
+// (mục 2.3) phải nằm ngay trong prompt: nhân vật không mang vũ khí hay bao đao (vũ khí là tệp riêng), không sừng,
+// không áo choàng; ai không có mũ trong prompt thì ghi rõ không mũ. Khối STYLE và POSE rút gọn để đủ chỗ trong 600 ký tự.
+const STYLE = "Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.";
+const POSE = "A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed.";
+function apiPrompt(a) {
+  let p = a.prompt.replace(STYLE, "Stylized low-poly game asset, realistic proportions, flat hand-painted colors, clean silhouette.");
+  if (FIX[a.code]) for (const [from, to] of FIX[a.code]) { if (!p.includes(from)) die(`FIX ${a.code}: không thấy "${from}"`); p = p.replace(from, to); }
+  if (!a.person) return p;
+  p = p.replace(POSE, "A-pose, arms angled down away from the body, open empty hands, feet shoulder-width, facing front.");
+  const guard = FIX[a.code] ? "Unarmed, empty belt, no scabbard. No cape." :
+    ["Unarmed: no sword, scabbard or weapon on the body.", /helmet|hat\b|cap\b/i.test(a.prompt) ? "" : "No helmet.", "No horns, no cape."].filter(Boolean).join(" ");
+  return p.replace(/(A-pose,)/, guard + " $1");
+}
+
+// Sửa riêng cho bản API sau lần dựng đầu (soát ảnh lưới ngày 2026-10-02): mũ tả chung chung bị dựng thành mũ có sừng
+// kiểu samurai hoặc mào tua tủa, nên tả mũ trơn và cụ thể hơn; meshy-5 dựng nỏ thành súng trường, đại đao thành kiếm.
+const GOLD_HELM = ["Short gold cylindrical helmet with a tall thin red spike.", "Small smooth round gold helmet with one thin red spike on top, plain, no crest."];
+const MONGOL_HELM2 = ["Tall pointed silver-grey steel helmet with brown fur rim.", "Open-face Mongol helmet: tall onion-shaped steel bowl rising to a thin spike, brown fur band, leather neck flap."];
+const FIX = {
+  H33: [GOLD_HELM], H40: [GOLD_HELM],
+  // Lần 2 vẫn ra mũ trụ kín châu Âu (X24) và mũ samurai có mào (OFF_doitruong): tả hình mũ Mông Cổ thật cụ thể.
+  X24: [MONGOL_HELM2, ["Blue-grey steel lamellar armor", "Blue-grey steel scale armor"]],
+  OFF_doitruong: [MONGOL_HELM2, ["Blue-grey steel lamellar cuirass", "Blue-grey steel scale cuirass"]],
+  NG_CUNG: [["Brown fur hat flaring outward, small indigo cone on top.", "Round brown fur hat with an upturned fur brim and a small indigo cloth top."]],
+  WPN_no: [["Vietnamese wooden crossbow, 13th century. Straight brown wooden stock 72 cm long, dark brown bow arms 1.1 m wide with slightly swept tips, iron trigger and groove, cream string, no bolt loaded. Floating",
+    "Medieval Asian hand crossbow, 13th century, all wood and cord: straight brown wooden stock 72 cm long, dark brown bow 1.1 m wide mounted crosswise at the front end, cream bowstring, simple bronze trigger, no bolt. No scope, no barrel, not a gun. Lying flat, floating"]],
+  // Lần 2 (latest) chỉ ra cây gậy: đưa lưỡi lên đầu câu.
+  WPN_dadao: [["Long pole glaive, 13th-century East Asia, about 2.6 m long. Plain brown wooden shaft, iron butt cap, gold metal collar, broad single-edged grey steel blade about 75 cm long and 26 cm wide, slightly curved edge, straight back.",
+    "Huge curved single-edged steel cleaver blade, 75 cm long and 26 cm wide, fixed on top of a long plain brown wooden pole, gold ring where blade meets pole, iron butt cap; total 2.6 m, like a Chinese guandao."]],
+};
 
 // Thứ tự làm theo mục 0.4 của tài liệu; "can" = những tệp game hiện tại cần (mục 1–4, 7–15, 17–41 trừ 23a, 49, 51).
 const ORDER = [
@@ -222,51 +261,76 @@ function saveManifest(m) {
   const sorted = Object.fromEntries(Object.entries(m).sort(([a], [b]) => (m[a].no + "").localeCompare(m[b].no + "", undefined, { numeric: true })));
   writeFileSync(MANIFEST, JSON.stringify(sorted, null, 2) + "\n");
 }
-const hash = (a) => createHash("sha1").update(a.prompt + "|" + a.tris + "|" + a.sym).digest("hex").slice(0, 10);
+const hash = (a) => createHash("sha1").update(apiPrompt(a) + "|" + a.tris + "|" + a.sym).digest("hex").slice(0, 10);
 
-const cost = (model) => (model === "latest" || model === "meshy-6" ? 20 : 5) + 10; // preview + refine, theo bảng giá Meshy
+// Theo bảng giá Meshy: lưới 20 credit với model mới nhất (5 với meshy-5 trở về trước), texture 10.
+const PREVIEW = (model) => (model === "latest" || model === "meshy-6" ? 20 : 5), REFINE = 10;
 
-async function renderOne(a, man, model, budget) {
-  const m = man[a.code] && man[a.code].hash === hash(a) && man[a.code].model === model ? man[a.code] : { no: a.no, code: a.code, hash: hash(a), model };
-  man[a.code] = m;
+async function renderOne(a, man, model, budget, stage) {
+  const m = man[a.code] && man[a.code].hash === hash(a) ? man[a.code] : { no: a.no, code: a.code, hash: hash(a), model };
+  man[a.code] = m; model = m.model; // texture phải cùng model với lưới
   const raw = join(RAW, `${m.hash}-${a.file}`); // gắn hash prompt: sửa prompt thì không dùng nhầm bản gốc cũ
   if (m.status === "done" && existsSync(join(OUT, a.kind, a.file))) { console.log(`= ${a.code} đã có`); return; }
   if (!existsSync(raw)) {
     if (!m.preview_id) {
-      if (!budget.take(cost(model))) { m.status = "het-credit"; return; }
+      if (!budget.take(PREVIEW(model) + (stage === "luoi" ? 0 : REFINE))) { m.status = "het-credit"; return; }
       m.preview_id = await create("/v2/text-to-3d", {
-        mode: "preview", prompt: a.prompt, negative_prompt: a.negative, art_style: "realistic", ai_model: model,
+        mode: "preview", prompt: apiPrompt(a), negative_prompt: a.negative, art_style: "realistic", ai_model: model,
         topology: "triangle", target_polycount: a.tris, should_remesh: true, symmetry_mode: a.sym,
         ...(a.person ? { pose_mode: "a-pose" } : {}),
       });
-      saveManifest(man);
-    }
-    console.log(`→ ${a.code} preview ${m.preview_id}`);
-    await wait(m.preview_id, `${a.code} lưới`);
+      m.status = "luoi-dang"; saveManifest(man);
+      console.log(`→ ${a.code} lưới ${m.preview_id}`);
+    } else if (!m.refine_id && stage !== "luoi" && !budget.take(REFINE)) { m.status = "het-credit"; return; }
+    const p = await wait(m.preview_id, `${a.code} lưới`);
+    const thumb = raw.replace(/\.glb$/, "-luoi.png");
+    if (p.thumbnail_url && !existsSync(thumb)) await download(p.thumbnail_url, thumb).catch(() => {});
+    if (stage === "luoi") { m.status = "luoi"; saveManifest(man); console.log(`◐ ${a.code} lưới xong`); return; }
     if (!m.refine_id) {
       m.refine_id = await create("/v2/text-to-3d", { mode: "refine", preview_task_id: m.preview_id, enable_pbr: false, remove_lighting: true, ai_model: model });
-      saveManifest(man);
+      m.status = "texture-dang"; saveManifest(man);
+      console.log(`→ ${a.code} texture ${m.refine_id}`);
     }
-    console.log(`→ ${a.code} refine ${m.refine_id}`);
     const t = await wait(m.refine_id, `${a.code} texture`);
     if (!t.model_urls?.glb) throw new Error(`${a.code}: Meshy không trả GLB`);
     await download(t.model_urls.glb, raw);
     if (t.thumbnail_url) await download(t.thumbnail_url, raw.replace(/\.glb$/, ".png")).catch(() => {});
   }
   Object.assign(m, await post(a, raw), { status: "done", tex: a.tex, target_tris: a.tris });
-  saveManifest(man);
+  delete m.error; saveManifest(man);
   console.log(`✓ ${a.code}: ${m.tris} tam giác (gốc ${m.tris_raw}), ${(m.bytes / 1048576).toFixed(2)} MB → ${m.path}`);
+}
+
+// Ghép ảnh Meshy trả về (ảnh texture nếu có, không thì ảnh lưới xám) thành một tờ có nhãn, để soát nhanh.
+async function sheet(list, man, out) {
+  const sharp = (await import("sharp")).default;
+  const S = Number(opt("size", 256)), cols = Number(opt("cols", 6)), tiles = [];
+  for (const a of list) {
+    const base = join(RAW, `${man[a.code]?.hash}-${a.file}`).replace(/\.glb$/, "");
+    const img = [base + ".png", base + "-luoi.png"].find((f) => existsSync(f));
+    if (!img) continue;
+    const label = Buffer.from(`<svg width="${S}" height="22"><rect width="100%" height="100%" fill="#1d1a17"/><text x="6" y="16" font-family="sans-serif" font-size="14" fill="#f1d98a">${a.code}${img.endsWith("-luoi.png") ? " (lưới)" : ""}</text></svg>`);
+    tiles.push(await sharp(img).resize(S, S, { fit: "contain", background: "#e9e5dc" }).flatten({ background: "#e9e5dc" })
+      .extend({ bottom: 22, background: "#1d1a17" }).composite([{ input: label, top: S, left: 0 }]).png().toBuffer());
+  }
+  if (!tiles.length) die("chưa có ảnh nào");
+  const rows = Math.ceil(tiles.length / cols);
+  await sharp({ create: { width: cols * S, height: rows * (S + 22), channels: 3, background: "#e9e5dc" } })
+    .composite(tiles.map((t, i) => ({ input: t, left: (i % cols) * S, top: Math.floor(i / cols) * (S + 22) }))).png().toFile(out);
+  console.log(`${tiles.length} ảnh → ${out}`);
 }
 
 async function main() {
   const all = loadAssets();
   if (cmd === "list") {
-    for (const a of pick(all)) console.log(`${a.no.padStart(3)} ${a.code.padEnd(20)} ${a.kind.padEnd(9)} ${String(a.tris).padStart(6)} tg  tex ${a.tex}  sym ${a.sym.padEnd(4)} ${a.prompt.length} ký tự  → ${a.kind}/${a.file}`);
+    for (const a of pick(all)) console.log(`${a.no.padStart(3)} ${a.code.padEnd(20)} ${a.kind.padEnd(9)} ${String(a.tris).padStart(6)} tg  tex ${a.tex}  sym ${a.sym.padEnd(4)} ${apiPrompt(a).length} ký tự  → ${a.kind}/${a.file}`);
+    if (flag("prompt")) for (const a of pick(all)) console.log(`\n${a.code}: ${apiPrompt(a)}`);
     return;
   }
   if (cmd === "balance") { console.log(`Credit còn: ${await balance()}`); return; }
   const list = pick(all);
   const man = readManifest();
+  if (cmd === "sheet") { await sheet(list, man, resolve(args[1] && !args[1].startsWith("--") ? args[1] : join(RAW, "to-xem.png"))); return; }
   if (cmd === "post") {
     for (const a of list) {
       const raw = join(RAW, `${man[a.code]?.hash}-${a.file}`);
@@ -277,18 +341,25 @@ async function main() {
     saveManifest(man); return;
   }
   if (cmd !== "run") die(`lệnh không rõ: ${cmd}`);
-  const model = opt("model", "latest"), modelVk = opt("model-vk", model);
-  const modelOf = (a) => (a.kind === "vu-khi" || a.kind === "dao-cu" ? modelVk : model);
-  for (const a of list) if (a.prompt.length > 600) die(`${a.code}: prompt ${a.prompt.length} ký tự > 600`);
-  const need = list.reduce((n, a) => n + (man[a.code]?.status === "done" ? 0 : cost(modelOf(a))), 0);
-  if (flag("dry")) { console.log(`${list.length} mẫu, ước tính ${need} credit (${model} / vũ khí ${modelVk})`); return; }
+  const model = opt("model", "latest"), modelVk = opt("model-vk", model), modelLinh = opt("model-linh", model);
+  const modelOf = (a) => (a.kind === "vu-khi" || a.kind === "dao-cu" ? modelVk : /^[CDJ]$/.test(a.group) && a.person ? modelLinh : model);
+  const stage = opt("stage");
+  if (stage && stage !== "luoi") die("--stage chỉ nhận luoi");
+  for (const c of (opt("redo") || "").split(",").filter(Boolean)) delete man[c.trim()];
+  for (const a of list) if (apiPrompt(a).length > 600) die(`${a.code}: prompt ${apiPrompt(a).length} ký tự > 600`);
+  const need = list.reduce((n, a) => {
+    const m = man[a.code], same = m && m.hash === hash(a);
+    if (same && m.status === "done") return n;
+    return n + (same && m.preview_id ? 0 : PREVIEW(modelOf(a))) + (stage === "luoi" || (same && m.refine_id) ? 0 : REFINE);
+  }, 0);
+  if (flag("dry")) { console.log(`${list.length} mẫu, ước tính ${need} credit (${model} / lính ${modelLinh} / vũ khí ${modelVk})`); return; }
   let left = await balance();
   console.log(`Credit còn: ${left}; ${list.length} mẫu, ước tính ${need} credit`);
   const budget = { take: (n) => { if (left < n) return false; left -= n; return true; } };
   const queue = [...list]; const errors = [];
   const worker = async () => {
     for (let a; (a = queue.shift());) {
-      try { await renderOne(a, man, modelOf(a), budget); }
+      try { await renderOne(a, man, modelOf(a), budget, stage); }
       catch (e) { errors.push(`${a.code}: ${e.message}`); console.error(`✗ ${a.code}: ${e.message}`); man[a.code].status = "loi"; man[a.code].error = e.message.slice(0, 300); }
       saveManifest(man);
     }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Xem GLB Meshy</title>
 <!-- Mở qua máy chủ tĩnh ở gốc repo (vd `npx serve .` rồi vào /design/glb/xem.html). Đọc manifest.json do design/tools/meshy.mjs ghi.
-     Chế độ ?tong-hop vẽ mọi mẫu thành một tờ (mặt trước + nghiêng) để chụp; ?nhom=vu-khi chỉ lấy một nhóm. -->
+     Chế độ ?tong-hop vẽ mọi mẫu thành một tờ (mặt trước + nghiêng) để chụp; ?nhom=vu-khi,dao-cu chỉ lấy các nhóm đó. -->
 <script type="importmap">
   { "imports": { "three": "../../game/vendor/three/three.module.js", "three/addons/": "../../game/vendor/three/addons/" } }
 </script>
@@ -39,7 +39,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const q = new URLSearchParams(location.search);
 const man = await (await fetch("manifest.json", { cache: "no-store" })).json();
 const NHOM = { "nhan-vat": "Nhân vật", "vu-khi": "Vũ khí", "dao-cu": "Đạo cụ", "thu-cuoi": "Ngựa, voi" };
-const items = Object.values(man).filter((m) => m.status === "done" && (!q.get("nhom") || m.path.includes(`/${q.get("nhom")}/`)));
+const nhom = q.get("nhom")?.split(",");
+const items = Object.values(man).filter((m) => m.status === "done" && (!nhom || nhom.some((n) => m.path.includes(`/${n}/`))));
 const loader = new GLTFLoader();
 const load = (m) => loader.loadAsync("../../" + m.path).then((g) => g.scene);
 
@@ -67,7 +68,7 @@ if (q.has("tong-hop")) {
     cell.append(cap); root.append(cell);
     try {
       const obj = await load(m); const scene = stage(renderer); scene.add(obj);
-      const { c, s } = frame(obj); const r = Math.max(s.x, s.y, s.z) * 0.55;
+      const { c, s } = frame(obj); const r = Math.max(s.y / 2, s.x, s.z) * 1.08; // khung nửa ô rộng r, cao 2r
       const cam = new THREE.OrthographicCamera(-r / 2, r / 2, r, -r, 0.01, 100);
       const ctx = cv.getContext("2d");
       for (const [i, ang] of [[0, 0], [1, Math.PI / 2]]) {
