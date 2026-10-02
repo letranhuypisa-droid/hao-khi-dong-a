@@ -2,6 +2,9 @@
 
 Mỗi ảnh là **một nhân vật / một người lính** cắt từ khung comic có sẵn của game (`game/assets/comic/`), để đưa vào công cụ ảnh → 3D như Hunyuan3D. Cắt bằng trình duyệt (canvas) từ bản WebP, phóng cạnh dài lên tối thiểu 768 px khi khung gốc nhỏ, lưu JPEG q92. Thư mục `design/` không nằm trong bản dựng Netlify, nên các ảnh này không lên web game.
 
+Prompt để vẽ thêm ảnh hợp dựng 3D (một người / một vật, nền trơn, tay chữ A): `PROMPTS-LINH.md` (lính), `PROMPTS-TUONG.md` (tướng
+thời Trần: Đại Việt, quân Tống lưu vong, Mông Cổ / Nguyên), `PROMPTS-MOI-TRUONG.md` (thuyền, công trình, đạo cụ, cây đá).
+
 **Nguồn:** khung comic là ảnh do AI vẽ (Nano Banana Pro qua Higgsfield, xem `game/assets/SOURCES.md` và `comic/*/NGUON-GOC.md`). Bản cắt ở đây mất phần XMP đánh dấu nội dung AI của ảnh gốc; dùng lại ở đâu thì ghi rõ là ảnh AI.
 
 | Tệp | Ai / loại quân | Khung gốc | Ghi chú cho dựng 3D |
