@@ -17,7 +17,8 @@
 
 import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
-import { skinnedKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
+import { skinnedKit, glbKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
+import { model } from "./glb.js";
 import { heightAt, collide } from "./world.js";
 import { surfaceY } from "./ground.js";
 import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, SUPPLY, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
@@ -37,6 +38,9 @@ const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _p = ne
 const _c = new THREE.Color();
 const _pose = new Float32Array(NCH);
 const LOD_FAR2 = 40 * 40;        // xa hơn 40 m: tính lại tư thế mỗi 3 khung, khung khác chép ma trận cũ; không IK, không mô phỏng vạt/tua
+// Lính GLB (glb.js, soldiers.js glbKit): mức chi tiết theo khoảng cách tới camera — LOD0 < 18 m, LOD1 < 40 m, LOD2 xa hơn
+// (design/systems.md §13.3: lính LOD0 ≤ 600 tam giác điện thoại, LOD1 ≤ 250, LOD2 ≤ 100; bản nướng sát các số đó)
+const LOD_D2 = [18 * 18, 40 * 40];
 
 let NEXT_ID = 1;
 
@@ -46,6 +50,8 @@ export class Crowd {
     this.meshes = {};
     const mat = lambert();
     for (const k of KIT_IDS) {
+      const G = model("kit/" + k);
+      if (G) { const S = glbKit(k, G, CAP); for (const m of S.meshes) scene.add(m); this.meshes[k] = S; continue; }
       const S = skinnedKit(k, CAP, mat);
       // màu instance: chớp trắng khi trúng, ánh đỏ báo đòn, lệch sáng tối từng người
       S.color = S.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3).fill(1), 3);
@@ -659,11 +665,25 @@ export class Crowd {
     const kSoft = 1 - Math.exp(-dtA * 18), kSnap = 1 - Math.exp(-dtA * 55);
     const counts = {}, hero = this.ctx.hero, frame = ++this.frame;
     for (const k of KIT_IDS) counts[k] = 0;
+    // lính GLB: chia mức chi tiết trước (lính cùng mức phải nằm liền nhau trong texture khớp), uBase mỗi mức
+    const cam = this.ctx.camera?.position, lodN = {}, lodC = {};
+    for (const k of KIT_IDS) if (this.meshes[k].glb) { lodN[k] = [0, 0, 0]; lodC[k] = [0, 0, 0]; }
+    for (const a of this.agents) {
+      if (!lodN[a.kit]) continue;
+      const d2 = cam ? (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 : 0;
+      a.lod = d2 < LOD_D2[0] ? 0 : d2 < LOD_D2[1] ? 1 : 2;
+      if (a.lod >= this.meshes[a.kit].meshes.length) a.lod = this.meshes[a.kit].meshes.length - 1;
+      lodN[a.kit][a.lod]++;
+    }
+    for (const k in lodN) { const B = this.meshes[k].bases, n = lodN[k]; let o = 0; for (let l = 0; l < B.length; l++) { B[l].value = o; o += n[l]; } }
     let nb = 0;
     for (const a of this.agents) {
-      const M = this.meshes[a.kit], i = counts[a.kit];
+      const M = this.meshes[a.kit];
+      let i = counts[a.kit], li = 0;
+      if (M.glb) { li = lodC[a.kit][a.lod]; i = M.bases[a.lod].value + li; }
       if (i >= CAP) continue;
       counts[a.kit]++;
+      if (M.glb) lodC[a.kit][a.lod]++;
       // đứng yên thì khỏi lấy lại; trên boong (boong chạy, dập dềnh) và đang bơi thì lấy mỗi khung (naval.standY)
       if (a.deck || a.gx !== a.x || a.gz !== a.z || a.state === "swim") { a.gy = nav ? nav.standY(a) : heightAt(a.x, a.z); a.gx = a.x; a.gz = a.z; }
       const gy = a.gy;
@@ -693,7 +713,7 @@ export class Crowd {
         if (a.K.heavy) { const f = 0.5 + 0.5 * Math.sin(clk * 30); _c.setRGB(1.5 + 0.7 * f, 0.55 + 0.2 * f, 0.45); }
         else _c.setRGB(1.5, 0.9, 0.8);
       }
-      M.color.setXYZ(i, _c.r, _c.g, _c.b);
+      if (M.glb) M.colors[a.lod].setXYZ(li, _c.r, _c.g, _c.b); else M.color.setXYZ(i, _c.r, _c.g, _c.b);
       if (nb < 2200 && sink < 0.5 && a.state !== "swim") {
         _p.set(a.x, gy + 0.06, a.z); _s.setScalar(a.K.mounted ? 1.5 : a.scale);
         _m.compose(_p, _q.identity(), _s); this.blob.setMatrixAt(nb++, _m);
@@ -701,14 +721,16 @@ export class Crowd {
     }
     for (const k of KIT_IDS) {
       const M = this.meshes[k], n = counts[k];
-      M.mesh.count = n;
+      if (M.glb) {
+        M.meshes.forEach((m, l) => { const c = Math.min(lodC[k][l], Math.max(0, CAP - M.bases[l].value)); m.count = c; const C = M.colors[l]; C.clearUpdateRanges(); C.addUpdateRange(0, c * 3); C.needsUpdate = true; });
+      } else M.mesh.count = n;
       if (n > 0) {       // chỉ tải các hàng texture đang dùng (mỗi hàng một lần texSubImage2D)
         const rows = Math.ceil((n * BONE_FLOATS) / 4 / BONE_TEX_W);
         M.tex.clearUpdateRanges();
         for (let r = 0; r < rows; r++) M.tex.addUpdateRange(r * BONE_TEX_W * 4, BONE_TEX_W * 4);
         M.tex.needsUpdate = true;
       }
-      M.color.clearUpdateRanges(); M.color.addUpdateRange(0, n * 3); M.color.needsUpdate = true;
+      if (!M.glb) { M.color.clearUpdateRanges(); M.color.addUpdateRange(0, n * 3); M.color.needsUpdate = true; }
     }
     this.blob.count = nb; this.blob.instanceMatrix.needsUpdate = true;
     let na = 0;

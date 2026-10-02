@@ -1,2 +1,5 @@
 # thư mục deploy Netlify do game/tools/build-netlify.mjs dựng (netlify.toml); Netlify tự dựng lại mỗi lần xây
 netlify-deploy/
+# GLB gốc tải từ Meshy (nặng, ngoài git) — design/tools/meshy.mjs nén từ đây ra design/glb/<nhóm>/
+design/glb/_raw/
+design/tools/node_modules/

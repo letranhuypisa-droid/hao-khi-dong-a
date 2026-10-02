@@ -1,0 +1,802 @@
+{
+  "H35": {
+    "no": "1",
+    "code": "H35",
+    "hash": "e4808eca55",
+    "model": "latest",
+    "preview_id": "01a0fd27-9da2-770e-a303-e2573dd4c9c5",
+    "status": "done",
+    "refine_id": "01a0fd35-05a4-76f2-8763-eb13796abad4",
+    "tris_raw": 12881,
+    "tris": 12881,
+    "bytes": 1369428,
+    "size_xyz": [
+      0.752,
+      1.902,
+      0.758
+    ],
+    "path": "design/glb/nhan-vat/char_H35_tran-quoc-toan.glb",
+    "tex": 2048,
+    "target_tris": 12500
+  },
+  "H31": {
+    "no": "2",
+    "code": "H31",
+    "hash": "f7f39d74c6",
+    "model": "latest",
+    "preview_id": "01a0fd2a-e744-7181-83b8-83945cbaf12f",
+    "status": "done",
+    "refine_id": "01a0fd3d-94e5-7268-87aa-cd3d4ed5c874",
+    "tris_raw": 12919,
+    "tris": 12919,
+    "bytes": 1521056,
+    "size_xyz": [
+      0.786,
+      1.903,
+      0.621
+    ],
+    "path": "design/glb/nhan-vat/char_H31_tran-hung-dao.glb",
+    "tex": 2048,
+    "target_tris": 12500
+  },
+  "H33": {
+    "no": "3",
+    "code": "H33",
+    "hash": "219d43e5e3",
+    "model": "latest",
+    "preview_id": "01a0fd30-2326-7169-ace6-3bf4e678f7d0",
+    "status": "done",
+    "refine_id": "01a0fd3a-f3ac-74b0-8277-45d4d55c1f15",
+    "tris_raw": 12859,
+    "tris": 12859,
+    "bytes": 999992,
+    "size_xyz": [
+      1.159,
+      1.9,
+      0.758
+    ],
+    "path": "design/glb/nhan-vat/char_H33_tran-nhat-duat.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "H40": {
+    "no": "4",
+    "code": "H40",
+    "hash": "49950aec63",
+    "model": "latest",
+    "preview_id": "01a0fd30-232c-76aa-b9ab-9425d51f512d",
+    "status": "done",
+    "refine_id": "01a0fd3b-1499-752d-8eff-d94cf5255e52",
+    "tris_raw": 12867,
+    "tris": 12867,
+    "bytes": 971956,
+    "size_xyz": [
+      0.897,
+      1.902,
+      0.639
+    ],
+    "path": "design/glb/nhan-vat/char_H40_nguyen-khoai.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "X19": {
+    "no": "7",
+    "code": "X19",
+    "hash": "ec302a347f",
+    "model": "latest",
+    "preview_id": "01a0fd2a-0dba-7348-a987-7072b4b319df",
+    "status": "done",
+    "refine_id": "01a0fd3b-dd94-7743-8ad8-582486fe5f89",
+    "tris_raw": 12710,
+    "tris": 12710,
+    "bytes": 1063520,
+    "size_xyz": [
+      0.878,
+      1.902,
+      0.759
+    ],
+    "path": "design/glb/nhan-vat/char_X19_toa-do.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "X20": {
+    "no": "8",
+    "code": "X20",
+    "hash": "4de1515d00",
+    "model": "latest",
+    "preview_id": "01a0fd2b-5596-762a-a789-a3d25d65bd55",
+    "status": "done",
+    "refine_id": "01a0fd3e-3b8d-707c-9043-989c39c8cc73",
+    "tris_raw": 12944,
+    "tris": 12944,
+    "bytes": 956288,
+    "size_xyz": [
+      1.478,
+      1.901,
+      0.518
+    ],
+    "path": "design/glb/nhan-vat/char_X20_o-ma-nhi.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "X24": {
+    "no": "9",
+    "code": "X24",
+    "hash": "294db491cf",
+    "model": "latest",
+    "preview_id": "01a0fd33-62ef-763f-a13c-277c54689761",
+    "status": "done",
+    "refine_id": "01a0fd3e-be37-72d7-89ad-e681c4c64075",
+    "tris_raw": 13000,
+    "tris": 13000,
+    "bytes": 953516,
+    "size_xyz": [
+      0.908,
+      1.904,
+      0.661
+    ],
+    "path": "design/glb/nhan-vat/char_X24_phan-tiep.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "OFF_tuong": {
+    "no": "10",
+    "code": "OFF_tuong",
+    "hash": "cac7be6ee0",
+    "model": "latest",
+    "preview_id": "01a0fd2c-ede8-75e0-beeb-a737a193c7d4",
+    "status": "done",
+    "refine_id": "01a0fd41-c087-752b-a6bc-7256efc2e55c",
+    "tris_raw": 12844,
+    "tris": 12844,
+    "bytes": 1010368,
+    "size_xyz": [
+      0.908,
+      1.9,
+      0.521
+    ],
+    "path": "design/glb/nhan-vat/char_OFF_tuong.glb",
+    "tex": 1024,
+    "target_tris": 12500
+  },
+  "OFF_photuong": {
+    "no": "11",
+    "code": "OFF_photuong",
+    "hash": "1afdfd1675",
+    "model": "latest",
+    "preview_id": "01a0fd2a-c60d-7430-88f9-720f07c73f7f",
+    "status": "done",
+    "refine_id": "01a0fd3d-0bb8-70bb-ade7-867497953672",
+    "tris_raw": 11880,
+    "tris": 11880,
+    "bytes": 910516,
+    "size_xyz": [
+      1.088,
+      1.902,
+      0.583
+    ],
+    "path": "design/glb/nhan-vat/char_OFF_photuong.glb",
+    "tex": 1024,
+    "target_tris": 11500
+  },
+  "OFF_doitruong": {
+    "no": "12",
+    "code": "OFF_doitruong",
+    "hash": "8f110729f4",
+    "model": "latest",
+    "preview_id": "01a0fd33-62e9-758d-982b-c6ae3b490d53",
+    "status": "done",
+    "refine_id": "01a0fd3c-8710-761e-801b-754c41621f76",
+    "tris_raw": 10944,
+    "tris": 10944,
+    "bytes": 900456,
+    "size_xyz": [
+      1.497,
+      1.901,
+      0.417
+    ],
+    "path": "design/glb/nhan-vat/char_OFF_doitruong.glb",
+    "tex": 1024,
+    "target_tris": 10500
+  },
+  "DV_GIAO": {
+    "no": "13",
+    "code": "DV_GIAO",
+    "hash": "00e21dc474",
+    "model": "meshy-5",
+    "preview_id": "01a0fd27-9d6d-7584-bb7b-cffd0357e28c",
+    "status": "done",
+    "refine_id": "01a0fd35-0608-73d6-b925-efcd4d55d53c",
+    "tris_raw": 3043,
+    "tris": 3043,
+    "bytes": 310504,
+    "size_xyz": [
+      1.332,
+      1.897,
+      0.575
+    ],
+    "path": "design/glb/nhan-vat/unit_DV_GIAO.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "DV_DAO": {
+    "no": "14",
+    "code": "DV_DAO",
+    "hash": "d848273933",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-0a49-76df-a8c8-ce24824de583",
+    "status": "done",
+    "refine_id": "01a0fd38-ba40-777b-9e32-d0be10e46c6b",
+    "tris_raw": 3103,
+    "tris": 3103,
+    "bytes": 260252,
+    "size_xyz": [
+      1.448,
+      1.897,
+      0.636
+    ],
+    "path": "design/glb/nhan-vat/unit_DV_DAO.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "DV_NO": {
+    "no": "15",
+    "code": "DV_NO",
+    "hash": "1833659d25",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-4b6d-730d-913b-92762c211787",
+    "status": "done",
+    "refine_id": "01a0fd39-a460-77b3-8e8f-ed0bcdc8aa7a",
+    "tris_raw": 3128,
+    "tris": 3128,
+    "bytes": 255068,
+    "size_xyz": [
+      0.881,
+      1.88,
+      0.767
+    ],
+    "path": "design/glb/nhan-vat/unit_DV_NO.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "NG_DAO": {
+    "no": "17",
+    "code": "NG_DAO",
+    "hash": "5bf3351488",
+    "model": "meshy-5",
+    "preview_id": "01a0fd27-9d98-73a5-8ac6-6a0d421540fe",
+    "status": "done",
+    "refine_id": "01a0fd35-0606-7046-a6ea-1a2acd5fcdf9",
+    "tris_raw": 3107,
+    "tris": 3107,
+    "bytes": 277568,
+    "size_xyz": [
+      1.303,
+      1.898,
+      0.749
+    ],
+    "path": "design/glb/nhan-vat/unit_NG_DAO.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "NG_GIAO": {
+    "no": "18",
+    "code": "NG_GIAO",
+    "hash": "801b5c0b19",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-b206-72c2-ad55-40cbf0940269",
+    "status": "done",
+    "refine_id": "01a0fd37-cf8b-752f-a127-7be9acb02ae2",
+    "tris_raw": 3074,
+    "tris": 3074,
+    "bytes": 280588,
+    "size_xyz": [
+      0.882,
+      1.895,
+      0.706
+    ],
+    "path": "design/glb/nhan-vat/unit_NG_GIAO.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "NG_CUNG": {
+    "no": "19",
+    "code": "NG_CUNG",
+    "hash": "6db793592e",
+    "model": "meshy-5",
+    "preview_id": "01a0fd30-2330-703e-bc4f-30d613e2df54",
+    "status": "done",
+    "refine_id": "01a0fd38-3729-7253-9cbe-ab75f1228d8b",
+    "tris_raw": 3136,
+    "tris": 3136,
+    "bytes": 241088,
+    "size_xyz": [
+      1.161,
+      1.895,
+      0.501
+    ],
+    "path": "design/glb/nhan-vat/unit_NG_CUNG.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "NG_TANK": {
+    "no": "20",
+    "code": "NG_TANK",
+    "hash": "b1d7e1d6ca",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-9beb-74e2-b4e7-2563846edbf9",
+    "status": "done",
+    "refine_id": "01a0fd39-c80b-7390-82ba-7b879eb3344a",
+    "tris_raw": 3137,
+    "tris": 3137,
+    "bytes": 289832,
+    "size_xyz": [
+      1.575,
+      1.897,
+      0.624
+    ],
+    "path": "design/glb/nhan-vat/unit_NG_TANK.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "NG_KY": {
+    "no": "21",
+    "code": "NG_KY",
+    "hash": "68a6d08812",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-2f23-773c-9294-d7390f285bfc",
+    "status": "done",
+    "refine_id": "01a0fd36-9d1a-769c-9d44-fc0287456f0a",
+    "tris_raw": 3120,
+    "tris": 3120,
+    "bytes": 295660,
+    "size_xyz": [
+      1.42,
+      1.896,
+      0.705
+    ],
+    "path": "design/glb/nhan-vat/unit_NG_KY.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "LINH_r01": {
+    "no": "22",
+    "code": "LINH_r01",
+    "hash": "c0cf921711",
+    "model": "latest",
+    "preview_id": "01a0fd2b-9fd7-71f3-8970-18782b3acd31",
+    "status": "done",
+    "refine_id": "01a0fd3e-c0da-76bb-96d8-67365fb8c29f",
+    "tris_raw": 12981,
+    "tris": 12981,
+    "bytes": 1580176,
+    "size_xyz": [
+      1.646,
+      1.902,
+      0.411
+    ],
+    "path": "design/glb/nhan-vat/char_LINH_r01.glb",
+    "tex": 2048,
+    "target_tris": 12500
+  },
+  "LINH_r24": {
+    "no": "23",
+    "code": "LINH_r24",
+    "hash": "8ea0beae51",
+    "model": "latest",
+    "preview_id": "01a0fd2b-ba90-7122-b6fc-1e857d8d656f",
+    "status": "done",
+    "refine_id": "01a0fd3f-47bf-76e0-8c03-b5d31ba81bb5",
+    "tris_raw": 12987,
+    "tris": 12987,
+    "bytes": 1482332,
+    "size_xyz": [
+      1.533,
+      1.901,
+      0.488
+    ],
+    "path": "design/glb/nhan-vat/char_LINH_r24.glb",
+    "tex": 2048,
+    "target_tris": 12500
+  },
+  "CV_khien": {
+    "no": "24",
+    "code": "CV_khien",
+    "hash": "f17f3e3f3b",
+    "model": "latest",
+    "preview_id": "01a0fd2b-f950-77bd-afeb-2c693f0dff16",
+    "status": "done",
+    "refine_id": "01a0fd3f-ebfc-7168-8e31-9741fed5c243",
+    "tris_raw": 6236,
+    "tris": 6236,
+    "bytes": 593404,
+    "size_xyz": [
+      1.163,
+      1.901,
+      0.675
+    ],
+    "path": "design/glb/nhan-vat/char_CV_khien.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  },
+  "CV_giao": {
+    "no": "25",
+    "code": "CV_giao",
+    "hash": "ec7b6c08e5",
+    "model": "latest",
+    "preview_id": "01a0fd2c-663b-7608-859a-f46624671b71",
+    "status": "done",
+    "refine_id": "01a0fd3f-edca-76b7-b7d0-925a0a0a1482",
+    "tris_raw": 6239,
+    "tris": 6239,
+    "bytes": 540456,
+    "size_xyz": [
+      1.397,
+      1.901,
+      0.668
+    ],
+    "path": "design/glb/nhan-vat/char_CV_giao.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  },
+  "CV_cung": {
+    "no": "26",
+    "code": "CV_cung",
+    "hash": "f115444bc3",
+    "model": "latest",
+    "preview_id": "01a0fd2c-ab3b-709c-b695-6968dd374945",
+    "status": "done",
+    "refine_id": "01a0fd40-5244-77ab-8b50-e898d6650e7a",
+    "tris_raw": 6203,
+    "tris": 6203,
+    "bytes": 540836,
+    "size_xyz": [
+      1.22,
+      1.901,
+      0.641
+    ],
+    "path": "design/glb/nhan-vat/char_CV_cung.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  },
+  "CV_songdao": {
+    "no": "27",
+    "code": "CV_songdao",
+    "hash": "90143e103b",
+    "model": "latest",
+    "preview_id": "01a0fd2c-cadc-73b7-85e1-f9b8dfae5614",
+    "status": "done",
+    "refine_id": "01a0fd40-d803-729c-875d-6c1ca537fe27",
+    "tris_raw": 6231,
+    "tris": 6231,
+    "bytes": 536372,
+    "size_xyz": [
+      1.461,
+      1.902,
+      0.545
+    ],
+    "path": "design/glb/nhan-vat/char_CV_songdao.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  },
+  "CV_daidao": {
+    "no": "28",
+    "code": "CV_daidao",
+    "hash": "b1a8db60f5",
+    "model": "latest",
+    "preview_id": "01a0fd2c-cb7f-75c7-a140-f80e5a312db4",
+    "status": "done",
+    "refine_id": "01a0fd41-3f29-7323-bf27-9e9846cab40d",
+    "tris_raw": 6228,
+    "tris": 6228,
+    "bytes": 570564,
+    "size_xyz": [
+      0.924,
+      1.901,
+      0.609
+    ],
+    "path": "design/glb/nhan-vat/char_CV_daidao.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  },
+  "WPN_songdao": {
+    "no": "29",
+    "code": "WPN_songdao",
+    "hash": "f914fd3e5d",
+    "model": "latest",
+    "preview_id": "01a0fd26-e359-7326-85c3-9d0b54c85486",
+    "status": "done",
+    "refine_id": "01a0fd35-05df-72c6-9f98-a434de690135",
+    "tris_raw": 1994,
+    "tris": 1994,
+    "bytes": 218176,
+    "size_xyz": [
+      0.282,
+      1.901,
+      0.122
+    ],
+    "path": "design/glb/vu-khi/wpn_songdao.glb",
+    "tex": 1024,
+    "target_tris": 2000
+  },
+  "WPN_daikiem": {
+    "no": "30",
+    "code": "WPN_daikiem",
+    "hash": "6600d4dd2b",
+    "model": "meshy-5",
+    "preview_id": "01a0fd2b-3569-7620-ab00-b7dde375dd61",
+    "status": "done",
+    "refine_id": "01a0fd3d-f780-7038-9baf-ee7c02f6bfd8",
+    "tris_raw": 2994,
+    "tris": 2994,
+    "bytes": 248744,
+    "size_xyz": [
+      0.308,
+      1.899,
+      0.087
+    ],
+    "path": "design/glb/vu-khi/wpn_daikiem.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "WPN_dadao": {
+    "no": "31",
+    "code": "WPN_dadao",
+    "hash": "dc7df9b49f",
+    "model": "meshy-5",
+    "preview_id": "01a0fd33-6358-7656-be5e-1b85a8ad2c13",
+    "status": "done",
+    "refine_id": "01a0fd3c-211d-72e9-9c76-45a6a464f66f",
+    "tris_raw": 2894,
+    "tris": 2894,
+    "bytes": 245356,
+    "size_xyz": [
+      0.446,
+      1.899,
+      0.19
+    ],
+    "path": "design/glb/vu-khi/wpn_dadao.glb",
+    "tex": 1024,
+    "target_tris": 3000
+  },
+  "WPN_dao": {
+    "no": "32",
+    "code": "WPN_dao",
+    "hash": "1b3792d27a",
+    "model": "meshy-5",
+    "preview_id": "01a0fd2a-a5c4-7471-8180-77ad3b23391d",
+    "status": "done",
+    "refine_id": "01a0fd3c-8861-772f-818f-c52d2c9de6d8",
+    "tris_raw": 1403,
+    "tris": 1403,
+    "bytes": 132848,
+    "size_xyz": [
+      0.29,
+      1.892,
+      0.086
+    ],
+    "path": "design/glb/vu-khi/wpn_dao.glb",
+    "tex": 1024,
+    "target_tris": 1500
+  },
+  "WPN_dao_linh": {
+    "no": "33",
+    "code": "WPN_dao_linh",
+    "hash": "5e4322174f",
+    "model": "meshy-5",
+    "preview_id": "01a0fd27-9dfc-71e3-a6a1-07b30536c5d6",
+    "status": "done",
+    "refine_id": "01a0fd36-5d4e-7101-aece-70b66c20f28f",
+    "tris_raw": 804,
+    "tris": 804,
+    "bytes": 118532,
+    "size_xyz": [
+      0.378,
+      1.898,
+      0.158
+    ],
+    "path": "design/glb/vu-khi/wpn_dao-linh.glb",
+    "tex": 1024,
+    "target_tris": 800
+  },
+  "WPN_giao_dv": {
+    "no": "34",
+    "code": "WPN_giao_dv",
+    "hash": "0a7aaf1a9b",
+    "model": "meshy-5",
+    "preview_id": "01a0fd27-9d4d-731e-9235-3dd27514a9a9",
+    "status": "done",
+    "refine_id": "01a0fd35-062f-7591-8108-f79ba6aa90fd",
+    "tris_raw": 1368,
+    "tris": 1368,
+    "bytes": 173704,
+    "size_xyz": [
+      0.215,
+      1.897,
+      0.062
+    ],
+    "path": "design/glb/vu-khi/wpn_giao-dv.glb",
+    "tex": 1024,
+    "target_tris": 1500
+  },
+  "WPN_giao_ng": {
+    "no": "35",
+    "code": "WPN_giao_ng",
+    "hash": "0fa26c72cb",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-b9f4-7464-8aa6-fa4609b19efc",
+    "status": "done",
+    "refine_id": "01a0fd38-1471-76a6-9f81-d134ffc6c6a2",
+    "tris_raw": 706,
+    "tris": 706,
+    "bytes": 97836,
+    "size_xyz": [
+      0.102,
+      1.898,
+      0.039
+    ],
+    "path": "design/glb/vu-khi/wpn_giao-ng.glb",
+    "tex": 1024,
+    "target_tris": 800
+  },
+  "WPN_cung_viet": {
+    "no": "36",
+    "code": "WPN_cung_viet",
+    "hash": "c7a3a105c4",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-dcbf-776b-b4d3-3aec543c5c70",
+    "status": "done",
+    "refine_id": "01a0fd3b-9b43-74d0-b577-25042f861d08",
+    "tris_raw": 1933,
+    "tris": 1933,
+    "bytes": 210716,
+    "size_xyz": [
+      0.282,
+      1.897,
+      0.104
+    ],
+    "path": "design/glb/vu-khi/wpn_cung-viet.glb",
+    "tex": 1024,
+    "target_tris": 2000
+  },
+  "WPN_cung_ng": {
+    "no": "37",
+    "code": "WPN_cung_ng",
+    "hash": "d6808a25b7",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-5004-7234-873b-40dcef66bd34",
+    "status": "done",
+    "refine_id": "01a0fd36-9e74-73db-9400-f789a86c9f68",
+    "tris_raw": 741,
+    "tris": 741,
+    "bytes": 146116,
+    "size_xyz": [
+      0.817,
+      1.9,
+      0.061
+    ],
+    "path": "design/glb/vu-khi/wpn_cung-ng.glb",
+    "tex": 1024,
+    "target_tris": 800
+  },
+  "WPN_no": {
+    "no": "38",
+    "code": "WPN_no",
+    "hash": "cbc43fbe8e",
+    "model": "latest",
+    "preview_id": "01a0fd30-236f-7628-9b3c-62571ca0e0bd",
+    "status": "done",
+    "refine_id": "01a0fd39-a468-778a-a0db-f11857e624e3",
+    "tris_raw": 1193,
+    "tris": 1193,
+    "bytes": 221520,
+    "size_xyz": [
+      1.902,
+      0.384,
+      1.043
+    ],
+    "path": "design/glb/vu-khi/wpn_no.glb",
+    "tex": 1024,
+    "target_tris": 1200
+  },
+  "WPN_chuy": {
+    "no": "39",
+    "code": "WPN_chuy",
+    "hash": "2c8d56455b",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-9c49-75b7-976c-fe8ff6284278",
+    "status": "done",
+    "refine_id": "01a0fd3a-b0e1-7578-b02a-1b9f72f5f708",
+    "tris_raw": 1522,
+    "tris": 1522,
+    "bytes": 181720,
+    "size_xyz": [
+      0.535,
+      1.896,
+      0.555
+    ],
+    "path": "design/glb/vu-khi/wpn_chuy.glb",
+    "tex": 1024,
+    "target_tris": 1500
+  },
+  "WPN_khien_tron_ng": {
+    "no": "40",
+    "code": "WPN_khien_tron_ng",
+    "hash": "18e125a2da",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-2cff-7665-9eb9-4418fee205cf",
+    "status": "done",
+    "refine_id": "01a0fd36-5e44-734a-9f73-4d3c26546099",
+    "tris_raw": 970,
+    "tris": 970,
+    "bytes": 122084,
+    "size_xyz": [
+      1.891,
+      1.895,
+      0.406
+    ],
+    "path": "design/glb/vu-khi/wpn_khien-tron-ng.glb",
+    "tex": 1024,
+    "target_tris": 1000
+  },
+  "WPN_khien_nhat_dv": {
+    "no": "41",
+    "code": "WPN_khien_nhat_dv",
+    "hash": "cdf5a0b898",
+    "model": "meshy-5",
+    "preview_id": "01a0fd29-4624-7049-93cb-cf7a9d85c922",
+    "status": "done",
+    "refine_id": "01a0fd39-414d-71f6-b3eb-e06bdf2b1ba0",
+    "tris_raw": 960,
+    "tris": 960,
+    "bytes": 150888,
+    "size_xyz": [
+      1.236,
+      1.897,
+      0.442
+    ],
+    "path": "design/glb/vu-khi/wpn_khien-nhat-dv.glb",
+    "tex": 1024,
+    "target_tris": 1000
+  },
+  "PROP_mui_ten": {
+    "no": "49",
+    "code": "PROP_mui_ten",
+    "hash": "5b7f10463c",
+    "model": "meshy-5",
+    "preview_id": "01a0fd28-97d2-762a-ab1e-4f707efcd252",
+    "status": "done",
+    "refine_id": "01a0fd37-b07f-7390-b275-0d930aa42962",
+    "tris_raw": 193,
+    "tris": 193,
+    "bytes": 117084,
+    "size_xyz": [
+      1.888,
+      0.171,
+      0.021
+    ],
+    "path": "design/glb/dao-cu/prop_mui-ten.glb",
+    "tex": 1024,
+    "target_tris": 300
+  },
+  "MOUNT_ngua_nguyen": {
+    "no": "51",
+    "code": "MOUNT_ngua_nguyen",
+    "hash": "1c99803405",
+    "model": "latest",
+    "preview_id": "01a0fd28-7013-7449-aaa0-8711f4e5224c",
+    "status": "done",
+    "refine_id": "01a0fd36-c1af-715c-ae76-0bf787625976",
+    "tris_raw": 6198,
+    "tris": 6198,
+    "bytes": 546984,
+    "size_xyz": [
+      1.898,
+      1.699,
+      0.587
+    ],
+    "path": "design/glb/thu-cuoi/mount_ngua-nguyen.glb",
+    "tex": 1024,
+    "target_tris": 6000
+  }
+}

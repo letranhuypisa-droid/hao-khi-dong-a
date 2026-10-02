@@ -9,7 +9,7 @@
 //
 // Bộ kiểm: Netlify chạy Linux (phân biệt hoa/thường), Windows thì không — "./Hud.js" gọi "hud.js" chạy tốt ở máy rồi hỏng khi deploy. Nên mọi tên
 // tệp game xin được đối chiếu CHÍNH XÁC từng chữ: mọi import tương đối, tệp trong index.html và url() của css, SFX / nhạc / fx theo bảng tên trong
-// code, khung comic (webp + avif) của từng Chương, icon theo bảng dữ liệu. Bộ kiểm đọc chữ trong mã (không nạp module) nên không phụ thuộc phiên bản
+// code, khung comic (webp + avif) của từng Chương, icon theo bảng dữ liệu, mô hình GLB nướng sẵn (assets/models/index.json). Bộ kiểm đọc chữ trong mã (không nạp module) nên không phụ thuộc phiên bản
 // Node; bảng tên nào không đọc được thì BÁO chứ không im lặng bỏ qua. Lỗi thì thoát mã 1: Netlify giữ nguyên bản đang chạy.
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -53,7 +53,7 @@ const joinRel = (fromFile, spec) => {
 export function checkDeploy(root) {
   const R = resolve(root), files = walk(R).map((p) => posix(R, p));
   const exact = new Set(files), lower = new Map(files.map((f) => [f.toLowerCase(), f]));
-  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, fx: 0, comic: 0, icon: 0 };
+  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, fx: 0, comic: 0, icon: 0, model: 0 };
   const need = (rel, kind, from) => {
     checked[kind]++;
     const path = rel.replace(/^\.\//, "").replace(/\/+/g, "/");
@@ -109,6 +109,17 @@ export function checkDeploy(root) {
     for (const m of src.matchAll(/\btb\("[A-Za-z0-9]+",\s*"([a-z0-9]+)"/g)) add(m[1], f);
   }
   for (const [name, from] of icons) need(`assets/icons/${name}.webp`, "icon", from);
+
+  // 5) mô hình GLB nướng sẵn (battle/glb.js): mọi tệp trong assets/models/index.json, và mô hình nhân vật code xin (model: "H35"; tên ghép như "CV_" + id thì bỏ qua)
+  const MI = "assets/models/index.json", mi = read(MI);
+  if (mi === null) unreadable("model", MI, "không có index.json");
+  else {
+    let idx = null; try { idx = JSON.parse(mi); } catch (e) { unreadable("model", MI, e.message); }
+    if (idx) {
+      for (const [id, m] of Object.entries(idx)) { need(`assets/models/${m.file}`, "model", MI + " " + id); need(`assets/models/${m.tex}`, "model", MI + " " + id); }
+      for (const [f, src] of jsSrc) for (const m of src.matchAll(/\bmodel:\s*"([A-Za-z0-9_]+)"(?!\s*\+)/g)) need(`assets/models/char/${m[1]}.hkm`, "model", f);
+    }
+  }
   return { files: files.length, checked, problems };
 }
 

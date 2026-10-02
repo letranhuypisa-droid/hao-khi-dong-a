@@ -283,11 +283,22 @@ function tudoIntro(c) {
   document.body.appendChild(d);
   d.querySelector("[data-close]").onclick = () => { d.remove(); c.introSeen = true; persist(); };
 }
+// Mô hình GLB (battle/glb.js) trong lúc màn tải hiện: chờ phần trận dựng ngay (tướng người chơi, lính đám đông, vũ khí, cận vệ,
+// sĩ quan), phần còn lại (tướng địch ra giữa trận, tướng của trận khác) tải ngầm. Mạng chậm, lỗi: trận vẫn chạy với hình dựng
+// bằng code.
+async function loadModels(chars = []) {
+  try {
+    const { preloadModels } = await import("./battle/glb.js");
+    await preloadModels([...chars.map((c) => "char/" + c), "kit/*", "wpn/*", "char/CV_*", "char/OFF_*"], 12000);
+    preloadModels(null, 0);
+  } catch (e) { console.warn("mô hình", e); }
+}
+
 async function startSkirmish(sk) {
   const c = save.career; if (!c) return;
   app.innerHTML = `<div class="loading"><h2>${esc(sk.name)} · ${esc(SITES[sk.siteId]?.name || "")}</h2><p>${esc(sk.goal)}.</p><div class="spin"></div><p class="small">${esc(sk.how)}</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const [{ runBattle }, { makeTD }] = await Promise.all([import("./battle/battle.js"), import("./battles/td.js")]);
+  const [{ runBattle }, { makeTD }] = await Promise.all([import("./battle/battle.js"), import("./battles/td.js"), loadModels(["LINH_r01", "LINH_r24"])]);
   const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
   app.style.display = "none";
   let res = null;
@@ -487,7 +498,7 @@ function huanluyen() {
 async function startTutorial() {
   app.innerHTML = `<div class="loading"><h2>Võ trường · Huấn luyện</h2><p>Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử.</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const { runArena } = await import("./battle/arena.js");
+  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
   const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
   app.style.display = "none";
   let res = null;
@@ -930,7 +941,7 @@ async function startBattle(battleId = pick.battle) {
   const note = notes[Math.floor(Math.random() * notes.length)];
   app.innerHTML = `<div class="loading ld-art b-${B.id}"><i class="ld-img" aria-hidden="true"></i><h2>${esc(B.loading.title)}</h2><p><span class="label ${note.label === "Chính sử" ? "cs" : note.label === "Tương truyền" && B.id !== "B15" ? "tt" : "hc"}">${note.label}</span> ${esc(note.text)}</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id)]);
+  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id), loadModels([heroFor(B)])]);
   const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
   app.style.display = "none";
   let res;
@@ -995,7 +1006,7 @@ async function startArena() {
   const opts = { ...arenaPick, week, seed: arenaPick.mode === "seedtuan" ? seedFromKey(week) : arenaPick.seed };
   app.innerHTML = `<div class="loading"><h2>Võ trường</h2><p>${ARENA_MODES[opts.mode].text}</p><div class="spin"></div></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const { runArena } = await import("./battle/arena.js");
+  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
   const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
   app.style.display = "none";
   let res = null;

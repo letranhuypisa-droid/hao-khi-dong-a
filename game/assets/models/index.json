@@ -1,0 +1,315 @@
+{
+ "char/CV_cung": {
+  "kind": "char",
+  "file": "char/CV_cung.hkm",
+  "tex": "char/CV_cung.webp",
+  "tris": 4999,
+  "bytes": 210192
+ },
+ "char/CV_daidao": {
+  "kind": "char",
+  "file": "char/CV_daidao.hkm",
+  "tex": "char/CV_daidao.webp",
+  "tris": 5000,
+  "bytes": 197628
+ },
+ "char/CV_giao": {
+  "kind": "char",
+  "file": "char/CV_giao.hkm",
+  "tex": "char/CV_giao.webp",
+  "tris": 5000,
+  "bytes": 197302
+ },
+ "char/CV_khien": {
+  "kind": "char",
+  "file": "char/CV_khien.hkm",
+  "tex": "char/CV_khien.webp",
+  "tris": 4999,
+  "bytes": 223438
+ },
+ "char/CV_songdao": {
+  "kind": "char",
+  "file": "char/CV_songdao.hkm",
+  "tex": "char/CV_songdao.webp",
+  "tris": 4999,
+  "bytes": 203280
+ },
+ "char/H31": {
+  "kind": "char",
+  "file": "char/H31.hkm",
+  "tex": "char/H31.webp",
+  "tris": 9000,
+  "bytes": 395714
+ },
+ "char/H33": {
+  "kind": "char",
+  "file": "char/H33.hkm",
+  "tex": "char/H33.webp",
+  "tris": 5998,
+  "bytes": 271338
+ },
+ "char/H35": {
+  "kind": "char",
+  "file": "char/H35.hkm",
+  "tex": "char/H35.webp",
+  "tris": 8999,
+  "bytes": 404114
+ },
+ "char/H40": {
+  "kind": "char",
+  "file": "char/H40.hkm",
+  "tex": "char/H40.webp",
+  "tris": 5995,
+  "bytes": 269818
+ },
+ "char/LINH_r01": {
+  "kind": "char",
+  "file": "char/LINH_r01.hkm",
+  "tex": "char/LINH_r01.webp",
+  "tris": 9000,
+  "bytes": 392334
+ },
+ "char/LINH_r24": {
+  "kind": "char",
+  "file": "char/LINH_r24.hkm",
+  "tex": "char/LINH_r24.webp",
+  "tris": 9000,
+  "bytes": 405896
+ },
+ "char/OFF_doitruong": {
+  "kind": "char",
+  "file": "char/OFF_doitruong.hkm",
+  "tex": "char/OFF_doitruong.webp",
+  "tris": 4996,
+  "bytes": 221114
+ },
+ "char/OFF_photuong": {
+  "kind": "char",
+  "file": "char/OFF_photuong.hkm",
+  "tex": "char/OFF_photuong.webp",
+  "tris": 5994,
+  "bytes": 250248
+ },
+ "char/OFF_tuong": {
+  "kind": "char",
+  "file": "char/OFF_tuong.hkm",
+  "tex": "char/OFF_tuong.webp",
+  "tris": 5985,
+  "bytes": 279932
+ },
+ "char/X19": {
+  "kind": "char",
+  "file": "char/X19.hkm",
+  "tex": "char/X19.webp",
+  "tris": 7461,
+  "bytes": 336756
+ },
+ "char/X20": {
+  "kind": "char",
+  "file": "char/X20.hkm",
+  "tex": "char/X20.webp",
+  "tris": 7500,
+  "bytes": 295088
+ },
+ "char/X24": {
+  "kind": "char",
+  "file": "char/X24.hkm",
+  "tex": "char/X24.webp",
+  "tris": 7498,
+  "bytes": 282466
+ },
+ "kit/DV_DAO": {
+  "kind": "kit",
+  "file": "kit/DV_DAO.hkm",
+  "tex": "kit/DV_DAO.webp",
+  "tris": 620,
+  "lods": [
+   620,
+   288,
+   112
+  ],
+  "bytes": 65222
+ },
+ "kit/DV_GIAO": {
+  "kind": "kit",
+  "file": "kit/DV_GIAO.hkm",
+  "tex": "kit/DV_GIAO.webp",
+  "tris": 573,
+  "lods": [
+   573,
+   285,
+   128
+  ],
+  "bytes": 63540
+ },
+ "kit/DV_NO": {
+  "kind": "kit",
+  "file": "kit/DV_NO.hkm",
+  "tex": "kit/DV_NO.webp",
+  "tris": 546,
+  "lods": [
+   546,
+   260,
+   102
+  ],
+  "bytes": 63420
+ },
+ "kit/NG_CUNG": {
+  "kind": "kit",
+  "file": "kit/NG_CUNG.hkm",
+  "tex": "kit/NG_CUNG.webp",
+  "tris": 546,
+  "lods": [
+   546,
+   246,
+   102
+  ],
+  "bytes": 51838
+ },
+ "kit/NG_DAO": {
+  "kind": "kit",
+  "file": "kit/NG_DAO.hkm",
+  "tex": "kit/NG_DAO.webp",
+  "tris": 617,
+  "lods": [
+   617,
+   285,
+   109
+  ],
+  "bytes": 58782
+ },
+ "kit/NG_GIAO": {
+  "kind": "kit",
+  "file": "kit/NG_GIAO.hkm",
+  "tex": "kit/NG_GIAO.webp",
+  "tris": 638,
+  "lods": [
+   638,
+   307,
+   145
+  ],
+  "bytes": 61914
+ },
+ "kit/NG_KY": {
+  "kind": "kit",
+  "file": "kit/NG_KY.hkm",
+  "tex": "kit/NG_KY.webp",
+  "tris": 875,
+  "lods": [
+   875,
+   332,
+   138
+  ],
+  "bytes": 134592
+ },
+ "kit/NG_TANK": {
+  "kind": "kit",
+  "file": "kit/NG_TANK.hkm",
+  "tex": "kit/NG_TANK.webp",
+  "tris": 589,
+  "lods": [
+   589,
+   276,
+   114
+  ],
+  "bytes": 63276
+ },
+ "wpn/chuy": {
+  "kind": "wpn",
+  "file": "wpn/chuy.hkm",
+  "tex": "wpn/chuy.webp",
+  "tris": 800,
+  "bytes": 36670
+ },
+ "wpn/cung_ng": {
+  "kind": "wpn",
+  "file": "wpn/cung_ng.hkm",
+  "tex": "wpn/cung_ng.webp",
+  "tris": 500,
+  "bytes": 33004
+ },
+ "wpn/cung_viet": {
+  "kind": "wpn",
+  "file": "wpn/cung_viet.hkm",
+  "tex": "wpn/cung_viet.webp",
+  "tris": 799,
+  "bytes": 41344
+ },
+ "wpn/dadao": {
+  "kind": "wpn",
+  "file": "wpn/dadao.hkm",
+  "tex": "wpn/dadao.webp",
+  "tris": 1500,
+  "bytes": 67972
+ },
+ "wpn/daikiem": {
+  "kind": "wpn",
+  "file": "wpn/daikiem.hkm",
+  "tex": "wpn/daikiem.webp",
+  "tris": 1498,
+  "bytes": 59294
+ },
+ "wpn/dao": {
+  "kind": "wpn",
+  "file": "wpn/dao.hkm",
+  "tex": "wpn/dao.webp",
+  "tris": 999,
+  "bytes": 43934
+ },
+ "wpn/dao_linh": {
+  "kind": "wpn",
+  "file": "wpn/dao_linh.hkm",
+  "tex": "wpn/dao_linh.webp",
+  "tris": 498,
+  "bytes": 30638
+ },
+ "wpn/giao_dv": {
+  "kind": "wpn",
+  "file": "wpn/giao_dv.hkm",
+  "tex": "wpn/giao_dv.webp",
+  "tris": 600,
+  "bytes": 37492
+ },
+ "wpn/giao_ng": {
+  "kind": "wpn",
+  "file": "wpn/giao_ng.hkm",
+  "tex": "wpn/giao_ng.webp",
+  "tris": 500,
+  "bytes": 26258
+ },
+ "wpn/khien_nhat": {
+  "kind": "wpn",
+  "file": "wpn/khien_nhat.hkm",
+  "tex": "wpn/khien_nhat.webp",
+  "tris": 500,
+  "bytes": 32284
+ },
+ "wpn/khien_tron": {
+  "kind": "wpn",
+  "file": "wpn/khien_tron.hkm",
+  "tex": "wpn/khien_tron.webp",
+  "tris": 686,
+  "bytes": 37580
+ },
+ "wpn/mui_ten": {
+  "kind": "wpn",
+  "file": "wpn/mui_ten.hkm",
+  "tex": "wpn/mui_ten.webp",
+  "tris": 154,
+  "bytes": 21742
+ },
+ "wpn/no": {
+  "kind": "wpn",
+  "file": "wpn/no.hkm",
+  "tex": "wpn/no.webp",
+  "tris": 1011,
+  "bytes": 59062
+ },
+ "wpn/songdao": {
+  "kind": "wpn",
+  "file": "wpn/songdao.hkm",
+  "tex": "wpn/songdao.webp",
+  "tris": 1200,
+  "bytes": 50946
+ }
+}

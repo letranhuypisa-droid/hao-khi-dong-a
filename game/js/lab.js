@@ -9,17 +9,20 @@
 //   &hero=H31              tướng H31 (rig RIGS.H31, bộ đòn WC01 anim-wc01.js) thay H35 ở view=hero; m nhận thêm hich, binhThu,
 //                          ult; ở view=rigs thì H31 chỉ hiện khi ghi rõ (&rigs=H31) và dùng tư thế WC01
 //   &play                  chạy thời gian thật thay vì khung đứng
+//   &noglb                 không nạp mô hình GLB (glb.js): khối hình dựng bằng code như trước
+//   &lod=1                 lính GLB: xem mức chi tiết 0 (gần, mặc định), 1, 2 (xa)
 //   &cols=8&sp=1.8         số cột, khoảng cách hình (m): dải khung hình một hàng khi xem chu kỳ bước
 // window.__lab.set(opts) đổi cảnh không cần tải lại (dùng khi chụp màn bằng script).
 
 import * as THREE from "three";
-import { kitGeometry, poseFor, soldierFrame, cycleLen, affineToMatrix, NCH, NJ, JOINT_NAMES, BONE_FLOATS } from "./battle/soldiers.js";
+import { kitGeometry, glbKit, poseFor, soldierFrame, cycleLen, affineToMatrix, NCH, NJ, JOINT_NAMES, BONE_FLOATS } from "./battle/soldiers.js";
 import { makeRig, disposeRig, PAL, lambert } from "./battle/models.js";
 import * as A from "./battle/anim.js";
 import { KITS } from "./data/tuning.js";
 import { HERO_ANIM, HERO_MOVE_LIST } from "./battle/hero-anim.js";
 import { RIGS } from "./battle/models.js";
 import { RigMotion } from "./battle/rig-motion.js";
+import { preloadModels, model } from "./battle/glb.js";
 import { MOVES } from "./data/tuning.js";
 import { ANIMS } from "./battle/hero-anim.js";
 import * as W1 from "./battle/anim-wc01.js";
@@ -99,7 +102,7 @@ const params = new URLSearchParams(location.search);
 let opts = { view: params.get("view") || "kit", kit: params.get("kit") || "NG_DAO", s: params.get("s") || "strike", m: params.get("m") || "N1",
   play: params.has("play"), only: params.get("only"), us: params.get("us"), kits: params.get("kits"), yaw: Number(params.get("yaw") ?? 0.6), t: Number(params.get("t") ?? 0),
   ground: params.get("ground") || "flat", cols: Number(params.get("cols")) || 0, sp: Number(params.get("sp")) || 0,
-  dir: params.has("dir") ? Number(params.get("dir")) : 90, hero: params.get("hero") || null };
+  dir: params.has("dir") ? Number(params.get("dir")) : 90, hero: params.get("hero") || null, lod: Number(params.get("lod") || 0) };
 
 let items = [], labels = [];
 const mats = lambert();
@@ -107,6 +110,8 @@ const meshCache = {};
 const _mc = new Float64Array(BONE_FLOATS), _m4 = new THREE.Matrix4();     // ma trận khớp một lính (affine 3 × 4)
 function kitMeshes(kit) {
   if (meshCache[kit]) return meshCache[kit];
+  const G = model("kit/" + kit);
+  if (G) { const S = glbKit(kit, G, 64); S.meshes.forEach((m) => scene.add(m)); return (meshCache[kit] = { glb: S, skel: S.skel }); }
   const g = kitGeometry(kit), parts = {};
   for (const j of JOINT_NAMES) { const m = new THREE.InstancedMesh(g.parts[j], mats, 32); m.count = 0; m.frustumCulled = false; scene.add(m); parts[j] = m; }
   return (meshCache[kit] = { parts, skel: g.skel });
@@ -114,7 +119,7 @@ function kitMeshes(kit) {
 
 function build() {
   for (const it of items) if (it.rig) disposeRig(it.rig);          // gỡ khỏi cảnh, giải phóng khung xương, vật liệu
-  for (const k in meshCache) for (const j of JOINT_NAMES) meshCache[k].parts[j].count = 0;
+  for (const k in meshCache) if (meshCache[k].glb) meshCache[k].glb.meshes.forEach((m) => (m.count = 0)); else for (const j of JOINT_NAMES) meshCache[k].parts[j].count = 0;
   labels.forEach((l) => l.remove()); labels = []; items = [];
   let list = [];
   if (opts.view === "kit") list = (opts.only ? opts.only.split(",") : Object.keys(STATES)).map((s) => ({ kit: opts.kit, s }));
@@ -294,9 +299,14 @@ function render(t) {
       a.walk = w0; poseFor(a, it.kit, K, t, it.pose); it.settled = true;
     }
     soldierFrame(a, M.skel, px, g0, pz, g0, it.pose, dt, labGround, true, _mc);
-    for (let j = 0; j < NJ; j++) M.parts[JOINT_NAMES[j]].setMatrixAt(i, affineToMatrix(_mc, j * 12, _m4));
+    if (M.glb) M.glb.data.set(_mc, i * BONE_FLOATS);
+    else for (let j = 0; j < NJ; j++) M.parts[JOINT_NAMES[j]].setMatrixAt(i, affineToMatrix(_mc, j * 12, _m4));
   }
-  for (const k in meshCache) for (const j of JOINT_NAMES) { const m = meshCache[k].parts[j]; m.count = (counts[k] ?? -1) + 1; m.instanceMatrix.needsUpdate = true; }
+  for (const k in meshCache) {
+    const n = (counts[k] ?? -1) + 1, C = meshCache[k];
+    if (C.glb) { const L = Math.min(opts.lod, C.glb.meshes.length - 1); C.glb.meshes.forEach((m, l) => (m.count = l === L ? n : 0)); C.glb.tex.needsUpdate = true; continue; }
+    for (const j of JOINT_NAMES) { const m = C.parts[j]; m.count = n; m.instanceMatrix.needsUpdate = true; }
+  }
   renderer.render(scene, camera);
   for (const it of items) {
     _v.set(it.x, -0.25, it.z).project(camera);
@@ -304,5 +314,8 @@ function render(t) {
   }
 }
 window.__lab.render = render;
+// mô hình GLB (glb.js) nạp trước khi dựng; &noglb để xem khối hình dựng bằng code như cũ
+if (!params.has("noglb")) await preloadModels();
+window.__lab.ready = true;
 build();
 requestAnimationFrame(frame);

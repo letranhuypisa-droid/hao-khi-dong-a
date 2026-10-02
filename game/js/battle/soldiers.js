@@ -362,6 +362,56 @@ vec3 objectNormal = normalize(mat3(bm) * vec3(normal));
   return { mesh, data, tex, skel };
 }
 
+// ---- lính GLB (design/tools/bake/kit.mjs, glb.js): 3 mức chi tiết, mỗi đỉnh ≤ 2 khúc ---------------------------------------------
+// Lưới ở tư thế nghỉ của bộ khúc (toạ độ khung gốc lính, khúc nghỉ chỉ tịnh tiến tới piv); aSkin = (khúc 0, khúc 1, trọng số khúc 0
+// × 255, 0): p = w·M₀·(v − piv₀) + (1 − w)·M₁·(v − piv₁), M lấy từ cùng texture khớp như skinnedKit. Ba InstancedMesh (LOD0–2)
+// chung một texture khớp: lính của mức l nằm liền nhau từ chỉ số uBase (Crowd.render xếp theo mức), mỗi mức một màu instance.
+export function glbKit(kit, G, cap) {
+  const skel = G.meta.skel;
+  const rows = Math.ceil((cap * NJ * 3) / BONE_TEX_W);
+  const data = new Float32Array(BONE_TEX_W * rows * 4);
+  const tex = new THREE.DataTexture(data, BONE_TEX_W, rows, THREE.RGBAFormat, THREE.FloatType);
+  tex.needsUpdate = true;
+  const piv = G.meta.piv.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const meshes = [], colors = [], bases = [];
+  for (let l = 0; G.geos["lod" + l]; l++) {
+    // LOD0 dán texture atlas; LOD1–2 tô màu đỉnh (lấy mẫu từ atlas lúc nướng, UV bỏ đi)
+    const geo = G.geos["lod" + l], vc = !!geo.attributes.color;
+    const mat = new THREE.MeshLambertMaterial(vc ? { vertexColors: true } : { map: G.tex });
+    const base = { value: 0 };
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.boneTex = { value: tex }; sh.uniforms.uBase = base; sh.uniforms.uPiv = { value: piv };
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", `#include <common>
+attribute vec4 aSkin;
+uniform highp sampler2D boneTex;
+uniform int uBase;
+uniform vec3 uPiv[${NJ}];
+mat4 boneM(int b) {
+  int t = ((gl_InstanceID + uBase) * ${NJ} + b) * 3;
+  vec4 r0 = texelFetch(boneTex, ivec2(t % ${BONE_TEX_W}, t / ${BONE_TEX_W}), 0);
+  vec4 r1 = texelFetch(boneTex, ivec2((t + 1) % ${BONE_TEX_W}, (t + 1) / ${BONE_TEX_W}), 0);
+  vec4 r2 = texelFetch(boneTex, ivec2((t + 2) % ${BONE_TEX_W}, (t + 2) / ${BONE_TEX_W}), 0);
+  return mat4(r0.x, r1.x, r2.x, 0.0, r0.y, r1.y, r2.y, 0.0, r0.z, r1.z, r2.z, 0.0, r0.w, r1.w, r2.w, 1.0);
+}`)
+        .replace("#include <beginnormal_vertex>", `int sb0 = int(aSkin.x + 0.5), sb1 = int(aSkin.y + 0.5);
+float sw0 = aSkin.z / 255.0;
+mat4 sm0 = boneM(sb0), sm1 = boneM(sb1);
+vec3 objectNormal = normalize(mat3(sm0) * vec3(normal) * sw0 + mat3(sm1) * vec3(normal) * (1.0 - sw0));
+#ifdef USE_TANGENT
+  vec3 objectTangent = vec3(tangent.xyz);
+#endif`)
+        .replace("#include <begin_vertex>", `vec3 transformed = (sm0 * vec4(position - uPiv[sb0], 1.0)).xyz * sw0 + (sm1 * vec4(position - uPiv[sb1], 1.0)).xyz * (1.0 - sw0);`);
+    };
+    mat.customProgramCacheKey = () => "glbKit" + NJ + (vc ? "c" : "t");
+    const mesh = new THREE.InstancedMesh(geo, mat, cap);
+    mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = false;
+    const col = mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
+    meshes.push(mesh); colors.push(col); bases.push(base);
+  }
+  return { glb: true, meshes, colors, bases, data, tex, skel, mesh: meshes[0] };
+}
+
 // Chép ma trận khớp (Matrix4, cột chính) vào mảng affine 3 × 4 theo hàng tại vị trí o.
 export function writeAffine(out, o, e) {
   out[o] = e[0]; out[o + 1] = e[4]; out[o + 2] = e[8]; out[o + 3] = e[12];
