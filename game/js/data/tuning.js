@@ -293,4 +293,40 @@ export const TROOP_LEVELS = [
   { id: "cao",  name: "Cao",  N: 400, r: 0.60 },
   { id: "rc",   name: "Rất cao", N: 800, r: 1.00 },
 ];
-export const ZONE = { radius: 25, enemies: 30, allies: 20, bodyguardsShown: 8, theoTaShown: 12, countR: 45 };   // countR: trần vùng chiến đấu chỉ đếm lính trong 45 m quanh tướng (ĐỀ XUẤT BẢN THỬ)
+// countR: trần vùng chiến đấu chỉ đếm lính trong 45 m quanh tướng (ĐỀ XUẤT BẢN THỬ).
+// nearR, forcedMax (đợt 12a, ĐỀ XUẤT BẢN THỬ): lính địch diễn (không trúng đòn) cách tướng dưới nearR m vẫn thành lính thật khi trần
+// enemies đã đầy, tối đa forcedMax người "bị ép" cùng lúc, kỵ binh trước (battle/promotion.js; chúng không tính vào trần enemies và không cản quân đồn trú).
+// Đo trước đợt 12: trần 30 đầy ~57% trận, cung kỵ diễn đứng sát tướng (38–46% thời gian cung kỵ trong 12 m ở pha 1 là không đánh được). nearR 9 phủ
+// tầm đòn xa của tướng (C4 vòng 5 m, C6 6 m + bán kính lính) cộng quãng tướng chạy giữa hai lần xét (0,25 s × 6,75 m/s ≈ 1,7 m); forcedMax 20: bản
+// 14 vẫn hết hạn mức ở đầu tuyến pha 1 (tướng đứng giữa khối quân + quân đồn trú: 40 mềm + 14 ép), còn cung kỵ diễn trong 6 m ~4% thời gian. Tổng địch thật
+// quanh tướng tăng thêm tối đa 20 người (baseline đã gặp tối đa 54; số lính có thẻ tấn công tướng không đổi).
+// forcedKeepR: chỉ lính ép trong chừng này m quanh tướng mới tính vào forcedMax — lính ép đã lùi ra xa (cung kỵ giữ tầm vẫn là lính thật) giữ hạn mức thì lính diễn sát
+// tướng không được chuyển thành thật (reviewer đo: 85–95% lính ép giữ chỗ là cung kỵ ở xa; cung kỵ diễn trong 6 m vẫn không đánh được lúc tướng đi xuyên tuyến).
+export const ZONE = { radius: 25, enemies: 30, allies: 20, bodyguardsShown: 8, theoTaShown: 12, countR: 45, nearR: 9, forcedMax: 20, forcedKeepR: 14 };
+
+// Quân đồn trú của Cứ Điểm (đợt 12b, ĐỀ XUẤT BẢN THỬ; battle/garrison.js). ringPad: lính đứng trong vòng + 3 m vẫn tính "trong đồn" (director.js sinh
+// lính trong vòng + 3 m). hardLeash: dây cứng — lính đồn trú không rời tâm Cứ Điểm quá bán kính vòng + 12 m (dây mềm cũ AI.kiteLeash, AI.duel.leash 10 m
+// chỉ lọc chọn đối thủ / cung thủ nhắm tướng nên lính vẫn tản 29–46 m khi sĩ quan trấn thủ ngã), và vỡ trận thì rút về đồn. hintR: thẻ nhiệm vụ hiện
+// "còn N · a trong đồn · b ngoài đồn" khi tướng cách Cứ Điểm < 45 m (cùng tầm sinh quân đồn trú), không chỉ lúc đứng trong vòng (ẩn ~48% trận A1).
+// pointLast: còn ≤ 6 lính thì bản đồ nhỏ nhấp nháy dấu và mũi tên mép màn hình chỉ con gần nhất (mấy con cuối hay là cung kỵ, đứng ngoài màn hình).
+export const GARRISON = { ringPad: 3, hardLeash: 12, hintR: 45, pointLast: 6 };
+
+// "Cửa ngõ" — nguồn viện binh của cánh (đợt 12c, ĐỀ XUẤT BẢN THỬ; battle/supply.js, director.js fillActors). Trước đợt 12 lính ở tuyến địch được bù NGAY tại
+// 18 m sau tuyến (57–80% lượt sinh quân rơi trong 30 m quanh tướng) và khối quân thật mọc cách tướng 10–22 m; chiếm doanh trại chỉ giảm nửa hồi quân.
+// Giờ, khi cửa ngõ còn của địch, lính bù xuất hiện ở chỗ xuất quân SAU doanh trại (r + behind m sau tâm), rồi hành quân ra tuyến: nhanh hơn đi bộ marchMult
+// lần nhưng không quá marchMax m/s (tướng chạy 6,75; cung kỵ đi bộ đã 5,2). minDist: tướng đứng gần chỗ xuất quân hơn chừng này thì chờ — không xuất quân trong tầm nhìn của tướng (tướng đứng giữa doanh
+// trại cũng chặn luôn đường viện binh: chỗ xuất quân cách tâm r + behind = 33 m). perTick: số lính xuất tối đa mỗi nhịp 1 s. transitMax: số lính đang trên đường tối đa (ở mức Số lính "Vừa" r 0,35, tỉ lệ theo r) — quân
+// đang đi đường không tính vào số lính ở tuyến, để tuyến không mỏng đi vì quãng đường (đo: 1,3 lính/s bị tiêu × ~27 s đường ≈ 35 lính). arrive: cách chỗ đứng
+// ≤ arrive m thì coi là đã tới (hết cờ hành quân).
+// Số lính hiển thị: canon (systems.md §13.1, quyết định #8) đòi vùng chiến đấu và kết quả KHÔNG đổi theo mức; trước đợt 12 khối quân mọc cạnh tướng (30 địch, Q quyết)
+// giữ điều đó, nay vùng chiến đấu lấy địch từ tuyến nên: lineFloor — cánh có tướng giữ ít nhất chừng này lính ở tuyến ở mọi mức (52 = số lính ở tuyến mức Vừa; mức Thấp chỉ có 17 → vùng chiến đấu chỉ
+// còn ~17 và cạn ở 1 lính/s; kho 52 không đủ nối quãng hành quân ~35 s ở 1,4 lính/s nhưng bằng mức Vừa); transitMax, perTick không dưới mức Vừa (refR = r của mức Vừa), mức cao hơn thì tăng theo r (kể cả Tổng Phản Công, r × 2). lineGap: nếu tuyến bị
+// đẩy vượt cửa ngõ (Tổng Phản Công khi doanh trại còn của địch) thì chỗ xuất quân lùi tới tuyến + lineGap m thay vì mọc sau lưng quân ta.
+export const SUPPLY = { behind: 20, minDist: 45, perTick: 4, transitMax: 36, marchMult: 1.6, marchMax: 7, arrive: 6, lineFloor: 52, lineGap: 55, refR: 0.35 };
+
+// Vòng trúng đòn quanh điểm (x, z) của một lính (tướng đánh: hero.js applyHits, hero-skills.js). Bộ binh 0,4 m như trước đợt 12. Kỵ binh
+// 1,0 m: thân ngựa kéo từ ~0,8 m sau tới ~1,2 m trước điểm lính (soldiers.js), mà cung kỵ lùi giữ tầm quay mặt về phía tướng nên nhát chém
+// ở mép tầm trượt qua mũi ngựa mà không trúng (đo: tướng không Né, không Phá Trận mất ~30 s hạ một cung kỵ đơn lẻ; vòng 1,0 → ~5 s).
+export const HIT_R = { foot: 0.4, mounted: 1.0 };
+export const hitRadius = (a) => (a && a.K && a.K.mounted ? HIT_R.mounted : HIT_R.foot);
+export const hitPad = (a) => hitRadius(a) - HIT_R.foot;     // phần cộng thêm vào tầm so khoảng cách tới điểm lính (0 với bộ binh)

@@ -219,6 +219,15 @@ t("H35 (def mặc định): M = MOVES, 2 vạch Khí Lực, 2 vệt lưỡi đú
   h.ki = 150; assert.deepEqual([h.ultInfo().ready, h.ultInfo().cd, h.ultInfo().name], [true, "1/2", "Bóp Nát Quân Thù"]);
   assert.equal(h.nextHeavyInfo().label, "C1 Phá khiên");
 });
+t("vòng trúng của kỵ binh (đợt 12a): đòn N1 ở mép tầm trúng cung kỵ mà không trúng bộ binh cùng chỗ; Phá Trận, vòng Tuyệt Kỹ và lướt né cũng vậy", () => {
+  const horse = (x, z) => ({ ...soldier(x, z), K: { mounted: true } });
+  const swing = (a) => { const ctx = makeCtx({ agents: [a] }), h = new Hero(ctx, statsFor("H35")); h.applyHits("N1", MOVES.N1, true); return a.hits || 0; };
+  assert.equal(swing(soldier(0, 4.2)), 0, "bộ binh ở 4,2 m: ngoài 3,4 + 0,4");
+  assert.equal(swing(horse(0, 4.2)), 1, "cung kỵ ở 4,2 m: trong 3,4 + 1,0");
+  assert.equal(swing(horse(0, 4.6)), 0, "ngoài vòng 1,0 m vẫn không trúng");
+  const burst = (a) => { const ctx = makeCtx({ agents: [a] }), h = new Hero(ctx, statsFor("H35")); h.afterimageBurst(0, 0); return a.hits || 0; };
+  assert.equal(burst(soldier(0, 3.3)), 0); assert.equal(burst(horse(0, 3.3)), 1, "ảnh lướt né: tầm 3 m + phần cộng của kỵ binh");
+});
 t("H35: đòn nặng ngắt đòn đang ra; không có tụ lực dù giữ C", () => {
   const ctx = makeCtx({ agents: [soldier(0, 2)] }), h = new Hero(ctx, statsFor("H35"));
   const inp = input({ held: { c: true } }); inp.pressed.c = true;

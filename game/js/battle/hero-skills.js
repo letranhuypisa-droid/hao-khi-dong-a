@@ -19,7 +19,7 @@
 import * as A from "./anim.js";
 import { heightAt } from "./world.js";
 import { turn } from "./crowd.js";
-import { HERO, POISE_PER_MV, C_POISE_MULT, HAO_KHI, AI, ultBigDamage, ultBigNote } from "../data/tuning.js";
+import { HERO, POISE_PER_MV, C_POISE_MULT, HAO_KHI, AI, ultBigDamage, ultBigNote, hitPad } from "../data/tuning.js";
 import { SKILLS } from "../data/heroes.js";
 
 // ---- H35 · Phá Trận: 3 lần lao 18 m trong 6 s, choáng lính 1 s (nguyên văn hero.js) -----------------------------------
@@ -56,7 +56,7 @@ const phaTran = {
     let hit = false;
     for (const a of ctx.crowd.agents) {
       if (a.side !== "dich" || !ctx.crowd.hittable(a) || h.dashHit.has(a)) continue;
-      if (Math.hypot(a.x - h.x, a.z - h.z) > 2.2) continue;
+      if (Math.hypot(a.x - h.x, a.z - h.z) > 2.2 + hitPad(a)) continue;
       h.dashHit.add(a);
       const kx = Math.cos(h.yaw), kz = -Math.sin(h.yaw), side = ((a.x - h.x) * kx + (a.z - h.z) * kz) >= 0 ? 1 : -1;
       const died = ctx.crowd.damage(a, h.damageTo(a.giap, HERO.phaTran.mv, false, a), { by: "hero", swing: h.swingId, kx: kx * side, kz: kz * side, knock: 4, stun: HERO.phaTran.stun });
@@ -120,7 +120,7 @@ const bopNat = {
       for (const a of ctx.crowd.agents) {
         if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
         const dx = a.x - h.x, dz = a.z - h.z, dd = Math.hypot(dx, dz);
-        if (dd > h.ultR) continue;
+        if (dd > h.ultR + hitPad(a)) continue;
         const died = ctx.crowd.damage(a, h.damageTo(a.giap, h.ultMv, false, a), { by: "hero", swing: h.swingId, kx: dx / (dd || 1), kz: dz / (dd || 1), knock: 3, launch: h.ultHits % 6 === 0 });
         if (Math.random() < 0.5) ctx.fx.impact(a.x, heightAt(a.x, a.z) + 1.15 * a.scale, a.z, dx / (dd || 1), dz / (dd || 1), { heavy: h.ultHits % 6 === 0, kill: died, full: Math.random() < 0.4 });
       }
@@ -325,7 +325,7 @@ function bachDangChop(h, c, i, last) {
   for (const a of [...ctx.crowd.agents]) {
     if (a.side !== "dich" || !ctx.crowd.hittable(a)) continue;
     const dx = a.x - gx, dz = a.z - gz, d = Math.hypot(dx, dz);
-    if (d > r) continue;
+    if (d > r + hitPad(a)) continue;
     const k = d || 1;
     const died = ctx.crowd.damage(a, h.damageTo(a.giap, mv, false, a), { by: "hero", swing: h.swingId, kx: dx / k, kz: dz / k,
       knock: hard ? 9 : 4.5, launch: hard && d < r * 0.7, heavy: true });

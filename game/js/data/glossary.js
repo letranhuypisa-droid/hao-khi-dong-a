@@ -5,7 +5,7 @@
 // Ba chữ dễ lẫn: "Phá Thế" = thanh vàng dưới tên sĩ quan (đầy → Vỡ Thế → Đòn Quyết); "Phá Trận" = kỹ năng E của Trần Quốc Toản;
 // "Phá khiên" = tên đòn C1 (trước đợt 11 gọi "Phá thế", trùng với thanh). Xem moves-info.js.
 
-import { HERO, HAO_KHI, SIM, DEFENSE, DIFFICULTY, BROKEN_SEC, BROKEN_MULT } from "./tuning.js";
+import { HERO, HAO_KHI, SIM, DEFENSE, DIFFICULTY, BROKEN_SEC, BROKEN_MULT, KITS, AI } from "./tuning.js";
 
 const vn = (x) => String(x).replace(".", ",");
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -18,6 +18,7 @@ function reviveByDifficulty() {
 }
 const SK_HI = SIM.skBands[0], SK_LO = SIM.skBands[SIM.skBands.length - 1], SK_LO_BELOW = SIM.skBands[SIM.skBands.length - 2][0];
 const revive = HERO.revive, reviveHk = -HAO_KHI.src.reviveUsed;
+const KY = KITS.NG_KY, KY_BACK = KY.range * AI.kite;      // Cung kỵ: tầm bắn 20 m; tướng áp sát dưới 8 m thì nó lùi giữ tầm
 
 // Chữ ở hàng "Gượng dậy" của màn Xuất trận (main.js): n lần theo độ khó đang chọn.
 export const guongDayRow = (n) => (n > 0
@@ -42,7 +43,15 @@ export const GLOSS = {
   doDo: { icon: "ct", name: "Đòn viền đỏ",
     long: `Vòng đỏ dưới chân sĩ quan lớn dần cho đầy trong ${vn(DEFENSE.redTelegraph)} s, vừa đầy thì cú bổ rơi. Không đỡ được: né ra khỏi vòng, hoặc bấm Đỡ trong ${vn(DEFENSE.parryWindow)} s cuối để Phản đòn; bấm sớm hơn thì hụt và bị khóa ${vn(DEFENSE.counterLockout)} s. Trúng đòn này lúc đang chiếm Cứ Điểm thì tiến độ chiếm về 0.`,
     short: "Vòng đỏ dưới chân sĩ quan là đòn không đỡ được. Né ra khỏi vòng, hoặc bấm {block} lúc vòng vừa đầy để Phản đòn." },
+  // Đợt 12c: cửa ngõ = doanh trại của cánh, nguồn viện binh. Vệt đỏ chạy từ doanh trại tới tuyến trên bản đồ nhỏ khi còn mở.
+  cuaNgo: { icon: "giuvung", name: "Cửa ngõ",
+    long: "Doanh trại của mỗi cánh là cửa ngõ viện binh. Còn của quân Nguyên thì quân mới liên tục xuất ra từ sau doanh trại rồi hành quân ra tuyến (bản đồ nhỏ có vệt đỏ từ doanh trại tới tuyến), cánh còn hồi quân và có thêm các đợt tiếp viện. Chiếm doanh trại, hoặc để cánh địch vỡ trận, là đóng cửa ngõ: hết viện binh, quân còn lại chỉ vơi đi.",
+    short: "Doanh trại là cửa ngõ viện binh của cánh: còn của quân Nguyên thì quân mới liên tục xuất ra rồi hành quân ra tuyến (vệt đỏ trên bản đồ nhỏ). Chiếm nó là đóng cửa ngõ, hết viện binh." },
+  // Đợt 12a: cung kỵ lùi giữ tầm nhanh gần bằng tướng chạy (4,7–5,7 so với 6,75 m/s) nên đuổi bộ rất lâu mới tới. Mọi cung kỵ thật không đang đấu tay đôi đều lùi khi tướng áp sát dưới 8 m.
+  cungKy: { icon: "dodge", name: "Cung kỵ",
+    long: `Cung kỵ cưỡi ngựa, bắn xa ${KY.range} m và lùi giữ tầm khi tướng áp sát dưới ${KY_BACK} m. Chạy bộ đuổi thì rất lâu mới tới: Né một cái cho sát rồi chém liền, hoặc dùng Phá Trận (kỹ năng của Trần Quốc Toản) lao tới. Trúng một đòn là hắn khựng lại.`,
+    short: `Cung kỵ lùi ngựa giữ tầm khi tướng áp sát dưới ${KY_BACK} m, chạy bộ đuổi rất lâu mới tới. Bấm {dodge} lộn sát tới rồi chém liền, hoặc dùng kỹ năng lao tới ({skill}).` },
 };
 
 // Thứ tự thẻ "Trong trận" ở bảng đòn (ui/guide.js)
-export const CONCEPT_ORDER = ["hk", "cuDiem", "matTran", "siKhi", "guongDay", "phaThe", "doDo"];
+export const CONCEPT_ORDER = ["hk", "cuDiem", "matTran", "siKhi", "guongDay", "phaThe", "doDo", "cungKy", "cuaNgo"];

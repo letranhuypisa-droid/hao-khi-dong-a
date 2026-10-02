@@ -61,7 +61,9 @@ import { laneFeaturesOn } from "../battle/ground.js";
 import { Director } from "../battle/director.js";
 import { Ambient } from "../battle/ambient.js";
 import { ATMO_B15 } from "../battle/atmosphere.js";
-import { createSim } from "../sim/front.js";
+import { createSim, supplyOpen } from "../sim/front.js";
+import { garrisonMarks } from "../battle/garrison.js";
+import { doorSpawnPoint } from "../battle/supply.js";
 
 // ---- camera tránh tường Hàm Tử quan (chuyển nguyên từ battle.js) -------------------------------------------------
 // Hộp 2D che camera, dựng theo world.js (tường tây x = MAP.fortWallX từ bờ sông tới góc nam, tường nam z =
@@ -151,6 +153,27 @@ function drawTop({ c, X, Z, t }, ctx) {
   if (objs.length) {
     c.strokeStyle = "#ffd27a"; c.lineWidth = 2.2; const k = 0.5 + 0.5 * Math.sin(t * 6);
     for (const o of objs) { c.beginPath(); c.arc(X(o.x), Z(o.z), 8 + 2.5 * k, 0, 7); c.stroke(); }
+  }
+  // Cửa ngõ còn mở (đợt 12c): vệt đỏ nét đứt chạy từ doanh trại của cánh ra tuyến — đường viện binh. Đóng thì hết vệt.
+  for (const F of Object.values(FRONTS)) {
+    if (!F.door || !supplyOpen(ctx.sim, F.id)) continue;
+    const v = ctx.world.bases[F.door], lx = lineToX(F, ctx.sim.fronts[F.id].x), S = doorSpawnPoint(F, v, lx);
+    c.save(); c.strokeStyle = "#d8321e"; c.lineWidth = 1.8; c.setLineDash([4, 3]); c.lineDashOffset = -t * 14;
+    c.beginPath(); c.moveTo(X(S.x), Z(F.laneZ)); c.lineTo(X(lx), Z(F.laneZ)); c.stroke(); c.restore();      // từ chỗ xuất quân thật (sau doanh trại) ra tuyến
+  }
+  // Quân đồn trú còn đánh được (đợt 12b): ô đỏ 4 px viền trắng — chấm 2 px của lính thường không thấy ở bản đồ nhỏ; còn ≤ GARRISON.pointLast người thì nhấp nháy vòng vàng
+  const by = {};
+  for (const a of ctx.crowd.agents) {
+    if (a.role !== "garrison" || !a.src || !ctx.crowd.hittable(a)) continue;
+    const b = ctx.sim.bases[a.src];
+    if (b && b.owner === "dich" && b.type !== "cong") (by[a.src] = by[a.src] || []).push(a);
+  }
+  const k = 0.5 + 0.5 * Math.sin(t * 7);
+  for (const m of garrisonMarks(Object.entries(by).map(([id, soldiers]) => ({ soldiers, G: ctx.sim.bases[id].G })))) {
+    c.fillStyle = "#e0402a";
+    if (!m.last) { c.fillRect(X(m.x) - 1.5, Z(m.z) - 1.5, 3, 3); continue; }       // đông: ô 3 px, khỏi che nhãn A1 / A2; những con cuối: ô 4 px viền trắng + vòng vàng nhấp nháy
+    c.strokeStyle = "#fff6e0"; c.lineWidth = 1; c.fillRect(X(m.x) - 2, Z(m.z) - 2, 4, 4); c.strokeRect(X(m.x) - 2, Z(m.z) - 2, 4, 4);
+    c.strokeStyle = "#ffd27a"; c.lineWidth = 1.6; c.beginPath(); c.arc(X(m.x), Z(m.z), 5 + 2.5 * k, 0, 7); c.stroke();
   }
   const ks = d.keSach;
   c.fillStyle = "#8a6a3a"; c.beginPath(); c.arc(X(VILLAGE.x), Z(VILLAGE.z), 5, 0, 7); c.fill();

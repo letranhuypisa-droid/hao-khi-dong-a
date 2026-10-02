@@ -150,6 +150,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .front { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; } .front.here b { color: var(--vang2); }
 .front b { font-family: var(--serif); } .front .ta { color: #ff9a80; font-weight: 700; } .front .dich { color: #9fc2e6; font-weight: 700; } .front .vs { color: var(--muted); }
 .front .skv { color: var(--muted); } .front em { font-style: normal; color: var(--vang2); } .front em.bad { color: var(--bad); } .front.reinf { color: var(--muted); }
+.front em.door { color: #ff8a6a; } .front em.door-shut { color: #9fd49a; }      /* cửa ngõ của cánh (đợt 12c): mở = còn viện binh (đỏ), đóng = hết (xanh) */
 .hud-msgs { position: absolute; left: 14px; top: 90px; width: 380px; display: flex; flex-direction: column; gap: 4px; }
 .msg { background: rgba(21,18,16,.72); border-left: 3px solid var(--vang); padding: 5px 9px; font-size: .82rem; border-radius: 0 6px 6px 0; }
 .msg.bad { border-color: var(--bad); } .msg.good { border-color: var(--good); }
@@ -423,6 +424,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-wp[data-mode="edge"] .wp-dir { display: block; }
 .wp-tip { width: 0; height: 0; margin-top: 1px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 11px solid var(--vang); filter: drop-shadow(0 1px 2px #000); }
 .hud-wp[data-mode="edge"] .wp-tip { display: none; }
+/* nhãn thứ hai: con lính đồn trú cuối (hud.js frameBlocker): đỏ, nhỏ hơn nhãn mục tiêu */
+.hud-wp.alt .wp-box { border-color: #d8321e; padding: 2px 9px; }
+.hud-wp.alt .wp-box b { color: #ff8a6a; font-size: .74rem; }
+.hud-wp.alt .wp-dir { border-top-color: #ff8a6a; }
+.hud-wp.alt .wp-tip { border-top-color: #d8321e; }
 @keyframes wpGlow { to { box-shadow: 0 0 16px rgba(255,210,122,.85); } }
 
 /* Nhắc khóa chuột (bàn phím + chuột): chỉ hiện khi chuột chưa khóa */
