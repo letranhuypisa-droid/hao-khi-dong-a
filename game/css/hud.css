@@ -21,7 +21,7 @@
 .stage.compact .hk-label span { display: none; }
 .stage.compact .hk-label b { font-size: .86rem; }
 .stage.compact .hk-bar { height: 9px; margin: 4px 30px 0 0; }
-.stage.compact .hk-state { font-size: .6rem; min-height: 0; line-height: 1.2; }
+.stage.compact .hk-state { font-size: .6rem; min-height: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stage.compact .hud-time { position: absolute; left: calc(var(--hkw) + 14px + var(--sl)); top: calc(6px + var(--st)); padding: 3px 9px; border-radius: 10px; background: var(--panel); border-color: var(--line2); }
 .stage.compact .hud-time b { font-size: .98rem; } .stage.compact .hud-time span { display: none; }
 .stage.compact .hud-kos { display: block; font-size: .6rem; color: var(--muted); line-height: 1.1; }
@@ -47,7 +47,7 @@
 .stage.compact .hud-phase.flash { animation: phaseFlash 2.2s ease-out; }
 .stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs { position: absolute; z-index: 1; top: calc(40px + var(--st)); left: 50%; transform: translateX(-50%); width: min(54vw, 460px); gap: 0; align-items: center; }
 .stage.compact .msg { font-size: .76rem; line-height: 1.32; padding: 4px 11px; border-radius: 9px; border-left-width: 3px; background: rgba(21,18,16,.84);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-height: calc(2.64em + 8px); }   /* dòng thứ ba không lòi xuống phần đệm */
 .stage.compact .msg.tip::before { display: inline; content: "Gợi ý · "; font-size: .66rem; letter-spacing: .04em; }
 .stage.compact.b20 .hud-msgs { top: calc(72px + var(--st)); width: min(42vw, 360px); }      /* B20: dải Hào Khí + Con nước cao hơn, bảng Nghi binh ở phải */
 .stage.compact .hud.b20-bossing .hud-msgs { top: calc(112px + var(--st)); }
@@ -164,6 +164,12 @@
   .stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs, .stage.compact.b20 .hud-msgs { left: calc(8px + var(--sl)); top: calc(var(--lefty) + 36px + var(--st)); transform: none; width: min(56vw, 420px); align-items: flex-start; }
   .stage.compact .hud-events { top: calc(var(--lefty) + 92px + var(--st)); }
 }
+
+/* chế độ Tự do (đợt 14): dải Danh tiếng thay Hào Khí dưới bậc Tướng, thanh Phá Thế của người lính, ô Tuyệt Kỹ chưa mở */
+.hk-bar.rep i { display: none; }
+.hk-bar.rep .hk-fill { background: linear-gradient(90deg, #6b4f2e, #c9a14a 60%, #f1d98a); }
+.bar.hpo { height: 5px; margin-top: 3px; } .bar.hpo[hidden] { display: none; } .bar.hpo > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
+.sk.locked { opacity: .35; filter: grayscale(1); }
 
 /* bảng tạm dừng: sổ tin trong trận */
 .msglog { margin: 10px 0 4px; }

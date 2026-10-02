@@ -54,7 +54,7 @@ export class HUD {
       <div class="hud-top">
         ${pin ? "" : card}
         <div class="hk">
-          <div class="hk-label"><span>HÀO KHÍ</span><b data-k="hkv">0</b></div>
+          <div class="hk-label"><span data-k="hklabel">HÀO KHÍ</span><b data-k="hkv">0</b></div>
           <div class="hk-bar"><div class="hk-fill" data-k="hkfill"></div><div class="hk-over" data-k="hkover"></div>
             <i style="left:25%"></i><i style="left:50%"></i><i style="left:75%"></i></div>
           <div class="hk-state" data-k="hkstate"></div>
@@ -67,6 +67,7 @@ export class HUD {
         <div class="bars">
           <div class="name">${hd?.name ?? HERO.name} <small data-k="rev"></small></div>
           <div class="bar hp"><div data-k="hp"></div><span data-k="hpt"></span></div>
+          <div class="bar hpo" data-k="hpo" hidden><div data-k="hpof"></div></div>
           <div class="ki">${Array.from({ length: nKi }, (_, i) => `<div class="bar kb"><div data-k="ki${i}"></div></div>`).join("")}</div>
           <div class="buffs" data-k="buffs"></div>
           <div class="ttags"><span class="ttag" data-k="ttag"></span><span class="ttag mud" data-k="tmud"></span></div>
@@ -238,14 +239,20 @@ export class HUD {
     this.measureAvoid();
     E.time.textContent = fmt(d.time);
     E.time.classList.toggle("late", d.time > (d.M?.par ?? this.parSec));
-    // Hào Khí
-    E.hkv.textContent = Math.floor(hk.value);
-    E.hkfill.style.width = `${hk.value}%`;
-    E.hkover.style.width = `${(hk.overflow / 30) * 100}%`;
-    E.hkfill.parentElement.classList.toggle("ready", tpcReady(hk));
-    E.hkfill.parentElement.classList.toggle("tpc", hk.tpc);
-    E.hkv.classList.toggle("pulse", this.pulse > 0);
-    E.hkstate.textContent = hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? fm("Sẵn sàng · bấm {tpc}") : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "";
+    // Hào Khí — trận có hud.hkView (chế độ Tự do dưới bậc Tướng) thì dải này là Danh tiếng: { label, value, pct, state }
+    const hv = this.B.hud?.hkView?.(ctx);
+    if (hv) {
+      if (E.hklabel.textContent !== hv.label) { E.hklabel.textContent = hv.label; E.hkover.style.width = "0"; E.hkfill.parentElement.classList.add("rep"); }
+      E.hkv.textContent = hv.value; E.hkfill.style.width = `${hv.pct}%`; E.hkstate.textContent = hv.state;
+    } else {
+      E.hkv.textContent = Math.floor(hk.value);
+      E.hkfill.style.width = `${hk.value}%`;
+      E.hkover.style.width = `${(hk.overflow / 30) * 100}%`;
+      E.hkfill.parentElement.classList.toggle("ready", tpcReady(hk));
+      E.hkfill.parentElement.classList.toggle("tpc", hk.tpc);
+      E.hkv.classList.toggle("pulse", this.pulse > 0);
+      E.hkstate.textContent = hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? fm("Sẵn sàng · bấm {tpc}") : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "";
+    }
     // tướng
     E.lv.textContent = `Cấp ${ctx.stats.level}`;
     E.hp.style.width = `${(hero.hp / hero.maxHp) * 100}%`;
@@ -254,6 +261,14 @@ export class HUD {
     const per = hero.def?.kiLucPerBar ?? HERO.kiLucPerBar ?? 100;                                   // Khí Lực mỗi vạch theo tướng (H35: 100)
     for (let i = 0; i < this.nKi; i++) E["ki" + i].style.width = `${Math.max(0, Math.min(100, (hero.ki - per * i) / per * 100))}%`;
     E.rev.textContent = hero.revives > 0 ? `· Gượng dậy ×${hero.revives}` : "";
+    // thanh Phá Thế của người lính (chế độ Tự do, từ Đội trưởng): đòn nhẹ trừ thanh thay vì làm khựng
+    if (hero.poiseMax > 0) { if (E.hpo.hidden) E.hpo.hidden = false; E.hpof.style.width = `${(hero.poise / hero.poiseMax) * 100}%`; }
+    // ô / nút chưa mở theo bậc (người lính): ẩn ô Phá Trận, Mệnh Lệnh; làm mờ ô Tuyệt Kỹ
+    if (hero.locked) {
+      if (E.sk1) E.sk1.style.display = hero.locked("skill") ? "none" : "";
+      if (E.sk4) E.sk4.style.display = hero.locked("cmd") ? "none" : "";
+      if (E.sk2) E.sk2.classList.toggle("locked", hero.locked("ult"));
+    }
     const buffs = [];
     if (hero.buffs.atk) buffs.push(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
     if (hero.buffs.flag) buffs.push(`Dưới cờ: đánh lính +${Math.round(hero.buffs.flag * 100)}%`);   // cờ Tuyệt Kỹ không cộng vào đòn lên sĩ quan, Toa Đô (đợt 9)

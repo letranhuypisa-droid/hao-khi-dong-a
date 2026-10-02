@@ -211,6 +211,8 @@ export function makeRig(cfg = {}) {
     if (hat === "mutuong") headParts.push(part(cyl(0.18, 0.2, 0.14, 8), trim, { y: 0.22 }), part(cone(0.06, 0.26, 5), PAL.son, { y: 0.4 }));
     if (hat === "munguyen") headParts.push(part(cone(0.2, 0.38, 7), PAL.xam, { y: 0.34 }), part(cyl(0.22, 0.24, 0.08, 8), PAL.long, { y: 0.2 }));
     if (hat === "mulong") headParts.push(part(cyl(0.2, 0.24, 0.26, 8), PAL.long, { y: 0.28 }), part(cone(0.05, 0.22, 4), trim, { y: 0.5 }));
+    // Nón lá của người lính (chế độ Tự do, đợt 14): vành rộng, chóp thấp, khăn đỏ buộc dưới nón
+    if (hat === "non") headParts.push(part(cone(0.42, 0.22, 10), 0xcdb98a, { y: 0.31 }), part(cyl(0.17, 0.17, 0.05, 8), PAL.son, { y: 0.19 }));
     // Mũ trụ Tiết chế (H31, Hư cấu): bát mũ sơn then viền vàng, đỉnh tròn, chóp vàng cắm tua son, tấm trán vàng hình
     // ngọn lửa, hai tai che, che gáy.
     if (hat === "tietche") headParts.push(

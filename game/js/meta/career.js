@@ -8,8 +8,8 @@ import { RANKS, rankOf, can, battleRep, applyRep, payOf, GEAR, gearCost, QUE, su
 
 // Binh khí chọn lúc tạo lính: hai bộ đòn có sẵn (Hư cấu). WC01 dùng bộ đòn Đại kiếm, gọi là Đại đao cho hợp người lính.
 export const WEAPONS = {
-  WC03: { id: "WC03", name: "Song đao", text: "Nhanh, chém liên hoàn; đánh trúng liền mạch thì tăng tốc đánh.", rig: "linh03", moves: "LINH03", atkSpeed: 1.05 },
-  WC01: { id: "WC01", name: "Đại đao", text: "Nặng, giữ C để tụ lực; siêu giáp khi vung, phá giáp.", rig: "linh01", moves: "LINH01", atkSpeed: 0.95 },
+  WC03: { id: "WC03", name: "Song đao", text: "Nhanh, chém liên hoàn; đánh trúng liền mạch thì tăng tốc đánh.", atkSpeed: 1.05 },
+  WC01: { id: "WC01", name: "Đại đao", text: "Nặng, giữ C để tụ lực; siêu giáp khi vung, phá giáp.", atkSpeed: 0.95 },
 };
 // Chỉ số gốc cấp 1 của người lính (ĐỀ XUẤT BẢN THỬ): yếu hơn Trần Quốc Toản cấp 1 (Công 140, Sinh lực 1.600, Giáp 50).
 export const SOLDIER = { cong1: 105, hp1: 1050, giap1: 35, move: 6.4, rankWeapon: 0.06 };
@@ -42,7 +42,7 @@ export function soldierDef(c) {
   const initials = c.name.split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
   return {
     id: "LINH", name: c.name, title: RANKS[i].name, rank: i, soldier: true,
-    cls: W.id, weaponClass: W.id, rig: W.rig, anim: W.id, moves: W.moves, portrait: initials || "L",
+    cls: W.id, weaponClass: W.id, rig: "linh", anim: W.id, moves: W.id, portrait: initials || "L",      // rig thật theo bậc: battle/soldier.js soldierRigKey
     cong1: SOLDIER.cong1, hp1: SOLDIER.hp1, giap1: SOLDIER.giap1, move: SOLDIER.move, atkSpeed: W.atkSpeed, rangeMul: 1,
     aura: 12, auraAtk: 0.04, skMult: 1, cmdCd: 1, bodyguards: 0,
     kiLucBars: 2, kiLucSteps: [[1, 2]], kiLucPerBar: HERO.kiLucPerBar, kiLucRegen: HERO.kiLucRegen,

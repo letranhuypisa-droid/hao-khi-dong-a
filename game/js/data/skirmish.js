@@ -98,7 +98,7 @@ export function makeSkirmish(seed, rank, type) {
     out.entry = P(255, ez); out.spawn = P(146, 122);
     const route = [P(150, 118), P(112, 82), P(72, 42), P(46, 14)];
     const nA = 2 + (rank >= 2) + (rank >= 4), offs = officersFor(rank);
-    out.escort = { route, speed: 1.6, cartHp: 100, start: route[0], dest: route[route.length - 1],
+    out.escort = { route, speed: 1.25, cartHp: 100, start: route[0], dest: route[route.length - 1],
       ambush: Array.from({ length: nA }, (_, i) => ({ atU: 0.15 + (0.7 * i) / Math.max(1, nA - 1), n: 5 + 2 * rank + rnd[i], officers: i === nA - 1 ? offs : [] })) };
     out.waves = out.escort.ambush.map((a, i) => ({ at: null, atU: a.atU, n: a.n, archers: 0.35, elite: 0.1, officers: a.officers, from: P(out.entry.x + (i % 2 ? 4 : -4), out.entry.z + (i % 3) * 4 - 4) }));
     out.timeLimit = 300;

@@ -42,13 +42,15 @@ function resetGround() { setBattleTerrain(null); setDecks(null); setWaterLevel(n
 // battle: BattleDef (mặc định B15), heroId: tướng (mặc định H35), quyetSach: kết quả Hiến kế { picked, historical } | null
 // (ctx.quyetSach, director của trận đọc). Dựng lỗi (vd trận chưa dựng) thì dọn GPU, trả mặt đất về mặc định rồi reject
 // để main.js báo lỗi và về Doanh trại.
-export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings, battle = B15, heroId = "H35", quyetSach = null }) {
+// Chế độ Tự do (đợt 14): heroDef / stats truyền thẳng (người lính — meta/career.js soldierDef / soldierStats), BattleDef.Hero là lớp tướng
+// riêng của trận (battle/soldier.js SoldierHero); thiếu thì như cũ (HEROES[heroId], heroStats, Hero).
+export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings, battle = B15, heroId = "H35", quyetSach = null, heroDef: heroDefIn = null, stats: statsIn = null }) {
   return new Promise((resolve, reject) => {
     const def = battle || B15;
-    const heroDef = HEROES[heroId] || HEROES.H35;
+    const heroDef = heroDefIn || HEROES[heroId] || HEROES.H35;
     const settings = save.settings;
     const diff = DIFFICULTY.find((d) => d.id === difficulty) || DIFFICULTY[1];
-    const stats = heroStats(save, R, heroDef.id, def.preset || null);
+    const stats = statsIn || heroStats(save, R, heroDef.id, def.preset || null);
     stats.guardBase = (heroDef.bodyguards ?? HERO.bodyguards) + stats.mods.bodyguards;
 
     container.innerHTML = `<canvas class="game"></canvas><div class="hud"></div><div class="overlay"></div><div class="touch"></div>`;
@@ -88,7 +90,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       music?.play("battle");
       ctx.fx = new FX(scene, camera, hudRoot); ctx.fx.fmt = ctx.fmt;
       ctx.crowd = new Crowd(scene, ctx);
-      ctx.hero = new Hero(ctx, stats, heroDef);
+      ctx.hero = new (def.Hero || Hero)(ctx, stats, heroDef);
       // Hero chưa đọc chỗ xuất hiện của trận (lõi tướng chưa nhận def): đặt theo BattleDef, chỉ cho trận khác B15
       const sp = def.heroSpawn;
       if (sp && def !== B15 && !ctx.hero.def) { ctx.hero.x = sp.x; ctx.hero.z = sp.z; ctx.hero.yaw = sp.yaw ?? ctx.hero.yaw; }
@@ -153,7 +155,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
     const bindPause = () => {
       overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
-      overlay.querySelector("[data-a=retry]").onclick = () => { ctx.director.restoreCheckpoint(); pause(false); };
+      const rt = overlay.querySelector("[data-a=retry]");
+      if (rt) rt.onclick = () => { ctx.director.restoreCheckpoint(); pause(false); };
       overlay.querySelector("[data-a=quit]").onclick = () => {
         if (ctx.director.over) { finish(ctx.director.result); return; }
         ctx.director.lose("Rút quân khỏi trận.", false); pause(false);
@@ -416,7 +419,7 @@ function pauseHTML(save, heroId = "H35", def = null, dev = 0, log = null) {
   const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? "selected" : ""}>${label}</option>`;
   return `<div class="panel pause">
     <h2>TẠM DỪNG</h2>
-    <div class="row"><button class="primary" data-a="resume">Tiếp tục</button><button data-a="retry">Tải lại đầu pha</button><button data-a="quit">Rút quân</button></div>
+    <div class="row"><button class="primary" data-a="resume">Tiếp tục</button>${def?.noRetry ? "" : `<button data-a="retry">Tải lại đầu pha</button>`}<button data-a="quit">Rút quân</button></div>
     ${logHTML(log)}
     <h3>Cài đặt (đổi được giữa trận)</h3>
     <label>Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
@@ -474,7 +477,9 @@ export function buildTouch(root, input, ctx, show = true) {
   const slots = ctx.hero?.skillSlots?.() || [], s1 = slots[0], s2 = slots[1], ult = ctx.hero?.ultInfo?.();
   // Cụm nút hình cung quanh N ở góc phải dưới (ui/layout.js touchArc): vòng trong C / Đỡ / Né, vòng ngoài kỹ năng, Tuyệt Kỹ, Tương tác.
   // Nút hệ thống (Kế Sách, Lệnh, Phản Công, Khóa, tạm dừng) gom sau nút ☰ trên cần điều khiển; ☰ sáng khi có việc trong đó (hud.js).
-  const ids = ["c", "dodge", "block", "skill", "ult", ...(s2 ? ["skill2"] : []), ...(ctx.battle?.touch?.interact ? ["interact"] : [])];
+  // Nút chưa mở (người lính chế độ Tự do: hero.locked(id) theo bậc) thì không dựng — Lính chỉ thấy N, C, Né, Đỡ, Khóa, tạm dừng.
+  const off = (id) => !!ctx.hero?.locked?.(id);
+  const ids = ["c", "dodge", "block", ...(off("skill") || (!s1 && ctx.hero?.locked) ? [] : ["skill"]), ...(off("ult") ? [] : ["ult"]), ...(s2 && !off("skill2") ? ["skill2"] : []), ...(ctx.battle?.touch?.interact ? ["interact"] : [])];
   const arc = touchArc(ids);
   root.innerHTML = `
     <div class="stick" data-t="stick"><div class="knob"></div></div>
@@ -482,11 +487,11 @@ export function buildTouch(root, input, ctx, show = true) {
     <div class="tbtns">
       ${tb("n", "n", "N", "big", { x: 0, y: 0, s: 1.6 })}${tb("c", "c1", "C", "mid", arc.c)}
       ${tb("dodge", "dodge", "Né", "", arc.dodge)}${tb("block", "block", "Đỡ", "", arc.block)}
-      ${tb("skill", s1?.icon ?? "skill", tlabel(s1) ?? "Phá Trận", "", arc.skill)}${tb("ult", ult?.icon ?? "ult", "Tuyệt Kỹ", "", arc.ult)}${s2 ? tb("skill2", s2.icon ?? "skill", tlabel(s2) ?? s2.id, "sk-" + s2.id, arc.skill2) : ""}
+      ${arc.skill ? tb("skill", s1?.icon ?? "skill", tlabel(s1) ?? "Phá Trận", "", arc.skill) : ""}${arc.ult ? tb("ult", ult?.icon ?? "ult", ult?.label && ctx.hero?.locked ? ult.label : "Tuyệt Kỹ", "", arc.ult) : ""}${arc.skill2 ? tb("skill2", s2.icon ?? "skill", tlabel(s2) ?? s2.name ?? s2.id, "sk-" + s2.id, arc.skill2) : ""}
       ${ctx.battle?.touch?.interact ? tb("interact", "kesach", "Tương tác", "act", arc.interact) : ""}
     </div>
     <div class="tsys"><button class="tmenu" data-menu aria-label="Lệnh, Kế Sách, Phản Công, Khóa, tạm dừng" aria-expanded="false">${MENU_SVG}</button>
-      <div class="tfan">${tb("kesach", "kesach", "Kế Sách")}${tb("cmd", "cmd", "Lệnh")}${tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div></div>`;
+      <div class="tfan">${off("kesach") ? "" : tb("kesach", "kesach", "Kế Sách")}${off("cmd") ? "" : tb("cmd", "cmd", "Lệnh")}${off("tpc") ? "" : tb("tpc", "tpc", "Phản Công")}${tb("lock", "lock", "Khóa")}<button data-b="pause">II</button></div></div>`;
   // ☰: mở / gập quạt nút hệ thống; tự gập sau 5 s (trừ lúc vòng Mệnh Lệnh đang mở) và sau khi bấm một nút trong quạt
   const sys = root.querySelector(".tsys"), menu = sys.querySelector("[data-menu]");
   let fanTimer = 0;
