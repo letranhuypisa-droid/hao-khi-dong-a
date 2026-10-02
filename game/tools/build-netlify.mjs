@@ -19,7 +19,8 @@ export const GAME = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const OUT_DIR_NAME = "netlify-deploy";                     // phải khớp `publish` trong netlify.toml (tests/deploy.test.mjs kiểm)
 export const INCLUDE = ["index.html", "css", "js", "assets", "vendor"];   // chạy game cần đúng bấy nhiêu
 // Công cụ của lập trình viên, không thuộc màn chơi (trang lab và script riêng của chúng, ghi nguồn tài nguyên)
-export const EXCLUDE = ["assets/SOURCES.md", "js/lab.js", "js/hud-lab.js", "js/lab-b20.js", "js/story-lab.js"];
+// Công cụ gắn xương GLB (rig.html, js/riglab, addon nạp / xuất GLB của three) cũng là công cụ phát triển: game chưa nạp GLB.
+export const EXCLUDE = ["assets/SOURCES.md", "js/lab.js", "js/hud-lab.js", "js/lab-b20.js", "js/story-lab.js", "js/riglab", "vendor/three/addons"];
 // Đường /game/ cũ (trước khi game nằm ở gốc site) vẫn mở được. Viết thành tệp _redirects TRONG thư mục dựng, không để ở netlify.toml: kéo thả
 // thư mục lên Netlify chỉ đọc _redirects, còn Netlify tự xây từ Git thì đọc cả hai — một nguồn duy nhất cho cả hai cách deploy.
 export const REDIRECTS = [["/game", "/", "301"], ["/game/*", "/:splat", "301"]];

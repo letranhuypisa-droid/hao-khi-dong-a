@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gắn xương GLB</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { --then: #151210; --then2: #221c18; --line: #5a4838; --vang: #c9a14a; --vang2: #f1d98a; --trung: #e6dcc3; --muted: #a8998a; --son: #9b2d20; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--then); color: var(--trung); font: 14px/1.45 system-ui, sans-serif; }
+    body { display: grid; grid-template-columns: 1fr 340px; height: 100vh; height: 100dvh; }
+    #view { width: 100%; height: 100%; display: block; touch-action: none; }
+    aside { overflow: auto; padding: 12px 14px; background: var(--then2); border-left: 1px solid var(--line); }
+    h1 { margin: 0 0 4px; font-size: 1.1rem; color: var(--vang2); }
+    h2 { margin: 14px 0 6px; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--vang); }
+    p { margin: 4px 0; } .muted { color: var(--muted); font-size: .82rem; } .ok { color: #9fd08a; }
+    ul { margin: 6px 0; padding-left: 18px; color: #ffb09a; font-size: .82rem; }
+    button, select, .file { font: inherit; color: var(--trung); background: #30261f; border: 1px solid var(--line); border-radius: 7px; padding: 7px 11px; cursor: pointer; }
+    button:hover, .file:hover { border-color: var(--vang); color: var(--vang2); }
+    button.on { background: var(--son); border-color: var(--vang); color: #ffeab0; }
+    button.primary { background: linear-gradient(#c13d2b, #8a2618); border-color: var(--vang); color: #ffeab0; font-weight: 700; width: 100%; padding: 11px; margin-top: 6px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .file input { display: none; }
+    #clips { display: flex; flex-wrap: wrap; gap: 5px; } #clips button { padding: 5px 9px; font-size: .82rem; }
+    #sliders label { display: grid; grid-template-columns: 1fr 140px; align-items: center; gap: 8px; font-size: .82rem; margin: 3px 0; }
+    #info { font-size: .85rem; }
+    @media (max-width: 760px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+  </style>
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <aside>
+    <h1>Gắn xương GLB</h1>
+    <p class="muted">Mô hình một người, đứng thẳng, tay chữ A (prompt ở design/3d-ref). Xương theo rig tướng của game, chạy đúng đòn của game.</p>
+    <h2>Mô hình</h2>
+    <div class="row"><label class="file">Chọn tệp GLB<input type="file" id="file" accept=".glb,.gltf,model/gltf-binary"></label><button id="sample">Mẫu thử</button><button id="rotate">Xoay 90°</button></div>
+    <div id="info" style="margin-top:8px"></div>
+    <h2>Hoạt ảnh</h2>
+    <div class="row"><select id="set"></select><button id="play">Dừng</button></div>
+    <div id="clips" style="margin-top:6px"></div>
+    <h2>Xem</h2>
+    <div class="row"><label><input type="checkbox" id="bones" checked> Xương</label><label><input type="checkbox" id="paint"> Tô màu theo xương</label></div>
+    <h2>Chỉnh khớp (khi dò sai)</h2>
+    <div id="sliders"></div>
+    <button id="reset">Về tự dò</button>
+    <h2>Xuất</h2>
+    <p class="muted">GLB có xương (tên khớp như rig game) và mọi clip của bộ đòn đang chọn.</p>
+    <button class="primary" id="export">Xuất GLB</button>
+  </aside>
+  <script type="module" src="./js/riglab/main.js"></script>
+</body>
+</html>

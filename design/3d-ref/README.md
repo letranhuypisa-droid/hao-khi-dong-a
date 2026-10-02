@@ -27,3 +27,11 @@ Mẹo khi đưa vào Hunyuan3D:
 - Mô hình giữ đúng tư thế trong ảnh. Muốn gắn xương (rig) để chạy hoạt ảnh thì cần ảnh đứng thẳng, tay dang chữ A/T, nền trơn — comic hiện chưa có ảnh nào như vậy.
 - Nét mực dày của comic sẽ in vào texture; ảnh nhìn thẳng (Toa Đô, Ô Mã Nhi) cho mặt trước tốt nhất, mặt sau công cụ tự đoán.
 - Các loại lính trong game chưa có ảnh riêng: Thương binh, Cung thủ, Lực sĩ trọng giáp, Cung kỵ của Nguyên; Giáo binh, Nỏ thủ của Đại Việt (`game/js/data/tuning.js` KITS). Prompt vẽ chúng (đứng thẳng tay chữ A, nền trơn, trang bị theo mô hình trong game): `PROMPTS-LINH.md`.
+
+## Gắn xương cho GLB
+
+Mở `game/rig.html` (chạy máy chủ tĩnh trong `game/`, ví dụ `python3 -m http.server`, rồi vào `/rig.html`): chọn tệp GLB → công cụ tự
+gắn xương theo rig tướng của game, cho xem mô hình chạy đúng các đòn của game, rồi **Xuất GLB** (có xương và 18 clip). Mô hình để gắn
+xương nên **tay không**: trong prompt, thay đoạn cầm binh khí bằng `empty open hands relaxed at his sides, no weapon`, binh khí sinh
+riêng (game gắn binh khí vào xương bàn tay). Mô hình phải đứng thẳng tay chữ A, nhìn thẳng; dò sai thì dùng các thanh "Chỉnh khớp".
+
