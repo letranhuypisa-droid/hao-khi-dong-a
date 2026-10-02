@@ -23,4 +23,4 @@ Mẹo khi đưa vào Hunyuan3D:
 - Công cụ tự tách nền, nhưng người đứng sát bên thường bị dính vào mô hình: xóa họ trước (tẩy bằng app chỉnh ảnh) thì mô hình sạch hơn.
 - Mô hình giữ đúng tư thế trong ảnh. Muốn gắn xương (rig) để chạy hoạt ảnh thì cần ảnh đứng thẳng, tay dang chữ A/T, nền trơn — comic hiện chưa có ảnh nào như vậy.
 - Nét mực dày của comic sẽ in vào texture; ảnh nhìn thẳng (Toa Đô, Ô Mã Nhi) cho mặt trước tốt nhất, mặt sau công cụ tự đoán.
-- Các loại lính trong game chưa có ảnh riêng: Thương binh, Cung thủ, Lực sĩ trọng giáp, Cung kỵ của Nguyên; Giáo binh, Nỏ thủ của Đại Việt (`game/js/data/tuning.js` KITS).
+- Các loại lính trong game chưa có ảnh riêng: Thương binh, Cung thủ, Lực sĩ trọng giáp, Cung kỵ của Nguyên; Giáo binh, Nỏ thủ của Đại Việt (`game/js/data/tuning.js` KITS). Prompt vẽ chúng (đứng thẳng tay chữ A, nền trơn, trang bị theo mô hình trong game): `PROMPTS-LINH.md`.
