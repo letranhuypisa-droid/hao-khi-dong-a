@@ -45,9 +45,11 @@
 .stage.compact .hud-phase.open b::after, .stage.compact .hud-phase.open::before { content: none; }
 .stage.compact .hud-phase.open small { display: block; -webkit-line-clamp: unset; font-size: .76rem; margin-top: 4px; }
 .stage.compact .hud-phase.flash { animation: phaseFlash 2.2s ease-out; }
-.stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs { position: absolute; z-index: 1; top: calc(40px + var(--st)); left: 50%; transform: translateX(-50%); width: min(54vw, 460px); gap: 0; align-items: center; }
-.stage.compact .msg { font-size: .76rem; line-height: 1.32; padding: 4px 11px; border-radius: 9px; border-left-width: 3px; background: rgba(21,18,16,.84);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-height: calc(2.64em + 8px); }   /* dòng thứ ba không lòi xuống phần đệm */
+.stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs { position: absolute; z-index: 1; top: calc(48px + var(--st)); left: 50%; transform: translateX(-50%); width: min(54vw, 460px); gap: 0; align-items: center; }
+/* hai dòng: đệm dưới là viền trong suốt (ngoài vùng cắt) nên dòng thứ ba không lòi một vệt xuống phần đệm */
+.stage.compact .msg { font-size: .76rem; line-height: 1.32; padding: 4px 11px 0; border-bottom: 4px solid transparent; border-radius: 9px; border-left-width: 3px; background: rgba(21,18,16,.84);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stage.compact .msg.bad, .stage.compact .msg.good, .stage.compact .msg.tip { border-bottom-color: transparent; }   /* .msg.bad… đặt màu cả bốn viền */
 .stage.compact .msg.tip::before { display: inline; content: "Gợi ý · "; font-size: .66rem; letter-spacing: .04em; }
 .stage.compact.b20 .hud-msgs { top: calc(72px + var(--st)); width: min(42vw, 360px); }      /* B20: dải Hào Khí + Con nước cao hơn, bảng Nghi binh ở phải */
 .stage.compact .hud.b20-bossing .hud-msgs { top: calc(112px + var(--st)); }
