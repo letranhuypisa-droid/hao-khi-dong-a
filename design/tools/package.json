@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "description": "Phụ thuộc của meshy.mjs (chỉ để nén GLB). Cài: cd design/tools && npm i",
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "meshoptimizer": "^0.22.0",
+    "sharp": "^0.35.5"
+  }
+}

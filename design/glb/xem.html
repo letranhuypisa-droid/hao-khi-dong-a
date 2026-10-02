@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xem GLB Meshy</title>
+<!-- Mở qua máy chủ tĩnh ở gốc repo (vd `npx serve .` rồi vào /design/glb/xem.html). Đọc manifest.json do design/tools/meshy.mjs ghi.
+     Chế độ ?tong-hop vẽ mọi mẫu thành một tờ (mặt trước + nghiêng) để chụp; ?nhom=vu-khi chỉ lấy một nhóm. -->
+<script type="importmap">
+  { "imports": { "three": "../../game/vendor/three/three.module.js", "three/addons/": "../../game/vendor/three/addons/" } }
+</script>
+<style>
+  :root { --bg: #e9e5dc; --ink: #1d1a17; --muted: #6b645a; --line: #cfc8bb; --accent: #9b2d20; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  #app { display: grid; grid-template-columns: 260px 1fr; height: 100vh; }
+  #list { overflow: auto; border-right: 1px solid var(--line); padding: 8px; }
+  #list h3 { margin: 12px 4px 4px; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+  #list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 6px; cursor: pointer; color: inherit; font: inherit; }
+  #list button:hover, #list button.on { background: #fff8; }
+  #list small { color: var(--muted); }
+  #view { position: relative; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  #info { position: absolute; left: 12px; bottom: 12px; background: #fffc; padding: 6px 10px; border-radius: 6px; }
+  #sheet { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 8px; padding: 8px; }
+  .cell { background: #f4f1ea; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .cell canvas { display: block; width: 300px; height: 300px; }
+  .cell div { padding: 4px 8px; font-size: 12px; }
+  .cell b { color: var(--accent); }
+  @media (max-width: 700px) { #app { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const q = new URLSearchParams(location.search);
+const man = await (await fetch("manifest.json", { cache: "no-store" })).json();
+const NHOM = { "nhan-vat": "Nhân vật", "vu-khi": "Vũ khí", "dao-cu": "Đạo cụ", "thu-cuoi": "Ngựa, voi" };
+const items = Object.values(man).filter((m) => m.status === "done" && (!q.get("nhom") || m.path.includes(`/${q.get("nhom")}/`)));
+const loader = new GLTFLoader();
+const load = (m) => loader.loadAsync("../../" + m.path).then((g) => g.scene);
+
+function stage(renderer) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe9e5dc);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f70, 2.2));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(2, 4, 3); scene.add(sun);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  return scene;
+}
+const frame = (obj) => { const b = new THREE.Box3().setFromObject(obj); return { b, c: b.getCenter(new THREE.Vector3()), s: b.getSize(new THREE.Vector3()) }; };
+
+if (q.has("tong-hop")) {
+  // Mỗi ô: nửa trái mặt trước (+Z nhìn về camera), nửa phải nghiêng 90°.
+  const root = document.getElementById("root"); root.id = "sheet";
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(150, 300);
+  const errors = [];
+  for (const m of items) {
+    const cell = document.createElement("div"); cell.className = "cell";
+    const cv = document.createElement("canvas"); cv.width = 300; cv.height = 300; cell.append(cv);
+    const cap = document.createElement("div");
+    cap.innerHTML = `<b>${m.code}</b> · ${m.tris.toLocaleString("vi")} tg · ${(m.bytes / 1048576).toFixed(2)} MB<br><small>${m.path.split("/").slice(-2).join("/")}</small>`;
+    cell.append(cap); root.append(cell);
+    try {
+      const obj = await load(m); const scene = stage(renderer); scene.add(obj);
+      const { c, s } = frame(obj); const r = Math.max(s.x, s.y, s.z) * 0.55;
+      const cam = new THREE.OrthographicCamera(-r / 2, r / 2, r, -r, 0.01, 100);
+      const ctx = cv.getContext("2d");
+      for (const [i, ang] of [[0, 0], [1, Math.PI / 2]]) {
+        cam.position.set(c.x + Math.sin(ang) * 10, c.y, c.z + Math.cos(ang) * 10); cam.lookAt(c);
+        renderer.render(scene, cam); ctx.drawImage(renderer.domElement, i * 150, 0);
+      }
+    } catch (e) { errors.push(`${m.code}: ${e.message}`); cap.innerHTML += `<br><b>LỖI</b> ${e.message}`; }
+  }
+  window.__done = { n: items.length, errors };
+} else {
+  const root = document.getElementById("root"); root.id = "app";
+  root.innerHTML = `<nav id="list"></nav><div id="view"><div id="info">Chọn một mẫu</div></div>`;
+  const view = document.getElementById("view"), info = document.getElementById("info"), list = document.getElementById("list");
+  const renderer = new THREE.WebGLRenderer({ antialias: true }); view.prepend(renderer.domElement);
+  const scene = stage(renderer); const cam = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+  const ctl = new OrbitControls(cam, renderer.domElement); ctl.enableDamping = true;
+  scene.add(new THREE.GridHelper(4, 8, 0xb8b0a2, 0xd3ccc0));
+  let cur = null;
+  const resize = () => { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+  addEventListener("resize", resize); resize();
+  renderer.setAnimationLoop(() => { ctl.update(); renderer.render(scene, cam); });
+  for (const [k, name] of Object.entries(NHOM)) {
+    const group = items.filter((m) => m.path.includes(`/${k}/`)); if (!group.length) continue;
+    list.insertAdjacentHTML("beforeend", `<h3>${name} (${group.length})</h3>`);
+    for (const m of group) {
+      const b = document.createElement("button");
+      b.innerHTML = `${m.code} <small>${m.tris.toLocaleString("vi")} tg · ${(m.bytes / 1048576).toFixed(2)} MB</small>`;
+      b.onclick = async () => {
+        list.querySelectorAll(".on").forEach((x) => x.classList.remove("on")); b.classList.add("on");
+        if (cur) scene.remove(cur);
+        cur = await load(m); scene.add(cur);
+        const { c, s } = frame(cur); const d = Math.max(s.x, s.y, s.z) * 1.8;
+        ctl.target.copy(c); cam.position.set(c.x + d * 0.4, c.y + d * 0.15, c.z + d); ctl.update();
+        info.textContent = `${m.code} · ${m.path} · cao ${s.y.toFixed(2)} (đơn vị gốc của Meshy, chưa chuẩn hoá mét)`;
+      };
+      list.append(b);
+    }
+  }
+  list.querySelector("button")?.click();
+}
+</script>
+</body>
+</html>
