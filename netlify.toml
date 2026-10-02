@@ -3,20 +3,12 @@
 #
 # Lệnh dựng (game/tools/build-netlify.mjs) chép index.html, css, js, assets, vendor vào netlify-deploy/ rồi kiểm mọi tên tệp game xin có đúng
 # HOA/THƯỜNG không (Netlify phân biệt, Windows thì không). Kiểm lỗi thì bản dựng hỏng và Netlify giữ nguyên bản đang chạy.
+#
+# File này chỉ có tác dụng khi Netlify TỰ XÂY từ Git. Kéo thả thư mục netlify-deploy lên Netlify thì không chạy lệnh dựng và không đọc file này:
+# thư mục đó đã được dựng sẵn bằng `node game/tools/build-netlify.mjs`, và chuyển hướng /game/ → / nằm trong tệp _redirects của chính nó.
 [build]
   command = "node game/tools/build-netlify.mjs"
   publish = "netlify-deploy"
 
 [build.environment]
   NODE_VERSION = "22"
-
-# Địa chỉ cũ /game/ (trước khi game nằm ở gốc site) vẫn mở được
-[[redirects]]
-  from = "/game"
-  to = "/"
-  status = 301
-
-[[redirects]]
-  from = "/game/*"
-  to = "/:splat"
-  status = 301

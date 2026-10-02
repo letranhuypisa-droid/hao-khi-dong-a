@@ -20,9 +20,13 @@ process.on("exit", () => { try { rmSync(tmp, { recursive: true, force: true }); 
 console.log("Bộ dựng thư mục deploy");
 const OUT = join(tmp, "site");
 const built = buildDeploy(GAME, OUT);
-t("chỉ chép phần game chạy cần: index.html, css, js, assets, vendor", () => {
-  assert.deepEqual(readdirSync(OUT).sort(), [...INCLUDE].sort());
+t("chỉ chép phần game chạy cần (index.html, css, js, assets, vendor) cộng tệp _redirects do bộ dựng viết", () => {
+  assert.deepEqual(readdirSync(OUT).sort(), [...INCLUDE, "_redirects"].sort());
   assert.ok(built.files > 100 && built.bytes > 1e6, JSON.stringify(built));
+});
+t("_redirects: đường /game/ cũ chuyển 301 về gốc — nằm TRONG thư mục dựng nên dùng được cả khi Netlify tự xây lẫn khi kéo thả (kéo thả không đọc netlify.toml)", () => {
+  const rules = readFileSync(join(OUT, "_redirects"), "utf8").split(/\r?\n/).map((l) => l.trim().split(/\s+/)).filter((r) => r[0] && !r[0].startsWith("#"));
+  assert.deepEqual(rules, [["/game", "/", "301"], ["/game/*", "/:splat", "301"]]);
 });
 t("không kèm công cụ lập trình viên, kiểm thử, tài liệu, trang lab", () => {
   for (const f of EXCLUDE) assert.ok(!existsSync(join(OUT, f)), f);
@@ -92,9 +96,8 @@ t("netlify.toml: chạy đúng script dựng, xuất bản đúng thư mục scr
   assert.match(toml, /command\s*=\s*"node game\/tools\/build-netlify\.mjs"/);
   assert.match(toml, new RegExp('publish\\s*=\\s*"' + OUT_DIR_NAME + '"'));
 });
-t("netlify.toml: đường dẫn cũ /game/ vẫn dùng được (chuyển hướng 301 về gốc)", () => {
-  assert.match(toml, /from\s*=\s*"\/game\/\*"[\s\S]*?to\s*=\s*"\/:splat"[\s\S]*?status\s*=\s*301/);
-  assert.match(toml, /from\s*=\s*"\/game"[\s\S]*?to\s*=\s*"\/"/);
+t("netlify.toml không khai báo chuyển hướng (một nguồn duy nhất là _redirects trong thư mục dựng, khỏi hai nơi lệch nhau)", () => {
+  assert.ok(!/\[\[redirects\]\]/.test(toml), "bỏ [[redirects]] khỏi netlify.toml: đã có _redirects");
 });
 t(".gitignore: thư mục deploy do script dựng không bị commit", () => {
   const gi = readFileSync(join(REPO, ".gitignore"), "utf8").split(/\r?\n/).map((l) => l.trim());

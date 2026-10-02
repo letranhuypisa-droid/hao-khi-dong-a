@@ -11,7 +11,7 @@
 // tệp game xin được đối chiếu CHÍNH XÁC từng chữ: mọi import tương đối, tệp trong index.html và url() của css, SFX / nhạc / fx theo bảng tên trong
 // code, khung comic (webp + avif) của từng Chương, icon theo bảng dữ liệu. Bộ kiểm đọc chữ trong mã (không nạp module) nên không phụ thuộc phiên bản
 // Node; bảng tên nào không đọc được thì BÁO chứ không im lặng bỏ qua. Lỗi thì thoát mã 1: Netlify giữ nguyên bản đang chạy.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -20,6 +20,9 @@ export const OUT_DIR_NAME = "netlify-deploy";                     // phải kh�
 export const INCLUDE = ["index.html", "css", "js", "assets", "vendor"];   // chạy game cần đúng bấy nhiêu
 // Công cụ của lập trình viên, không thuộc màn chơi (trang lab và script riêng của chúng, ghi nguồn tài nguyên)
 export const EXCLUDE = ["assets/SOURCES.md", "js/lab.js", "js/hud-lab.js", "js/lab-b20.js", "js/story-lab.js"];
+// Đường /game/ cũ (trước khi game nằm ở gốc site) vẫn mở được. Viết thành tệp _redirects TRONG thư mục dựng, không để ở netlify.toml: kéo thả
+// thư mục lên Netlify chỉ đọc _redirects, còn Netlify tự xây từ Git thì đọc cả hai — một nguồn duy nhất cho cả hai cách deploy.
+export const REDIRECTS = [["/game", "/", "301"], ["/game/*", "/:splat", "301"]];
 
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
 const posix = (root, p) => relative(root, p).split(sep).join("/");
@@ -32,6 +35,7 @@ export function buildDeploy(src = GAME, out = resolve(GAME, "..", OUT_DIR_NAME))
   mkdirSync(to, { recursive: true });
   const skip = new Set(EXCLUDE);
   for (const name of INCLUDE) cpSync(join(from, name), join(to, name), { recursive: true, filter: (p) => !skip.has(posix(from, p)) });
+  writeFileSync(join(to, "_redirects"), "# đường /game/ cũ vẫn mở được; tệp này do game/tools/build-netlify.mjs viết\n" + REDIRECTS.map((r) => r.join("  ")).join("\n") + "\n");
   const files = walk(to);
   return { out: to, files: files.length, bytes: files.reduce((s, f) => s + statSync(f).size, 0) };
 }
