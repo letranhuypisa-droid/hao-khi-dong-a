@@ -21,6 +21,7 @@ import { HEROES } from "./data/heroes.js";
 import { exitLine } from "./data/tutorial-steps.js";
 import { guongDayRow } from "./data/glossary.js";
 import { NAV, SUBTABS, groupOf, navBadge } from "./ui/layout.js";
+import { installNoZoom } from "./ui/nozoom.js";
 import { RANKS as CAREER_RANKS, rankOf, nextRank, RANK_PERKS, PICKS, GEAR, gearCost, QUE, suggestName, MISSION_MULT } from "./data/career.js";
 import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS, careerGuards, recruitGuard, editGuard, dismissGuard } from "./meta/career.js";
 import { GUARD_CLASSES, GUARD_NAME_MAX, guardSlots, guardStats } from "./data/guards.js";
@@ -41,7 +42,9 @@ if (syncLegacy(save)) writeSave(save);
 save.battles ||= {};                               // trận ngoài thang R (B20): { best, cleared } — progress.js migrate cũng thêm
 for (const id of BATTLE_ORDER) if (!BATTLES[id].ladder) save.battles[id] ||= { best: null, cleared: false };
 let tab = "xuattran";
-let pick = { R: Math.max(...save.ladder.unlocked), difficulty: save.settings.difficulty, battle: DEBUG_BATTLE || "B15", hero: {} };
+let onTitle = false;                                      // đang ở màn chào (titleScreen); render() đặt lại false
+const freshPick = () => ({ R: Math.max(...save.ladder.unlocked), difficulty: save.settings.difficulty, battle: DEBUG_BATTLE || "B15", hero: {} });
+let pick = freshPick();
 
 // ---- nội dung Chương (comic, thẻ, Quiz): B15 nạp sẵn, Chương khác nạp lười (data/battles.js) ----------------------
 const METAS = { B15: { id: "B15", comic: COMIC_B15, cards: CARDS, cardById: CARD_BY_ID, quiz: QUIZ_B15, groups: CARD_GROUPS } };
@@ -102,6 +105,7 @@ function hubHead(group) {
   return `<header class="hub-head">${who}<button class="gear" data-settings title="Cài đặt" aria-label="Cài đặt">${GEAR_ICON}</button></header>`;
 }
 function render() {
+  onTitle = false;
   const group = groupOf(tab);
   if (group === "quandoanh") lastSub.quandoanh = tab;
   const info = { unread: unreadCards().length, points: P.freePoints(save), tutorialNew: !save.tutorial?.done, tudo: tudoBadge() };
@@ -139,6 +143,7 @@ function openSettings() {
     <label class="field">Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <label class="field">Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume ?? 0.8}" data-set="volume"></label>
     <button data-hintreset>Hiện lại gợi ý đã xem</button>
+    ${onTitle ? "" : `<button data-totitle>Về màn chào</button>`}
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng cho cùng kết quả ở mọi mức. "Tự nhận": giao diện cảm ứng theo cách bạn bấm gần nhất.</p>
   </div>`;
   document.body.appendChild(d);
@@ -153,6 +158,7 @@ function openSettings() {
     if (k === "music") music.setVolume(v);
   }));
   d.querySelector("[data-hintreset]").onclick = () => { save.hints = {}; persist(); toast("Các gợi ý lần đầu sẽ hiện lại từ trận sau."); };
+  d.querySelector("[data-totitle]")?.addEventListener("click", () => { close(); titleScreen(); });
   d.querySelector("[data-close]").focus();
 }
 
@@ -327,11 +333,12 @@ function tdPromotion(i) {
 }
 
 // ---- Xuất trận: sảnh chính (đợt 16) -----------------------------------------------------------
-// Màn vào game kiểu game hành động trên điện thoại: tranh lớn của trận đang chọn (khung comic, css/lobby.css), logo, cột
-// nút tắt (Huấn luyện, Võ trường, comic mở chương), dải thẻ trận bằng tranh, ô "Bày trận" tóm tắt chế độ · độ khó · R và
+// Sảnh kiểu game hành động trên điện thoại: tranh lớn của trận đang chọn (khung comic, css/lobby.css), hàng nút tắt
+// (Huấn luyện, Võ trường, comic mở chương), dải thẻ trận bằng tranh, ô "Bày trận" tóm tắt chế độ · độ khó · R và
 // nút XUẤT CHINH. Chữ dài trước đây nằm thẳng trên trang (mô tả trận, ghi chú sử liệu, giải thích cấp R, bảng chỉ số) dời
-// vào hai bảng trượt: "Sử liệu" (nút i trên thẻ trận — openBattleInfo) và "Bày trận" (openPrep).
+// vào hai bảng trượt: "Sử liệu" (nút i trên thẻ trận — openBattleInfo) và "Bày trận" (openPrep). Logo chỉ ở màn chào (đợt 17).
 let lastArt = null;                                           // trận của tranh nền lần vẽ trước: đổi trận thì tranh mờ vào lại
+const EMBERS = `<i class="ember"></i>`.repeat(9);
 const SLIDERS = SVG(`<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>`);
 const LOCK = SVG(`<rect x="5.5" y="10.5" width="13" height="10" rx="1.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>`);
 const ratio = (v) => String(v).replace(".", ",");
@@ -342,8 +349,7 @@ function xuattran() {
   const fresh = lastArt !== B.id; lastArt = B.id;
   const tutNew = !save.tutorial?.done, seen = chapterState(save, B.chapter).openSeen;
   return `<section class="lobby b-${B.id}">
-    <div class="lb-art${fresh ? " fresh" : ""}" aria-hidden="true"><i class="lb-img"></i>${`<i class="ember"></i>`.repeat(9)}</div>
-    <div class="lb-logo"><h1>Hào Khí <span>Đông A</span></h1><p>Nam Quốc Sơn Hà</p></div>
+    <div class="lb-art${fresh ? " fresh" : ""}" aria-hidden="true"><i class="lb-img"></i>${EMBERS}</div>
     <nav class="lb-rail" aria-label="Lối tắt">
       <button class="rail-btn${tutNew ? " hot" : ""}" data-rail="tut"><img src="${ICON("n")}" alt=""><span>Huấn luyện</span>${tutNew ? "<em>Mới</em>" : ""}</button>
       <button class="rail-btn" data-rail="votruong"><img src="${ICON("ct")}" alt=""><span>Võ trường</span></button>
@@ -903,7 +909,7 @@ const bind = {
   hoso() {
     app.querySelector("[data-export]").onclick = () => exportSave(save);
     app.querySelector("[data-import]").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { save = await importSave(f); syncLegacy(save); persist(); toast("Đã nhập bản lưu."); render(); } catch (_) { toast("File không đọc được.", true); } };
-    app.querySelector("[data-reset]").onclick = () => { if (confirm("Xóa toàn bộ tiến độ? Không hoàn tác được.")) { save = resetSave(); pick = { R: 1, difficulty: "quansi" }; persist(); render(); } };
+    app.querySelector("[data-reset]").onclick = () => { if (confirm("Xóa toàn bộ tiến độ? Không hoàn tác được.")) { save = resetSave(); pick = freshPick(); persist(); render(); } };
   },
 };
 
@@ -1076,7 +1082,39 @@ function showResults(res, { cards = [], firstClear = false, ui = null, council =
   app.querySelector("[data-close-comic]")?.addEventListener("click", async () => { await playComic("close", { ch: B.chapter }); tab = "xuattran"; render(); });
 }
 
-render();
+// ---- màn chào (đợt 17) -------------------------------------------------------------------------
+// Mở game là màn này, không phải sảnh: tranh, logo và chỉ hai, ba nút — Bắt đầu (máy chưa có tiến độ) hoặc Tiếp tục + Chơi mới,
+// và Cài đặt. Bấm Bắt đầu / Tiếp tục mới tới sảnh Xuất trận. Chơi mới hỏi lại rồi xóa bản lưu (như nút ở Hồ sơ). Cài đặt ở hub
+// có nút "Về màn chào". ?debug bỏ qua màn này: bot và kịch bản kiểm thử bấm thẳng nút ở sảnh (__start).
+const hasProgress = (s) => !!(s.stats?.battles || s.hero.level > 1 || s.hero.exp > 0 || s.tutorial?.done || s.career || s.veterans?.length
+  || Object.values(s.chapters || {}).some((c) => c?.opened));
+function titleScreen() {
+  onTitle = true;
+  const cont = hasProgress(save);
+  app.innerHTML = `<div class="ttl">
+    <div class="lb-art fresh" aria-hidden="true"><i class="lb-img"></i>${EMBERS}</div>
+    <div class="lb-logo ttl-logo"><h1>Hào Khí <span>Đông A</span></h1><p>Nam Quốc Sơn Hà</p></div>
+    <nav class="ttl-menu" aria-label="Màn chào">
+      <button class="lb-go" data-ttl="go"><span class="gi"><i>${NAV_ICON.xuattran}</i><span><b>${cont ? "Tiếp tục" : "Bắt đầu"}</b></span></span></button>
+      ${cont ? `<button class="ttl-btn" data-ttl="new">Chơi mới</button>` : ""}
+      <button class="ttl-btn" data-ttl="settings">${GEAR_ICON}<span>Cài đặt</span></button>
+    </nav>
+  </div>`;
+  window.scrollTo(0, 0);
+  app.querySelector("[data-ttl=go]").onclick = () => { tab = "xuattran"; render(); };
+  app.querySelector("[data-ttl=settings]").onclick = openSettings;
+  app.querySelector("[data-ttl=new]")?.addEventListener("click", () => openSheet("ttl-new", "Chơi mới", (sh, close) => {
+    sh.innerHTML = `<div class="sheet-head"><h3>Chơi mới?</h3><button data-close aria-label="Đóng">✕</button></div>
+      <p>Tiến độ trên máy này sẽ bị xóa: cấp tướng, binh khí, thẻ Sử quán, người lính Tự do. Không hoàn tác được.</p>
+      <p class="small">Muốn giữ bản cũ: Tiếp tục → Hồ sơ → Xuất file trước.</p>
+      <div class="row center"><button class="danger" data-ttl-reset>Xóa và chơi mới</button><button data-ttl-keep>Thôi</button></div>`;
+    sh.querySelector("[data-ttl-keep]").onclick = close;
+    sh.querySelector("[data-ttl-reset]").onclick = () => { save = resetSave(); pick = freshPick(); persist(); close(); tab = "xuattran"; render(); };
+  }));
+}
+
+installNoZoom();
+if (DEBUG) render(); else titleScreen();
 if (location.search.includes("debug")) {
   import("./debug.js");
   // kịch bản kiểm thử màn Chương (comic, kết quả, kết chương, Quiz) không cần đánh hết trận

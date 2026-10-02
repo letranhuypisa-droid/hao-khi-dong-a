@@ -12,6 +12,8 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--then); color: var(--trung); font-family: var(--sans); -webkit-tap-highlight-color: transparent; }
+/* đợt 17: chạm đúp không phóng to trang (vẫn cuộn được); trong trận còn ui/nozoom.js chặn ở tầng touch cho Safari iPhone */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { overflow-x: hidden; }
 button, select, input { font: inherit; }
 button, .btn { background: linear-gradient(#30261f, #241c17); color: var(--trung); border: 1px solid var(--line); border-radius: 7px; padding: 8px 14px; cursor: pointer;
@@ -102,7 +104,7 @@ table.keys td:nth-child(odd) { color: var(--vang2); white-space: nowrap; font-we
 details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margin-top: 8px; }
 
 /* ---- trận ---- */
-.stage { position: fixed; inset: 0; background: #000; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.stage { position: fixed; inset: 0; background: #000; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .stage canvas.game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .hud { position: absolute; inset: 0; z-index: 4; pointer-events: none; font-family: var(--sans); color: var(--trung); text-shadow: 0 1px 2px #000; }
 .hud-top { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; align-items: flex-start; }
