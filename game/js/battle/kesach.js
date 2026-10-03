@@ -165,7 +165,7 @@ export class KeSachManager {
         x: L.x + ctx.rng.range(-6, 6), z: L.z + ctx.rng.range(-3, 3), legionMult: ctx.stats.legionMult });
     }
     this.reward(k, def.perBoat);
-    ctx.director.say(`${b.name} cập bến: quân Tống lên bãi (+${def.effect.qTa} quân cho cánh A).`, 4, "good");
+    ctx.director.say(`${b.name} cập bến: người Tống của Chiêu Văn vương lên bãi (+${def.effect.qTa} quân cho cánh A).`, 4, "good");
     ctx.audio.play("capture", b.x, b.z);
     ctx.storyEvent?.("coAoTong:land");             // khung comic D2 "Áo Tống trên bến" (lần chơi đầu, battle.js)
   }

@@ -253,8 +253,8 @@ export const COMIC_B15 = {
    "part": "close",
    "aspect": "21:9",
    "caption": {
-    "vi": "Ở Hàm Tử quan, các quân đều có mặt. Quân Nguyên thấy người Tống thì kinh hãi, thua chạy.",
-    "en": "At Hàm Tử quan, a river checkpoint, all the armies were there. Seeing the Song men, the Yuan panicked and fled.",
+    "vi": "Ở Hàm Tử quan, quân Nguyên thấy người Tống đánh bên quân Trần, tưởng có quân Tống sang giúp, kinh hãi thua chạy.",
+    "en": "At Hàm Tử quan, a river checkpoint, the Yuan saw Song men fighting for the Trần, thought a Song army had come to help, and fled in panic.",
     "label": "Chính sử"
    },
    "bubbles": [
@@ -318,8 +318,8 @@ export const COMIC_B15 = {
      "x": 22,
      "y": 25,
      "tail": "right",
-     "vi": "Hôm nay Tống, Việt cùng giữ một dòng sông.",
-     "en": "Today Song and Việt held the same river.",
+     "vi": "Người Tống theo ta hôm nay lập công lớn.",
+     "en": "The Song men who follow me won great merit today.",
      "label": "Hư cấu"
     },
     {
