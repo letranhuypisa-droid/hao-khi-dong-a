@@ -44,6 +44,8 @@ export const xToLine = (f, wx) => (wx - f.x0) / (f.x1 - f.x0);
 // cắt viện binh khi chiếm cửa ngõ kéo nhịp xuống 300 / 68 / 97 s (bot thắng trong 5 phút, mức đợt 9 đã coi là quá nhanh). Chỉnh lại: A1 G 110 → 140 (P1: lính
 // đồn trú không còn tản ra nên hạ nhanh hơn), cổng 8000 → 11000 và quân giữ cổng G 30 → 45 (P3: cửa ngõ A đã đóng nên cánh A không còn dày như lúc đợt 9 thấy
 // cổng 9500–12000 làm P3 phình tới 250–330 s). A2/B2 giữ 160.
+// 2026-10-03: cổng giữ 11000 nhưng đòn tướng vào cổng ×4 (tuning.js GATE_MULT): người chơi thử muốn đổ cổng trong ~30 s và
+// chấp nhận trận ngắn đi ~1 phút (không bù bằng quân giữ cổng).
 export const BASES = [
   { id: "HQ_TA", name: "Bản doanh ta", type: "ban_doanh", owner: "ta", front: null, x: 34, z: 0, r: 16 },
   { id: "A1", name: "Đồn bến trên", type: "don", owner: "dich", front: "A", lineX: 0.30, G: 140, keeper: "doitruong", cap: 3, hk: [3, -5] },

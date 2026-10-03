@@ -17,7 +17,7 @@ export function gatePct(hp, max) {
   return Math.min(100, Math.max(1, Math.ceil((hp * 100) / max - 1e-9)));
 }
 
-// "7.340 / 11.000". Độ bền lẻ (đòn = Công × MV / 3) làm tròn lên như số máu tướng (hud.js Math.ceil(hero.hp)).
+// "7.340 / 11.000". Độ bền lẻ (đòn = Công × MV × GATE_MULT) làm tròn lên như số máu tướng (hud.js Math.ceil(hero.hp)).
 export const gateText = (hp, max) => `${n(Math.ceil(Math.max(0, hp)))} / ${n(max)}`;
 
 // Cổng cho ô mục tiêu. gates [{ id, name, x, z, hp, max, open }]; hero { x, z }; phase: chỉ số pha của director; now: giờ trận;

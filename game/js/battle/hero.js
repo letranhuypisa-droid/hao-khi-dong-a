@@ -23,7 +23,7 @@ import { makeRig, RIGS } from "./models.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
 import { heightAt, collide } from "./world.js";
-import { HERO, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, GATE_DIV, HAO_KHI, IMPACT, hitRadius, hitPad } from "../data/tuning.js";
+import { HERO, DEFENSE, POISE_PER_MV, C_POISE_MULT, heSoGiap, CRIT_MULT, GATE_MULT, HAO_KHI, IMPACT, hitRadius, hitPad } from "../data/tuning.js";
 import { HEROES, SKILLS, CHAINS, movesetOf, moveFlags } from "../data/heroes.js";
 import { WEAPON_CLASSES, poisePerMv, chargeMult, chargeLevel } from "../data/weapon-classes.js";
 import { moveInfoOf, nextHeavy } from "../data/moves-info.js";
@@ -378,11 +378,11 @@ export class Hero {
       crit ||= uc || !!r.broke; if (r.killed) kills += 3;
       hitAny = true; nHit++; this.onLanded();
     }
-    // cổng: Cong × MV / 3, bỏ qua giáp
+    // cổng: Cong × MV × GATE_MULT (4/3), bỏ qua giáp
     for (const id in ctx.world.gates) {
       const gt = ctx.world.gates[id];
       if (ctx.openGates[id] || !inShape(gt.x - 1.6, gt.z, 3.5)) continue;
-      ctx.director.damageGate(id, this.effCong() * mv / GATE_DIV);
+      ctx.director.damageGate(id, this.effCong() * mv * GATE_MULT);
       ctx.fx.spark(gt.x - 1.8, heightAt(gt.x, gt.z) + 2, gt.z, true);
       hitAny = true;
     }

@@ -86,7 +86,7 @@ t("text cùng kiểu n() của main.js (toLocaleString vi-VN): '7.340 / 11.000';
   const n = (v) => Math.round(v).toLocaleString("vi-VN");       // y như main.js
   assert.equal(gateText(12650, 12650), `${n(12650)} / ${n(12650)}`, "R cao: gốc 11000 × S(R)");
 });
-t("hp lẻ (đòn = Công × MV / 3): số làm tròn LÊN như số máu tướng; 0 thì '0 / …'", () => {
+t("hp lẻ (đòn = Công × MV × GATE_MULT): số làm tròn LÊN như số máu tướng; 0 thì '0 / …'", () => {
   assert.equal(gateText(7339.2, 11000), "7.340 / 11.000");
   assert.equal(gateText(0.3, 11000), "1 / 11.000", "còn chút độ bền: không hiện 0");
   assert.equal(gateText(0, 11000), "0 / 11.000");

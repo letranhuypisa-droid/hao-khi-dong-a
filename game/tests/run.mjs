@@ -6,6 +6,7 @@ import { FRONTS, BASES, ENEMY_MIX, PHASES, EVENTS } from "../js/data/battle-b15.
 import { createSim, simTick, issueOrder, triggerTPC, totalQ, snapshot } from "../js/sim/front.js";
 import { createHaoKhi, gain, tick, activate, tpcReady, raiseTo } from "../js/sim/haokhi.js";
 import * as P from "../js/meta/progress.js";
+import * as TUNING from "../js/data/tuning.js";
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -33,6 +34,12 @@ t("H35 hạ Toa Đô trong 20–25 s (~172/s)", () => {
   const dps = HERO.cong1 * 1.6 * HERO.atkSpeed * heSoGiap(TIERS.tuong.giap, 1);
   const ttk = TIERS.tuong.hp / dps;
   assert.ok(ttk >= 20 && ttk <= 26, `ttk ${ttk.toFixed(1)} s`);
+});
+t("H35 cấp 1 chém chuỗi N liên tục đổ cổng Hàm Tử quan (R1) trong 25–35 s", () => {
+  const gate = BASES.find((b) => b.id === "A3").gate * TUNING.S(1);
+  const dps = HERO.cong1 * 1.6 * HERO.atkSpeed * TUNING.GATE_MULT;
+  const t = gate / dps;
+  assert.ok(t >= 25 && t <= 35, `cổng ${gate} đổ sau ${t.toFixed(1)} s (${dps.toFixed(0)}/s)`);
 });
 t("E(R) khớp 12.7", () => { near(E(10), 1.135, 1e-9); near(E(25), 1.36, 1e-9); near(E(50), 1.735, 1e-9); });
 t("EXP_next khớp bảng 12.1", () => { assert.equal(EXP_NEXT(1), 300); assert.equal(EXP_NEXT(10), 5250); assert.equal(EXP_NEXT(35), 61500); });

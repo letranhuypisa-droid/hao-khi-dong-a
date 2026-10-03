@@ -21,7 +21,10 @@ export const BROKEN_MULT = 1.5;        // mục tiêu Vỡ Thế: nhận sát th
 export const BROKEN_SEC = 3.5;         // Vỡ Thế kéo dài (s): loạng choạng, rồi thanh Phá Thế đầy lại (units.js)
 // Tướng người chơi trong Tổng Phản Công: Công +20% (§6.4) — nhân một lần trong hero.effCong (HAO_KHI.tpc.heroAtk). Trước
 // đợt 9 damageTo nhân thêm hằng số TPC_HERO_MULT 1,2 lần nữa (×1,44); hằng số đã bỏ.
-export const GATE_DIV = 3;             // tướng đánh cổng = Cong * MV / 3, bỏ qua giáp
+// Tướng đánh cổng = Cong × MV × GATE_MULT, bỏ qua giáp. GDD (systems.md "Tướng tự phá") ghi Cong × MV / 3; ĐỀ XUẤT BẢN THỬ
+// (2026-10-03, người chơi thử thấy đập cổng 11000 quá lâu, muốn ~30 s): ×4 → 4/3. Đo cấp 1, R1, chém liên tục: chuỗi N ~29 s
+// (trước ~117 s), mỗi đòn ~120 (C4 ~390); bot 4 seed: P3 trung vị 112 → 49 s, cả trận 330 → 266 s, P1/P2/P4 không đổi.
+export const GATE_MULT = 4 / 3;
 
 // ---- Độ khó (mục 10/§10; thẻ tấn công 21.6) ---------------------------------------------
 // tokens: số lính được đánh cùng lúc. dmg: hệ số doKho cho đòn của địch (ĐỀ XUẤT BẢN THỬ).
