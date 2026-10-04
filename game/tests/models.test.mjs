@@ -1,8 +1,10 @@
 // tests/models.test.mjs — đợt 19a: mô hình nướng sẵn (game/assets/models/** + index.json, design/tools/glb-bake.mjs) đúng hình người
 // và đúng chiều vũ khí: (a) 17 nhân vật rig — độ dài cánh tay, cẳng tay, hai bên lệch nhau, khớp lúc chạy trùng khung gắn, vai, cổ;
-// (b) trọng số da — mỗi xương có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt; (c) vũ khí —
-// kiếm, đao chuôi ở phía tay và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z; (d) lính đám đông — không trộn khúc
-// không kề, tay theo khúc tay, mức chi tiết nào cũng còn vũ khí; (e) xương phụ (đợt 19a bước A4).
+// trục bản lề khuỷu theo mặt gập khuỷu của mô hình, đế giày (meta.foot), phần thừa đã cắt (sừng, bao đao); (b) trọng số da — mỗi xương
+// có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt; (c) vũ khí — kiếm, đao chuôi ở phía tay
+// và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z, chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua);
+// (d) lính đám đông — không trộn khúc không kề, tay theo khúc tay, mức chi tiết nào cũng còn vũ khí, neo tua giáo; (e) xương phụ (A4);
+// (f) bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs trên trục tay tổng hợp (khuỷu, "hand", tỉ lệ chung, kiểm dải).
 // Thuần Node: đọc .hkm bằng fs (định dạng bake/io.mjs, như glb.js parseHKM), không three, không node_modules. Số liệu lấy từ khung gắn
 // (nghịch đảo meta.inv) và meta.rest; bảng nướng (cỡ, chỗ cầm vũ khí của lính) từ design/tools/bake/catalog.mjs (dữ liệu thuần).
 // TODO: lỗi đã đo trên tài sản hiện có, bước sau của đợt 19a sửa (A2 khung xương + vũ khí, A3 trọng số + lính đám đông, A4 xương phụ):
@@ -16,19 +18,12 @@ const { SKELETONS, JOINT_NAMES } = await import("../js/battle/soldier-motion.js"
 
 // mã kiểm:id → bước sửa. "*" = mọi mô hình của mục đó. Số đo lúc viết (đợt 19a A1) in kèm khi chạy.
 const TODO = {
-  ...Object.fromEntries(["CV_cung", "CV_daidao", "CV_khien", "CV_songdao", "H31", "H35", "H40", "LINH_r24", "OFF_doitruong", "OFF_photuong", "X19", "X20", "X24"].map((id) => ["tay-dai:" + id, "A2"])),
-  ...Object.fromEntries(["CV_cung", "CV_daidao", "CV_khien", "CV_songdao", "H31", "H35", "OFF_doitruong", "OFF_photuong", "X19", "X24"].map((id) => ["tay-lech:" + id, "A2"])),
-  "tay-nghi:H31": "A2",
-  "vai:OFF_doitruong": "A2",
-  ...Object.fromEntries(["CV_daidao", "CV_songdao", "H31", "H33", "H35", "H40", "OFF_doitruong", "X19", "X20", "X24"].map((id) => ["dau:" + id, "A2"])),
-  ...Object.fromEntries(["songdao", "dao", "dao_linh", "daikiem"].map((id) => ["kiem:" + id, "A2"])),
-  "dadao:dadao": "A2",
-  ...Object.fromEntries(["OFF_doitruong", "OFF_photuong", "OFF_tuong", "X19"].map((id) => ["phan:" + id, "A3"])),
+  ...Object.fromEntries(["OFF_tuong", "X19"].map((id) => ["phan:" + id, "A3"])),
   "khong-ke:*": "A3",
   "ban-chan:*": "A3",
-  ...Object.fromEntries(["CV_cung", "CV_daidao", "CV_giao", "CV_khien", "CV_songdao", "H31", "H33", "H35", "H40", "LINH_r01", "LINH_r24", "OFF_doitruong", "OFF_photuong", "X19", "X20", "X24"].map((id) => ["mot-xuong:" + id, "A3"])),
+  // OFF_tuong 45% → 56% ở A2: trọng số tay nay theo khớp ghi tay (trước đây tay gần như theo thân), dải trộn còn hẹp — A3 làm mượt
+  ...Object.fromEntries(["CV_cung", "CV_daidao", "CV_giao", "CV_khien", "CV_songdao", "H31", "H33", "H35", "H40", "LINH_r01", "LINH_r24", "OFF_doitruong", "OFF_photuong", "OFF_tuong", "X20", "X24"].map((id) => ["mot-xuong:" + id, "A3"])),
   ...Object.fromEntries(["DV_DAO", "DV_GIAO", "DV_NO", "NG_CUNG", "NG_DAO", "NG_GIAO", "NG_TANK"].map((id) => ["kit-ke:" + id, "A3"])),
-  "kit-tay:DV_GIAO": "A3", "kit-tay:NG_CUNG": "A3",
   "kit-vk:DV_GIAO": "A3", "kit-vk:DV_DAO": "A3", "kit-vk:NG_DAO": "A3",          // LOD2: giáo mất cán; dao_linh 12 tam giác chỉ còn chắn tay + chuôi
   "phu:*": "A4",
 };
@@ -145,10 +140,11 @@ t("index", "mọi mục index.json có .hkm + .webp, đúng loại, đúng số 
 });
 
 console.log("(a) Nhân vật rig: độ dài xương, vai, cổ (khung gắn = nghịch đảo meta.inv; lúc chạy = meta.rest)");
-t("tay-dai", "cánh tay trên 0,22–0,40 m, cẳng tay 0,18–0,34 m, hai bên (rig WC01: cẳng tới 0,37 — tư thế WC01 giải IK cho tay 0,34 + 0,36)", () => forChars((c) => {
+// cánh tay ≥ 0,18 (A1 đặt 0,22): CV_daidao đo trên lưới chỉ 0,19 (vai trong giáp vai, khuỷu 1,275 khung thô — design/tools/bake/catalog.mjs FIX_CV_DAIDAO)
+t("tay-dai", "cánh tay trên 0,18–0,40 m, cẳng tay 0,18–0,34 m, hai bên (rig WC01: cẳng tới 0,37 — tư thế WC01 giải IK cho tay 0,34 + 0,36)", () => forChars((c) => {
   const bad = [], fMax = c.meta.wc01 ? 0.37 : 0.34;
   for (const s of ["L", "R"]) {
-    if (!(c.arm["U" + s] >= 0.22 && c.arm["U" + s] <= 0.4)) bad.push(`trên ${s} ${f3(c.arm["U" + s])}`);
+    if (!(c.arm["U" + s] >= 0.18 && c.arm["U" + s] <= 0.4)) bad.push(`trên ${s} ${f3(c.arm["U" + s])}`);
     if (!(c.arm["F" + s] >= 0.18 && c.arm["F" + s] <= fMax)) bad.push(`cẳng ${s} ${f3(c.arm["F" + s])}`);
   }
   return bad.join(", ");
@@ -176,6 +172,59 @@ t("dau", "khớp cổ cao hơn đường vai 0,05–0,26 m (cổ quá cao thì m
   const h = c.J.head[1] - (c.J.shL[1] + c.J.shR[1]) / 2;
   return h >= 0.05 && h <= 0.26 ? "" : `cổ trên vai ${f3(h)}`;
 }));
+
+// khung gắn (nghịch đảo meta.inv): cột x của ma trận xoay = hàng 0 của phần xoay nghịch đảo
+const bindX = (inv, i) => [inv[i * 16], inv[i * 16 + 4], inv[i * 16 + 8]];
+const unit = (a) => { const l = Math.hypot(...a) || 1; return a.map((x) => x / l); };
+const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dt3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+t("khuyu", "bản lề khuỷu theo mặt gập của mô hình: trục x của vai và khuỷu (khung gắn) lệch pháp tuyến (cẳng × cánh) ≤ 10°, cùng chiều (elLx âm gập về lòng khuỷu)", () => forChars((c) => {
+  const bad = [];
+  for (const s of ["L", "R"]) {
+    const u = sub3(c.J["el" + s], c.J["sh" + s]), f = sub3(c.J["hand" + s], c.J["el" + s]);
+    const bend = Math.acos(Math.max(-1, Math.min(1, dt3(unit(u), unit(f))))) * 180 / Math.PI;
+    if (bend < 12) continue;
+    const n = unit(crs(f, u));
+    for (const b of ["sh", "el"]) {
+      const a = Math.acos(Math.max(-1, Math.min(1, dt3(unit(bindX(c.meta.inv, c.B.indexOf(b + s))), n)))) * 180 / Math.PI;
+      if (!(a <= 10)) bad.push(`${b}${s} lệch ${a.toFixed(0)}° (gập ${bend.toFixed(0)}°)`);
+    }
+  }
+  return bad.join(", ");
+}));
+t("de", "đế giày lưới (meta.foot): sole 0,03–0,08 dưới cổ chân gắn, khớp đỉnh thấp nhất quanh mỗi chân (±1 cm), mũi trước, gót sau cổ chân", () => forChars((c) => {
+  const F = c.meta.foot; if (!F) return "thiếu meta.foot (IK đặt đế khối 0,08: lưới lơ lửng)";
+  const bad = [];
+  if (!(F.sole >= 0.03 && F.sole <= 0.08)) bad.push(`sole ${f3(F.sole)}`);
+  if (!(F.toe > 0.05 && F.heel < 0)) bad.push(`mũi ${f3(F.toe)}, gót ${f3(F.heel)}`);
+  for (const s of ["L", "R"]) {
+    const ax = c.J["ankle" + s], P = c.g.position; let y0 = Infinity;
+    for (let v = 0; v < c.g.count; v++) if (Math.abs(P[v * 3] - ax[0]) < 0.12 && P[v * 3 + 1] < ax[1] + 0.02) y0 = Math.min(y0, P[v * 3 + 1]);
+    if (!(Math.abs(ax[1] - y0 - F.sole) <= 0.01)) bad.push(`chân ${s}: đế lưới ${f3(ax[1] - y0)} dưới cổ chân ≠ sole ${f3(F.sole)}`);
+  }
+  return bad.join(", ");
+}));
+// hộp cắt (khung chuẩn hoá thô) → khung nướng: x' = (x − ox)·s, y' = y·s, z' = (z − oz)·s (meta.norm = [s, ox, oz]); thu mỗi bên 1 cm
+t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao DV_DAO): meta.cut > 0, nhân vật không còn tam giác nào trong hộp cắt", () => {
+  const out = [];
+  for (const [kind, cat, M] of [["char", CHARS, CH], ["kit", KIT_LIST, KT]]) for (const [id, e] of Object.entries(cat)) {
+    if (!e.cut) continue;
+    const m = M[id]; if (!m) { out.push({ id, msg: "chưa nướng" }); continue; }
+    if (!(m.meta.cut > 0)) { out.push({ id, msg: "meta.cut không có / 0" }); continue; }
+    if (kind !== "char") continue;
+    const [sc, ox, oz] = m.meta.norm || [], g = m.meshes.body, P = g.position, I = g.index;
+    if (sc === undefined) { out.push({ id, msg: "thiếu meta.norm" }); continue; }
+    const box = e.cut.map((b) => ({ lo: [(b.lo[0] - ox) * sc + 0.01, b.lo[1] * sc + 0.01, (b.lo[2] - oz) * sc + 0.01], hi: [(b.hi[0] - ox) * sc - 0.01, b.hi[1] * sc - 0.01, (b.hi[2] - oz) * sc - 0.01] }));
+    let n = 0;
+    for (let q = 0; q < I.length; q += 3) {
+      const ct = [0, 1, 2].map((k) => (P[I[q] * 3 + k] + P[I[q + 1] * 3 + k] + P[I[q + 2] * 3 + k]) / 3);
+      if (box.some((b) => ct.every((x, k) => x >= b.lo[k] && x <= b.hi[k]))) n++;
+    }
+    if (n) out.push({ id, msg: `${n} tam giác còn trong hộp cắt` });
+  }
+  return out;
+});
 
 console.log("(b) Trọng số da nhân vật rig");
 // phần trọng số tối thiểu mỗi xương (% số đỉnh, Σw / n): rig đúng đều qua; tay, khuỷu ~0% là tay chết (rig hỏng)
@@ -268,6 +317,29 @@ t("mui", "giáo (giao_dv, giao_ng), chùy: đầu (mặt cắt rộng nhất) �
   if (r0 > 0.07) bad.push(`chỗ nắm z = 0 rộng ${f3(r0)}`);
   return bad.length ? [{ id, msg: bad.join("; ") }] : [];
 }));
+
+t("tua", "chân đầu (catalog head: giáo — chân mũi, đại đao — chân lưỡi; meta.head): trước đó cán hẹp, từ đó đầu rộng > 1,5 lần cán suốt ≥ 0,06 m; neo tua lính (kit meta.tas) = chỗ cầm + head", () => {
+  const out = [];
+  for (const [id, w] of Object.entries(WEAPONS)) {
+    if (!w.head) continue;
+    const m = WP[id]; if (!m) { out.push({ id, msg: "chưa nướng" }); continue; }
+    const h = m.meta.head; if (typeof h !== "number") { out.push({ id, msg: "thiếu meta.head" }); continue; }
+    const p = profile(m.meshes.body), med = (a, b) => { const v = [...p.r].filter((_, k) => p.z(k) >= a && p.z(k) <= b).sort((x, y) => x - y); return v.length ? v[v.length >> 1] : Infinity; };
+    const rs = Math.min(med(-0.4, 0.1), med(0, 0.6));                 // cán: trung vị quanh / trước chỗ cầm (như bake/wpn.mjs headBase)
+    let wide = true; for (let k = 0; k < p.K; k++) if (p.z(k) >= h + 0.005 && p.z(k) <= h + 0.06 && !(p.r[k] > 1.5 * rs)) wide = false;
+    const before = p.rAt(h - 0.03, 0.01);
+    if (!wide || before > 1.5 * rs) out.push({ id, msg: `head ${f2(h)}: trước ${f3(before)}, cán ${f3(rs)}, sau đó ${wide ? "rộng" : "không rộng suốt 0,06"}` });
+  }
+  for (const [id, k] of Object.entries(KIT_LIST)) {
+    if (!k.tassel) continue;
+    const w = k.weapons.find((q) => WEAPONS[q.id].head), m = KT[id];
+    if (!m) { out.push({ id, msg: "chưa nướng" }); continue; }
+    const hd = WP[w.id].meta.head, got = m.meta.tas;
+    const want = typeof hd === "number" ? [w.p[0], w.p[1], w.p[2] + hd * (w.s ?? 1)] : null;
+    if (!want || !got || Math.hypot(...sub3(got, want)) > 0.005) out.push({ id, msg: `neo tua ${JSON.stringify(got)} ≠ ${want ? want.map(f3).join(", ") : "?"}` });
+  }
+  return out;
+});
 
 console.log("(d) Lính đám đông kit/*.hkm (bộ khúc soldier-motion.js, aSkin = khúc 0, khúc 1, w0·255)");
 function kitInfo(id) {
@@ -366,6 +438,67 @@ t("phu", "nhân vật rig có xương phụ (ngoài 15 khớp) có cha (meta.par
   }
   return bad.join(", ");
 }));
+
+console.log("(f) Bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs (trục tay tổng hợp, cao chuẩn hoá 1,9)");
+const LM = await import("../../design/tools/bake/landmarks.mjs");
+// trục tay tổng hợp: các điểm trên đường gấp khúc đầu ngón → "hand" → khuỷu → vai mỗi 0,019 (0,01 H), d = độ dài cung từ đầu ngón
+function axisOf(pts, jog = null) {
+  const out = []; let acc = 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], L = Math.hypot(...sub3(b, a));
+    for (let u = 0; u < L; u += 0.019) { const c = a.map((x, k) => x + (b[k] - x) * (u / L)); out.push({ d: acc + u, c }); }
+    acc += L;
+  }
+  out.push({ d: acc, c: pts[pts.length - 1].slice() });
+  if (jog) out[jog.k] = { ...out[jog.k], c: out[jog.k].c.map((x, k) => x + jog.off[k]) };
+  return out.slice(1);
+}
+const ARM = { tip: [0.34, 1.29, 0.41], hand: [0.33, 1.25, 0.3], el: [0.3, 1.15, 0.05], sh: [0.25, 1.4, -0.05] };
+const near3 = (a, b, tol) => Math.hypot(...sub3(a, b)) <= tol;
+t("tay-do", "armJoints: khuỷu ở chỗ gập thật (≤ 3 cm), \"hand\" cách đầu ngón ≥ 0,058 H, vai là điểm cuối trục; gai tâm vòng (gập > 2 rad, ống tay rộng) giữa cẳng tay không thành khuỷu; tay thẳng → khuỷu theo tỉ lệ 1,1", () => {
+  const out = [], P = [ARM.tip, ARM.hand, ARM.el, ARM.sh];
+  const A = LM.armJoints(axisOf(P), ARM.tip, 1.9);
+  if (!A || !near3(A.el, ARM.el, 0.03) || A.how !== "gập") out.push({ id: "gập", msg: `khuỷu ${A && A.el.map(f3)} (${A && A.how})` });
+  if (A && !(Math.hypot(...sub3(A.hand, ARM.tip)) >= 0.058 * 1.9 && Math.hypot(...sub3(A.hand, ARM.tip)) <= 0.058 * 1.9 + 0.02)) out.push({ id: "hand", msg: `hand ${A.hand.map(f3)}` });
+  if (A && !near3(A.sh, ARM.sh, 1e-9)) out.push({ id: "vai", msg: "vai không phải điểm cuối" });
+  const ax = axisOf(P), kj = ax.findIndex((r) => Math.hypot(...sub3(r.c, [0.315, 1.2, 0.175])) < 0.02);
+  const B = LM.armJoints(axisOf(P, { k: kj, off: [0.06, 0, 0] }), ARM.tip, 1.9);
+  if (!B || !near3(B.el, ARM.el, 0.03)) out.push({ id: "gai", msg: `gai giữa cẳng tay thành khuỷu ${B && B.el.map(f3)}` });
+  const S = [[0.62, 1.42, 0], [0.56, 1.42, 0], [0.42, 1.42, 0], [0.25, 1.42, 0]], C = LM.armJoints(axisOf(S), S[0], 1.9);
+  if (!C || C.how !== "tỉ lệ" || Math.abs(C.ratio - 1.1) > 0.12) out.push({ id: "thẳng", msg: `tay thẳng: ${C && C.how} tỉ lệ ${C && f2(C.ratio)}` });
+  return out;
+});
+t("tay-doi", "pairFrac / moveElbow: hai tay cùng tỉ lệ khuỷu — bên gập rõ quyết định, bên gập yếu dời khuỷu về tỉ lệ đó (≤ 0,03)", () => {
+  const out = [], P = [ARM.tip, ARM.hand, ARM.el, ARM.sh], rr = axisOf(P);
+  const A = LM.armJoints(rr, ARM.tip, 1.9), fA = LM.armFrac(A);
+  const k = rr.findIndex((r) => r.d > A.dEl + 0.08), weak = { ...A, el: rr[k].c, dEl: rr[k].d, bend: 0.1 };
+  const f = LM.pairFrac([A, weak]);
+  if (Math.abs(f - fA) > 0.02) out.push({ id: "f", msg: `tỉ lệ chung ${f3(f)} ≠ bên gập rõ ${f3(fA)}` });
+  const M = LM.moveElbow(rr, weak, f);
+  if (Math.abs(LM.armFrac(M) - f) > 0.03) out.push({ id: "dời", msg: `sau khi dời ${f3(LM.armFrac(M))} ≠ ${f3(f)}` });
+  return out;
+});
+t("tay-kiem", "armProblems / mirrorArm / axialGeo: dải mét (cẳng 3 cm, vai sai phía bị bắt; lính đám đông dải rộng), đối xứng qua trục cổ, trường khoảng cách theo chuỗi xương (ngoài ống, sai phía = Infinity; quá vai ≤ 0,06 H > dSh)", () => {
+  const out = [], good = { sh: [0.25, 1.4, 0], el: [0.28, 1.12, 0.04], hand: [0.3, 1.18, 0.3] };
+  if (LM.armProblems(good, "R", 1).length) out.push({ id: "tốt", msg: LM.armProblems(good, "R", 1).join(", ") });
+  if (!LM.armProblems({ ...good, hand: [0.28, 1.12, 0.07] }, "R", 1).some((m) => m.startsWith("cẳng"))) out.push({ id: "cẳng", msg: "cẳng tay 3 cm không bị bắt" });
+  if (!LM.armProblems(good, "L", 1).some((m) => m.startsWith("vai"))) out.push({ id: "phía", msg: "vai sai phía không bị bắt" });
+  const short = { ...good, el: [0.27, 1.24, 0.02] };
+  if (!LM.armProblems(short, "R", 1).length || LM.armProblems(short, "R", 1, { ok: LM.ARM_KIT }).length) out.push({ id: "kit", msg: "cánh tay 0,16: nhân vật phải bị bắt, lính đám đông nhận" });
+  const m = LM.mirrorArm(good, 0.01);
+  if (!near3(m.sh, [-0.23, 1.4, 0], 1e-9)) out.push({ id: "đối xứng", msg: m.sh.map(f3).join(",") });
+  const tip = [0.31, 1.2, 0.41], chain = [tip, good.hand, good.el, good.sh], P = [], want = [];
+  const put = (p, w) => { P.push(...p); want.push(w); };
+  put([0.305, 1.19, 0.355], 0.055); put([0.29, 1.15, 0.17], null); put([0.27, 1.26, 0.02], null); put([0.6, 1.2, 0.2], Infinity); put([-0.3, 1.18, 0.3], Infinity);
+  const ext = good.sh.map((x, k) => x + (good.sh[k] - good.el[k]) * (0.05 * 1.9 / Math.hypot(...sub3(good.sh, good.el))));
+  put(ext, "quá vai");
+  const g = LM.axialGeo(Float32Array.from(P), want.length, chain, "R", 1.9);
+  if (!(Math.abs(g.DF[0] - 0.055) < 0.01)) out.push({ id: "đầu ngón", msg: f3(g.DF[0]) });
+  if (!(g.DF[1] > g.dHand && g.DF[1] < g.dEl && g.DF[2] > g.dEl && g.DF[2] < g.dSh)) out.push({ id: "thứ tự", msg: `${f3(g.DF[1])}, ${f3(g.DF[2])} / ${f3(g.dHand)} ${f3(g.dEl)} ${f3(g.dSh)}` });
+  if (g.DF[3] !== Infinity || g.DF[4] !== Infinity) out.push({ id: "ngoài ống", msg: `${g.DF[3]}, ${g.DF[4]}` });
+  if (!(g.DF[5] > g.dSh && g.DF[5] < g.dSh + 0.06 * 1.9 + 1e-6)) out.push({ id: "quá vai", msg: f3(g.DF[5]) });
+  return out;
+});
 
 console.log(`\n${pass} đạt, ${fail} trượt, ${skip} bỏ qua (TODO đợt 19a)`);
 process.exit(fail ? 1 : 0);

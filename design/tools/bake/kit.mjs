@@ -8,10 +8,11 @@
 // của bộ khúc, rồi gộp 15 khớp về 15 khúc (đầu theo thân, bàn tay theo cẳng tay).
 // Mức chi tiết: hàn đỉnh trùng vị trí (bỏ đường may UV của Meshy) rồi giảm lưới tự do (meshopt) tới đúng ngân sách. LOD0 trải UV
 // lại và nướng texture riêng từ lưới gốc (rebake.mjs); LOD1–2 tô màu đỉnh lấy từ texture gốc, không dùng texture.
+// meta.tas: neo tua giáo (khung cẳng tay cầm giáo) ở chân mũi giáo Meshy — soldiers.js glbKit đặt vào soldier-motion.js TAS.
 
 import * as THREE from "three";
 import { readGLB, smoothNormals, rawImage } from "./io.mjs";
-import { JOINTS, fitHuman, bindSkeleton, weights15 } from "./human.mjs";
+import { JOINTS, fitHuman, cutBoxes, bindSkeleton, weights15 } from "./human.mjs";
 import { rebake, weldSimplify } from "./rebake.mjs";
 import { SKELETONS, JOINT_NAMES, HAND } from "../../../game/js/battle/soldier-motion.js";
 
@@ -173,8 +174,8 @@ async function nearLOD(parts, tris, res) {
 // ---- người đứng (bộ khúc HUMAN) --------------------------------------------------------------------------------------------
 // c: { lods: [tris…], weapons: [{ raw: [raw lod0, lod1, lod2], bone, p, r, s }], tassel: "son" | "long" | null, tasZ }
 export async function bakeKit(file, c) {
-  const g = await readGLB(file, Infinity);
-  const F = fitHuman(g.pos, g.idx, { shY: HP.uaL[1], fix: c.fix });
+  const cg = cutBoxes(await readGLB(file, Infinity), c.cut), g = cg.g;
+  const F = fitHuman(g.pos, g.idx, { shY: HP.uaL[1], fix: c.fix, box: cg.bounds, name: c.name, kit: true });
   const bind = bindSkeleton(F, YH);
   const W = weights15(F, YH);
   // khung nghỉ: vai, khuỷu, cổ tay bộ khúc (tay buông), chân ở hông bộ khúc, đầu giữ chỗ mô hình
@@ -199,7 +200,11 @@ export async function bakeKit(file, c) {
     if (c.tassel) parts.push(tasselColor(c.tassel));
     lods.push(assemble(parts, true));
   }
-  return { lods, image: near.image, warnings: F.lm.warnings, meta: { kind: "kit", skel: "human", piv: JOINT_NAMES.map((j) => (j === "tas" ? [0, 0, 0] : HP[j])) } };
+  // neo tua giáo (khung cẳng tay cầm giáo): chân mũi giáo đo lúc nướng (wpn.mjs meta.head) — soldier-motion.js TAS dùng thay neo
+  // "dài giáo − 0,79" của giáo dựng bằng code (mũi giáo Meshy dài hơn: neo cũ rơi giữa lưỡi)
+  const tw = c.tassel ? c.weapons.find((w) => w.head != null) : null;
+  return { lods, image: near.image, warnings: F.lm.warnings, how: F.how, cut: cg.cut, meta: { kind: "kit", skel: "human", piv: JOINT_NAMES.map((j) => (j === "tas" ? [0, 0, 0] : HP[j])),
+    ...(tw ? { tas: [tw.p[0], tw.p[1], +(tw.p[2] + tw.head * (tw.s ?? 1)).toFixed(4)] } : {}), arms: F.how, ...(cg.cut ? { cut: cg.cut } : {}) } };
 }
 export { pivots as kitPivots, placeWeapon, assemble, skin2, restPose, tassel, MAP as KIT_MAP, YH as KIT_Y };
 
@@ -277,8 +282,8 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
   const horse = { pos: VR, nor: hnor, uv: h.uv, skin, idx: h.idx, img: await rawImage(h.image) };
 
   // ---- người cưỡi ----
-  const r = await readGLB(riderFile, Infinity);
-  const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix });
+  const cr = cutBoxes(await readGLB(riderFile, Infinity), c.cut), r = cr.g;
+  const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix, box: cr.bounds, name: c.name, kit: true });
   const bind = bindSkeleton(F, YH);
   const W = weights15(F, YH);
   const seat = [0, XP.torso[1] - 0.08, XP.torso[2]];
@@ -308,5 +313,5 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
     lods.push(assemble(parts, true));
   }
   const piv = JOINT_NAMES.map((j) => (j === "tas" ? tailRoot.map((x) => +x.toFixed(4)) : XP[j]));
-  return { lods, image: near.image, warnings: F.lm.warnings, meta: { kind: "kit", skel: "horse", piv }, info: { s, sx, sz, belly, tailRoot, legs } };
+  return { lods, image: near.image, warnings: F.lm.warnings, how: F.how, meta: { kind: "kit", skel: "horse", piv, arms: F.how }, info: { s, sx, sz, belly, tailRoot, legs } };
 }

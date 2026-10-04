@@ -13,7 +13,7 @@
 
 import * as THREE from "three";
 import { part, merge, PAL } from "./models.js";
-import { JOINT_NAMES, NJ, BONE_FLOATS, HAND, SPEAR, jointsInto } from "./soldier-motion.js";
+import { JOINT_NAMES, NJ, BONE_FLOATS, HAND, SPEAR, TAS, jointsInto } from "./soldier-motion.js";
 
 export { NCH, CH, SKELETONS, JOINT_NAMES, NJ, BONE_FLOATS, KIT_WEAPON, LEG, poseFor, soldierFrame, resetMotion,
   advanceStride, smoothPose, legRate, cycleLen, jointsInto } from "./soldier-motion.js";
@@ -368,6 +368,8 @@ vec3 objectNormal = normalize(mat3(bm) * vec3(normal));
 // chung một texture khớp: lính của mức l nằm liền nhau từ chỉ số uBase (Crowd.render xếp theo mức), mỗi mức một màu instance.
 export function glbKit(kit, G, cap) {
   const skel = G.meta.skel;
+  // neo tua giáo ở chân mũi giáo Meshy (design/tools/bake/kit.mjs meta.tas; neo của giáo dựng bằng code rơi giữa lưỡi giáo Meshy)
+  if (G.meta.tas && TAS[kit]) TAS[kit].p = G.meta.tas;
   const rows = Math.ceil((cap * NJ * 3) / BONE_TEX_W);
   const data = new Float32Array(BONE_TEX_W * rows * 4);
   const tex = new THREE.DataTexture(data, BONE_TEX_W, rows, THREE.RGBAFormat, THREE.FloatType);

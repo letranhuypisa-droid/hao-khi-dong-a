@@ -2,7 +2,8 @@
 //
 // Khung chuẩn (game/js/battle/glb.js xoay tiếp theo chỗ gắn: tay rig tướng, cẳng tay lính đám đông):
 //   blade    (đao, kiếm, giáo, đại đao, chùy) gốc ở chỗ nắm, trục cán từ đuôi ra mũi theo +Z, bề rộng lưỡi theo ±Y (đại đao: phía
-//            có lưỡi là +Y), bề dày theo X. Meshy dựng đứng mũi lên (+Y).
+//            có lưỡi là +Y), bề dày theo X. Meshy dựng đứng mũi lên (+Y); catalog flip: mẫu dựng mũi xuống (kiếm, đao, đại đao),
+//            grip đo từ đầu trên. catalog head: ghi chân đầu (giáo — chân mũi, đại đao — chân lưỡi) vào meta.head (neo tua).
 //   bow      (cung) gốc ở giữa chuôi cầm, hai đầu cánh theo ±Z, dây cung phía +Y.
 //   shield   (khiên) gốc ở tâm mặt khiên, mặt có núm nhìn +Z, chiều đứng +Y.
 //   crossbow (nỏ) đúng khung cẳng tay lính (soldiers.js W.no): báng dọc Y, đầu cánh nỏ phía −Y, cánh nỏ ngang X, rãnh tên +Z;
@@ -78,6 +79,33 @@ export async function bakeWeapon(file, c) {
   for (let i = 0; i < P.length; i += 3) { v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(M); V[i] = v.x; V[i + 1] = v.y; V[i + 2] = v.z; }
   const out = bounds(V);
   const nor = smoothNormals(V, g.idx);
+  const head = c.head ? headBase(V, g.idx) : null;
   return { mesh: packMesh({ pos: V, nor, uv: g.uv, idx: g.idx }), raw: { pos: V, nor, uv: g.uv, idx: g.idx }, image: g.image, tris: g.tris, trisBefore: g.trisBefore,
-    meta: { kind: "wpn", type: c.type, lo: out.lo.map((x) => +x.toFixed(3)), hi: out.hi.map((x) => +x.toFixed(3)) } };
+    meta: { kind: "wpn", type: c.type, lo: out.lo.map((x) => +x.toFixed(3)), hi: out.hi.map((x) => +x.toFixed(3)), ...(head != null ? { head: +head.toFixed(3) } : {}) } };
+}
+
+// Chân đầu vũ khí cán dài (catalog head: giáo — chân mũi giáo, đại đao — chân lưỡi), khung chuẩn: mặt cắt r(z) = nửa bề ngang
+// max(|x|, |y|) mỗi 1 cm (giao cạnh tam giác với mặt phẳng z); cán = trung vị r nhỏ hơn của hai quãng 0,4 m sau tay … 0,1 m trước
+// tay và 0–0,6 m trước tay (lưỡi đại đao bắt đầu ngay trên tay, đuôi giáo có đai); chân đầu = z đầu tiên (từ
+// 0,1 m trước tay ra mũi) mà r > 1,5 lần cán suốt ≥ 0,06 m (đĩa chắn tay mỏng của đại đao không tính). Tua treo ở đây (models.js,
+// lính đám đông: kit.mjs meta.tas).
+export function headBase(V, idx, step = 0.01) {
+  let z0 = Infinity, z1 = -Infinity; for (let i = 2; i < V.length; i += 3) { z0 = Math.min(z0, V[i]); z1 = Math.max(z1, V[i]); }
+  const K = Math.floor((z1 - z0) / step) + 1, r = new Float64Array(K), z = (k) => z0 + k * step;
+  for (let t = 0; t < idx.length; t += 3) for (let e = 0; e < 3; e++) {
+    const a = idx[t + e] * 3, b = idx[t + ((e + 1) % 3)] * 3, za = V[a + 2], zb = V[b + 2];
+    const put = (k, x, y) => { if (k >= 0 && k < K) r[k] = Math.max(r[k], Math.abs(x), Math.abs(y)); };
+    put(Math.round((za - z0) / step), V[a], V[a + 1]);
+    if (za === zb) continue;
+    for (let k = Math.ceil((Math.min(za, zb) - z0) / step); k <= Math.floor((Math.max(za, zb) - z0) / step); k++) { const u = (z(k) - za) / (zb - za); put(k, V[a] + u * (V[b] - V[a]), V[a + 1] + u * (V[b + 1] - V[a + 1])); }
+  }
+  const med = (a, b) => { const v = [...r].filter((_, k) => z(k) >= a && z(k) <= b).sort((p, q) => p - q); return v.length ? v[v.length >> 1] : Infinity; };
+  const rs = Math.min(med(-0.4, 0.1), med(0, 0.6));
+  const run = Math.round(0.06 / step);
+  for (let k = 0; k + run < K; k++) {
+    if (z(k) < 0.1) continue;
+    let ok = true; for (let q = 0; q <= run && ok; q++) ok = r[k + q] > 1.5 * rs;
+    if (ok) return z(k);
+  }
+  return null;
 }

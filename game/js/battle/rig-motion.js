@@ -1,5 +1,6 @@
 // battle/rig-motion.js — chuyển động phụ cho rig khớp nối (tướng, sĩ quan, boss, tướng đồng minh):
-//   · chân bám đất: IK hai chân (ik.js), hạ hông cho chân phía đất thấp, cổ chân nằm theo dốc khi chạm đất;
+//   · chân bám đất: IK hai chân (ik.js), hạ hông cho chân phía đất thấp, cổ chân nằm theo dốc khi chạm đất; đế giày theo
+//     rig.foot (rig khối: LEG; thân GLB: đế, mũi, gót của lưới — meta.foot);
 //   · 4 vạt áo lò xo: nặng theo trọng lực, bị gió/quán tính kéo, bị đùi đẩy (không xuyên chân), xoè khi xoay
 //     (gia tốc hướng tâm ∝ ω² của điểm treo);
 //   · dây treo (dải khăn, tua giáo, tua đại đao) mô phỏng PBD trong không gian thế giới, dải khăn không xuyên đầu;
@@ -8,7 +9,8 @@
 //     trên (nâng, bay phần phật khi chạy, rủ khi đứng, uốn cong khi xoay/xoắn người), không xuyên cạp áo, vạt sau,
 //     đùi, cẳng chân;
 //   · cờ sau lưng tướng: vải xoay quanh cán (lò xo theo tốc độ, gió), nằm ngang khi ngã;
-//   · tay trái nắm chuôi vũ khí hai tay (đại kiếm WC01, rig có dyn.grip): IK tay hai khúc tới điểm nắm trên chuôi.
+//   · tay trái nắm chuôi vũ khí hai tay (đại kiếm WC01, rig có dyn.grip): IK tay hai khúc tới điểm nắm trên chuôi, theo độ dài
+//     tay của rig (thân GLB: khung gắn của mô hình).
 // Mỗi rig một thể hiện. Gọi update(dt, pose, ground) SAU khi đã đặt root (vị trí, yaw) và tư thế (applyPose):
 // dt là bước mô phỏng của Hero.update / BigUnit.update (1/60 s; hit-stop không có bước nào nên vải cũng đứng
 // yên), dt = 0 chỉ dựng lại hình, không chạy động lực. pose là tư thế đang trộn (anim.js): chân và hông dựng lại
@@ -52,8 +54,6 @@ const K = {
   // nhanh, 1–3 khung) thì tay vẫn duỗi thẳng về phía chuôi thay vì buông về tư thế gốc
   gripPole: [-1, -0.7, -0.25], gripFar0: 1.3, gripFar1: 2.0,
 };
-// Tay rig (models.js): vai → khuỷu 0,34 (dọc −y); khuỷu → cổ tay (0, −0,36, 0,02): dài L2, lệch góc off quanh trục x.
-const ARM = { L1: 0.34, L2: Math.hypot(0.36, 0.02), off: Math.atan2(0.02, 0.36) };
 const _arm = [0, 0, 0, 0], _e = new THREE.Euler(0, 0, 0, "YXZ");
 
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -120,6 +120,12 @@ export class RigMotion {
     this.blades = d.blades || [];
     this.grip = d.grip || null;             // { j: khớp cầm vũ khí, local: điểm tay trái nắm (khung khớp đó) }
     const P = rig.p;
+    // tay trái theo độ dài tay của rig (gripIK): vai → khuỷu dài L1 (dọc −y), khuỷu → cổ tay dài L2 lệch góc off quanh trục x — rig
+    // khối 0,34 và (0, −0,36, 0,02); thân GLB theo khung gắn của mô hình (khớp lúc chạy = khung gắn, models.js applyRest)
+    const eL = P.elL.position, hL = P.handL.position;
+    this.arm = { L1: Math.hypot(eL.x, eL.y, eL.z), L2: Math.hypot(hL.y, hL.z), off: Math.atan2(hL.z, -hL.y) };
+    // đế giày (khung cổ chân): rig khối LEG; thân GLB theo lưới (models.js rig.foot từ meta.foot)
+    this.foot = rig.foot || LEG;
     this.legs = [
       { hip: P.hipL, knee: P.kneeL, ankle: P.ankleL, key: "L", d: 0, c: 0, pw: 0, pa: 0, roll: 0, rollA: 0, gx: 0, gz: 0, g: 0 },
       { hip: P.hipR, knee: P.kneeR, ankle: P.ankleR, key: "R", d: 0, c: 0, pw: 0, pa: 0, roll: 0, rollA: 0, gx: 0, gz: 0, g: 0 },
@@ -174,7 +180,7 @@ export class RigMotion {
 
   // ---- chân ----------------------------------------------------------------------------------
   legIK(dt, pose, ground, snap, on) {
-    const P = this.rig.p, root = this.rig.root, s = this.s;
+    const P = this.rig.p, root = this.rig.root, s = this.s, FT = this.foot;
     // dựng lại chân, hông theo tư thế gốc (bỏ kết quả IK lượt trước)
     P.hips.position.y = 0.92 + pose.hipsY;
     P.hipL.rotation.set(pose.hipLx, 0, pose.hipLz); P.hipR.rotation.set(pose.hipRx, 0, pose.hipRz);
@@ -201,7 +207,7 @@ export class RigMotion {
       L.hip.updateWorldMatrix(false, false); L.knee.updateWorldMatrix(false, false); L.ankle.updateWorldMatrix(false, false);
       const m = L.ankle.matrixWorld;
       _a.setFromMatrixPosition(m);
-      _v.set(0, -LEG.sole, LEG.footZ).applyMatrix4(m);          // tâm đế giày
+      _v.set(0, -FT.sole, FT.footZ).applyMatrix4(m);          // tâm đế giày
       _f.setFromMatrixColumn(m, 2).normalize();                 // mũi bàn chân
       _x.setFromMatrixColumn(m, 0).normalize();                 // phía phải bàn chân
       const liftA = _v.y - g0, lift = Math.max(0, liftA);
@@ -211,7 +217,7 @@ export class RigMotion {
       const hx = Math.hypot(_f.x, _f.z) || 1, slopeP = IK.slopePitch(ground, _v.x, _v.z, _f.x / hx, _f.z / hx, 0.22 * s);
       L.pw = L.pa + (slopeP - L.pa) * c;
       // tâm đế sau khi cổ chân xoay tới góc pw lệch khỏi chỗ cũ theo mũi chân: lấy độ cao đất ở chỗ mới
-      const zOff = (-LEG.sole * Math.sin(L.pw) + LEG.footZ * Math.cos(L.pw)) * s / hx;
+      const zOff = (-FT.sole * Math.sin(L.pw) + FT.footZ * Math.cos(L.pw)) * s / hx;
       const gF = ground(_a.x + _f.x * zOff, _a.z + _f.z * zOff);
       // nghiêng ngang: đế theo dốc ngang khi chạm đất
       const rx = Math.hypot(_x.x, _x.z) || 1, dd = 0.1 * s;
@@ -219,7 +225,7 @@ export class RigMotion {
       L.rollA = Math.asin(clamp(_x.y, -1, 1));
       L.roll = (Math.atan(clamp(sAcross, -1.2, 1.2)) - L.rollA) * c;
       // cổ chân phải ở đâu để tâm đế nằm đúng mặt đất + độ nhấc chân của hoạt ảnh
-      const dyOff = (-LEG.sole * Math.cos(L.pw) - LEG.footZ * Math.sin(L.pw)) * s;
+      const dyOff = (-FT.sole * Math.cos(L.pw) - FT.footZ * Math.sin(L.pw)) * s;
       L.d = clamp(gF + lift - dyOff - _a.y, -K.maxShift * s, K.maxShift * s);
       L.c = c; L.gx = _v.x; L.gz = _v.z; L.g = gF;
     }
@@ -246,7 +252,7 @@ export class RigMotion {
   // phương thẳng đứng của thế giới đổi về mặt phẳng chân (khung hông) rồi giải lại IK hai khúc; cổ chân bù phần đùi,
   // gối đổi (giữ góc bàn chân). Trước đây chân nằm, chân ngã ngửa cắm xuống đất 0,2–0,4 m.
   liftFeet(ground) {
-    const P = this.rig.p, s = this.s;
+    const P = this.rig.p, s = this.s, FT = this.foot;
     P.hips.updateWorldMatrix(false, false);
     // phương thẳng đứng thế giới trong khung hông = hàng y của ma trận xoay (ma trận thế giới có scale s)
     const e = P.hips.matrixWorld.elements, ny = e[5] / s, nz = e[9] / s, m2 = ny * ny + nz * nz;
@@ -256,7 +262,7 @@ export class RigMotion {
       L.hip.updateWorldMatrix(false, false); L.knee.updateWorldMatrix(false, false); L.ankle.updateWorldMatrix(false, false);
       let pen = 0;
       for (let c = 0; c < 4; c++) {
-        _v.set(c & 1 ? 0.08 : -0.08, -LEG.sole, c & 2 ? LEG.toe : LEG.heel).applyMatrix4(L.ankle.matrixWorld);
+        _v.set(c & 1 ? 0.08 : -0.08, -FT.sole, c & 2 ? FT.toe : FT.heel).applyMatrix4(L.ankle.matrixWorld);
         pen = Math.max(pen, ground(_v.x, _v.z) + 0.005 - _v.y);
       }
       if (pen <= 0) continue;
@@ -321,6 +327,7 @@ export class RigMotion {
     _v.copy(G.local).applyMatrix4(G.j.matrixWorld);                     // điểm nắm (thế giới)
     _v.applyMatrix4(_inv.copy(P.torso.matrixWorld).invert());           // về khung thân (đơn vị rig)
     const sh = P.shL.position, tx = _v.x - sh.x, ty = _v.y - sh.y, tz = _v.z - sh.z, pl = K.gripPole;
+    const ARM = this.arm;
     IK.armIK(tx, ty, tz, pl[0], pl[1], pl[2], ARM.L1, ARM.L2, _arm);
     const w = w0 * (1 - smooth(K.gripFar0, K.gripFar1, Math.sqrt(tx * tx + ty * ty + tz * tz) / (ARM.L1 + ARM.L2)));
     if (w < 1e-3) return;

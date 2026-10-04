@@ -160,8 +160,10 @@ const I4 = new THREE.Matrix4();
 // Toa Đô 22 (41), nay 2 lưới + lá cờ (tướng): 4–6 lượt vẽ mỗi rig. Hộp bao: cầu cố định đủ rộng cho mọi tư thế (vũ
 // khí dài, lộn né, nằm) nên vẫn bị loại khi ngoài khung nhìn, ngoài hộp bóng (áo choàng trước đây tắt loại bỏ).
 // Mô hình GLB (cfg.model, glb.js): có trong đệm thì thân là một lưới da GLB gắn vào chính các khớp này (vị trí vai, khuỷu, cổ tay,
-// cổ, bề ngang chân đặt theo mô hình), vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo
-// (vạt áo nằm trong lưới, đi theo hông và chân). Áo choàng, cờ lưng, tua giáo, dải khăn vẫn dựng bằng code như cũ.
+// cổ, bề ngang chân đặt theo mô hình — đúng khung gắn, kể cả rig đại kiếm WC01; tay trái nắm chuôi giải IK theo độ dài tay đó),
+// vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo (vạt áo nằm trong lưới, đi theo hông và
+// chân); đế giày theo lưới (rig.foot từ meta.foot, rig-motion.js). Áo choàng, cờ lưng, tua giáo (GLB: neo ở chân mũi, meta.head),
+// dải khăn vẫn dựng bằng code như cũ.
 export function makeRig(cfg = {}) {
   const { scale = 1, cloth = PAL.son, armor = PAL.then, trim = PAL.vang, skin = PAL.da,
     hat = "tocbui", weapon = "songdao", cape = null, flag = null, shield = false,
@@ -310,8 +312,8 @@ export function makeRig(cfg = {}) {
     const m = WM("giao_dv");
     if (m) wpn(p.handR, m);
     else add(p.handR, () => merge([part(cyl(0.03, 0.03, 3.0, 5), PAL.go, { z: 0.6, rx: Math.PI / 2 }), part(cone(0.07, 0.4, 4), PAL.sat, { z: 2.25, rx: Math.PI / 2 }), part(box(0.1, 0.1, 0.06), PAL.son, { z: 1.98 })]));
-    const tz = m ? tipZ(m) - 0.32 : 1.98;
-    tassel(p.handR, 0, -0.03, tz);                       // tua lông ngựa đỏ dưới mũi giáo
+    const tz = m ? (m.meta.head ?? tipZ(m) - 0.32) : 1.98;
+    tassel(p.handR, 0, -0.03, tz);                       // tua lông ngựa đỏ dưới mũi giáo (GLB: chân mũi đo lúc nướng, meta.head)
     edge(p.handR, "handRx", 0, 0, m ? tipZ(m) : 2.45, 0, 0, m ? buttZ(m) : -0.9); reach = m ? tipZ(m) + 0.05 : 2.5;
   } else if (weapon === "cung") {
     const m = WM("cung_viet");
@@ -321,7 +323,7 @@ export function makeRig(cfg = {}) {
     const m = WM("dadao");
     if (m) wpn(p.handR, m);
     else add(p.handR, () => merge([part(cyl(0.035, 0.035, 2.2, 5), PAL.go, { z: 0.4, rx: Math.PI / 2 }), part(box(0.05, 0.28, 0.8), PAL.sat, { z: 1.7, y: 0.1 }), part(box(0.2, 0.08, 0.08), trim, { z: 1.3 })]));
-    tassel(p.handR, 0, -0.04, 1.3);                      // tua ở chân lưỡi đại đao
+    tassel(p.handR, 0, -0.04, m?.meta.head ?? 1.3);      // tua ở chân lưỡi đại đao (GLB: meta.head)
     const z = m ? tipZ(m) - 0.05 : 2.1;
     edge(p.handR, "handRx", 0, -0.04, z, 0, 0.24, z, 0, 0, m ? buttZ(m) : -0.7); reach = z + 0.1;
   } else if (weapon === "dao") {
@@ -419,7 +421,9 @@ export function makeRig(cfg = {}) {
   }
   for (const b of segBones) b.scale.setScalar(0);
   root.scale.setScalar(scale);
-  return { root, p, scale, dyn, skeleton, mats, meshes, weapons, glb: !!M };
+  // đế giày cho IK chân (rig-motion.js): thân GLB theo lưới (meta.foot: đế, mũi, gót trong khung cổ chân), rig khối LEG
+  const foot = M && M.meta.foot ? { ...LEG, ...M.meta.foot } : LEG;
+  return { root, p, scale, dyn, skeleton, mats, meshes, weapons, glb: !!M, foot };
 }
 
 // Giải phóng phần riêng của một thể hiện rig: gỡ khỏi cảnh, texture xương của khung xương, vật liệu. Hình học dùng
