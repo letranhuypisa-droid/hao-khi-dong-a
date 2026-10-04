@@ -5,6 +5,19 @@ Mỗi ảnh là **một nhân vật / một người lính** cắt từ khung co
 Prompt để vẽ thêm ảnh hợp dựng 3D (một người / một vật, nền trơn, tay chữ A): `PROMPTS-LINH.md` (lính), `PROMPTS-TUONG.md` (tướng
 thời Trần: Đại Việt, quân Tống lưu vong, Mông Cổ / Nguyên), `PROMPTS-MOI-TRUONG.md` (thuyền, công trình, đạo cụ, cây đá).
 
+**Bản Meshy (chữ → 3D) của các prompt này** nằm ở `design/glb-prompts.md`, đúng khuôn mà `design/tools/meshy.mjs` đọc và gửi lên Meshy:
+prompt ở đây là prompt vẽ ảnh (Nano Banana, rồi Image to 3D), dài khoảng 1.400 ký tự, cầm binh khí, nên công cụ không dùng được.
+
+| Ở đây | Ở `glb-prompts.md` |
+| --- | --- |
+| `PROMPTS-TUONG.md`: H31, H33, H34, H35, H38, H39, H40, X19, X20, X24, DT, PT | Mục A1–A7, B1–B6 (DT = `OFF_doitruong`, PT = `OFF_photuong`) |
+| `PROMPTS-TUONG.md`: H27–H30, H32, H36, H37, TT, X16–X18, X21–X23, X25 | Mục A8–A15, B7–B13: tay không, POSE v2, người cưỡi ngựa (X16, X21) đứng A-pose, ngựa là tệp riêng |
+| `PROMPTS-TUONG.md`: TONG (cung thủ quân Tống) | Mục C4 `DV_AOTONG` (lính đám đông), không thêm mục riêng |
+| `PROMPTS-LINH.md` | Mục C, D (lính đám đông, đã tạo GLB) |
+| `PROMPTS-MOI-TRUONG.md` | Mục K–O (89 mục), viết lại theo đúng kích thước và số cột buồm, mái chèo game đang dựng; chỗ lệch ghi ở từng mục |
+
+Binh khí của tướng là tệp riêng (`glb-prompts.md` mục G); binh khí riêng của 15 tướng mới chưa có prompt (mục 0.8 của tài liệu đó).
+
 **Nguồn:** khung comic là ảnh do AI vẽ (Nano Banana Pro qua Higgsfield, xem `game/assets/SOURCES.md` và `comic/*/NGUON-GOC.md`). Bản cắt ở đây mất phần XMP đánh dấu nội dung AI của ảnh gốc; dùng lại ở đâu thì ghi rõ là ảnh AI.
 
 | Tệp | Ai / loại quân | Khung gốc | Ghi chú cho dựng 3D |

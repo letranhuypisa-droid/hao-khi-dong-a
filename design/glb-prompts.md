@@ -12,7 +12,7 @@ Ngoại hình và màu bám theo cách game đang vẽ: `game/js/battle/models.j
 
 ### 0.1 Hai cách dùng
 
-1. **Chữ → 3D (nhanh nhất).** Mở công cụ, chọn Text to 3D, dán nguyên khối **PROMPT** của mục. Prompt đã kèm sẵn khối tư thế và khối phong cách, dài không quá 550 ký tự (Meshy cho tối đa 600); riêng prompt môi trường (mục K–O) dài tới 630 ký tự, xem đầu mục K. Nếu công cụ có ô *Negative prompt* thì dán khối **NEGATIVE** ở mục 2.3.
+1. **Chữ → 3D (nhanh nhất).** Mở công cụ, chọn Text to 3D, dán nguyên khối **PROMPT** của mục. Prompt đã kèm sẵn khối tư thế và khối phong cách, dài không quá 550 ký tự (Meshy cho tối đa 600); mục người viết bằng POSE v2 (mục 2.2) dài tới 565 ký tự vì khối tư thế dài hơn; riêng prompt môi trường (mục K–O) dài tới 630 ký tự, xem đầu mục K. Bản gửi API (in bởi `node design/tools/meshy.mjs list`) không quá 600. Nếu công cụ có ô *Negative prompt* thì dán khối **NEGATIVE** ở mục 2.3.
 2. **Ảnh mẫu → 3D (đẹp và ổn định hơn).** Dùng công cụ tạo ảnh để vẽ ảnh mẫu trước, chọn ảnh ưng ý, rồi đưa vào Image to 3D. Prompt ảnh mẫu = khối **ẢNH-MỞ** + PROMPT của mục + khối **ẢNH-ĐÓNG** (mục 2.4, có ví dụ ghép sẵn). Ảnh mẫu luôn ra một tờ có hai hình (mặt trước và nghiêng). **Luôn cắt tờ ảnh thành từng hình riêng, đừng đưa cả tờ vào công cụ 3D**: đưa cả tờ thì công cụ sẽ dựng ra hai người dính nhau hoặc một lưới hỏng. Công cụ chỉ nhận một ảnh: chỉ đưa ảnh **mặt trước**. Công cụ nhận nhiều ảnh (multi-view): ảnh mặt trước vào ô Front, ảnh nghiêng vào ô Left hoặc Right tuỳ ảnh cho thấy sườn trái hay sườn phải của nhân vật (xem hình minh hoạ cạnh từng ô trong công cụ). Cách này còn giữ được **cùng một khuôn mặt** giữa các tệp, ví dụ người lính Tự do ở bậc thấp và bậc cao.
 
 Mẹo giữ phong cách đồng đều: làm xong ảnh mẫu đầu tiên (H35) thì dùng nó làm ảnh tham chiếu phong cách cho mọi ảnh mẫu sau.
@@ -25,7 +25,7 @@ Mỗi công cụ đặt tên tuỳ chọn khác nhau. Cần chỉnh mấy thứ 
 - **Kiểu lưới** (Topology ở Meshy, Mesh mode ở Rodin): chọn **Triangle** (hoặc Raw). Nếu công cụ chỉ cho lưới tứ giác (Quad) thì đặt số mặt bằng **một nửa** cột "Tam giác", vì mỗi mặt tứ giác khi xuất GLB thành hai tam giác.
 - **Tư thế**: nếu có tuỳ chọn A-pose thì bật.
 - **Texture**: cỡ 1024 hoặc 2048, xuất **GLB** có texture nhúng sẵn.
-- **Đối xứng** (Symmetry): bật cho ngựa và cho nhân vật mặc đồ cân hai bên. **Tắt** (Off, hoặc để Auto) với các mẫu có đồ lệch một bên: ống tên hay hộp tên sau lưng, bao tay một bên, dây vắt chéo vai. Đó là A4 H40, A6 H38, C3 DV_NO, C4 DV_AOTONG, D3 NG_CUNG, D5 NG_KY, F1 CV_khien, F3 CV_cung; phần Kỹ thuật của các mục này có ghi "Symmetry: tắt". Bật đối xứng thì công cụ sẽ nhân đôi các chi tiết đó sang bên kia, dời vào giữa, hoặc xoá mất.
+- **Đối xứng** (Symmetry): bật cho ngựa và cho nhân vật mặc đồ cân hai bên. **Tắt** (Off, hoặc để Auto) với các mẫu có đồ lệch một bên: ống tên hay hộp tên sau lưng, bao tay một bên, dây vắt chéo vai. Đó là A4 H40, A6 H38, C3 DV_NO, C4 DV_AOTONG, D3 NG_CUNG, D5 NG_KY, F1 CV_khien, F3 CV_cung; phần Kỹ thuật của các mục này có ghi "Symmetry: tắt". Mục thêm từ đợt 19 (tướng mới, mục P làm lại) ghi rõ bật hay tắt ở phần Kỹ thuật. Bật đối xứng thì công cụ sẽ nhân đôi các chi tiết đó sang bên kia, dời vào giữa, hoặc xoá mất.
 
 ### 0.3 Phải đúng ngay khi tạo, và phần Claude tự sửa được
 
@@ -53,6 +53,8 @@ Theo quy cách đã chốt, mũ, giáp và ống tên nên là object riêng tro
 | 4 | Tự do và Võ trường: LINH_r01, LINH_r24, 5 lớp CV, OFF_tuong | |
 | 5 (tuỳ chọn) | H34, H38 (chưa có trong game), DV_AOTONG, vũ khí riêng (quạt, đại phủ…), ngựa tướng, voi chiến + bành + Dã Tượng, dân làng | Game chưa dùng, hoặc chỉ là cảnh nền |
 | 6 (môi trường) | Thuyền B20 (`env_thuyen-chien-tran`, `env_chien-thuyen-nguyen`, `env_ky-ham-nguyen`), cổng và tường Hàm Tử, lều lương Tự do, khóm tre, cột đá vôi; rồi phần còn lại của mục K–O và nón lá rời (H5) | Thuyền người chơi đứng và cổng là vật nhìn gần, lều lương hiện không có hình, tre và đá vôi là bóng dáng lớn nhất mỗi cảnh. Cần thêm bước nướng môi trường (đầu mục K) |
+
+Phần còn phải tạo sau 40 mẫu đầu (thứ game còn vẽ bằng code, mục làm lại, tướng mới), thứ tự theo đợt, lệnh và credit: mục 0.8.
 
 ### 0.5 Tên tệp
 
@@ -90,6 +92,71 @@ Tên tệp luôn suy ra được từ cột **Mã** ở bảng mục 1, theo ba 
 - **Lính đám đông dùng chung một thân.** Game vẽ hàng trăm lính bằng một bộ xương chung, nên mọi mẫu nhóm C và D phải cùng chiều cao, cùng tỉ lệ (vai, tay, chân), chỉ khác mũ, giáp, áo. Làm DV_GIAO trước, rồi dùng ảnh mẫu của nó làm ảnh tham chiếu dáng người cho các kiểu lính còn lại, kể cả lính Nguyên. NG_TANK to con hơn là do code phóng to, không cần tạo thân to hơn.
 - **Dung lượng.** Cả game hiện khoảng 28 MB. Claude sẽ nén mọi tệp: texture lính đám đông và vũ khí còn 1024, nhắm mỗi lính đám đông ≤ 1 MB, mỗi tướng ≤ 3–4 MB. Bạn cứ xuất 2048 nếu công cụ cho.
 - **Bản quyền.** Game đang công khai trên mạng. Nhiều công cụ AI 3D ở gói miễn phí cấp tệp theo giấy phép CC BY (phải ghi công) hoặc không cho dùng thương mại. Kiểm gói bạn đang dùng và báo Claude để ghi nguồn vào `game/assets/SOURCES.md`.
+
+### 0.8 Còn phải tạo (từ đợt 19)
+
+40 mẫu game cần ở đợt đầu đã có (bộ `can`). Tài liệu nay có 183 mục; 143 mục chưa có GLB, tất cả đã có prompt đúng khuôn công cụ (bản API ≤ 600 ký tự). Liệt kê: `node design/tools/meshy.mjs list --set tat-ca --hash` (cột cuối ghi "chưa tạo").
+
+**Còn thiếu, theo mức ưu tiên**
+
+| Mức | Gồm | Bộ (`--set`) | Hiện trong game |
+| --- | --- | --- | --- |
+| 1. Game đang dựng bằng code | Nón lá rời PROP_non_la; dân làng DAN_NAM, DAN_NU, DAN_TRE cùng quang gánh, tay nải; quân áo Tống DV_AOTONG; ống tên rời; trâu, cò, quạ | `thieu` (12) | Dân, trâu, chim ở B15 và Tự do (`ambient.js`); quân Triệu Trung là giáo binh nhuộm hổ phách (`kesach.js:164`); bốn vai đội nón đang ra mũ trụ đỏ của GLB vì nón code bị bỏ khi có thân GLB (`models.js:181`) |
+| 1. Game đang dựng bằng code | Môi trường: 10 thuyền, 22 công trình, 37 đạo cụ cảnh, 17 cây đá núi (mục K–N) | `moi-truong` (89, gồm cò, quạ và 3 mục tuỳ chọn K10, L22, N17) | Mọi cảnh B15, B20, Võ trường, Tự do; lều lương ở nhiệm vụ Đánh úp trại hiện không có hình |
+| 2. GLB có rồi nhưng lệch prompt | 14 mục làm lại (mục P): mũ mọc sừng H33, X19, mào OFF_photuong, X20 thiếu mũ và giáp, đầu và nón lính Trần, bốn vai đội nón ra mũ trụ, giáo có cánh, lưỡi đại đao lệch cán, OFF_doitruong gần T-pose | `lam-lai` (14) | Đang hiện bản lệch |
+| 3. Chưa có trong game | H34, H38, H39 và 15 tướng thời Trần từ `design/3d-ref/PROMPTS-TUONG.md` (mục A8–A15, B7–B13) | `tuong-moi` (18) | Chưa có trận dùng (B12–B14, B16–B19 chưa dựng; H34, H38 hiện "sắp có" ở B20) |
+| 4. Tuỳ chọn | LINH_r2, cờ lưng, áo choàng (code đã dựng vải có lắc), vũ khí tuỳ chọn G14–G19, ngựa tướng, voi chiến, bành, giáp voi | `--only` (13) | Không |
+
+Chưa có prompt, phải viết sau: binh khí riêng của 15 tướng mới (kiếm khắc sóng và khiên mây H27, cờ lệnh H28, ván thuyền H29, bút lông H30, sóc H37, giáo móc X17, kích mạ vàng X18, kích X23, giáo lưỡi rộng X25; cột Đi kèm ở bảng mục 1 ghi vũ khí có sẵn dùng tạm). Ba vũ khí lệch nhẹ chưa có mục làm lại: `wpn_songdao` ra kiếm thẳng mũi nhọn hai cạnh thay vì đao mũi vát, `wpn_dao-linh` không hếch mũi, `wpn_daikiem` chắn tay kiểu châu Âu. Không cần credit: H31 lệch khuỷu trái phải và LINH_r24 khuỷu cao là lỗi bộ dò khớp, sửa trong `design/tools/bake/landmarks.mjs` hoặc ghi khớp tay trong catalog.
+
+**Thứ tự tạo theo đợt**
+
+Mỗi đợt ba bước: dựng lưới xám (`--stage luoi`, chỉ tốn tiền lưới), ghép ảnh lưới thành một tờ để soát, rồi chạy lại không có `--stage` để tô texture. Lưới hỏng thì dựng lại riêng mã đó trước khi tô: `run --only <mã> --redo <mã> --stage luoi`. Thêm `--dry` vào lệnh `run` thì công cụ chỉ in ước tính credit, không gọi Meshy. Lần tô texture công cụ giữ model của lưới, nên tuỳ chọn model chỉ có tác dụng ở lần dựng lưới (ghi lại cho khỏi nhầm).
+
+Credit tính theo bảng giá trong `meshy.mjs`: lưới 20 với `latest` (mặc định), 5 với `meshy-5`; texture 10 mỗi mẫu. `--model-mt` (môi trường) mặc định bằng `--model-vk`; trâu là thú cưỡi nên theo `--model`. Mẫu đã xong ở đợt trước thì công cụ bỏ qua, nên số dưới đây đã trừ phần trùng (cò, quạ ở đợt 1; 9 mục môi trường ở đợt 2).
+
+| Đợt | Gồm | Credit: lưới + texture | Claude làm sau đợt này |
+| --- | --- | --- | --- |
+| 1 | `thieu`, 12 mục | 75 + 120 = **195** (dân, áo Tống, đạo cụ, chim bằng meshy-5; trâu `latest`); tất cả `latest` 240 + 120 = 360 | Code gắn nón lá vào khớp đầu khi có thân GLB (`models.js`) và gộp nón vào bộ lính (`design/tools/bake/kit.mjs`); nướng bộ lính cho dân làng (thay thân code ở `ambient.js`) và quân áo Tống (chọn cung hay giáo, đổi lính thả ở `kesach.js`); gộp quang gánh, tay nải vào bộ dân. Trâu, chim, ống tên chờ bước nướng môi trường (đợt 2), cắt thành phần rời cho code tự cử động (`ambient.js:13-15`) |
+| 2 | 9 mục môi trường thử: thuyền chiến quân Trần (người chơi đứng), chiến thuyền Nguyên, kỳ hạm, cổng, cánh cổng, tường Hàm Tử, lều lương, khóm tre, cột đá vôi A | 180 + 90 = **270** (`latest`); meshy-5 45 + 90 = 135 | Chế độ nướng tĩnh `env` mới trong `design/tools/glb-bake.mjs`: giảm lưới, phóng về cột "Kích thước thật", đặt lại gốc, nướng texture thành màu đỉnh, LOD (đầu mục K). Mã đặt mẫu vào cảnh thay khối code (`boats.js` LOD0, cổng và tường, lều, `kit.js`) làm ở một đợt sau. Chờ 9 mục này vào được game rồi mới mua đợt 4, vì có thể phải sửa câu chữ |
+| 3 | `lam-lai`, 14 mục | 280 + 140 = **420** (cả mục bằng `latest`, như mục P khuyên); nếu thêm `--model-linh meshy-5 --model-vk meshy-5` thì 205 + 140 = 345 | Soát tờ ảnh; chuyển bước nướng sang tệp `_v2` (vũ khí: đổi `src` trong catalog; nhân vật, bộ lính: thêm `src` và cho `glb-bake.mjs` đọc `man[c.src ?? code].path`, xem `design/glb/README.md`); nướng lại; bỏ khớp ghi tay nếu bộ dò khớp ra đúng; bỏ `side`, `flip` của đại đao; gắn nón lá cho bốn vai đầu trần (code của đợt 1) |
+| 4 | Phần còn lại của `moi-truong`, 77 mục (gồm 3 mục tuỳ chọn K10, L22, N17) | `--model-mt meshy-5`: 385 + 770 = **1.155**; `latest` 1.540 + 770 = 2.310 | Như đợt 2, thêm mã đặt từng cảnh. Vật vẽ hàng trăm lần (cây, tre, cọc, lau, đá) phải nướng giảm về ngân sách trong game ghi ở từng mục. Muốn bỏ 3 mục tuỳ chọn thì chạy `--only` với danh sách mã in bởi `list --set moi-truong` |
+| 5 | `tuong-moi`, 18 mục | 360 + 180 = **540** (`latest`) | Rig và nướng như 17 nhân vật đang có (thêm vào `CHARS` của catalog), thêm cấu hình `RIGS` khi có trận dùng họ; viết prompt binh khí riêng; ngựa cho X16, X21 (đổi màu mẫu ngựa có sẵn hoặc làm ngựa tướng) |
+| 6 | Tuỳ chọn, 13 mục, theo nhu cầu | meshy-5 cho vũ khí, đạo cụ 110 + 130 = 240; `latest` 260 + 130 = 390 | Tuỳ mục (voi: rig bốn chân, bành gắn lưng) |
+
+Cả sáu đợt theo lựa chọn in đậm khoảng 2.820 credit; tất cả bằng `latest` khoảng 4.290.
+
+Lệnh cho từng đợt (chạy ở gốc repo; key đặt bằng `MESHY_API_KEY`, không ghi vào repo):
+
+```bash
+# Đợt 1
+node design/tools/meshy.mjs list --set thieu --hash
+node design/tools/meshy.mjs run --set thieu --stage luoi --model-linh meshy-5 --model-vk meshy-5
+node design/tools/meshy.mjs sheet design/glb/_raw/dot1-luoi.png --set thieu
+node design/tools/meshy.mjs run --set thieu --model-linh meshy-5 --model-vk meshy-5
+
+# Đợt 2
+node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a --stage luoi
+node design/tools/meshy.mjs sheet design/glb/_raw/dot2-luoi.png --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
+node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
+
+# Đợt 3
+node design/tools/meshy.mjs run --set lam-lai --stage luoi
+node design/tools/meshy.mjs sheet design/glb/_raw/dot3-luoi.png --set lam-lai
+node design/tools/meshy.mjs run --set lam-lai
+
+# Đợt 4
+node design/tools/meshy.mjs run --set moi-truong --stage luoi --model-mt meshy-5
+node design/tools/meshy.mjs sheet design/glb/_raw/dot4-luoi.png --set moi-truong --cols 10
+node design/tools/meshy.mjs run --set moi-truong --model-mt meshy-5
+
+# Đợt 5
+node design/tools/meshy.mjs run --set tuong-moi --stage luoi
+node design/tools/meshy.mjs sheet design/glb/_raw/dot5-luoi.png --set tuong-moi
+node design/tools/meshy.mjs run --set tuong-moi
+```
+
+`run` không có `--set` và `--only` thì chạy bộ `can` (40 mẫu đã có): công cụ chỉ báo "đã có", không tốn credit, trừ khi băm đổi (mục 2.2). Trước mỗi đợt nên chạy `list --set tat-ca --hash` để chắc dòng cuối vẫn là "40/40 mã đã có trong manifest giữ nguyên băm".
 
 ---
 
@@ -158,7 +225,7 @@ Vũ khí, đạo cụ và ngựa thì khác: số đo trong bảng là kích th�
 | 50 | PROP_ong_ten | `prop_ong-ten.glb` | Ống tên rời (tuỳ chọn) | H | 0,3–1k | 0,55 m | — |
 | 51 | MOUNT_ngua_nguyen | `mount_ngua-nguyen.glb` | Ngựa cung kỵ Nguyên | I | 4–8k | lưng 1,4 m | — |
 | 52 | MOUNT_ngua_tuong | `mount_ngua-tuong.glb` | Ngựa tướng (tuỳ chọn) | I | 8–15k | lưng 1,5 m | — |
-| 53 | DAN_NAM | `unit_DAN_NAM.glb` | Dân làng nam (tuỳ chọn) | J | 1,5–3k | 1,65 m | PROP_quang_ganh |
+| 53 | DAN_NAM | `unit_DAN_NAM.glb` | Dân làng nam (tuỳ chọn) | J | 1,5–3k | 1,65 m | PROP_quang_ganh, PROP_non_la |
 | 54 | DAN_NU | `unit_DAN_NU.glb` | Dân làng nữ (tuỳ chọn) | J | 1,5–3k | 1,55 m | PROP_tay_nai |
 | 55 | DAN_TRE | `unit_DAN_TRE.glb` | Trẻ con làng (tuỳ chọn) | J | 1–2k | 1,15 m | PROP_tay_nai (thu nhỏ) |
 | 56 | PROP_quang_ganh | `prop_quang-ganh.glb` | Đòn gánh + hai thúng (tuỳ chọn) | J | 1–2k | đòn 1,7 m | — |
@@ -168,11 +235,28 @@ Vũ khí, đạo cụ và ngựa thì khác: số đo trong bảng là kích th�
 | 60 | PROP_giap_voi | `prop_giap-voi.glb` | Giáp đầu voi (tuỳ chọn) | I | 0,5–1,5k | 1,0 m | — |
 | 61 | WPN_moc_voi | `wpn_moc-voi.glb` | Móc voi (tuỳ chọn) | G | 0,3–1k | 0,7 m | — |
 | 62 | H39 | `char_H39_da-tuong.glb` | Dã Tượng, người cưỡi voi (chưa có trong game) | A | 10–20k | 1,78 m | WPN_moc_voi, WPN_giao_dv, MOUNT_voi_chien |
-| 63 | PROP_non_la | `prop_non-la.glb` | Nón lá rời (người lính Tự do, cận vệ Giáo, Cung, Song đao) | H | 300–600 | Ø 0,84 m, cao 0,22 m | — |
+| 63 | PROP_non_la | `prop_non-la.glb` | Nón lá rời (người lính Tự do, cận vệ Giáo, Cung, Song đao, dân làng nam) | H | 300–600 | Ø 0,84 m, cao 0,22 m | — |
+| 154 | H27 | `char_H27_tran-thai-tong.glb` | Trần Thái Tông (chưa có trong game) | A | 10–20k | 1,74 m | kiếm, khiên mây (chưa có prompt) |
+| 155 | H28 | `char_H28_tran-thu-do.glb` | Trần Thủ Độ (chưa có trong game) | A | 10–20k | 1,72 m | WPN_giao_dv tạm cho cờ lệnh |
+| 156 | H29 | `char_H29_le-phu-tran.glb` | Lê Phụ Trần (chưa có trong game) | A | 10–20k | 1,76 m | WPN_dao tạm, ván thuyền (chưa có prompt) |
+| 157 | H30 | `char_H30_tran-nhan-tong.glb` | Trần Nhân Tông (chưa có trong game) | A | 10–20k | 1,72 m | WPN_quat, bút lông (chưa có prompt) |
+| 158 | H32 | `char_H32_tran-quang-khai.glb` | Trần Quang Khải (chưa có trong game) | A | 10–20k | 1,76 m | WPN_cung_viet, PROP_mui_ten |
+| 159 | H36 | `char_H36_tran-binh-trong.glb` | Trần Bình Trọng (chưa có trong game) | A | 10–20k | 1,76 m | WPN_giao_dv (rút ngắn) |
+| 160 | H37 | `char_H37_pham-ngu-lao.glb` | Phạm Ngũ Lão (chưa có trong game) | A | 10–20k | 1,80 m | WPN_giao_dv tạm cho sóc |
+| 161 | TT | `char_TT_trieu-trung.glb` | Triệu Trung (chưa có trong game) | A | 10–20k | 1,76 m | WPN_cung_viet |
+| 162 | X16 | `char_X16_ngot-luong-hop-thai.glb` | Ngột Lương Hợp Thai (chưa có trong game) | B | 10–20k | 1,74 m | WPN_cung_ng, PROP_cape, ngựa |
+| 163 | X17 | `char_X17_a-truat.glb` | A Truật (chưa có trong game) | B | 10–20k | 1,80 m | WPN_giao_ng tạm |
+| 164 | X18 | `char_X18_thoat-hoan.glb` | Thoát Hoan (chưa có trong game) | B | 10–20k | 1,80 m | WPN_dadao tạm cho kích |
+| 165 | X21 | `char_X21_ly-hang.glb` | Lý Hằng (chưa có trong game) | B | 10–20k | 1,78 m | WPN_cung_ng, PROP_cape, ngựa |
+| 166 | X22 | `char_X22_ly-quan.glb` | Lý Quán (chưa có trong game) | B | 10–20k | 1,78 m | WPN_giao_ng, WPN_khien_tron_ng (×0,72) |
+| 167 | X23 | `char_X23_truong-van-ho.glb` | Trương Văn Hổ (chưa có trong game) | B | 10–20k | 1,76 m | WPN_dadao tạm cho kích |
+| 168 | X25 | `char_X25_a-bat-xich.glb` | A Bát Xích (chưa có trong game) | B | 10–20k | 1,82 m | WPN_giao_ng tạm |
 
 Cần cho game hiện tại: mục 1–4, 7–15, 17–41 (trừ 23a), 49 và 51. Cờ (47) và áo choàng (48) Claude dựng bằng code cũng được (xem nhóm H), nên tuỳ bạn. Voi và Dã Tượng (58–62) làm sẵn cho các trận sau (lớp vũ khí WC16 Voi chiến trong `systems.md`); game hiện chưa có voi. Còn lại là tuỳ chọn.
 
 Mục 63 (nón lá rời) là đạo cụ game đang vẽ bằng code mà mẫu GLB của người lính Tự do và cận vệ chưa có. Môi trường và thú (mục K–O, từ số 64) có bảng riêng ở đầu từng mục; cột 7 của các bảng đó là kích thước thật để bước nướng phóng về.
+
+Mục 154–168 là 15 tướng thời Trần chưa có trong game, chuyển từ prompt vẽ ảnh `design/3d-ref/PROMPTS-TUONG.md` sang khuôn Meshy (mục A8–A15, B7–B13: tay không, POSE v2). Cột Đi kèm ghi vũ khí có sẵn để dùng tạm; binh khí riêng của họ chưa có prompt (mục 0.8). Mục làm lại mẫu lệch (169–182, mã `_v2`) có bảng riêng ở mục P.
 
 ---
 
@@ -199,6 +283,7 @@ A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers to
 - **Đừng sửa khối POSE cũ trong 40 mục đã tạo.** `design/tools/meshy.mjs` băm đúng chữ của bản gửi API; đổi một chữ là băm đổi, lần `run` mặc định kế tiếp sẽ mua lại mẫu đó (cả 25 nhân vật khoảng 630 credit) và ghi đè GLB. Muốn làm lại một mẫu cũ với POSE v2 thì thêm mục mới mã `_v2` (mục 0.5).
 - Công cụ nhận cả hai khối, đúng từng chữ như trên, và đổi sang bản API ngắn hơn (v2 bỏ `mouth closed`, 121 ký tự). Bản API vẫn mở đầu bằng `A-pose,` (dấu phẩy) vì câu chặn vũ khí được chèn ngay trước chữ đó; viết `A-pose:` thì công cụ báo lỗi khi đọc tài liệu.
 - Bản API của mục người = mô tả + câu chặn (69 ký tự, thêm 11 khi prompt không có chữ helmet, hat, cap) + POSE + STYLE rút gọn. Với POSE v2, phần mô tả (trước khối POSE) giữ trong 300 ký tự thì bản API không quá 600; `node design/tools/meshy.mjs list --only <mã>` in độ dài.
+- Từ đợt 19b mọi mục người chưa tạo dùng POSE v2: H34, H38, H39, DV_AOTONG, DAN_NAM, DAN_NU, DAN_TRE, 15 tướng mới và mục P. Riêng LINH_r2 (tuỳ chọn) công cụ dựng từ prompt LINH_r24 đã tạo nên còn khối cũ; muốn tạo thì thêm mục riêng viết bằng POSE v2.
 
 ### 2.3 NEGATIVE (dán vào ô Negative prompt nếu công cụ có)
 
@@ -302,6 +387,14 @@ Công cụ AI hiểu tên màu tốt hơn mã hex. Prompt dùng tên màu; mã h
 | gỗ cháy | `#2a221a` | charred black | Khung lều cháy |
 | trâu | `#687078` | slate-grey | Trâu |
 | cò / mỏ cò | `#f4f1e8` / `#e2b43a` | pure white / yellow | Cò trắng |
+| **Tướng mới (mục A8–A15, B7–B13)** | | | |
+| H32 áo | `#2f5a4a` **(đề xuất)** | dark jade-green | Trần Quang Khải |
+| áo Tống | `#b0752c` / `#8a5a28` **(đề xuất)** | amber-ochre / dark ochre | Quân áo Tống (C4) / Triệu Trung |
+| khăn cổ quân Tống | `#2f8f83` **(đề xuất)** | jade-green | C4, Triệu Trung |
+| X16 áo | `#4a3524` | dark brown | Ngột Lương Hợp Thai (như "nâu") |
+| X18 áo, giáp | `#2c3a4a` + `#c9a14a` | dark indigo brocade with gold, gilded | Thoát Hoan |
+| X21 áo / X23 áo | `#34465a` / `#4b5364` | slate-blue / grey-blue | Như NG_GIAO / NG_CUNG |
+| X25 áo | `#3a4a2e` **(đề xuất)** | dark green | A Bát Xích |
 
 ### 2.6 Nguyên tắc nội dung
 
@@ -383,7 +476,7 @@ Vietnamese royal guard general, 13th-century Tran dynasty, about 45, weathered f
 
 PROMPT (dán thẳng):
 ```text
-Rugged Vietnamese naval general, 13th-century Tran dynasty, about 45, broad shoulders, sun-tanned weathered face, short full beard, topknot. Dark brown lacquer lamellar armor with gold trim and pauldrons, red under-robe, teal sash, dark trousers, black boots, faint charcoal dust on the clothes. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Rugged Vietnamese naval general, 13th-century Tran dynasty, about 45, broad shoulders, sun-tanned weathered face, short full beard, topknot. Dark brown lacquer lamellar armor with gold trim and pauldrons, red under-robe, teal sash, dark trousers, black boots, faint charcoal dust on the clothes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 10–20k; cao 1,88 m.
@@ -397,7 +490,7 @@ Rugged Vietnamese naval general, 13th-century Tran dynasty, about 45, broad shou
 
 PROMPT (dán thẳng):
 ```text
-Lean wiry Vietnamese navy diver, 13th-century Tran dynasty, around 30, bare-chested, sun-darkened skin, black cloth headband over a small topknot. Dark knee-length trousers, red cloth sash, barefoot, coiled hemp rope slung across one shoulder, small cloth pouch at the hip. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Lean wiry Vietnamese navy diver, 13th-century Tran dynasty, around 30, bare-chested, sun-darkened skin, black cloth headband over a small topknot. Dark knee-length trousers, red cloth sash, barefoot, coiled hemp rope slung across one shoulder, small cloth pouch at the hip. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 10–20k; cao 1,72 m. **Symmetry: tắt** (dây vắt một vai, túi một bên hông). Cuộn dây dính thân.
@@ -411,12 +504,111 @@ Gia tướng của Hưng Đạo vương cùng Yết Kiêu. Danh tính và lời 
 
 PROMPT (dán thẳng):
 ```text
-Strong Vietnamese war-elephant handler, 13th-century Tran dynasty, about 35, broad weathered face, short black beard, black topknot under a brown cloth head wrap. Brown knee-length tunic, black lacquer lamellar vest with bronze trim, leather bracers, red sash, dark trousers, black cloth shoes. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Strong Vietnamese war-elephant handler, 13th-century Tran dynasty, about 35, broad weathered face, short black beard, black topknot under a brown cloth head wrap. Brown knee-length tunic, black lacquer lamellar vest with bronze trim, leather bracers, red sash, dark trousers, black cloth shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 10–20k; cao 1,78 m.
 - **Vũ khí**: WPN_moc_voi (tay phải) + WPN_giao_dv (Claude rút ngắn còn khoảng 2 m). **Voi**: MOUNT_voi_chien + PROP_banh_voi.
 - **Lưu ý**: mọi chiến công trên voi gắn nhãn Tương truyền (`canon.json`, H39 notes).
+
+### A8 · H27 · Trần Thái Tông · vua, chưa có trong game
+
+Vua đầu tiên nhà Trần, tự cầm quân năm 1258 ở Bình Lệ Nguyên và Đông Bộ Đầu (B12, B13; hai trận này chưa có trong game, `game/js/data/battles.js`). Chính sử (`canon.json:2260`); diện mạo là Hư cấu, theo `design/3d-ref/PROMPTS-TUONG.md` H27. Khoảng 40 tuổi năm 1258 (sinh 1218). Áo son sẫm viền vàng, giáp then viền vàng, mũ lụa đen có đồ trang sức vàng. Lọng vàng của kỹ năng "Ngự Giá Thân Chinh" là đạo cụ code, không thuộc mẫu.
+
+PROMPT (dán thẳng):
+```text
+Vietnamese emperor leading his army, 13th-century Tran dynasty, about 40, calm resolute face, short black beard and moustache. Topknot under a small black silk cap with a gold ornament. Dark red war robe, black lacquer lamellar armor and shoulder guards with gold trim, gold-trimmed belt, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,74 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí** (tệp riêng, chưa có prompt, mục 0.8): Ngự kiếm Thiên Mạc (kiếm thẳng, lưỡi khắc sóng nước) và khiên mây tròn sơn son; khiên tạm dùng câu khiên mây ở G13. Hư cấu.
+
+### A9 · H28 · Trần Thủ Độ · Thái sư, chưa có trong game
+
+Thái sư năm 1258 (B13), người đáp vua "Đầu thần chưa rơi xuống đất". Chính sử (`canon.json:2343`); nhân vật gây tranh cãi, game chỉ khắc họa vai trò năm 1258. Khoảng 64 tuổi (sinh 1194): người gầy, thẳng lưng, râu bạc dài. Áo đen viền đỏ sẫm dưới giáp then. Diện mạo Hư cấu theo 3d-ref.
+
+PROMPT (dán thẳng):
+```text
+Elderly Vietnamese grand chancellor in war gear, 13th-century Tran dynasty, about 64, lean and upright, stern face, grey moustache and long thin grey beard. Topknot under a black silk cap. Black robe with dark red trim, black lacquer lamellar armor with dark red lacing, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,72 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: Đại kỳ Thái sư, cờ lệnh đen viền đỏ trên cán sắt dài 3 m có mũi giáo (Hư cấu): tạm WPN_giao_dv, lá cờ do code dựng và vẽ như cờ lưng (`flagTexture`, `models.js:463`); chưa có prompt riêng.
+
+### A10 · H29 · Lê Phụ Trần · tướng hộ vệ, chưa có trong game
+
+Lấy ván thuyền che tên cho vua Thái Tông ở Bình Lệ Nguyên năm 1258 (B12, B13). Chính sử (`canon.json:2423`); năm sinh không rõ, khoảng 35 theo 3d-ref **(đề xuất)**. Dáng chắc nịch, khăn đen, giáp da nâu sẫm, thắt lưng đỏ. Chuyện ông là cha Trần Bình Trọng chỉ là gia phả (Tương truyền), không thể hiện qua mẫu.
+
+PROMPT (dán thẳng):
+```text
+Sturdy watchful Vietnamese bodyguard general, 13th-century Tran dynasty, about 35, short black beard, black topknot under a black cloth head wrap. Dark brown tunic, dark brown lacquered leather lamellar armor and shoulder guards, red sash, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,76 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: tấm ván mạn thuyền đóng quai làm khiên (Chính sử: ván thuyền che vua; dáng là Hư cấu) và kiếm ngắn: chưa có prompt; kiếm tạm WPN_dao.
+
+### A11 · H30 · Trần Nhân Tông · vua, chưa có trong game
+
+Vua thứ ba nhà Trần, cùng Thượng hoàng và Hưng Đạo vương lãnh đạo kháng chiến 1285 và 1288 (B14, B17, B20). Chính sử (`canon.json:2504`). Khoảng 30 tuổi (sinh 1258). Áo ngự son sẫm viền vàng, giáp then nhẹ viền vàng, đai ngọc. Bút lông cán ngọc, quạt giấy và trống ngự nhỏ bên hông là đạo cụ kỹ năng (Hư cấu), tệp riêng hoặc code dựng, không dính thân.
+
+PROMPT (dán thẳng):
+```text
+Young Vietnamese emperor commanding in the field, 13th-century Tran dynasty, about 30, serene scholarly face, thin moustache. Topknot under a black silk cap with a gold ornament. Dark red imperial robe with gold borders, light black lacquer lamellar armor with gold trim, jade belt, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,72 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: quạt WPN_quat (G15); bút lông cán ngọc và trống ngự: chưa có prompt.
+- **Lưu ý**: không hiện chữ thích trên tay năm 1285 (canon H30), không hào quang.
+
+### A12 · H32 · Trần Quang Khải · tướng, chưa có trong game
+
+Chiêu Minh Đại vương, Thượng tướng Thái sư; phá quân Nguyên ở Chương Dương năm 1285 (B16). Chính sử (`canon.json:2670`). Khoảng 44 tuổi (sinh 1241), dáng văn võ, ria và râu ngắn. Áo xanh ngọc sẫm **(đề xuất, theo 3d-ref)** dưới giáp then viền vàng; ống tên lệnh có còi sau lưng dính thân như H40.
+
+PROMPT (dán thẳng):
+```text
+Vietnamese prince-general and archer, 13th-century Tran dynasty, about 44, noble poet-warrior bearing, neat moustache and short beard. Topknot under a black silk cap with a gold pin. Dark jade-green robe, black lacquer lamellar armor with gold trim, quiver of arrows on the back, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,76 m **(đề xuất)**. **Symmetry: tắt** (ống tên).
+- **Vũ khí**: WPN_cung_viet (Cung Chiêu Minh, cung sừng dài; Hư cấu). Tên lệnh có còi: PROP_mui_ten, Claude thêm đầu còi.
+
+### A13 · H36 · Trần Bình Trọng · tướng, chưa có trong game
+
+Bảo Nghĩa hầu, chặn hậu ở bãi Đà Mạc năm 1285 để triều đình rút (B14). Chính sử (`canon.json:2997`). Khoảng 26 tuổi (sinh 1259), dáng thẳng, bất khuất; khăn đen, áo son sẫm, giáp then đinh đồng.
+
+PROMPT (dán thẳng):
+```text
+Young Vietnamese noble general, 13th-century Tran dynasty, about 26, upright defiant bearing, clean-shaven with a light moustache, black topknot under a black cloth head wrap. Dark red tunic, black lacquer lamellar armor and shoulder guards with bronze studs, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,76 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: Giáo Bảo Nghĩa, cán gỗ lim 2,5 m đuôi bịt đồng (Hư cấu): tạm WPN_giao_dv, Claude rút ngắn và nhuộm cán sẫm.
+- **Lưu ý**: không dựng cảnh bị bắt hay xử tử (canon H36).
+
+### A14 · H37 · Phạm Ngũ Lão · tướng, chưa có trong game
+
+Người làng Phù Ủng, xuất thân bình dân; đánh quân Nguyên năm 1285 và 1288 (B18, B20). Chính sử (`canon.json:3078`); chuyện ngồi đan sọt là Tương truyền. Khoảng 30 tuổi (sinh 1255), vai rộng, bàn tay nông dân. Khác H29 ở giáp then (H29 giáp da nâu).
+
+PROMPT (dán thẳng):
+```text
+Strong earnest Vietnamese general of common birth, 13th-century Tran dynasty, about 30, broad shoulders, big farmer's hands, short black beard, black topknot under a black cloth head wrap. Plain dark brown tunic, black lacquer lamellar armor, red sash, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,80 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: Sóc Phù Ủng, giáo dài cán tre đực, lưỡi lá dài (Chính sử: thơ Thuật hoài; dáng Hư cấu): tạm WPN_giao_dv; chưa có prompt riêng.
+
+### A15 · TT · Triệu Trung · gia tướng quân Tống lưu vong, chưa có trong game
+
+Gia tướng người Tống lưu vong của Chiêu Văn vương Trần Nhật Duật, dẫn quân áo Tống ở Hàm Tử năm 1285 (B15). Người là Chính sử (Toàn thư, `canon.json:2758`); trang phục là Hư cấu theo truyện (`comic/B15-ham-tu/PROMPTS.md:39`). Game có Kế Sách "Cờ áo Tống" với hai thuyền quân Triệu Trung (`kesach.js:150-165`) nhưng chưa có nhân vật ông. Khoảng 45 **(đề xuất)**. Cùng kiểu áo với quân áo Tống (C4) nhưng màu đất sẫm hơn, giáp da cũ.
+
+PROMPT (dán thẳng):
+```text
+Exiled Southern Song officer, 13th century, about 45, lean weathered face, trimmed moustache, short beard. Black cloth head wrap knotted at the back, jade-green scarf at the neck. Knee-length round-collar dark ochre robe, brown leather lamellar cuirass, black boots, arrow quiver at the right hip. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,76 m **(đề xuất)**. **Symmetry: tắt** (ống tên một bên hông).
+- **Vũ khí**: WPN_cung_viet (cung tên theo Toàn thư); kiếm đeo hông của bản 3d-ref bỏ, vì mẫu tay không.
+- **Lưu ý**: đồng minh có phẩm giá, chiến đấu vì mối thù mất nước. Khăn cổ xanh ngọc phải rõ để không nhầm với địch (`comic-b15.js:224`). Cung thủ "TONG" của 3d-ref là lính đám đông, đã có ở mục C4 (DV_AOTONG), không thêm mục riêng.
 
 ---
 
@@ -504,6 +696,96 @@ Mongol-Yuan squad captain, 13th century, about 30, alert clean-shaven face. Tall
 - **Kỹ thuật**: 10–12k (mức thấp nhất của sĩ quan theo quy cách, vì Đội trưởng hay xuất hiện nhiều người cùng lúc); cao 1,78 m (game ×1,12).
 - **Vũ khí**: WPN_dao (tay phải) + WPN_khien_tron_ng (cẳng tay trái).
 
+### B7 · X16 · Ngột Lương Hợp Thai (兀良合台, Uriyangkhadai) · chủ soái 1258, chưa có trong game
+
+Chủ soái Mông Cổ năm 1258 (B12, B13), con danh tướng Tốc Bất Đài, cha A Truật. Chính sử (`canon.json:5062`); diện mạo Hư cấu theo 3d-ref. Khoảng 57 tuổi **(đề xuất; sinh khoảng 1200)**: lão tướng thảo nguyên, ria dài và râu thưa bạc. Mũ trụ Mông Cổ mở mặt (câu mũ đã dựng đúng ở FIX của OFF_doitruong, `MONGOL_HELM2` trong `meshy.mjs`). 3d-ref vẽ ông trên ngựa; mẫu này đứng A-pose như NG_KY, Claude dựng tư thế ngồi. Ngựa thảo nguyên màu vàng sẫm: MOUNT_ngua_nguyen hoặc MOUNT_ngua_tuong, Claude đổi màu lông.
+
+PROMPT (dán thẳng):
+```text
+Veteran Mongol marshal, 13th century, about 57, weathered face, long grey moustache, thin grey beard. Open-face Mongol helmet: tall onion-shaped steel bowl, brown fur band, neck flaps. Heavy blue-grey steel lamellar armor over a dark brown crossover robe, arrow quiver at the right hip, riding boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,74 m, thấp chắc **(đề xuất)**. **Symmetry: tắt** (ống tên một bên hông).
+- **Tách riêng**: áo choàng viền lông → PROP_cape. **Vũ khí**: WPN_cung_ng; đao đeo hông của bản 3d-ref bỏ.
+- **Lưu ý**: lão tướng dày dạn nhất thời đại, nói năng tôn trọng đối thủ (canon `dignity`); không biếm hoạ.
+
+### B8 · X17 · A Truật (阿朮, Aju) · tướng trẻ Mông Cổ, chưa có trong game
+
+Con Ngột Lương Hợp Thai, theo cha đánh Đại Việt năm 1258 (B12, B13); về sau là đại tướng vây Tương Dương. Chính sử (`canon.json:5087`). Khoảng 31 tuổi (sinh 1227), dáng hăng hái tự tin.
+
+PROMPT (dán thẳng):
+```text
+Bold young Mongol general, 13th century, about 31, confident eyes, short moustache. Open-face Mongol helmet: tall onion-shaped steel bowl, brown fur band, red tassel on top. Blue-grey steel lamellar armor over a dark indigo crossover robe, leather belt, leather riding boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,80 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: giáo kỵ có móc và tua lông ngựa: tạm WPN_giao_ng; chưa có prompt riêng. Đao đeo hông bỏ.
+
+### B9 · X18 · Thoát Hoan (脫歡, Toghon) · Trấn Nam vương, chưa có trong game
+
+Hoàng tử nhà Nguyên, tổng chỉ huy các đợt tiến quân 1285 và 1287–1288 (B16, B18; ở B20 chỉ có trên sa bàn Kế Sách). Chính sử (`canon.json:5112`). Khoảng 35 **(đề xuất; năm sinh không rõ)**, mặt nghiêm và mệt mỏi. Áo gấm chàm sẫm viền vàng cổ lông, giáp mạ vàng, mũ tròn viền lông có núm vàng.
+
+PROMPT (dán thẳng):
+```text
+Yuan prince and commander-in-chief, Mongol noble, 13th century, about 35, stern weary expression, short moustache. Open-face round steel helmet with a brown fur band and a gold finial. Gilded lamellar armor over a dark indigo brocade robe with gold trim and fur collar, leather belt, leather boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,80 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: kích mạ vàng cán dài: tạm WPN_dadao, Claude nhuộm vàng; chưa có prompt riêng.
+- **Lưu ý**: hoàng tử mang gánh nặng lệnh vua cha; chuyện chui ống đồng là mưu thoát thân của cận vệ, không chế giễu (canon `dignity`).
+
+### B10 · X21 · Lý Hằng (李恆, Li Heng) · lão tướng Đảng Hạng, chưa có trong game
+
+Tướng Nguyên dòng dõi hoàng tộc Tây Hạ, cầm hậu vệ khi Thoát Hoan rút năm 1285 (B18). Chính sử (`canon.json:5191`). Khoảng 49 tuổi (mất khoảng 50 tuổi năm 1285), người gầy, râu điểm bạc. 3d-ref vẽ ông trên ngựa; mẫu đứng A-pose, ngựa nâu sẫm dùng mẫu ngựa có sẵn đổi màu.
+
+PROMPT (dán thẳng):
+```text
+Lean veteran Yuan general of Tangut descent, 13th century, about 49, calm steady eyes, grey-streaked beard. Open-face round steel helmet with a brown fur band and one short spike on the top centre. Blue-grey steel lamellar armor over a slate-blue robe, arrow quiver at the right hip, riding boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,78 m **(đề xuất)**. **Symmetry: tắt** (ống tên một bên hông).
+- **Tách riêng**: áo choàng sẫm → PROP_cape. **Vũ khí**: WPN_cung_ng.
+- **Lưu ý**: không hiển thị vết thương hay tên độc (canon `dignity`).
+
+### B11 · X22 · Lý Quán (李瓘, Li Guan) · phó tướng hầu cận, chưa có trong game
+
+Tướng trong đạo quân Thoát Hoan năm 1285 (B18); Toàn thư chép ông giấu Thoát Hoan trong ống đồng để thoát về bắc. Chính sử (`canon.json:5215`); gốc người Hán là theo 3d-ref (Hư cấu). Khoảng 45 **(đề xuất)**, mặt chân thành, che chở.
+
+PROMPT (dán thẳng):
+```text
+Loyal Han Chinese aide-general in Yuan service, 13th century, about 45, earnest protective face, moustache. Open-face round steel helmet with a brown fur band. Blue-grey steel lamellar armor with silver-grey trim over a dark indigo robe, leather belt, leather boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,78 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: WPN_giao_ng + WPN_khien_tron_ng thu nhỏ ×0,72 như NG_GIAO.
+- **Lưu ý**: người hầu cận liều mình cứu chủ, kể bằng giọng trân trọng (canon `dignity`).
+
+### B12 · X23 · Trương Văn Hổ (張文虎, Zhang Wenhu) · vạn hộ đoàn thuyền lương, chưa có trong game
+
+Chỉ huy đoàn thuyền lương đường biển năm 1287–1288 (B19, Vân Đồn). Chính sử (`canon.json:5238`); gốc người Hán theo 3d-ref. Khoảng 45 **(đề xuất)**, mặt cẩn thận, thực tế. Cuộn sổ hàng buộc ở hông trái, dính thân.
+
+PROMPT (dán thẳng):
+```text
+Careful practical Han Chinese naval supply commander of the Yuan, 13th century, about 45, moustache and short beard. Open-face round steel helmet with a brown fur band. Blue-grey steel lamellar armor over a grey-blue robe, cloth sash, rolled paper ledger tied at the left hip, leather boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,76 m **(đề xuất)**. **Symmetry: tắt** (cuộn sổ một bên hông).
+- **Vũ khí**: kích cán dài: tạm WPN_dadao; chưa có prompt riêng.
+- **Lưu ý**: quan vận lương tận tụy lo cho binh sĩ tuyến trước (canon `dignity`).
+
+### B13 · X25 · A Bát Xích (來阿八赤, Abachi) · tướng Đường Ngột mở đường, chưa có trong game
+
+Tướng Nguyên người Đường Ngột (Tangut), cầm quân mở đường khi quân Nguyên rút năm 1288 (B20, chỉ ở sa bàn Kế Sách "Chặn đường bộ Nội Bàng"; bản đánh trực tiếp chưa có, canon `openQuestions`). Chính sử (`canon.json:5285`). Khoảng 45 **(đề xuất)**, mặt rộng, râu ngắn; mũ nỉ viền lông trùm mũ sắt, áo xanh lục sẫm.
+
+PROMPT (dán thẳng):
+```text
+Brave Yuan general of Tangut origin, 13th century, about 45, broad face, short beard. Fur-trimmed felt hat over a steel cap. Blue-grey steel lamellar armor over a dark green robe, leather belt, leather boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,82 m **(đề xuất)**. **Symmetry: bật.**
+- **Vũ khí**: giáo lưỡi rộng: tạm WPN_giao_ng. Đao đeo hông bỏ.
+- **Lưu ý**: tướng đi đầu nơi nguy hiểm nhất để đồng đội rút; cái chết chỉ nêu trong thẻ Sử quán, không dựng cảnh (canon).
+
 ---
 
 ## C. Lính đám đông quân Trần
@@ -552,11 +834,12 @@ Kế Sách "Cờ áo Tống" ở B15: gia binh người Tống của Chiêu Văn
 
 PROMPT (dán thẳng):
 ```text
-Southern Song exile soldier, 13th century, short black beard, black cloth head-wrap knotted at the back, jade-green scarf knotted at the neck. Knee-length round-collar amber-ochre robe, brown leather lamellar vest, leather belt, dark trousers, black cloth boots, arrow quiver at the right hip. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Southern Song exile soldier, 13th century, short black beard, black cloth head-wrap knotted at the back, jade-green scarf knotted at the neck. Knee-length round-collar amber-ochre robe, brown leather lamellar vest, leather belt, dark trousers, black cloth boots, arrow quiver at the right hip. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: tắt** (ống tên một bên hông). Áo hổ phách khoảng `#b0752c` (lấy màu nền cờ 宋, `kesach.js:76`); khăn cổ xanh ngọc khoảng `#2f8f83` **(đề xuất)**. Không có dải khăn buông: mẫu lính đám đông giữ lưới nhẹ, nút khăn sau gáy là đủ.
 - **Vũ khí**: WPN_cung_viet (theo Toàn thư: cung tên), hoặc giữ vũ khí DV như game hiện nay.
+- **3d-ref**: cung thủ "TONG" ở `design/3d-ref/PROMPTS-TUONG.md` chính là kiểu lính này, không thêm mục riêng. Game thả quân Triệu Trung là giáo binh nhuộm hổ phách (`kesach.js:164`), nên khi nướng bộ lính cần chọn cung (theo Toàn thư) hay giáo (như game); thân tạo tay không nên không ảnh hưởng lúc tạo.
 - **Lưu ý**: đồng minh có phẩm giá, chiến đấu vì mối thù mất nước, không phải lính đánh thuê. Theo sử, áo Tống trông gần giống áo Nguyên, nên khăn xanh ngọc phải nổi rõ để người chơi không nhầm với địch (`comic-b15.js:224, 473`).
 
 ---
@@ -1019,7 +1302,7 @@ Cylindrical arrow quiver, 13th-century Mongol style, about 55 cm long, brown lea
 
 ### H5 · PROP_non_la · Nón lá rời
 
-Nón lá của người lính Tự do ở bậc Lính và Tinh nhuệ (`soldier.js:30`) và ba lớp cận vệ Giáo thủ, Cung thủ, Song đao (`guards.js:29`, `guards.js:34`, `guards.js:39`). Code dựng nón chóp thấp vành rộng: Ø 0,84 m, cao 0,22 m, màu nón lá `#cdb98a`, vòng khăn son dưới nón (`models.js:223-224`). Khi thân là lưới GLB thì khối đầu dựng bằng code bị bỏ (`addBody` không làm gì, `models.js:181`), nên các vai này đang mất nón; các mẫu Meshy đã tạo cho họ cũng không ra nón. Tệp rời này để gắn vào khớp đầu và gộp vào bộ lính khi nướng. Cần sửa code đi kèm: `models.js` gắn nón vào `p.head` khi `cfg.hat === "non"` kể cả khi có thân GLB, `design/tools/bake/kit.mjs` gộp nón vào bộ lính. Vành 84 cm là cỡ game vẽ cho dễ nhìn (Hư cấu).
+Nón lá của người lính Tự do ở bậc Lính và Tinh nhuệ (`soldier.js:30`) và ba lớp cận vệ Giáo thủ, Cung thủ, Song đao (`guards.js:29`, `guards.js:34`, `guards.js:39`). Code dựng nón chóp thấp vành rộng: Ø 0,84 m, cao 0,22 m, màu nón lá `#cdb98a`, vòng khăn son dưới nón (`models.js:223-224`). Khi thân là lưới GLB thì khối đầu dựng bằng code bị bỏ (`addBody` không làm gì, `models.js:181`), nên các vai này đang mất nón; các mẫu Meshy đã tạo cho họ cũng không ra nón. Tệp rời này để gắn vào khớp đầu và gộp vào bộ lính khi nướng; dân làng nam (J1, thu nhỏ khoảng ×0,8) và bốn mục làm lại đầu trần ở mục P (LINH_r01_v2, CV_giao_v2, CV_cung_v2, CV_songdao_v2) cũng đội tệp này. Cần sửa code đi kèm: `models.js` gắn nón vào `p.head` khi `cfg.hat === "non"` kể cả khi có thân GLB, `design/tools/bake/kit.mjs` gộp nón vào bộ lính. Vành 84 cm là cỡ game vẽ cho dễ nhìn (Hư cấu).
 
 PROMPT (dán thẳng):
 ```text
@@ -1101,14 +1384,14 @@ Chỉ có ở B15, là cảnh nền dân chạy loạn (`ambient.js`). Dân khô
 
 ### J1 · DAN_NAM · Dân làng nam
 
-Gánh quang gánh. Màu theo `soldiers.js:394-437`: áo nâu củ nâu `#5e4330`, thắt lưng `#8a7550`, quần thâm `#2b2825`, nón lá `#d8c48e`.
+Gánh quang gánh. Màu theo `soldiers.js:394-437`: áo nâu củ nâu `#5e4330`, thắt lưng `#8a7550`, quần thâm `#2b2825`, nón lá `#d8c48e`. Tạo **đầu trần** (búi tóc, khăn vấn): Meshy chưa dựng được nón lá vành rộng lần nào (mục P), nên nón lấy từ PROP_non_la (mục H5) thu nhỏ khoảng ×0,8, nhuộm `#d8c48e`, gộp vào bộ lính khi nướng (nón code Ø 0,68 m, cao 0,18 m, `soldiers.js:487`).
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese peasant man, 13th century, about 40, lean, plain face, black hair bun at the nape under a dark headcloth, wide conical palm-leaf hat. Brown hip-length tunic with sleeves rolled past the elbows, khaki sash, black trousers rolled to mid-calf, barefoot. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese peasant man, 13th century, about 40, lean, plain face, black hair bun at the nape under a dark headcloth. Brown hip-length tunic with sleeves rolled past the elbows, khaki sash, black trousers rolled to mid-calf, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 1,5–3k; cao 1,65 m. **Đi kèm**: PROP_quang_ganh. Gậy tre của cụ già Claude dựng bằng code.
+- **Kỹ thuật**: 1,5–3k; cao 1,65 m. **Đi kèm**: PROP_quang_ganh, PROP_non_la. Gậy tre của cụ già Claude dựng bằng code.
 
 ### J2 · DAN_NU · Dân làng nữ
 
@@ -1116,7 +1399,7 @@ Vietnamese peasant man, 13th century, about 40, lean, plain face, black hair bun
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese peasant woman, 13th century, about 30, gentle tired face, hair wrapped in a dark cloth turban. Long-sleeved brown tunic, khaki sash, black two-panel skirt to mid-calf with dark hem, barefoot. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese peasant woman, 13th century, about 30, gentle tired face, hair wrapped in a dark cloth turban. Long-sleeved brown tunic, khaki sash, black two-panel skirt to mid-calf with dark hem, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,55 m. Váy hai tấm có lắc như vạt áo lính. **Đi kèm**: PROP_tay_nai.
@@ -1127,7 +1410,7 @@ Vietnamese peasant woman, 13th century, about 30, gentle tired face, hair wrappe
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese village child, 13th century, about 7, natural child proportions, small tuft of black hair at the front of a shaved head, brown short-sleeved tunic, black shorts, barefoot. A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese village child, 13th century, about 7, natural child proportions, small tuft of black hair at the front of a shaved head, brown short-sleeved tunic, black shorts, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1–2k; cao 1,15 m. **Đi kèm**: PROP_tay_nai thu nhỏ (bọc nhỏ xách tay).
@@ -2296,6 +2579,189 @@ Large-billed crow standing, about 45 cm long: glossy black feathers, thick black
 
 ---
 
+## P. Làm lại mẫu lệch (mục `_v2`)
+
+Mẫu đã tạo ở đợt đầu mà lệch prompt, soát bằng ảnh `design/glb/xem-truoc/nhan-vat.webp`, `vu-khi.webp` và khung xương đã nướng trong `game/assets/models/char/*.hkm`. Mỗi mục là một mã mới `<mã gốc>_v2` ra tệp `…_v2.glb` nằm cạnh tệp cũ (mục 0.5). **Tệp cũ và băm của mã gốc giữ nguyên**: game vẫn dùng tệp cũ cho tới khi soát xong bản mới và Claude chuyển bước nướng sang tệp `_v2` (mục "Tạo thêm hoặc làm lại" của `design/glb/README.md`). Liệt kê bằng `node design/tools/meshy.mjs list --set lam-lai --prompt`; thứ tự và credit ở mục 0.8.
+
+- **Tư thế.** Mọi mục người viết bằng POSE v2 (mục 2.2). 40 mẫu đầu ra tay dang khoảng 74° so với buông thẳng, khuỷu gập, ngửa bàn tay, nên bộ dò khớp (`design/tools/bake/landmarks.mjs`) đặt sai khuỷu và cổ tay: cẳng tay chỉ dài 0,03–0,12 đơn vị rig ở X19, OFF_photuong, CV_cung (rig dựng bằng code là 0,36), tay phải của OFF_doitruong không rig được.
+- **Đối xứng.** Áo cân hai bên thì bật (mục 0.2), để hai tay ra cùng một góc; 40 mẫu đầu, trừ mẫu có đồ lệch, để Auto, và có mẫu lệch trái phải rõ (H35 cẳng tay 0,26 và 0,15). Đồ chỉ có ở một bên (hộp tên DV_NO, bao tay và ống tên CV_cung, lưỡi đại đao một cạnh) thì tắt.
+- **Bảng `FIX` của mã gốc không theo sang mã `_v2`** (`apiPrompt` trong `meshy.mjs`), nên câu đã sửa và dựng ra đúng (mũ Mông Cổ, giáp vảy của OFF_doitruong) được viết thẳng vào prompt. Câu chặn vũ khí là bản chung: `Unarmed: no sword, scabbard or weapon on the body.`, thêm `No helmet.` khi prompt không có chữ helmet, hat, cap, rồi `No horns, no cape.`. Độ dài API in bởi `list` đã gồm câu này.
+- **Nón lá.** Meshy chưa dựng được nón lá vành rộng lần nào (6/6 lần, cả meshy-5 lẫn `latest`). Người lính Tự do bậc 0–1 và ba cận vệ đội nón vì thế tạo **đầu trần buộc khăn đỏ** (câu của H35, đã dựng đúng); nón là tệp PROP_non_la (mục H5) gắn vào khớp đầu bằng code. Lính đám đông DV_GIAO, DV_NO vẫn thử nón trong prompt, tả bằng hình và cỡ của code; hỏng lần nữa thì làm như trên: thân đầu trần, nón gộp vào bộ lính khi nướng.
+- **Model.** DV_DAO bản meshy-5 bỏ qua câu tả đầu, đại đao bản meshy-5 từng mất lưỡi, nên chạy cả mục này bằng `latest` (`--model-linh latest --model-vk latest`, mục 0.8).
+
+| # | Mã | Tệp | Tên | Nhóm | Tam giác | Lệch ở bản cũ | Bản làm lại |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 169 | H33_v2 | `char_H33_tran-nhat-duat_v2.glb` | Trần Nhật Duật (làm lại) | A | 10–20k | Mũ vàng mọc cặp sừng và mào, cả bản sửa FIX | Mũ bát vàng tròn, tua đỏ |
+| 170 | X19_v2 | `char_X19_toa-do_v2.glb` | Toa Đô (làm lại) | B | 10–20k | Mũ lông hai chóp như sừng; cẳng tay rig 0,03 và 0,08 | Mũ lông hình trống, một quả cầu vàng |
+| 171 | OFF_photuong_v2 | `char_OFF_photuong_v2.glb` | Phó tướng Nguyên (làm lại) | B | 10–15k | Mào tua tủa như vương miện; cẳng tay trái 0,03 | Mũ lông hình trống, một quả cầu xám bạc |
+| 172 | X20_v2 | `char_X20_o-ma-nhi_v2.glb` | Ô Mã Nhi (làm lại) | B | 10–20k | Không mũ lông, không chóp vàng; dáng áo bào, giáp mỏng; tay gần ngang | Mũ lông chóp vàng, giáp nặng từ vai tới gối |
+| 173 | DV_DAO_v2 | `unit_DV_DAO_v2.glb` | Đao khiên (làm lại) | C | 1,5–3k | Đội nón thay khăn đỏ; bao đao hông trái | Đầu trần, khăn son buộc trán, thắt lưng trơn |
+| 174 | DV_GIAO_v2 | `unit_DV_GIAO_v2.glb` | Giáo binh (làm lại) | C | 1,5–3k | Nón chóp nhỏ nhọn, giống mũ nhọn phe Nguyên | Nón lá Ø 64 cm cao 15 cm, vành rộng hơn vai |
+| 175 | DV_NO_v2 | `unit_DV_NO_v2.glb` | Nỏ thủ (làm lại) | C | 1,5–3k | Mũ lưỡi trai thay nón | Nón lá Ø 52 cm cao 24 cm, vành rộng hơn vai |
+| 176 | LINH_r01_v2 | `char_LINH_r01_v2.glb` | Người lính Tự do bậc 0–1 (làm lại) | E | 10–20k | Mũ trụ đỏ thay nón lá; tay gần ngang | Đầu trần khăn đỏ; nón là PROP_non_la gắn bằng code |
+| 177 | CV_giao_v2 | `char_CV_giao_v2.glb` | Cận vệ Giáo thủ (làm lại) | F | 4–8k | Mũ trụ đỏ; ria và chòm râu dù prompt ghi không râu | Đầu trần khăn đỏ, mặt trẻ cạo nhẵn; nón PROP_non_la |
+| 178 | CV_cung_v2 | `char_CV_cung_v2.glb` | Cận vệ Cung thủ (làm lại) | F | 4–8k | Mũ trụ đỏ; cẳng tay trái rig 0,11 | Đầu trần khăn đỏ; nón PROP_non_la |
+| 179 | CV_songdao_v2 | `char_CV_songdao_v2.glb` | Cận vệ Song đao (làm lại) | F | 4–8k | Mũ trụ đỏ; mặt già tóc râu bạc dù prompt ghi 22 tuổi | Đầu trần khăn đỏ, mặt trẻ cạo nhẵn; nón PROP_non_la |
+| 180 | WPN_giao_dv_v2 | `wpn_giao-dv_v2.glb` | Giáo Đại Việt (làm lại) | G | 0,5–1,5k | Chùm cánh chữ thập dưới mũi giáo | Một lưỡi lá dẹt trên khâu tròn |
+| 181 | WPN_dadao_v2 | `wpn_dadao_v2.glb` | Đại đao cán dài (làm lại) | G | 1–3k | Lưỡi nằm cạnh cán như lá cờ | Lưỡi và cán thẳng một hàng |
+| 182 | OFF_doitruong_v2 | `char_OFF_doitruong_v2.glb` | Đội trưởng Nguyên (làm lại) | B | 10–12k | Gần T-pose (rộng 1,50 m); tay phải không rig được | POSE v2; giữ mũ và giáp vảy của FIX |
+
+### P1 · H33_v2 · Trần Nhật Duật, làm lại mũ
+
+Làm lại A3. Bản cũ mọc cặp sừng và một mào trên mũ vàng, cả lần đầu lẫn lần sửa FIX (`Small smooth round gold helmet with one thin red spike on top, plain, no crest.`), trong khi cùng câu mũ ấy H40 ra đúng. Lý do (suy luận): phần còn lại của prompt (`scholar-general`, `brocade robe`) kéo về mũ tướng tuồng có cánh, và chữ `spike` bị nhân lên. Bản này bỏ hai chữ đó, tả mũ là cái bát úp, đỉnh có tua đỏ. Mũ code `mutuong` là trụ vàng thấp có chóp son (`models.js:220`); tua thay chóp là lệch nhỏ, chấp nhận để không mọc sừng. Muốn mũ như truyện thì thay câu mũ bằng `Small soft black silk cap over a topknot.`
+
+PROMPT (dán thẳng):
+```text
+Vietnamese general, 13th-century Tran dynasty, about 30, clever face, thin moustache, goatee. Round gold helmet like an upturned bowl, short red tassel at the top centre. Steel-blue robe, black lacquer lamellar vest with gold trim, jade belt, four steel-blue skirt flaps, black greaves and shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,78 m. **Symmetry: bật.** Đi kèm như A3.
+
+### P2 · X19_v2 · Toa Đô, làm lại mũ
+
+Làm lại B1. Bản cũ: mũ lông có hai chóp nhọn như sừng (OFF_tuong cùng câu mũ thì ra đúng); cẳng tay rig chỉ 0,03 và 0,08. Mũ code `mulong` là trụ lông có chóp vàng nhỏ (`models.js:222`); bản này đổi chóp thành một quả cầu vàng nhỏ ở chính giữa để không thể thành cặp sừng, và bỏ chữ `Veteran`, `worn` (kéo về dáng thủ lĩnh man rợ, suy luận). Râu điểm bạc giữ như B1.
+
+PROMPT (dán thẳng):
+```text
+Senior Mongol-Yuan general, 13th century, about 55, weathered dignified face, grey-streaked moustache and beard. Tall round brown fur hat shaped like a drum, one small gold ball on the top centre. Heavy black lacquer lamellar armor with gold trim, dark plum robe, leather belt, tall riding boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,90 m, vạm vỡ. **Symmetry: bật.** Đi kèm như B1.
+
+### P3 · OFF_photuong_v2 · Phó tướng Nguyên, làm lại mũ
+
+Làm lại B5. Bản cũ: mào tua tủa như vương miện thay cho một chóp xám bạc (chữ `spike` bị hiểu thành nhiều gai, suy luận); bắp tay trái 0,12, cẳng tay trái 0,03. Cùng dáng mũ với P2 như code (`mulong` cho cả hai, `models.js:441-442`), chỉ khác quả cầu xám bạc.
+
+PROMPT (dán thẳng):
+```text
+Mongol-Yuan deputy commander, 13th century, about 35, stern clean-shaven face. Tall round brown fur hat shaped like a drum, one small silver-grey ball on the top centre. Black lacquer lamellar armor with silver-grey trim, dark indigo robe, indigo skirt flaps, leather belt, tall riding boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–15k; cao 1,82 m. **Symmetry: bật.** Đi kèm như B5.
+
+### P4 · X20_v2 · Ô Mã Nhi, làm lại mũ và giáp
+
+Làm lại B2. Bản cũ (ảnh `xem-truoc/nhan-vat.webp`): không có mũ lông cao, chỉ búi tóc với mũ nhỏ; dáng áo bào dài, vai giáp mỏng; tay gần ngang (khung rộng 1,48 m). Đây là boss B20, game phóng ×1,42, to nhất game (`models.js:451`), nên cần đủ dáng của rig code: mũ lông `mulong` chóp vàng, giáp nặng then viền vàng như H31. Câu mũ nói rõ **một** chóp ở **chính giữa** đỉnh (X19 ra hai chóp khi câu không nói số và chỗ); câu giáp tả từ vai tới gối để không thành áo bào. Chùm lông đỏ theo truyện.
+
+PROMPT (dán thẳng):
+```text
+Proud Central Asian Yuan admiral, 13th century, about 45, thick black beard. Tall round brown fur hat like a drum, one short gold spike on the top centre, red plume. Heavy black lacquer lamellar armor to the knees, layered pauldrons, gold chest mirror, gold trim, near-black sleeves, tall boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,92 m. **Symmetry: bật.** Đi kèm như B2.
+
+### P5 · DV_DAO_v2 · Đao khiên, làm lại đầu
+
+Làm lại C2. Bản cũ (meshy-5): đội nón thay cho khăn đỏ, bao đao ở hông trái. Code: khăn son quấn đầu và búi tóc, không nón (`soldiers.js:247`). Câu tả đầu đứng riêng, mở bằng `Bare head`; thắt lưng trơn. Chạy `--model-linh latest`.
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty infantryman, 13th century, young beardless face. Bare head: topknot, vermilion cloth band round the forehead. Dark red tunic, black lacquer chest plate, shoulder pads, plain black belt, dark red apron and back flap, black hems, black trousers, straw leg wraps, black shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: bật.** Đi kèm như C2.
+
+### P6 · DV_GIAO_v2 · Giáo binh, làm lại nón
+
+Làm lại C1. Bản cũ: nón chóp nhỏ nhọn, nhìn như mũ trụ nhọn của phe Nguyên, trái quy ước hai phe khác cả dáng mũ (`soldiers.js:196-197`, `models.js:3-5`). Code: nón rơm chóp thấp Ø 0,64 m, cao 0,15 m, màu rơm `#b9a37a`, vòng khăn then dưới nón (`soldiers.js:242`). Prompt ghi đúng cỡ ấy và `brim wider than the shoulders` thay cho `low wide conical`. Vành mỏng có thể vỡ khi Meshy dựng lại lưới 3k tam giác; hỏng thì làm thân đầu trần và gộp PROP_non_la vào bộ lính khi nướng (mục H5).
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty infantryman, 13th century, young beardless face. Straw rice hat (non la): a flat cone 64 cm across and 15 cm tall, brim wider than the shoulders. Vermilion tunic, black lacquer chest plate, narrow vermilion apron, wide back flap, black trousers, straw leg wraps, black shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: bật.** Đi kèm như C1.
+
+### P7 · DV_NO_v2 · Nỏ thủ, làm lại nón
+
+Làm lại C3. Bản cũ: mũ lưỡi trai thay cho nón. Code: nón rơm Ø 0,52 m, cao 0,24 m (chóp cao hơn, vành hẹp hơn nón giáo binh nhưng vẫn rộng hơn vai), vòng then dưới nón (`soldiers.js:252`); hộp tên nâu lệch trái sau lưng (`soldiers.js:253`). Chữ `narrow-brimmed` và `padded vest` của bản cũ bị hiểu thành mũ lưỡi trai (suy luận); bản này ghi cỡ.
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty foot soldier, 13th century, beardless face. Straw rice hat (non la): a cone 52 cm across and 24 cm tall, brim wider than the shoulders. Vermilion tunic, straw-colored padded vest, matching apron and back flap, black trousers and shoes, leg wraps, brown wooden box on the back. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: tắt** (hộp tên lệch trái). Đi kèm như C3.
+
+### P8 · LINH_r01_v2 · Người lính Tự do bậc Lính và Tinh nhuệ, làm lại đầu
+
+Làm lại E1, nhân vật người chơi ở chế độ Tự do bậc 0–1. Bản cũ: mũ trụ đỏ thay cho nón lá; tay gần ngang (khung rộng 1,65 m). Bản này đầu trần, búi tóc, khăn đỏ buộc sau gáy. Nón lá là PROP_non_la gắn vào khớp đầu khi `cfg.hat === "non"` (`models.js:224`); cần sửa code, vì khi có thân GLB thì khối đầu dựng bằng code bị bỏ (`addBody`, `models.js:181`).
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty foot soldier, 13th century, about 20, beardless determined face. Bare head: black topknot under a red headband knotted at the back. Brick-red robe, dark brown leather armor, arm and shoulder guards with dull bronze trim, four brick-red skirt flaps, black greaves and shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–20k; cao 1,78 m; texture 2048 như E1 (công cụ giữ quy tắc của nhóm E). **Symmetry: bật.** Đi kèm: như E1, thêm PROP_non_la.
+
+### P9 · CV_giao_v2 · Cận vệ Giáo thủ, làm lại đầu
+
+Làm lại F2. Bản cũ: mũ trụ đỏ; có ria và chòm râu dù prompt ghi không râu. Đầu trần khăn đỏ như P8, mặt trẻ cạo nhẵn; nón PROP_non_la gắn bằng code (`guards.js:29`).
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty bodyguard, 13th century, about 25, lean young smooth-shaven face. Bare head: black topknot under a red headband knotted at the back. Brick-red robe, dark brown lamellar chest armor and shoulder guards with gold trim, four maroon skirt flaps, black greaves and shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 4–8k; cao 1,78 m. **Symmetry: bật.** Đi kèm: WPN_giao_dv, PROP_non_la.
+
+### P10 · CV_cung_v2 · Cận vệ Cung thủ, làm lại đầu
+
+Làm lại F3. Bản cũ: mũ trụ đỏ; cẳng tay trái rig 0,11. Đầu trần khăn đỏ, giữ bao tay da cẳng tay trái và ống tên sau lưng; nón PROP_non_la gắn bằng code (`guards.js:34`).
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty bodyguard, 13th century, about 25, calm face, thin moustache. Bare head: topknot under a red headband knotted at the back. Brick-red robe, dark brown leather armor with gold trim, bracer on the left forearm, quiver on the back, maroon skirt flaps, black greaves and shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 4–8k; cao 1,78 m. **Symmetry: tắt** (bao tay một bên, ống tên). Đi kèm: WPN_cung_viet, PROP_non_la.
+
+### P11 · CV_songdao_v2 · Cận vệ Song đao, làm lại đầu và mặt
+
+Làm lại F4. Bản cũ: mũ trụ đỏ; mặt già, tóc và râu bạc dù prompt ghi khoảng 22 tuổi, không râu. Đầu trần khăn đỏ, mặt trẻ cạo nhẵn, tóc đen; nón PROP_non_la gắn bằng code (`guards.js:39`).
+
+PROMPT (dán thẳng):
+```text
+Vietnamese Tran dynasty bodyguard, 13th century, about 22, wiry build, young smooth-shaven face. Bare head: topknot under a red headband knotted at the back. Brick-red robe, sleeves bound at the wrist, dark brown leather vest, gold trim, red sash, short maroon skirt flaps, black greaves and shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 4–8k; cao 1,75 m. **Symmetry: bật.** Đi kèm: WPN_songdao ×2, PROP_non_la.
+
+### P12 · WPN_giao_dv_v2 · Giáo Đại Việt, làm lại mũi giáo
+
+Làm lại G6. Bản cũ: chùm cánh chữ thập dưới mũi giáo. Chữ `four-sided` bị hiểu thành bốn lưỡi, `black binding below the head` thành một gờ (suy luận; thương Nguyên ghi `narrow four-sided` mà ra đúng vì mũi hẹp). Code dựng mũi là chóp nhọn dài 0,28 m trên khâu then (`soldiers.js:44-48`); một lưỡi lá dẹt giữ đúng dáng ấy mà không mọc cánh.
+
+PROMPT (dán thẳng):
+```text
+Long infantry spear, 13th-century Vietnam, about 3 m long. Slim straight brown wooden shaft, black iron butt cap, one flat leaf-shaped grey steel blade 30 cm long on a short round socket wrapped in black cord. Vertical, point up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Gốc** như G6. 0,5–1,5k. **Symmetry: bật.**
+
+### P13 · WPN_dadao_v2 · Đại đao cán dài, làm lại chỗ gắn lưỡi
+
+Làm lại G3 (đã sửa FIX một lần). Bản cũ: lưỡi lớn nằm cạnh phần trên của cán như lá cờ. Bước nướng đang bù bằng `side: true, flip: true` (`design/tools/bake/catalog.mjs:33`), nên đây là sửa cho đẹp, không gấp. Câu `like a Chinese guandao` không nói lưỡi và cán thẳng hàng, mà lưỡi quan đao vốn lệch trục, nên công cụ gắn lưỡi bên hông (suy luận). Chạy `latest` (meshy-5 từng mất lưỡi). Khi chuyển bước nướng sang tệp này thì bỏ `side`, `flip` của mục `dadao` trong catalog.
+
+PROMPT (dán thẳng):
+```text
+Long pole glaive, 13th-century East Asia, 2.6 m long. Plain brown wooden pole; its top end goes straight into the base of one big curved single-edged grey steel blade 75 cm long and 26 cm wide, blade and pole in one straight line, gold ring at the joint, iron butt cap. Vertical, blade up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Gốc** và grip2 như G3. 1–3k. **Symmetry: tắt** (lưỡi một cạnh, cong về một phía).
+
+### P14 · OFF_doitruong_v2 · Đội trưởng Nguyên, làm lại tư thế
+
+Làm lại B6. Bản cũ: gần T-pose (khung rộng 1,50 m); khung xương nướng không có tay phải (vai phải đặt ở x 0,75, tức đầu ngón tay; khuỷu và cổ tay phải dài 0). Mũ và giáp lấy đúng câu FIX đã dựng ra đúng (`MONGOL_HELM2` trong `meshy.mjs`, giáp vảy thay giáp phiến), vì FIX không theo sang mã `_v2`. Trong lúc chờ, Claude đặt được khớp tay bằng tay trong catalog như `FIX_OFF_TUONG` (`design/tools/bake/catalog.mjs:5-8`), không tốn credit.
+
+PROMPT (dán thẳng):
+```text
+Mongol-Yuan squad captain, 13th century, about 30, clean-shaven face. Open-face Mongol helmet: tall onion-shaped steel bowl rising to a thin spike, brown fur band, leather neck flap. Blue-grey steel scale cuirass and shoulder guards with silver trim, dark indigo robe and skirt flaps, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+```
+
+- **Kỹ thuật**: 10–12k; cao 1,78 m. **Symmetry: bật.** Đi kèm như B6.
+
+---
+
 ## Danh sách kiểm tra trước khi gửi tệp cho Claude
 
 Mở tệp GLB ở `gltf-viewer.donmccurdy.com` hoặc `3dviewer.net` (kéo thả tệp vào trang web), hoặc xem ngay trong trình xem của Meshy, Tripo trước khi tải về, rồi soát:
@@ -2312,6 +2778,7 @@ Mở tệp GLB ở `gltf-viewer.donmccurdy.com` hoặc `3dviewer.net` (kéo th�
 - [ ] Đúng thời đại và giữ phẩm giá: quân Trần không ra dáng samurai (mũ kabuto, giáp o-yoroi), không áo nhà Thanh; quân Nguyên mặc giáp phiến, không giáp tấm châu Âu, là người lính nghiêm trang, không sừng, không mặt quái vật hay biếm hoạ (mục 2.6).
 - [ ] Đồ chỉ có ở một bên (ống tên, hộp tên, bao tay, dây vắt vai) vẫn ở một bên, không bị nhân đôi sang bên kia (mục 0.2, Symmetry).
 - [ ] Không có bệ, sàn, bóng đổ hay đèn trong tệp.
+- [ ] Mục làm lại `_v2` (mục P): đúng chỗ đã sửa ở cột "Bản làm lại" của bảng mục P, so cạnh ảnh bản cũ; mục đầu trần không mọc mũ.
 - [ ] Số tam giác nằm trong khoảng ở bảng mục 1 (đám đông 1,5–3k; cận vệ 4–8k; tướng, sĩ quan và nhân vật chính 10–20k, Đội trưởng Nguyên 10–12k).
 
 **Vũ khí, đạo cụ, ngựa**

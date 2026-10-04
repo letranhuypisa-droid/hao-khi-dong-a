@@ -2,6 +2,8 @@
 // tệp môi trường env_, bộ chọn, POSE v2, mục làm lại _v2, lệnh list --hash; và mọi mã trong design/glb/manifest.json giữ nguyên
 // băm prompt (băm đổi thì `run` mặc định mua lại mẫu đó và ghi đè GLB). Soát cả nội dung mục môi trường K–O của tài liệu thật:
 // độ dài (tài liệu ≤ 630, API ≤ 600), khối STYLE, dải tam giác ≥ 300, kích thước thật, không xin chữ, dẫn chỗ code; nón lá, trâu.
+// Mục P làm lại (14 mã _v2: đúng tệp, nhóm, POSE v2, sửa đúng chỗ lệch), 15 tướng mới từ design/3d-ref (tay không, POSE v2,
+// tài liệu ≤ 565, API ≤ 600), mục người chưa tạo đều dùng POSE v2, mục 0.8 "Còn phải tạo" có lệnh và credit từng đợt.
 //   node design/tools/meshy.test.mjs
 // Nhập meshy.mjs như thư viện: tệp đó chỉ chạy lệnh khi là tệp chính (import.meta.main, Node ≥ 24.2).
 import assert from "node:assert/strict";
@@ -208,6 +210,77 @@ t("trâu MOUNT_trau ở mục O, đối xứng bật; cò, quạ ở mục O; b�
   assert.ok(a, "chưa có MOUNT_trau"); assert.equal(a.sec[0], "O"); assert.equal(a.sym, "on"); assert.equal(a.kind, "thu-cuoi");
   const o = env.filter((x) => x.sec[0] === "O").map((x) => x.code), th = codes(setOf(all, "thieu"));
   assert.ok(o.length >= 3, o.join(" ")); for (const c of o) assert.ok(th.includes(c), c);
+});
+
+console.log("Tài liệu thật: làm lại (mục P), tướng mới, mục 0.8 còn phải tạo");
+const P_CODES = ["H33_v2", "X19_v2", "OFF_photuong_v2", "X20_v2", "DV_DAO_v2", "DV_GIAO_v2", "DV_NO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_cung_v2",
+  "CV_songdao_v2", "WPN_giao_dv_v2", "WPN_dadao_v2", "OFF_doitruong_v2"];
+const NEW_GEN = ["H27", "H28", "H29", "H30", "H32", "H36", "H37", "TT", "X16", "X17", "X18", "X21", "X22", "X23", "X25"];
+const get = (c) => all.find((x) => x.code === c) || { code: c, prompt: "", missing: true };
+const missing = (list) => list.filter((c) => get(c).missing);
+t("mục P: đủ 14 mã làm lại; tệp _v2 cạnh tệp gốc, cùng nhóm, dải tam giác, thư mục với mã gốc đã tạo; bộ lam-lai đúng 14 mã", () => {
+  assert.deepEqual(missing(P_CODES), []);
+  for (const c of P_CODES) {
+    const a = get(c), b = get(c.replace(/_v2$/, ""));
+    assert.equal(a.sec[0], "P", c); assert.ok(man[b.code], `${b.code} chưa có trong manifest`);
+    assert.equal(a.file, b.file.replace(/\.glb$/, "_v2.glb"), c); assert.equal(a.group, b.group, c); assert.equal(a.kind, b.kind, c);
+    assert.deepEqual(a.range, b.range, c);
+  }
+  assert.deepEqual(codes(setOf(all, "lam-lai")).sort(), [...P_CODES].sort());
+});
+t("mục P: người viết bằng POSE v2, tài liệu ≤ 565, API ≤ 600 kể cả câu chặn; vũ khí ≤ 550 / ≤ 600, vật đứng một mình", () => {
+  assert.deepEqual(missing(P_CODES), []);
+  const bad = P_CODES.map(get).filter((a) => a.person
+    ? !a.prompt.includes(POSE2) || a.prompt.includes(POSE) || a.prompt.length > 565 || apiPrompt(a).length > 600 || !/Unarmed:/.test(apiPrompt(a))
+    : a.prompt.length > 550 || apiPrompt(a).length > 600 || !a.prompt.endsWith(STYLE) || !/isolated single object/i.test(a.prompt));
+  assert.deepEqual(bad.map((a) => `${a.code} ${a.prompt.length}/${apiPrompt(a).length}`), []);
+});
+t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đầu trần khăn đỏ, nón lá vành rộng, giáo một lưỡi, lưỡi đại đao thẳng cán", () => {
+  assert.deepEqual(missing(P_CODES), []);
+  const p = (c) => get(c).prompt, bad = [];
+  const want = (c, ok, why) => { if (!ok) bad.push(`${c}: ${why}`); };
+  want("H33_v2", /bowl/i.test(p("H33_v2")) && /tassel/i.test(p("H33_v2")) && !/spike|horn|crest/i.test(p("H33_v2")), "mũ bát vàng tua đỏ, không chóp nhọn");
+  want("X19_v2", /drum/i.test(p("X19_v2")) && /gold ball/i.test(p("X19_v2")) && !/spike/i.test(p("X19_v2")), "mũ lông hình trống, một quả cầu vàng");
+  want("OFF_photuong_v2", /drum/i.test(p("OFF_photuong_v2")) && /silver-grey ball/i.test(p("OFF_photuong_v2")) && !/spike|crown|crest/i.test(p("OFF_photuong_v2")), "mũ lông, cầu xám bạc, không mào");
+  want("X20_v2", /fur hat/i.test(p("X20_v2")) && /gold spike/i.test(p("X20_v2")) && /heavy/i.test(p("X20_v2")) && /pauldrons|shoulder plates/i.test(p("X20_v2")), "mũ lông, chóp vàng, giáp nặng");
+  for (const c of ["DV_DAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_cung_v2", "CV_songdao_v2"])
+    want(c, !/\b(hat|helmet|cap)\b/i.test(p(c)) && /bare head/i.test(p(c)) && /red (cloth )?(head)?band|vermilion cloth band/i.test(p(c)) && apiPrompt(get(c)).includes("No helmet."), "đầu trần buộc khăn đỏ (nón lá gắn bằng code)");
+  for (const c of ["DV_GIAO_v2", "DV_NO_v2"])
+    want(c, /non la/i.test(p(c)) && /wider than the shoulders/i.test(p(c)) && /\d+ cm across/.test(p(c)) && !/helmet|pointed/i.test(p(c)), "nón lá vành rộng hơn vai, có cỡ, khác mũ nhọn Nguyên");
+  for (const c of ["CV_giao_v2", "CV_songdao_v2"]) want(c, /smooth-shaven/i.test(p(c)), "mặt trẻ cạo nhẵn (bản cũ ra râu, tóc bạc)");
+  want("WPN_giao_dv_v2", /\bone flat leaf-shaped\b/i.test(p("WPN_giao_dv_v2")) && !/four-sided/i.test(p("WPN_giao_dv_v2")), "một lưỡi lá dẹt");
+  want("WPN_dadao_v2", /one straight line/i.test(p("WPN_dadao_v2")), "lưỡi và cán thẳng hàng");
+  want("OFF_doitruong_v2", /onion-shaped/i.test(p("OFF_doitruong_v2")) && /scale cuirass/i.test(p("OFF_doitruong_v2")), "giữ mũ và giáp vảy của FIX đã dựng đúng");
+  assert.deepEqual(bad, []);
+});
+t("mục P: đồ lệch một bên giữ Symmetry tắt (DV_NO_v2, CV_cung_v2, WPN_dadao_v2); áo cân hai bên bật", () => {
+  assert.deepEqual(missing(P_CODES), []);
+  assert.deepEqual(["DV_NO_v2", "CV_cung_v2", "WPN_dadao_v2"].filter((c) => get(c).sym !== "off"), []);
+  assert.deepEqual(["H33_v2", "X19_v2", "OFF_photuong_v2", "X20_v2", "DV_DAO_v2", "DV_GIAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_songdao_v2", "OFF_doitruong_v2"]
+    .filter((c) => get(c).sym !== "on"), []);
+});
+t("15 tướng mới (design/3d-ref/PROMPTS-TUONG.md): mục A/B, tệp char_<mã>_<tên>.glb, 10–20k, POSE v2, tài liệu ≤ 565, API ≤ 600, chưa có trong manifest", () => {
+  assert.deepEqual(missing(NEW_GEN), []);
+  const bad = NEW_GEN.map(get).filter((a) => !/^[AB]\d+$/.test(a.sec) || !new RegExp(`^char_${a.code}_[a-z-]+\\.glb$`).test(a.file) || a.range[0] !== 10000 || a.range[1] !== 20000
+    || !a.prompt.includes(POSE2) || a.prompt.length > 565 || apiPrompt(a).length > 600 || man[a.code] || a.kind !== "nhan-vat");
+  assert.deepEqual(bad.map((a) => `${a.code} ${a.sec} ${a.file} ${a.prompt.length}/${apiPrompt(a).length}`), []);
+});
+t("tướng mới tay không: prompt không xin binh khí, khiên, cờ, quạt, bút (binh khí là tệp riêng)", () => {
+  assert.deepEqual(missing(NEW_GEN), []);
+  const arms = /\b(holding|held|sword|saber|spear|lance|halberd|glaive|bow|shield|banner|flag|fan|brush|drum)\b/i;
+  assert.deepEqual(NEW_GEN.filter((c) => arms.test(get(c).prompt)), []);
+});
+t("tuong-moi = H34, H38, H39 và 15 tướng mới; mọi mục người chưa tạo viết bằng POSE v2 (trừ LINH_r2 dựng từ prompt LINH_r24 đã tạo)", () => {
+  assert.deepEqual(codes(setOf(all, "tuong-moi")).sort(), ["H34", "H38", "H39", ...NEW_GEN].sort());
+  const old = all.filter((a) => a.person && !man[a.code] && a.code !== "LINH_r2" && !a.prompt.includes(POSE2));
+  assert.deepEqual(old.map((a) => a.code), []);
+});
+t("mục 0.8 Còn phải tạo: trước bảng mục 1; có lệnh run --stage luoi, sheet, run tô texture; credit từng đợt; bộ thieu, moi-truong, lam-lai, tuong-moi", () => {
+  const s = md.replace(/\r\n/g, "\n"), i = s.indexOf("\n### 0.8 "), j = s.indexOf("\n## 1. ");
+  assert.ok(i > 0 && i < j, "thiếu mục 0.8 trước mục 1");
+  const s08 = s.slice(i, j);
+  for (const w of ["--stage luoi", "meshy.mjs sheet", "credit", "--set thieu", "--set moi-truong", "--set lam-lai", "--set tuong-moi"]) assert.ok(s08.includes(w), w);
+  assert.ok(/run --set lam-lai(?! --stage)/.test(s08), "thiếu lệnh tô texture (run không có --stage)");
 });
 
 console.log("Lệnh list (không mạng)");

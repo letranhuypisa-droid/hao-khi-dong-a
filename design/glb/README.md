@@ -4,11 +4,13 @@ Mẫu 3D tĩnh tạo bằng Meshy API từ đúng prompt trong `design/glb-promp
 
 | Thư mục | Chứa | Tiền tố tệp |
 | --- | --- | --- |
-| `nhan-vat/` | Tướng, sĩ quan, người lính Tự do, cận vệ (`char_`), lính đám đông và dân làng (`unit_`) | `char_`, `unit_` |
+| `nhan-vat/` | Tướng, sĩ quan, người lính Tự do, cận vệ (`char_`), lính đám đông và dân làng (`unit_`). Bản làm lại `…_v2.glb` nằm cạnh tệp cũ | `char_`, `unit_` |
 | `vu-khi/` | Đao, kiếm, giáo, cung, nỏ, chùy, khiên | `wpn_` |
 | `dao-cu/` | Mũi tên, cờ lưng, áo choàng, bành voi… | `prop_` |
 | `thu-cuoi/` | Ngựa, voi, trâu | `mount_` |
-| `moi-truong/` | Môi trường (mã `ENV_`): thuyền, công trình, đạo cụ cảnh, cây, đá, núi, cò, quạ. Đã có 89 prompt (`glb-prompts.md` mục K–O), chưa có tệp nào; chưa có bước nướng môi trường (đầu mục K của tài liệu) | `env_` |
+| `moi-truong/` | Môi trường (mã `ENV_`): thuyền, công trình, đạo cụ cảnh, cây, đá, núi, cò, quạ. Đã có 89 prompt (`glb-prompts.md` mục K–O), chưa có tệp nào; chưa có bước nướng môi trường (đầu mục K của tài liệu). Mã `ENV_` luôn đi với tệp `env_` (công cụ báo lỗi nếu lệch) | `env_` |
+
+Còn phải tạo gì, theo thứ tự nào, mỗi đợt tốn bao nhiêu credit và Claude phải làm gì sau đó: mục 0.8 của `glb-prompts.md`.
 
 `manifest.json` ghi từng tệp: mã task Meshy, model, số tam giác trước và sau khi nén, dung lượng, kích thước khung bao. Xem nhanh mọi mẫu: mở `xem.html` qua máy chủ tĩnh ở gốc repo (ví dụ `npx serve .` rồi vào `/design/glb/xem.html`). Ảnh tổng hợp nằm ở `xem-truoc/`.
 
@@ -19,19 +21,21 @@ Mẫu 3D tĩnh tạo bằng Meshy API từ đúng prompt trong `design/glb-promp
 ![Nhân vật](xem-truoc/nhan-vat.webp)
 ![Vũ khí, đạo cụ, ngựa](xem-truoc/vu-khi.webp)
 
-Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit:
+Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit. Từ đợt 19b mỗi mẫu lệch có một mục làm lại mã `_v2` ở mục P của tài liệu (`--set lam-lai`, 14 mục, khoảng 420 credit); tệp cũ giữ nguyên cho tới khi soát và chọn bản mới:
 
-| Tệp | Lệch | Cách xử lý đề xuất |
+| Tệp | Lệch | Mục làm lại |
 | --- | --- | --- |
-| `char_H33` | Mũ vàng mọc cặp sừng (lần đầu thì đeo đao ở hông) | Cắt sừng khi rig, hoặc tạo lại khi có credit |
-| `char_X19` | Mũ có hai chóp nhọn như sừng | Như trên |
-| `unit_DV_DAO` | Bao đao ở hông trái; đội nón thay vì khăn đỏ quấn đầu | Xoá mảnh bao đao khi rig |
-| `wpn_dadao` | Lưỡi lớn nằm cạnh cán thay vì ở đầu cán | Dời lưỡi lên đầu cán khi đặt trục vũ khí |
-| `char_LINH_r01`, `char_CV_giao`, `char_CV_cung`, `char_CV_songdao` | Đội mũ trụ đỏ thay vì nón lá | Meshy chưa dựng được nón lá vành rộng; có thể gắn nón lá dựng bằng code |
-| `unit_DV_GIAO`, `unit_DV_NO` | Nón chóp nhỏ, khác dáng nón trong prompt | Chấp nhận được ở cỡ lính đám đông |
-| `char_OFF_photuong` | Mũ có mào tua tủa thay vì chóp xám bạc | Chấp nhận, hoặc tạo lại |
-| `wpn_giao-dv` | Có một chùm cánh nhỏ dưới mũi giáo | Xoá khi đặt trục, hoặc giữ làm tua |
-| Mọi nhân vật | Tay dang gần ngang hơn A-pose 45° của tài liệu | Rig vẫn dùng được |
+| `char_H33` | Mũ vàng mọc cặp sừng (lần đầu thì đeo đao ở hông) | `H33_v2`: mũ bát vàng tua đỏ |
+| `char_X19` | Mũ có hai chóp nhọn như sừng | `X19_v2`: mũ lông hình trống, một quả cầu vàng |
+| `char_X20` | Không có mũ lông và chóp vàng, dáng áo bào, giáp mỏng | `X20_v2`: mũ lông chóp vàng, giáp nặng tới gối |
+| `unit_DV_DAO` | Bao đao ở hông trái; đội nón thay vì khăn đỏ quấn đầu | `DV_DAO_v2`: đầu trần khăn son, thắt lưng trơn |
+| `wpn_dadao` | Lưỡi lớn nằm cạnh cán thay vì ở đầu cán (bước nướng đang bù bằng `side`, `flip`) | `WPN_dadao_v2`: lưỡi và cán thẳng hàng |
+| `char_LINH_r01`, `char_CV_giao`, `char_CV_cung`, `char_CV_songdao` | Đội mũ trụ đỏ thay vì nón lá; CV_giao có râu, CV_songdao ra mặt già tóc bạc | Mục `_v2` đầu trần buộc khăn đỏ, nón lá là `prop_non-la.glb` gắn bằng code (Meshy chưa dựng được nón lá vành rộng lần nào) |
+| `unit_DV_GIAO`, `unit_DV_NO` | Nón chóp nhỏ (giống mũ nhọn phe Nguyên), mũ lưỡi trai | `DV_GIAO_v2`, `DV_NO_v2`: nón lá ghi đúng cỡ code, vành rộng hơn vai |
+| `char_OFF_photuong` | Mũ có mào tua tủa thay vì chóp xám bạc | `OFF_photuong_v2`: mũ lông, quả cầu xám bạc |
+| `char_OFF_doitruong` | Gần T-pose; tay phải không rig được | `OFF_doitruong_v2` |
+| `wpn_giao-dv` | Có một chùm cánh nhỏ dưới mũi giáo | `WPN_giao_dv_v2`: một lưỡi lá dẹt |
+| Mọi nhân vật | Tay dang gần ngang hơn A-pose 45° của tài liệu, khuỷu gập, nên bộ dò khớp đặt sai khuỷu | Mục `_v2` và mọi mục người mới viết bằng POSE v2 (`glb-prompts.md` mục 2.2) |
 
 Lính đám đông (nhóm C, D) và vũ khí, đạo cụ dùng meshy-5 cho vừa ngân sách; tướng, sĩ quan, người lính Tự do, cận vệ, ngựa, song đao và nỏ dùng model mới nhất (cột `model` trong `manifest.json`). Mặt nhân vật quay về +Z; ngựa quay theo trục X (xoay khi rig).
 
@@ -81,16 +85,18 @@ node design/tools/meshy.mjs sheet design/glb/_raw/to-xem.png --only H34,H38
 node design/tools/meshy.mjs run --only H34,H38
 ```
 
+Lệnh đủ cho từng đợt còn lại (dân làng và nón lá, môi trường, làm lại, tướng mới), kèm credit ước tính: mục 0.8 của `glb-prompts.md`.
+
 Bộ chọn (`--set`):
 
 | Bộ | Gồm |
 | --- | --- |
 | `thu` | Cặp thử H35 + song đao |
 | `can` | 40 tệp game đang dùng (mặc định của `run`); không bao giờ gồm mục mới |
-| `thieu` | Thứ game còn dựng bằng code: dân làng (`DAN_*`), áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú ở mục O |
-| `moi-truong` | Mọi mã `ENV_` |
-| `lam-lai` | Mọi mã `_v2`, `_v3` (làm lại mẫu cũ) |
-| `tuong-moi` | Tướng có tên (mã H.., X.., TT) chưa có GLB: H34, H38, H39 và tướng thêm từ `design/3d-ref/PROMPTS-TUONG.md` |
+| `thieu` | Thứ game còn dựng bằng code: dân làng (`DAN_*`), áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú ở mục O (12 mục) |
+| `moi-truong` | Mọi mã `ENV_`: thuyền, công trình, đạo cụ cảnh, cây, đá, núi, cò, quạ (89 mục, tệp `env_` vào `moi-truong/`) |
+| `lam-lai` | Mọi mã `_v2`, `_v3` (làm lại mẫu cũ, ra tệp mới cạnh tệp cũ): 14 mục ở mục P của tài liệu |
+| `tuong-moi` | Tướng có tên (mã H.., X.., TT) chưa có GLB: H34, H38, H39 và 15 tướng chuyển từ `design/3d-ref/PROMPTS-TUONG.md` (mục A8–A15, B7–B13), 18 mục |
 | `tat-ca` | Mọi mục: 40 mã `can` trước, rồi theo thứ tự bảng |
 
 Các bộ mới tính từ mã và chữ mục, nên mục thêm sau tự vào đúng bộ; bộ chưa có mục nào thì công cụ báo và dừng. Chạy lại chỉ làm phần chưa xong. Tài liệu đọc được cả khi cây làm việc là CRLF (Windows, `core.autocrlf`). Lỗi trong tài liệu (thiếu PROMPT, tiền tố tệp lạ, dải tam giác sai, mục người thiếu `A-pose,`) báo ngay khi đọc, trước mọi lệnh.
