@@ -26,6 +26,7 @@ import { RANKS as CAREER_RANKS, rankOf, nextRank, RANK_PERKS, PICKS, GEAR, gearC
 import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS, careerGuards, recruitGuard, editGuard, dismissGuard } from "./meta/career.js";
 import { GUARD_CLASSES, GUARD_NAME_MAX, guardSlots, guardStats } from "./data/guards.js";
 import { MISSIONS, SITES, missionBoard } from "./data/skirmish.js";
+import { GFX_LEVELS, GFX_NAME } from "./core/gfx.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
 const DEBUG = /[?&]debug\b/.test(location.search);
@@ -128,14 +129,15 @@ function render() {
   bind[tab]?.();
 }
 
-// Cài đặt (nút ⚙ ở dải đầu): các tùy chọn "Hiển thị" trước đây nằm ở Xuất trận, thêm âm lượng. Bảng trượt từ đáy trên điện
-// thoại, hộp giữa màn trên màn rộng (css/hub.css). Đổi là lưu ngay.
+// Cài đặt (nút ⚙ ở dải đầu): các tùy chọn "Hiển thị" trước đây nằm ở Xuất trận, thêm âm lượng, Đồ hoạ (đợt 19c, core/gfx.js). Bảng
+// trượt từ đáy trên điện thoại, hộp giữa màn trên màn rộng (css/hub.css). Đổi là lưu ngay (Đồ hoạ theo từ trận sau).
 function openSettings() {
   const s = save.settings;
   const opt = (v, cur, l) => `<option value="${v}" ${v === cur ? "selected" : ""}>${l}</option>`;
   const d = document.createElement("div"); d.className = "sheet-wrap";
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Cài đặt">
     <div class="sheet-head"><h3>Cài đặt</h3><button data-close aria-label="Đóng">✕</button></div>
+    <label class="field">Đồ hoạ <select data-set="graphics">${GFX_LEVELS.map((l) => opt(l.id, s.graphics in GFX_NAME ? s.graphics : "auto", l.name)).join("")}</select></label>
     <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
     <label class="field">Điều khiển cảm ứng <select data-set="touch">${[["auto", "Tự nhận"], ["on", "Bật"], ["off", "Tắt"]].map(([v, l]) => opt(v, s.touch, l)).join("")}</select></label>
     <label class="field">Bóng <input type="checkbox" data-set="shadows" ${s.shadows ? "checked" : ""}></label>
@@ -144,7 +146,7 @@ function openSettings() {
     <label class="field">Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume ?? 0.8}" data-set="volume"></label>
     <button data-hintreset>Hiện lại gợi ý đã xem</button>
     ${onTitle ? "" : `<button data-totitle>Về màn chào</button>`}
-    <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng cho cùng kết quả ở mọi mức. "Tự nhận": giao diện cảm ứng theo cách bạn bấm gần nhất.</p>
+    <p class="small">Đồ hoạ Tự động chọn theo máy và tự hạ độ phân giải khi khung hình chậm. Số lính hiển thị chỉ đổi phần vẽ; mô phỏng cho cùng kết quả ở mọi mức. "Tự nhận": giao diện cảm ứng theo cách bạn bấm gần nhất.</p>
   </div>`;
   document.body.appendChild(d);
   const close = () => { d.remove(); removeEventListener("keydown", onKey); };
@@ -283,15 +285,22 @@ function tudoIntro(c) {
   document.body.appendChild(d);
   d.querySelector("[data-close]").onclick = () => { d.remove(); c.introSeen = true; persist(); };
 }
-// Mô hình GLB (battle/glb.js) trong lúc màn tải hiện: chờ phần trận dựng ngay (tướng người chơi, lính đám đông, vũ khí, cận vệ,
-// sĩ quan), phần còn lại (tướng địch ra giữa trận, tướng của trận khác) tải ngầm. Mạng chậm, lỗi: trận vẫn chạy với hình dựng
-// bằng code.
+// Mô hình GLB (battle/glb.js) và ảnh fx (battle/fx.js) trong lúc màn tải hiện: chờ mọi thứ trận dùng — tướng người chơi, tướng đồng minh và
+// boss của trận (data/battles.js models: ra giữa trận cũng nạp trước, đợt 19c — trước đây tải ngầm khi trận đã chạy nên tướng đồng minh
+// trận đầu là hình khối, việc đọc mô hình rơi vào mấy giây đầu trận), lính đám đông, vũ khí, cận vệ, sĩ quan. Tối đa 12 s; mạng chậm, lỗi:
+// trận vẫn chạy với hình dựng bằng code. Mô hình của trận khác không tải ngầm giữa trận nữa: màn tải của trận đó tự nạp.
 async function loadModels(chars = []) {
   try {
-    const { preloadModels } = await import("./battle/glb.js");
-    await preloadModels([...chars.map((c) => "char/" + c), "kit/*", "wpn/*", "char/CV_*", "char/OFF_*"], 12000);
-    preloadModels(null, 0);
+    const [{ preloadModels }, { preloadFx }] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js")]);
+    await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + c), "kit/*", "wpn/*", "char/CV_*", "char/OFF_*"], 12000), preloadFx()]),
+      new Promise((r) => setTimeout(r, 12000))]);
   } catch (e) { console.warn("mô hình", e); }
+}
+// Khung trận (đợt 19c): dựng ẩn sau màn tải; battle.js / arena.js gọi onReady khi đã làm nóng (biên dịch shader, nạp texture — battle/gfx.js)
+// thì mới hiện khung trận và ẩn màn tải, nên khung đầu nhìn thấy không khựng vì biên dịch. Lỗi trước lúc đó: nơi gọi gỡ stage, hiện lại app.
+function makeStage() {
+  const stage = document.createElement("div"); stage.className = "stage"; stage.style.visibility = "hidden"; document.body.appendChild(stage);
+  return { stage, onReady: () => { stage.style.visibility = ""; app.style.display = "none"; } };
 }
 
 async function startSkirmish(sk) {
@@ -299,11 +308,10 @@ async function startSkirmish(sk) {
   app.innerHTML = `<div class="loading"><h2>${esc(sk.name)} · ${esc(SITES[sk.siteId]?.name || "")}</h2><p>${esc(sk.goal)}.</p><div class="spin"></div><p class="small">${esc(sk.how)}</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
   const [{ runBattle }, { makeTD }] = await Promise.all([import("./battle/battle.js"), import("./battles/td.js"), loadModels(["LINH_r01", "LINH_r24"])]);
-  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
-  app.style.display = "none";
+  const { stage, onReady } = makeStage();
   let res = null;
   try {
-    res = await runBattle({ container: stage, save, R: sk.R, difficulty: "quansi", mode: "nhanh", music, onSettings: () => persist(),
+    res = await runBattle({ container: stage, save, R: sk.R, difficulty: "quansi", mode: "nhanh", music, onSettings: () => persist(), onReady,
       battle: makeTD(sk, c), heroDef: { ...soldierDef(c), ...(sk.type === "dautuong" ? { guards: 0 } : {}) }, stats: soldierStats(c) });     // Đấu tướng: cận vệ ở lại doanh — ẩn nút Lệnh
   } catch (err) { console.error(err); toast("Lỗi khi chạy giao tranh: " + err.message, true); }
   stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
@@ -499,10 +507,9 @@ async function startTutorial() {
   app.innerHTML = `<div class="loading"><h2>Võ trường · Huấn luyện</h2><p>Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử.</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
   const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
-  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
-  app.style.display = "none";
+  const { stage, onReady } = makeStage();
   let res = null;
-  try { res = await runArena({ container: stage, save, R: Math.max(1, Math.min(...save.ladder.unlocked)), difficulty: "danbinh", music, opts: { mode: "huanluyen" }, onSettings: () => persist() }); }
+  try { res = await runArena({ container: stage, save, R: Math.max(1, Math.min(...save.ladder.unlocked)), difficulty: "danbinh", music, opts: { mode: "huanluyen" }, onSettings: () => persist(), onReady }); }
   catch (err) { console.error(err); toast("Lỗi màn huấn luyện: " + err.message, true); }
   stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");
   if (res?.done) { save.tutorial = { done: true, at: Date.now() }; persist(); toast("Xong huấn luyện — sẵn sàng ra bến Hàm Tử!"); tab = "xuattran"; }
@@ -941,9 +948,8 @@ async function startBattle(battleId = pick.battle) {
   const note = notes[Math.floor(Math.random() * notes.length)];
   app.innerHTML = `<div class="loading ld-art b-${B.id}"><i class="ld-img" aria-hidden="true"></i><h2>${esc(B.loading.title)}</h2><p><span class="label ${note.label === "Chính sử" ? "cs" : note.label === "Tương truyền" && B.id !== "B15" ? "tt" : "hc"}">${note.label}</span> ${esc(note.text)}</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id), loadModels([heroFor(B)])]);
-  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
-  app.style.display = "none";
+  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id), loadModels([heroFor(B), ...(B.models || [])])]);
+  const { stage, onReady } = makeStage();
   let res;
   try {
     // khung chèn giữa trận (B15: D2 khi thuyền quân Triệu Trung đầu tiên cập bến) chỉ tự phát lần đầu
@@ -953,7 +959,7 @@ async function startBattle(battleId = pick.battle) {
       onDone: () => { ch.insertSeen = true; persist(); },
     } : null;
     res = await runBattle({ container: stage, save, R: B.fixedR ?? pick.R, difficulty: pick.difficulty, mode: modeFor(B), music, story, onSettings: () => persist(),
-      battle: def, heroId: heroFor(B), quyetSach });
+      battle: def, heroId: heroFor(B), quyetSach, onReady });
   } catch (err) {
     console.error(err);
     res = null;
@@ -1007,10 +1013,9 @@ async function startArena() {
   app.innerHTML = `<div class="loading"><h2>Võ trường</h2><p>${ARENA_MODES[opts.mode].text}</p><div class="spin"></div></div>`;
   await new Promise((r) => setTimeout(r, 60));
   const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
-  const stage = document.createElement("div"); stage.className = "stage"; document.body.appendChild(stage);
-  app.style.display = "none";
+  const { stage, onReady } = makeStage();
   let res = null;
-  try { res = await runArena({ container: stage, save, R: pick.R, difficulty: pick.difficulty, music, opts, onSettings: () => persist() }); }
+  try { res = await runArena({ container: stage, save, R: pick.R, difficulty: pick.difficulty, music, opts, onSettings: () => persist(), onReady }); }
   catch (err) { console.error(err); toast("Lỗi Võ trường: " + err.message, true); }
   stage.remove(); stage.replaceChildren(); app.style.display = ""; music.play("hub");   // như startBattle
   if (!res) { render(); return; }

@@ -18,7 +18,8 @@ export function newSave() {
     ladder: { unlocked: [1], best: {} },          // R → hạng tốt nhất
     battles: { B20: { best: null, cleared: false } },   // trận ngoài thang R (đợt 9: B20 Bạch Đằng — hạng tốt nhất, đã qua)
     firsts: { tinh: false, bao: false, danh: false, rankS: {} },
-    settings: { troops: "vua", difficulty: "quansi", renderScale: 1, shadows: true, volume: 0.7, touch: "auto", hints: true },   // hints: gợi ý lần đầu giữa trận (đợt 11)
+    settings: { troops: "vua", difficulty: "quansi", renderScale: 1, shadows: true, volume: 0.7, touch: "auto", hints: true,   // hints: gợi ý lần đầu giữa trận (đợt 11)
+      graphics: "auto" },                         // Đồ hoạ (đợt 19c, core/gfx.js): auto | thap | vua | cao; bản lưu cũ nhận qua migrate
     stats: { battles: 0, wins: 0, tpc: 0, ko: 0, bestTime: null },
     hints: {},                                    // gợi ý lần đầu đã xem { id: true } (battle/hints.js ghi thẳng vào đây; nút "Hiện lại gợi ý" xóa)
     log: [],

@@ -78,6 +78,7 @@ export function makeTD(sk, career) {
       EVENTS: { leave: { name: "Rời vòng thách đấu" } }, STORY_INSERTS: {}, HISTORY_NOTES: [],
     },
     camFar: 1400,
+    rigs: ["tuong"],                                     // tướng Nguyên của Đấu tướng (sĩ quan luôn làm nóng — battle/gfx.js)
     openGates: () => ({ A3: false, B3: false }),
     heroSpawn: { x: sk.spawn.x, z: sk.spawn.z, yaw: facing },
     camYaw: facing,

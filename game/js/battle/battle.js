@@ -6,12 +6,18 @@
 // Nhiều trận, nhiều tướng (đợt 9 lõi): phần riêng của trận nằm sau các móc của BattleDef (battles/b15.js — danh sách
 // móc ở đầu file đó), tướng theo HEROES[heroId] (data/heroes.js). Mặc định B15 + H35: đúng thứ tự dựng, thứ tự rút
 // ctx.rng và từng phép tính như trước.
+//
+// Đồ hoạ (đợt 19c, battle/gfx.js): renderer dựng theo mức Đồ hoạ (MSAA, kiểu bóng, tỉ lệ điểm ảnh, độ phân giải động khi Tự động).
+// Dựng xong thì làm nóng (biên dịch mọi shader kể cả bóng, nạp texture) trong lúc màn tải của main.js còn che, rồi mới gọi onReady và
+// chạy vòng lặp — khung đầu nhìn thấy không khựng. Đổi Bóng / Đồ hoạ ở bảng tạm dừng thì biên dịch lại ngay lúc còn tạm dừng.
 
 import * as THREE from "three";
 import { heightAt, setBattleTerrain, setDecks, setWaterLevel, waterLevel } from "./ground.js";
 import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
-import { FX, releaseFxTextures } from "./fx.js";
+import { FX, releaseFxTextures, preloadFx } from "./fx.js";
+import { createRenderer, Warm } from "./gfx.js";
+import { GFX_LEVELS, GFX_NAME } from "../core/gfx.js";
 import * as Models from "./models.js";
 import { Atmosphere } from "./atmosphere.js";
 import { Audio } from "./audio.js";
@@ -44,7 +50,8 @@ function resetGround() { setBattleTerrain(null); setDecks(null); setWaterLevel(n
 // để main.js báo lỗi và về Doanh trại.
 // Chế độ Tự do (đợt 14): heroDef / stats truyền thẳng (người lính — meta/career.js soldierDef / soldierStats), BattleDef.Hero là lớp tướng
 // riêng của trận (battle/soldier.js SoldierHero); thiếu thì như cũ (HEROES[heroId], heroStats, Hero).
-export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings, battle = B15, heroId = "H35", quyetSach = null, heroDef: heroDefIn = null, stats: statsIn = null }) {
+// onReady (đợt 19c): gọi khi đã làm nóng xong, ngay trước khung đầu — main.js lúc đó mới hiện khung trận, ẩn màn tải.
+export function runBattle({ container, save, R, difficulty, mode = "nhanh", music, story = null, onSettings, battle = B15, heroId = "H35", quyetSach = null, heroDef: heroDefIn = null, stats: statsIn = null, onReady = null }) {
   return new Promise((resolve, reject) => {
     const def = battle || B15;
     const heroDef = heroDefIn || HEROES[heroId] || HEROES.H35;
@@ -57,18 +64,15 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     const canvas = container.querySelector("canvas"), hudRoot = container.querySelector(".hud");
     const overlay = container.querySelector(".overlay"), touchRoot = container.querySelector(".touch");
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-    // r186 bỏ PCFSoftShadowMap (tự lùi về PCF và cảnh báo mỗi lần vào trận): đặt thẳng PCF, hình không đổi
-    renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;
+    // renderer theo mức Đồ hoạ (battle/gfx.js): MSAA, kiểu bóng; tone mapping, không gian màu như trước
+    const { renderer, gfx } = createRenderer(canvas, settings);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.3, def.camFar ?? 1400);
 
     const seed = (Date.now() & 0xffff) ^ (R * 977);
     const ctx = {
       scene, camera, renderer, R, diff, stats, save,
-      rng: makeRng(seed), clock: 0, openGates: def.openGates ? def.openGates() : {}, units: [],
+      rng: makeRng(seed), clock: 0, openGates: def.openGates ? def.openGates() : {}, units: [], gfx,
       troops: TROOP_LEVELS.find((t) => t.id === settings.troops) || TROOP_LEVELS[1],
       touch: false, mode, music, battle: def, heroDef, quyetSach,
     };
@@ -100,6 +104,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       ctx.atmo = new Atmosphere(ctx, new THREE.PointLight(0xff8a3c, 0, 30, 1.7));   // nắng, sương, khói lửa theo pha (atmosphere.js)
       ctx.ambient = def.ambient ? def.ambient(scene, ctx) : null;   // B15: cò, trâu, trẻ chăn trâu, quạ, dân; theo đồng hồ trận
       camBoxes = def.camBoxes ? def.camBoxes(ctx.world) : [];
+      gfx.shadow(ctx.world.sun);                    // cỡ bản đồ bóng theo mức (Thấp 1024)
     } catch (err) {
       input?.dispose?.();
       try { ctx.audio?.close(); } catch (_) { /* đã đóng */ }
@@ -131,8 +136,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // ---- cỡ khung, tỉ lệ render ----------------------------------------------------------
     const resize = () => {
       W = container.clientWidth; H = container.clientHeight;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * (save.settings.renderScale || 1));
-      renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+      gfx.resize(W, H);                            // min(DPR, trần của mức Đồ hoạ) × Tỉ lệ render × nấc độ phân giải động
+      camera.aspect = W / H; camera.updateProjectionMatrix();
       syncCompact(container);
     };
     window.addEventListener("resize", resize); resize();
@@ -143,13 +148,13 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     syncCompact(container);
 
     // ---- tạm dừng, kết quả -----------------------------------------------------------------
-    let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0;
+    let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, warm = null;   // warm: làm nóng (battle/gfx.js)
     // Trận đã hết (director.over) thì không mở tạm dừng: bảng tạm dừng ghi đè bảng THẮNG/THUA, tắt đi thì lớp phủ
     // trống mà showEnd không hiện lại → kẹt trong trận chết, mất thưởng. Chặn ở cả ba đường (Esc/Start/"II",
     // mất khoá chuột, ẩn tab); nếu vẫn lọt thì tắt tạm dừng sẽ dựng lại bảng kết quả, "Rút quân" thì rời luôn.
     const pause = (on) => {
       if (finished) return;
-      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx), ctx.hud?.log) : ""; overlay.classList.toggle("on", on);
+      paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx), ctx.hud?.log, gfx) : ""; overlay.classList.toggle("on", on);
       if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
@@ -165,10 +170,14 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         const k = el.dataset.set, v = el.type === "checkbox" ? el.checked : el.type === "range" ? Number(el.value) : el.value;
         save.settings[k] = v; onSettings?.(save.settings);
         if (k === "troops") { ctx.troops = TROOP_LEVELS.find((t) => t.id === v); ctx.director.fillActors(false); }
-        if (k === "renderScale") resize();
         if (k === "volume") ctx.audio.setVolume(v);
         if (k === "music") music?.setVolume(v);
-        if (k === "shadows") { renderer.shadowMap.enabled = v; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
+        // Tỉ lệ render, Đồ hoạ: tỉ lệ điểm ảnh, bóng đổi ngay (MSAA theo từ trận sau). Bóng / kiểu bóng đổi thì mọi chương trình shader dựng
+        // lại: biên dịch và vẽ một lượt ngay lúc còn tạm dừng (warm.pass) thay vì khựng cả giây ở khung đầu sau khi bấm Tiếp tục.
+        let recompile = false;
+        if (k === "renderScale" || k === "graphics") { recompile = gfx.set(save.settings); resize(); }
+        if (k === "shadows") { renderer.shadowMap.enabled = v; recompile = true; }
+        if (recompile) { scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); }); warm?.pass(renderer, scene, camera, true); }
       });
     };
     const onLockChange = () => { if (!document.pointerLockElement && !paused && !finished && !ctx.touch && !ctx.director.over) pause(true); };
@@ -195,6 +204,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       input.dispose(); ctx.audio.close();                      // đóng hẳn AudioContext (suspend thì mỗi trận rò một cái)
       // dọn riêng của trận trước khi trả GPU (B20: naval tự gỡ lưới hạm đội — làm sau releaseGpu là gỡ hai lần)
       resetGround(); def.dispose?.(ctx);
+      warm?.attach();                                          // nhóm làm nóng về cảnh để releaseGpu dọn cùng (battle/gfx.js)
       releaseGpu(scene, renderer);
       resolve(res);
     };
@@ -231,9 +241,10 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       // dấu giờ rAF có thể sớm hơn last (đặt sau khi dựng trận xong): dt âm làm bộ tích lũy âm, trận đứng ~0,5 s đầu
-      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
+      const ms = now - last, dt = Math.max(0, Math.min(0.1, ms / 1000)); last = now;
       if (paused || finished) return;
       if (rotateBlocked(container)) return;          // điện thoại cầm dọc: màn nhắc xoay ngang che trận (css/hud.css) — trận đứng chờ
+      if (gfx.frame(ms)) resize();                   // độ phân giải động (Đồ hoạ Tự động): khung chậm kéo dài thì hạ một nấc
       step(dt, input.poll(), true);
       input.pickMode = !!ctx.hud?.pickerOpen;   // bảng chọn điểm đến mở: D-pad tay cầm chọn 1–4 (input.js)
     };
@@ -374,7 +385,17 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (outroT >= 0 && d.over && (outroT >= OUTRO.sec || (outroT > 0.6 && (anyKey || outroTap)))) { outroT = -1; container.classList.remove("outro-mode"); showEnd(d.result); }
       if (!d.over) { endShown = false; outroT = -1; container.classList.remove("outro-mode"); }
     };
-    raf = requestAnimationFrame(frame);
+    // Làm nóng (battle/gfx.js) trước khung đầu: sprite fx dựng sẵn, vòng báo đòn, cờ, vật phẩm, rig sĩ quan / boss / tướng vào sau
+    // (BattleDef.rigs); biên dịch, vẽ một lượt lên canvas còn bị màn tải che. Xong (hoặc lỗi) mới hiện trận và chạy vòng lặp.
+    // ctx.warmed: kịch bản kiểm thử (?debug) chờ cờ này; tua bằng advance trong lúc làm nóng vẫn được (làm nóng chỉ vẽ).
+    ctx.warmed = false;
+    (async () => {
+      try { warm = new Warm(scene, ctx, ["doitruong", "photuong", ...(def.rigs || [])]); await warm.run(renderer, scene, camera, preloadFx()); }
+      catch (err) { console.warn("làm nóng", err); }
+      if (finished) return;
+      ctx.warmed = true; onReady?.();
+      last = performance.now(); raf = requestAnimationFrame(frame);
+    })();
   });
 }
 
@@ -414,21 +435,24 @@ export function logHTML(log) {
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   return `<details class="msglog"${log.length ? " open" : ""}><summary>Tin trong trận · ${log.length}</summary><ol>${log.slice().reverse().map((m) => `<li class="${m.kind}">${esc(m.text)}</li>`).join("")}</ol></details>`;
 }
-function pauseHTML(save, heroId = "H35", def = null, dev = 0, log = null) {
+// gfx: Đồ hoạ của trận (battle/gfx.js) — Tự động ghi kèm mức đang dùng.
+function pauseHTML(save, heroId = "H35", def = null, dev = 0, log = null, gfx = null) {
   const s = save.settings;
   const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? "selected" : ""}>${label}</option>`;
+  const gl = (l) => (l.id === "auto" && gfx && !(s.graphics in GFX_NAME) ? `${l.name} · ${GFX_NAME[gfx.tier]}` : l.name);
   return `<div class="panel pause">
     <h2>TẠM DỪNG</h2>
     <div class="row"><button class="primary" data-a="resume">Tiếp tục</button>${def?.noRetry ? "" : `<button data-a="retry">Tải lại đầu pha</button>`}<button data-a="quit">Rút quân</button></div>
     ${logHTML(log)}
     <h3>Cài đặt (đổi được giữa trận)</h3>
     <label>Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
+    <label>Đồ hoạ <select data-set="graphics">${GFX_LEVELS.map((l) => opt(l.id, s.graphics in GFX_NAME ? s.graphics : "auto", gl(l))).join("")}</select></label>
     <label>Tỉ lệ render <input type="range" min="0.5" max="1" step="0.05" value="${s.renderScale}" data-set="renderScale"></label>
     <label>Bóng <input type="checkbox" ${s.shadows ? "checked" : ""} data-set="shadows"></label>
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <label>Gợi ý lần đầu <input type="checkbox" ${s.hints !== false ? "checked" : ""} data-set="hints"></label>
-    <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức.</p>
+    <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức. Đồ hoạ Tự động chọn theo máy và tự hạ độ phân giải khi khung hình chậm; khử răng cưa đổi từ trận sau.</p>
     ${controlsHTML(dev, heroId)}${def?.touch?.interact ? interactNote(def) : ""}
   </div>`;
 }

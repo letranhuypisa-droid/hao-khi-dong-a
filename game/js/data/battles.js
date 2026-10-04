@@ -9,6 +9,8 @@
 // QUIZ_<id> (CARD_GROUPS nếu có, không thì dùng nhóm của B15); notes() → thẻ sử liệu ở màn nạp trận (dữ liệu thuần,
 // không kéo three.js vào hub). loading.title: tiêu đề màn nạp. result: mặc định cho màn kết quả khi kết quả trận không tự
 // ghi (res.missionsTotal, res.sideTotal, res.eventNames) — B15 giữ đúng chữ và số trước đợt 9.
+// models (đợt 19c): mô hình nhân vật (assets/models/char/<id>) màn tải nạp trước ngoài tướng người chơi — tướng đồng minh, boss, kể cả khi
+// ra giữa trận (main.js loadModels); rig của chúng làm nóng ở BattleDef.rigs.
 // keSach: số Kế Sách theo chế độ (nhãn nút chế độ ở Xuất trận). Đợt 9 D5 (tùy chọn): result.cLabel (tên dòng thứ tư của
 // bảng điểm — B15 "Cứ Điểm"), resultUI() → module dựng phần riêng của màn kết quả (ui/result-b20.js), marks() → tên các
 // Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau).
@@ -18,6 +20,7 @@ export const BATTLES = {
     id: "B15", chapter: "B15", name: "Hàm Tử", title: "Trận Hàm Tử", date: "1285",
     sub: "Tháng 4 năm Ất Dậu · 1285 · bến Hàm Tử, sông Hồng",
     heroes: ["H35"], playable: ["H35"], ladder: true, modes: ["nhanh", "chuan"], keSach: { nhanh: 1, chuan: 2 },
+    models: ["H33", "H40", "X19"],                        // Trần Nhật Duật, Nguyễn Khoái (đồng minh), Toa Đô (boss P4)
     loading: { title: "Bến Hàm Tử · 1285" },
     result: { title: "Thắng trận Hàm Tử", missionsTotal: 4, sideTotal: 2,
       eventNames: { counterA1: "Cứ Điểm bị phản công", surrounded: "Tướng ta bị vây" } },
@@ -28,6 +31,7 @@ export const BATTLES = {
     id: "B20", chapter: "B20", name: "Bạch Đằng", title: "Trận Bạch Đằng", date: "9/4/1288",
     sub: "Ngày 8 tháng 3 năm Mậu Tý · 9/4/1288 · sông Bạch Đằng",
     heroes: ["H31", "H34", "H38"], playable: ["H31"], fixedR: 25, preset: { level: 25 }, modes: ["nhanh"], wip: true,
+    models: ["H40", "X20", "X24"],                        // Nguyễn Khoái (vào từ pha 2), Ô Mã Nhi, Phàn Tiếp (boss)
     keSach: { nhanh: 3, chuan: 3 },                       // 3 Kế Sách Lớn (Nội Bàng — Nhỏ, chỉ Trận chuẩn — chưa làm)
     par: { nhanh: 780 },                                  // par Trận nhanh 13 phút (canon B20; = PAR_B20 của director-b20.js — HUD và màn kết quả cùng số)
     loading: { title: "Sông Bạch Đằng · 1288" },

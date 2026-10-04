@@ -43,6 +43,8 @@
 //                                          debug.js giữ __objective / __state của B15
 //   ? dispose(ctx)                       dọn thêm lúc rời trận (sau khi đã trả địa hình về null)
 //   ? preset { level }, fixedR           tướng dựng sẵn (heroStats(save, R, heroId, preset)), cấp trận cố định (B20: 25)
+//   ? rigs [khoá RIGS]                   rig chỉ xuất hiện giữa trận (boss, tướng đồng minh vào sau) — battle.js làm nóng shader / texture
+//                                          của chúng trước khung đầu (battle/gfx.js Warm; Đội trưởng, Phó tướng luôn có). B15: Toa Đô
 // Không nằm trong BattleDef (hub đọc mà không nạp three.js): data/battles.js giữ thẻ hub, loading.title, notes() cho màn
 // nạp trận, result { title, missionsTotal, sideTotal, eventNames } mặc định cho màn kết quả (kết quả trận có thể tự ghi
 // res.missionsTotal / res.sideTotal / res.eventNames / res.battle / res.stub).
@@ -218,5 +220,6 @@ export const B15 = {
   music: (d, hk) => (hk.tpc || d.phase === 3 ? "boss" : "battle"),
   hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, drawTop, pinTip: true },   // pinTip: thẻ nhiệm vụ giữ câu "làm thế nào" suốt pha (hud.js)
   debug: null,
+  rigs: ["X19"],                                         // Toa Đô ra ở P4: làm nóng trước khung đầu (battle/gfx.js)
 };
 export default B15;

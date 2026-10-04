@@ -1,12 +1,14 @@
 // battle/arena.js — Võ trường: sân tập, bộ điều phối và HUD riêng (GDD 13.5, 12.9).
 // Dùng lại hệ chiến đấu của trận chính (lính, tướng, sĩ quan, hiệu ứng, âm thanh, input, cảm ứng).
+// Đồ hoạ (đợt 19c, battle/gfx.js) như battle.js: renderer theo mức Đồ hoạ, độ phân giải động, làm nóng shader trước khung đầu rồi onReady.
 
 import * as THREE from "three";
 import { buildArena, heightAt, ARENA_R } from "./world.js";
 import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
 import { BigUnit } from "./units.js";
-import { FX } from "./fx.js";
+import { FX, preloadFx } from "./fx.js";
+import { createRenderer, Warm } from "./gfx.js";
 import { Audio } from "./audio.js";
 import { Input } from "./input.js";
 import { lerpAngle, setupTouch, controlsHTML, releaseGpu, syncCompact, logHTML, rotateBlocked } from "./battle.js";
@@ -211,8 +213,8 @@ class ArenaHUD {
   }
 }
 
-// opts: { mode, tier, count, invincible, seed, week, sync }
-export function runArena({ container, save, R, difficulty, music, opts, onSettings }) {
+// opts: { mode, tier, count, invincible, seed, week, sync }; onReady: làm nóng xong, ngay trước khung đầu (main.js hiện sân, ẩn màn tải)
+export function runArena({ container, save, R, difficulty, music, opts, onSettings, onReady = null }) {
   return new Promise((resolve) => {
     const settings = save.settings;
     const diff = DIFFICULTY.find((d) => d.id === difficulty) || DIFFICULTY[1];
@@ -226,19 +228,17 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     if (opts.mode === "huanluyen") container.classList.add("tut-mode");
     const canvas = container.querySelector("canvas"), hudRoot = container.querySelector(".hud");
     const overlay = container.querySelector(".overlay"), touchRoot = container.querySelector(".touch");
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-    renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = settings.shadows; renderer.shadowMap.type = THREE.PCFShadowMap;   // r186 bỏ PCFSoft (xem battle.js)
+    const { renderer, gfx } = createRenderer(canvas, settings);   // mức Đồ hoạ: MSAA, kiểu bóng, tỉ lệ điểm ảnh (battle/gfx.js)
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(55, 1, 0.3, 1400);   // núi xa đặt ngoài vòng 600–900 m
     // Võ trường (cả Huấn luyện) giữ HP / Phá Thế địch ×1 ở mọi độ khó: ước lượng thời gian Vàng/Bạc (meta/arena.js
     // estimateTime) và mốc Đua KO cố định tính theo HP gốc; hệ số §10 của đợt 9 chỉ dành cho trận (trước đây lọt sang đây,
     // làm huy chương thời gian khó hơn ×1,7–2,2 ở Nguyên soái, Truyền Kỳ).
     const ctx = {
       scene, camera, renderer, R, diff: { ...diff, hp: 1, poise: 1 }, stats, save, rng: makeRng((opts.seed || Date.now()) & 0x7fffffff), clock: 0,
-      openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music,
+      openGates: {}, units: [], troops: TROOP_LEVELS[1], touch: false, mode: "arena", music, gfx,
     };
     ctx.fmt = (str) => fmtKeys(str, devOf(ctx));   // chữ phím theo thiết bị đang dùng (data/controls.js), như battle.js
-    ctx.world = buildArena(scene, { shadows: settings.shadows });
+    ctx.world = buildArena(scene, { shadows: settings.shadows }); gfx.shadow(ctx.world.sun);
     ctx.hk = createHaoKhi({ quick: false });
     ctx.sim = { heroFront: null, fronts: {}, bases: {} };
     ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
@@ -265,15 +265,14 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     ctx.project = (x, y, z) => { v3.set(x, y, z).project(camera); if (v3.z > 1) return null; return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; };
     const resize = () => {
       W = container.clientWidth; H = container.clientHeight;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * (settings.renderScale || 1));
-      renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+      gfx.resize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix();
       syncCompact(container);
     };
     window.addEventListener("resize", resize); resize();
     const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);   // "Tự nhận" theo cách bạn bấm vào sân, rồi theo thiết bị vừa dùng (xem battle.js)
     syncCompact(container);                                                      // HUD gọn khi cảm ứng / khung hẹp (đợt 13)
 
-    let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, time = 0, endShown = false;
+    let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, time = 0, endShown = false, warm = null;
     // hết lượt (director.over) thì không mở tạm dừng, như battle.js: bảng tạm dừng đè mất bảng kết quả
     const pause = (on) => {
       if (finished) return;
@@ -297,7 +296,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     const finish = (res) => {
       finished = true; cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize); document.removeEventListener("pointerlockchange", onLock); document.removeEventListener("visibilitychange", onVis);
-      input.dispose(); ctx.audio.close(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
+      input.dispose(); ctx.audio.close(); warm?.attach(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
       resolve(res);
     };
     const showEnd = (res) => {
@@ -352,7 +351,15 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       if (d.over && !endShown) { endShown = true; if (d.result?.tutorial) setTimeout(() => finish(d.result), 400); else setTimeout(() => showEnd(d.result), 900); }
     };
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => { for (let t = 0; t < sec && !finished; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); if (paused) break; } };
-    const frame = (now) => { raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now; if (paused || finished || rotateBlocked(container)) return; step(dt, input.poll(), true); };   // cầm dọc: chờ xoay ngang (battle.js)
-    raf = requestAnimationFrame(frame);
+    const frame = (now) => { raf = requestAnimationFrame(frame); const ms = now - last, dt = Math.min(0.1, ms / 1000); last = now; if (paused || finished || rotateBlocked(container)) return; if (gfx.frame(ms)) resize(); step(dt, input.poll(), true); };   // cầm dọc: chờ xoay ngang (battle.js)
+    // làm nóng như battle.js: sĩ quan, tướng Nguyên của các đợt / luyện tập ra giữa chừng
+    ctx.warmed = false;
+    (async () => {
+      try { warm = new Warm(scene, ctx, ["doitruong", "photuong", "tuong"]); await warm.run(renderer, scene, camera, preloadFx()); }
+      catch (err) { console.warn("làm nóng", err); }
+      if (finished) return;
+      ctx.warmed = true; onReady?.();
+      last = performance.now(); raf = requestAnimationFrame(frame);
+    })();
   });
 }
