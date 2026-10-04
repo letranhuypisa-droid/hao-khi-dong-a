@@ -45,6 +45,9 @@ import { ICON } from "../data/moves-info.js";
 const fmtS = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : `${Math.ceil(s)} s`);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const pct = (v) => `${(clamp01(v) * 100).toFixed(1)}%`;
+// ghi DOM chỉ khi đổi (đợt 19c, như hud.js setText / setWidth): giá trị lần trước giữ trên phần tử
+const setT = (el, s) => { if (el._t !== s) { el._t = s; el.textContent = s; } };
+const setSt = (el, k, s) => { const c = "_" + k; if (el[c] !== s) { el[c] = s; el.style[k] = s; } };
 const PHASE_NAMES = ["P1", "P2", "P3", "P4", "P5", "P6"];
 const STANCE = { tiencong: { name: "Tiến công", sub: "khiêu chiến" }, giuvung: { name: "Giữ vững", sub: "giữ khoảng cách" }, theota: { name: "Theo ta", sub: "lui nhanh" } };
 const MARK_GLYPH = { hidden: "✦", active: "◆", exposed: "✖" };
@@ -230,7 +233,8 @@ function lureHTML(L, t) {
     : `<span class="b20-chip stance none">chưa lệnh</span>`;
   const pips = Array.from({ length: L.boatsMax }, (_, i) => `<i class="${i < L.boats ? "ok" : "lost"}"></i>`).join("");
   const lostTooMany = L.boatsMax - L.boats > L.lostMax;
-  return `<section class="b20-sec lure ${cls}"${near ? ` style="--pulse:${(0.55 + 0.45 * Math.sin(t * 9)).toFixed(2)}"` : ""}>
+  // nhấp nháy "Quá sát!" bằng hoạt ảnh CSS (css/b20.css, chỉ opacity): trước đây --pulse = sin(t) ghi vào chuỗi HTML nên bảng phân tích lại 20 lần/s
+  return `<section class="b20-sec lure ${cls}">
     <header><b>NGHI BINH</b>${chip}</header>
     <div class="row"><span>Khoảng cách</span><b class="gapv">${g} m</b><em class="gs">${word}</em></div>
     <div class="gapbar"><i class="zn" style="width:${pct(lo / L.max)}"></i><i class="zb" style="left:${pct(lo / L.max)};width:${pct((hi - lo) / L.max)}"></i>
@@ -265,7 +269,7 @@ function escapeHTML(X, t) {
   const v = Math.floor(X.value), hot = v >= 80 && !X.full;
   const hold = X.holding ? `<span class="b20-chip hold on"><img src="${ICON("giuvung")}" alt="">Giữ vững ×0,7${X.holdLeft ? ` · ${Math.ceil(X.holdLeft)} s` : ""}</span>`
     : `<span class="b20-chip hold"><img src="${ICON("giuvung")}" alt="">Chưa Giữ vững · Mệnh Lệnh → Giữ vững</span>`;
-  return `<section class="b20-sec escape${X.full ? " full" : hot ? " hot" : ""}"${hot ? ` style="--pulse:${(0.6 + 0.4 * Math.sin(t * 7)).toFixed(2)}"` : ""}>
+  return `<section class="b20-sec escape${X.full ? " full" : hot ? " hot" : ""}">
     <header><b>THOÁT VÂY</b><b class="v">${v}<small>/100</small></b></header>
     <div class="bar esc"><div style="width:${pct(X.value / 100)}"></div></div>
     <div class="row">${hold}<span class="rate">${X.full ? "Hạm đội đã thoát vây" : `+${X.rate.toFixed(1).replace(".", ",")}/s`}</span></div></section>`;
@@ -342,7 +346,9 @@ export class HudB20 {
     if (!it) { h.prompt(null); return; }
     const k = it.key ?? this.keyName(), touch = k === "✋";
     h.prompt(touch ? it.text : `Giữ ${k === "⬇" ? "D-pad ⬇" : k} · ${it.text}`, it.p ?? 0);          // cảm ứng: ✋ trong vòng đã là "giữ nút Tương tác"
-    const e = h.el.prompt; e.dataset.key = k; e.dataset.kind = it.kind || "";
+    const e = h.el.prompt, kind = it.kind || "";
+    if (e.dataset.key !== k) e.dataset.key = k;
+    if (e.dataset.kind !== kind) e.dataset.kind = kind;
     e.classList.toggle("quiet", !!it.quiet);          // gọi đò lúc đang giao chiến: nhắc nhỏ ở góc, không giữa màn
   }
   ferry(f) {
@@ -393,15 +399,16 @@ export class HudB20 {
       this.bossId = b.id; w.bname.textContent = b.name; w.bhan.textContent = b.nameHan ?? ""; w.btitle.textContent = b.title ?? "";
       const n = b.phases ?? 1; w.bpips.innerHTML = n > 1 ? Array.from({ length: n }, () => "<i></i>").join("") : "";
     }
-    e.hidden = false; this.root.classList.add("b20-bossing");
+    if (e.hidden) e.hidden = false;
+    this.root.classList.toggle("b20-bossing", true);
     const hp = clamp01(b.hp / b.maxHp), lock = (b.hpLock ?? 0) / 100, locked = lock > 0 && hp <= lock + 1e-4;
-    w.bhp.style.width = pct(hp); w.block.style.left = pct(lock); w.block.hidden = !(lock > 0);
-    w.bhpt.textContent = b.captured ? "" : `${Math.ceil(b.hp)} / ${Math.round(b.maxHp)}`;
-    w.bpo.style.width = b.poiseMax ? pct(b.poise / b.poiseMax) : "0";
-    [...w.bpips.children].forEach((p, i) => p.classList.toggle("done", i < (b.phase ?? 1) - 1));
+    setSt(w.bhp, "width", pct(hp)); setSt(w.block, "left", pct(lock)); if (w.block.hidden !== !(lock > 0)) w.block.hidden = !(lock > 0);
+    setT(w.bhpt, b.captured ? "" : `${Math.ceil(b.hp)} / ${Math.round(b.maxHp)}`);
+    setSt(w.bpo, "width", b.poiseMax ? pct(b.poise / b.poiseMax) : "0");
+    const pips = w.bpips.children; for (let i = 0; i < pips.length; i++) pips[i].classList.toggle("done", i < (b.phase ?? 1) - 1);
     e.classList.toggle("locked", locked); e.classList.toggle("broken", !!b.broken && !b.captured); e.classList.toggle("captured", !!b.captured);
-    w.bhint.textContent = b.captured ? "ĐÃ BẮT SỐNG" : b.broken ? (this.ctx.fmt ? this.ctx.fmt("VỠ THẾ · bấm {c}: ĐÒN QUYẾT — BẮT SỐNG") : "VỠ THẾ · bấm C: ĐÒN QUYẾT — BẮT SỐNG")
-      : locked ? `Sinh lực khóa ở ${b.hpLock}% — đánh cạn Phá Thế để bắt sống` : lock > 0 ? `Bắt sống: đánh tới ${b.hpLock}% rồi cạn Phá Thế` : "Vỡ Thế rồi Đòn Quyết để bắt sống";
+    setT(w.bhint, b.captured ? "ĐÃ BẮT SỐNG" : b.broken ? (this.ctx.fmt ? this.ctx.fmt("VỠ THẾ · bấm {c}: ĐÒN QUYẾT — BẮT SỐNG") : "VỠ THẾ · bấm C: ĐÒN QUYẾT — BẮT SỐNG")
+      : locked ? `Sinh lực khóa ở ${b.hpLock}% — đánh cạn Phá Thế để bắt sống` : lock > 0 ? `Bắt sống: đánh tới ${b.hpLock}% rồi cạn Phá Thế` : "Vỡ Thế rồi Đòn Quyết để bắt sống");
     // khung mục tiêu của hud.js trùng boss thì ẩn (thanh boss đã đủ)
     const h = this.ctx.hero, tgt = h?.lock?.alive && !h.lock.dead ? h.lock : this.hud.nearestOfficer?.();
     this.root.classList.toggle("b20-boss-target", !!b.unit && tgt === b.unit);

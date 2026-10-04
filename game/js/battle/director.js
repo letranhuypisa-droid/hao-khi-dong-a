@@ -21,6 +21,7 @@ const baseDef = (id) => BASES.find((b) => b.id === id);
 // Đội hình lính diễn: 11 cột cách 4 m (rộng 40 m); hàng đầu cận chiến đứng cách tuyến 0,95 m nên hai hàng đầu cách
 // nhau 1,9 m — vừa tầm đao, giáo. Trước đây 2,2 m mỗi bên: hai hàng cách 4,4 m, vung đòn vào không khí.
 const ACTOR_COLS = 11, ACTOR_FRONT = 0.95;
+const GAR = [];                  // updateBases: lính đồn trú còn đứng của một Cứ Điểm (dùng lại mỗi bước)
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
 export class Director {
@@ -403,9 +404,9 @@ export class Director {
       const b = sim.bases[id], d = baseDef(id);
       if (b.type === "cong" || b.type === "ban_doanh") continue;
       if (b.owner !== "dich") { ctx.world.setBaseProgress(id, 0); this.capT[id] = 0; continue; }
-      const p = this.basePos(id);
+      const p = ctx.world.bases[id];                    // x, z, r như basePos(id) — đọc thẳng, không dựng đối tượng mỗi bước (đợt 19c)
       const dHero = hero.alive ? Math.hypot(hero.x - p.x, hero.z - p.z) : Infinity, inRing = dHero < p.r;
-      const garrison = [];
+      const garrison = GAR; GAR.length = 0;             // mảng dùng lại (classifyGarrison chỉ đọc, không giữ)
       for (const a of ctx.crowd.agents) if (a.role === "garrison" && a.src === id && ctx.crowd.hittable(a)) garrison.push(a);
       const garrisonAlive = garrison.length;
       const ready = b.G < 1 && !garrisonAlive && !b.keeperAlive;

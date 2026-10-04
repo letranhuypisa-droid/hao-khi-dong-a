@@ -35,6 +35,15 @@ const SLOT_KEY = [short("skill"), short("skill2")];
 // Mỗi ô: { id, name, icon?, key?, ready?, cd?, text? } — thiếu trường nào thì suy ra như dưới.
 const heroSlots = (h) => { const s = h?.skillSlots?.(); return Array.isArray(s) && s.length ? s.slice(0, 2) : null; };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Ghi DOM chỉ khi đổi (đợt 19c): HUD cập nhật 20 lần/s mà phần lớn chữ, thanh, ô không đổi giữa hai lần — mỗi lần ghi (kể cả cùng giá trị)
+// là một thay đổi DOM, làm mất hiệu lực style / layout, innerHTML còn phân tích lại cả khối. Giá trị ghi lần trước giữ ngay trên phần tử.
+// Phần tử nào đã ghi qua các hàm này thì chỉ ghi qua chúng.
+export const setText = (el, s) => { if (el && el._t !== s) { el._t = s; el.textContent = s; } };
+export const setHTML = (el, s) => { if (el && el._h !== s) { el._h = s; el.innerHTML = s; } };
+export const setWidth = (el, s) => { if (el && el._w !== s) { el._w = s; el.style.width = s; } };
+export const setShow = (el, s) => { if (el && el._d !== s) { el._d = s; el.style.display = s; } };
+const setTf = (el, s) => { if (el._tf !== s) { el._tf = s; el.style.transform = s; } };
+const pctW = (v) => `${Math.round(v * 10) / 10}%`;          // độ rộng thanh làm tròn 0,1 % (≤ 0,2 px): Khí Lực hồi dần không ghi mỗi lần
 
 export class HUD {
   constructor(root, ctx) {
@@ -119,6 +128,11 @@ export class HUD {
     card0.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.openCard(this.openT <= 0); });
     root.querySelector(".hud-map").addEventListener("pointerdown", (e) => { e.stopPropagation(); this.toggleMap(); });
     this.el.sit.addEventListener("pointerdown", (e) => { e.stopPropagation(); this.toggleSit(); });
+    // Vùng tránh của nhãn chỉ đường (measureAvoid) đo lại khi bố cục đổi (đợt 19c): ResizeObserver báo ngay sau bước layout của trình duyệt —
+    // getBoundingClientRect lúc đó không ép layout. Trước đây đo mỗi lần cập nhật HUD (20 lần/s), ngay sau các lần ghi chữ: một lượt layout
+    // đồng bộ mỗi lần. Mảnh nào đổi cỡ (tin mới, bảng sự kiện, thẻ mở, bản đồ to, cửa sổ) là đo lại cả danh sách. Không có ResizeObserver
+    // thì đo mỗi lần như cũ.
+    this.avoidRO = typeof ResizeObserver === "function" ? new ResizeObserver(() => this.measureAvoid()) : null;
   }
   get compact() { return !!this.root.parentElement?.classList.contains("compact"); }
   // thẻ nhiệm vụ một dòng → mở đủ (mục tiêu, câu "làm thế nào") OPEN_SEC giây; chạm lần nữa thì gập
@@ -171,10 +185,17 @@ export class HUD {
   // Vùng HUD mà nhãn chỉ đường phải tránh (cột trái: thẻ nhiệm vụ + tin; bản đồ nhỏ + bảng mặt trận), đo ở nhịp 0,05 s thay vì mỗi khung.
   // HUD gọn: cột trái là display: contents (khung 0 × 0) nên đo từng mảnh — thẻ nhiệm vụ, tin, nút Tình hình, cụm nút cảm ứng,
   // cần điều khiển, thanh máu.
-  measureAvoid() {
-    const base = this.root.getBoundingClientRect(), out = [], st = this.root.parentElement;
+  avoidEls(touch) {
+    const st = this.root.parentElement, on = touch === "all" ? ".touch" : ".touch.on";
     const list = [this.el.left, this.el.phase.parentElement, this.el.msgs, this.root.querySelector(".hud-map"), this.el.events, this.el.ks, this.el.sit];
-    if (this.compact && st) list.push(st.querySelector(".touch.on .tbtns"), st.querySelector(".touch.on .stick"), st.querySelector(".touch.on .tsys"), this.root.querySelector(".hud-hero"));
+    if (touch && st) list.push(st.querySelector(on + " .tbtns"), st.querySelector(on + " .stick"), st.querySelector(on + " .tsys"), this.root.querySelector(".hud-hero"));
+    return list;
+  }
+  // theo dõi đổi cỡ: gốc HUD, các mảnh trên, cả cụm nút cảm ứng (dựng sau HUD) — gọi lại khi bật / tắt HUD gọn
+  wireAvoid() { const ro = this.avoidRO; if (ro) for (const n of [this.root, ...this.avoidEls("all")]) if (n) ro.observe(n); }
+  measureAvoid() {
+    const base = this.root.getBoundingClientRect(), out = [];
+    const list = this.avoidEls(this.compact);
     for (const n of list) {
       if (!n) continue;
       const r = n.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;      // bảng sự kiện / Kế Sách rỗng thì cao 0
@@ -197,8 +218,8 @@ export class HUD {
     const w = placeWaypoint({ W, H, fwd, rgt, p: fwd > 0 ? ctx.project(best.x, best.y + 9, best.z) : null, half: this.wpHalf || 90, avoid: this.avoid || [] });   // hình học: waypoint.js
     if (E.wp.hidden) E.wp.hidden = false;
     if (E.wp.dataset.mode !== w.mode) E.wp.dataset.mode = w.mode;
-    E.wp.style.transform = `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`;
-    E.wpdir.style.transform = `rotate(${Math.round(w.rot)}deg)`;
+    setTf(E.wp, `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`);
+    setTf(E.wpdir, `rotate(${Math.round(w.rot)}deg)`);
     if (best.label !== this.wpName) { this.wpName = best.label; E.wpname.textContent = best.label; this.wpHalf = 0; }
     if (!this.wpHalf) this.wpHalf = Math.max(60, ((E.wp.querySelector(".wp-box").offsetWidth || 180) + 26) / 2);       // đo lại khi đổi chữ
     const dist = `${Math.round(bd)} m`;
@@ -219,8 +240,8 @@ export class HUD {
     const w = placeWaypoint({ W, H, fwd, rgt, p: fwd > 0 ? ctx.project(b.x, b.y + 2.6, b.z) : null, half, avoid: [...avoid, ...first] });
     if (E.wp2.hidden) E.wp2.hidden = false;
     if (E.wp2.dataset.mode !== w.mode) E.wp2.dataset.mode = w.mode;
-    E.wp2.style.transform = `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`;
-    E.wp2dir.style.transform = `rotate(${Math.round(w.rot)}deg)`;
+    setTf(E.wp2, `translate(${Math.round(w.x)}px, ${Math.round(w.y)}px)`);
+    setTf(E.wp2dir, `rotate(${Math.round(w.rot)}deg)`);
     if (b.label !== this.wp2Name) { this.wp2Name = b.label; E.wp2name.textContent = b.label; this.wp2Half = 0; }
     if (!this.wp2Half) this.wp2Half = Math.max(50, ((E.wp2.querySelector(".wp-box").offsetWidth || 120) + 26) / 2);
     const dist = `${Math.round(Math.hypot(dx, dz))} m`;
@@ -243,8 +264,9 @@ export class HUD {
     const E = this.el;
     if (text == null) { if (this.promptKey !== null) { E.prompt.hidden = true; this.promptKey = null; } return; }
     if (text !== this.promptKey) { E.prompttext.textContent = text; this.promptKey = text; }
-    E.prompt.hidden = false;
-    E.promptring.style.strokeDashoffset = String(94.25 * (1 - Math.max(0, Math.min(1, p))));
+    if (E.prompt.hidden) E.prompt.hidden = false;                 // gọi mỗi khung (hud-b20.js): chỉ ghi khi đổi
+    const off = String(94.25 * (1 - Math.max(0, Math.min(1, p))));
+    if (E.promptring._o !== off) { E.promptring._o = off; E.promptring.style.strokeDashoffset = off; }
     E.prompt.classList.toggle("full", p >= 1);
   }
   // Chọn điểm đến: items [{ id, label, sub?, icon?, svg?, kind? }] (tối đa 4), phím 1–4 (battle.js chuyển cmd1–4 vào pick khi
@@ -273,7 +295,7 @@ export class HUD {
     // vòng lệnh theo trận (Tự do): dựng 4 ô và chọn người nhận đầu tiên ngay khi director có — phím 1–4 dùng được cả khi chưa mở vòng
     if (!this.ringCustom && d.ringItems) { this.buildRing(d.ringItems()); this.ringCustom = true; this.ringFront = d.ringTargets?.()[0]?.id ?? this.ringFront; }
     const P = PH[Math.min(d.phase, PH.length - 1)];
-    E.phase.textContent = P ? `${P.id} · ${P.name}` : "";
+    setText(E.phase, P ? `${P.id} · ${P.name}` : "");
     // P3: mục tiêu kèm phần trăm độ bền từng cổng (director.goalText, đợt 15a) — HUD gọn khi thẻ gập dùng dạng ngắn cho thấy cả hai phần trăm;
     // trận không có goalText (Tự do, B20, Võ trường) như cũ
     const goal = d.baseHint || d.goalText?.(this.compact && this.openT <= 0) || P?.goal || "";
@@ -284,117 +306,125 @@ export class HUD {
       if (tip !== this.tipText) { this.tipText = tip; E.tip.textContent = tip; }
     }
     this.lockHint(ctx, d);
-    this.measureAvoid();
-    E.time.textContent = fmt(d.time);
+    if (!this.avoidRO) this.measureAvoid();                   // không có ResizeObserver: đo mỗi lần như cũ
+    else if (this.compact !== this.avoidCp) { this.avoidCp = this.compact; this.wireAvoid(); this.measureAvoid(); }   // vào trận, đổi HUD gọn: đo ngay một lần
+    setText(E.time, fmt(d.time));
     E.time.classList.toggle("late", d.time > (d.M?.par ?? this.parSec));
     // Hào Khí — trận có hud.hkView (chế độ Tự do dưới bậc Tướng) thì dải này là Danh tiếng: { label, value, pct, state }
     const hv = this.B.hud?.hkView?.(ctx);
     if (hv) {
-      if (E.hklabel.textContent !== hv.label) { E.hklabel.textContent = hv.label; E.hkover.style.width = "0"; E.hkfill.parentElement.classList.add("rep"); }
-      E.hkv.textContent = hv.value; E.hkfill.style.width = `${hv.pct}%`; E.hkstate.textContent = hv.state;
+      if (E.hklabel.textContent !== hv.label) { E.hklabel.textContent = hv.label; setWidth(E.hkover, "0"); E.hkfill.parentElement.classList.add("rep"); }
+      setText(E.hkv, hv.value); setWidth(E.hkfill, `${hv.pct}%`); setText(E.hkstate, hv.state);
     } else {
-      E.hkv.textContent = Math.floor(hk.value);
-      E.hkfill.style.width = `${hk.value}%`;
-      E.hkover.style.width = `${(hk.overflow / 30) * 100}%`;
+      setText(E.hkv, Math.floor(hk.value));
+      setWidth(E.hkfill, pctW(hk.value));
+      setWidth(E.hkover, pctW((hk.overflow / 30) * 100));
       E.hkfill.parentElement.classList.toggle("ready", tpcReady(hk));
       E.hkfill.parentElement.classList.toggle("tpc", hk.tpc);
       E.hkv.classList.toggle("pulse", this.pulse > 0);
-      E.hkstate.textContent = hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? fm("Sẵn sàng · bấm {tpc}") : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "";
+      setText(E.hkstate, hk.tpc ? `TỔNG PHẢN CÔNG · ${Math.ceil(hk.tpcLeft)} s` : tpcReady(hk) ? fm("Sẵn sàng · bấm {tpc}") : hk.overflow > 0 ? `dư ${Math.floor(hk.overflow)}` : "");
     }
     // tướng
-    E.lv.textContent = `Cấp ${ctx.stats.level}`;
-    E.hp.style.width = `${(hero.hp / hero.maxHp) * 100}%`;
-    E.hpt.textContent = `${Math.ceil(hero.hp)} / ${Math.round(hero.maxHp)}`;
+    setText(E.lv, `Cấp ${ctx.stats.level}`);
+    setWidth(E.hp, pctW((hero.hp / hero.maxHp) * 100));
+    setText(E.hpt, `${Math.ceil(hero.hp)} / ${Math.round(hero.maxHp)}`);
     E.hp.parentElement.classList.toggle("low", hero.hp / hero.maxHp < 0.3);
     const per = hero.def?.kiLucPerBar ?? HERO.kiLucPerBar ?? 100;                                   // Khí Lực mỗi vạch theo tướng (H35: 100)
-    for (let i = 0; i < this.nKi; i++) E["ki" + i].style.width = `${Math.max(0, Math.min(100, (hero.ki - per * i) / per * 100))}%`;
-    E.rev.textContent = hero.revives > 0 ? `· Gượng dậy ×${hero.revives}` : "";
+    for (let i = 0; i < this.nKi; i++) setWidth(E["ki" + i], pctW(Math.max(0, Math.min(100, (hero.ki - per * i) / per * 100))));
+    setText(E.rev, hero.revives > 0 ? `· Gượng dậy ×${hero.revives}` : "");
     // thanh Phá Thế của người lính (chế độ Tự do, từ Đội trưởng): đòn nhẹ trừ thanh thay vì làm khựng
-    if (hero.poiseMax > 0) { if (E.hpo.hidden) E.hpo.hidden = false; E.hpof.style.width = `${(hero.poise / hero.poiseMax) * 100}%`; }
+    if (hero.poiseMax > 0) { if (E.hpo.hidden) E.hpo.hidden = false; setWidth(E.hpof, pctW((hero.poise / hero.poiseMax) * 100)); }
     // ô / nút chưa mở theo bậc (người lính): ẩn ô Phá Trận, Mệnh Lệnh; làm mờ ô Tuyệt Kỹ
     if (hero.locked) {
-      if (E.sk1) E.sk1.style.display = hero.locked("skill") ? "none" : "";
-      if (E.sk4) E.sk4.style.display = hero.locked("cmd") ? "none" : "";
+      if (E.sk1) setShow(E.sk1, hero.locked("skill") ? "none" : "");
+      if (E.sk4) setShow(E.sk4, hero.locked("cmd") ? "none" : "");
       if (E.sk2) E.sk2.classList.toggle("locked", hero.locked("ult"));
     }
-    const buffs = [];
-    if (hero.buffs.atk) buffs.push(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
-    if (hero.buffs.flag) buffs.push(`Dưới cờ: đánh lính +${Math.round(hero.buffs.flag * 100)}%`);   // cờ Tuyệt Kỹ không cộng vào đòn lên sĩ quan, Toa Đô (đợt 9)
-    if (hero.lienHoan) buffs.push(`Liên hoàn ×${hero.lienHoan}`);
-    if (hero.chargeLevel > 0) buffs.push(`Tụ lực ${hero.chargeLevel}`);
-    if (hero.invuln > 0 && hero.state === "ult") buffs.push("Bất tử");
-    if (hero.combo > 4) buffs.push(`${hero.combo} đòn`);
-    E.buffs.textContent = buffs.join(" · ");
+    let buffs = "";
+    const buff = (s) => { buffs += (buffs ? " · " : "") + s; };
+    if (hero.buffs.atk) buff(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
+    if (hero.buffs.flag) buff(`Dưới cờ: đánh lính +${Math.round(hero.buffs.flag * 100)}%`);   // cờ Tuyệt Kỹ không cộng vào đòn lên sĩ quan, Toa Đô (đợt 9)
+    if (hero.lienHoan) buff(`Liên hoàn ×${hero.lienHoan}`);
+    if (hero.chargeLevel > 0) buff(`Tụ lực ${hero.chargeLevel}`);
+    if (hero.invuln > 0 && hero.state === "ult") buff("Bất tử");
+    if (hero.combo > 4) buff(`${hero.combo} đòn`);
+    setText(E.buffs, buffs);
     this.terrainTags(hero, E);
     // kỹ năng
     updateAttackTiles(hero, E, this);
     this.combo(hero, E);
     this.skillTiles(hero, hk, E);
     E.sk3.classList.toggle("ready", tpcReady(hk));
-    E.sk3.style.display = tpcReady(hk) || hk.tpc ? "" : "none";
+    setShow(E.sk3, tpcReady(hk) || hk.tpc ? "" : "none");
     { const kb = E.sk1?.querySelector("b"), want = ctx.touch ? "" : this.sk1Key; if (kb && kb.textContent !== want) kb.textContent = want; }    // lớp cảm ứng bật / tắt theo thiết bị đang dùng
-    // mặt trận
-    E.fronts.innerHTML = this.B.hud?.frontsHTML ? this.B.hud.frontsHTML(ctx) : Object.values(FRONTS).map((F) => frontRowHTML(F, sim.fronts[F.id], sim)).join("") + (sim.reinf ? `<div class="front reinf">Tiếp viện: ${sim.reinf.charges} lượt${sim.reinf.pending.length ? ` · đang tới ${Math.max(0, Math.ceil(sim.reinf.pending[0].at - sim.t))}s` : ""}${d.followers ? ` · Theo ta ${d.followers.q}` : ""}</div>` : "");
-    // sự kiện
-    E.events.innerHTML = Object.entries(d.events || {}).filter(([, v]) => v.state === "run").map(([k, v]) =>
-      `<div class="ev"><b>${EVENTS[k]?.name ?? k}</b><span>${Math.ceil(v.left)} s</span></div>`).join("");
+    // mặt trận, sự kiện: chuỗi HTML dựng như cũ, chỉ ghi (phân tích lại) khi chuỗi đổi — số đổi ~1 lần/giây
+    setHTML(E.fronts, this.B.hud?.frontsHTML ? this.B.hud.frontsHTML(ctx) : Object.values(FRONTS).map((F) => frontRowHTML(F, sim.fronts[F.id], sim)).join("") + (sim.reinf ? `<div class="front reinf">Tiếp viện: ${sim.reinf.charges} lượt${sim.reinf.pending.length ? ` · đang tới ${Math.max(0, Math.ceil(sim.reinf.pending[0].at - sim.t))}s` : ""}${d.followers ? ` · Theo ta ${d.followers.q}` : ""}</div>` : ""));
+    let evs = "";
+    for (const k in d.events || {}) { const v = d.events[k]; if (v.state === "run") evs += `<div class="ev"><b>${EVENTS[k]?.name ?? k}</b><span>${Math.ceil(v.left)} s</span></div>`; }
+    setHTML(E.events, evs);
     // Kế Sách, rồi các bảng của trận (setPanel)
     const kl = (d.keSach?.hud?.() || []).filter((k) => k.state !== "khoa");
     let ks = kl.map((k) =>
       `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${fm(k.word + (k.detail ? " · " + k.detail : ""))}</span><i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`).join("");
     for (const [id, html] of this.panels) ks += `<div class="hud-panel" data-panel="${id}">${html}</div>`;
     if (ks !== this.ksHtml) { E.ks.innerHTML = ks; this.ksHtml = ks; this.sitBadge(kl.length); }     // chỉ vẽ lại khi đổi: hoạt ảnh CSS (nhấp nháy Sẵn sàng) chạy liền
-    // tin nhắn: sổ tin (bảng tạm dừng) + HUD gọn một tin ≤ 5 s, bố cục máy tính 4 tin như cũ
+    // tin nhắn: sổ tin (bảng tạm dừng) + HUD gọn một tin ≤ 5 s, bố cục máy tính 4 tin như cũ (ghi khi chuỗi đổi: lúc có tin mới, lúc tin mờ dần)
     logMsgs(this.log, d.msgs, this.seenMsgs, fm);
     const compact = this.compact;
     if (compact) {
-      const c = compactMsg(d.msgs), html = c ? `<div class="msg ${c.m.kind}" style="opacity:${c.alpha}">${fm(c.m.text)}</div>` : "";
-      if (html !== this.msgHtml) { E.msgs.innerHTML = html; this.msgHtml = html; }
-    } else { E.msgs.innerHTML = d.msgs.slice(-4).map((m) => `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${fm(m.text)}</div>`).join(""); this.msgHtml = null; }
+      const c = compactMsg(d.msgs);
+      setHTML(E.msgs, c ? `<div class="msg ${c.m.kind}" style="opacity:${c.alpha}">${fm(c.m.text)}</div>` : "");
+    } else {
+      let html = "";
+      for (let i = Math.max(0, d.msgs.length - 4); i < d.msgs.length; i++) { const m = d.msgs[i]; html += `<div class="msg ${m.kind}" style="opacity:${Math.min(1, (m.T - m.t) * 2)}">${fm(m.text)}</div>`; }
+      setHTML(E.msgs, html);
+    }
     if (this.openT > 0 && (this.openT -= dt) <= 0) this.openCard(false);
-    E.ko.textContent = d.ko;
-    E.kos.textContent = `${d.ko} KO`;
+    setText(E.ko, d.ko);
+    setText(E.kos, `${d.ko} KO`);
     // nút ☰ của lớp cảm ứng sáng khi có việc ở trong (Tổng Phản Công sẵn sàng, Kế Sách sẵn sàng)
     this.menuEl ??= this.root.parentElement?.querySelector(".touch .tmenu") || null;
     if (this.menuEl) { const al = tpcReady(hk) || kl.some((k) => k.state === "sansang"); if (al !== this.menuAlert) { this.menuAlert = al; this.menuEl.classList.toggle("alert", al); } }
     // mục tiêu: sĩ quan đang khóa > cổng vừa bị đánh (≤ 3 s) > sĩ quan thức gần nhất (18 m) > cổng trong 25 m (đợt 15a: cổng Hàm Tử quan
     // hiện độ bền — director.gateTarget, gatebar.js). Trận không có gateTarget (Tự do, B20, Võ trường) thì như cũ.
+    // classList.toggle(lớp, có/không) không đổi gì khi lớp đã đúng (add / remove thì luôn ghi lại thuộc tính class)
     const lk = hero.lock?.alive && !hero.lock.dead ? hero.lock : null;
     const gt = lk ? null : d.gateTarget?.() ?? null;
     const t = lk || (gt?.hit ? null : this.nearestOfficer());
+    const tc = E.target.classList;
     if (t) {
-      E.target.classList.add("on"); E.target.classList.remove("gate", "locked");
+      tc.toggle("on", true); tc.toggle("gate", false); tc.toggle("locked", false);
       const nm = t.name + (t.broken > 0 ? " · VỠ THẾ" : "");
       if (nm !== this.tgtName) { this.tgtName = nm; E.tname.textContent = nm; }
-      E.thp.style.width = `${(t.hp / t.maxHp) * 100}%`;
-      E.tpo.style.width = t.poiseMax ? `${(t.poise / t.poiseMax) * 100}%` : "0";
-      E.tpo.parentElement.style.display = t.poiseMax ? "" : "none";
-      E.target.classList.toggle("broken", t.broken > 0);
+      setWidth(E.thp, pctW((t.hp / t.maxHp) * 100));
+      setWidth(E.tpo, t.poiseMax ? pctW((t.poise / t.poiseMax) * 100) : "0");
+      setShow(E.tpo.parentElement, t.poiseMax ? "" : "none");
+      tc.toggle("broken", t.broken > 0);
     } else if (gt) this.gateBox(gt, E);
-    else E.target.classList.remove("on");
+    else tc.toggle("on", false);
     // dấu khóa mục tiêu
     if (hero.lock?.alive && !hero.lock.dead) {
       const p = ctx.project(hero.lock.x, hero.lock.y + 3.2 * hero.lock.rig.scale, hero.lock.z);
-      E.lockmark.style.display = p ? "" : "none";
-      if (p) E.lockmark.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%,-50%)`;
-    } else E.lockmark.style.display = "none";
+      setShow(E.lockmark, p ? "" : "none");
+      if (p) setTf(E.lockmark, `translate(${p.x}px, ${p.y}px) translate(-50%,-50%)`);
+    } else setShow(E.lockmark, "none");
     // vòng lệnh
     if (this.ringOpen) {
       if (d.ringTargets) {
-        E.ringfront.textContent = d.ringTargets().find((t) => t.id === this.ringFront)?.name ?? "";
+        setText(E.ringfront, d.ringTargets().find((t) => t.id === this.ringFront)?.name ?? "");
         const hint = d.ringHint?.() ?? ""; if (E.ringhint.textContent !== hint) E.ringhint.textContent = hint;
-        for (const k of this.ringKeys) E["cd_" + k].textContent = d.ringStatus?.(k, this.ringFront) ?? "";
+        for (const k of this.ringKeys) setText(E["cd_" + k], d.ringStatus?.(k, this.ringFront) ?? "");
       } else {
-        E.ringfront.textContent = FRONTS[this.ringFront]?.name ?? "";
+        setText(E.ringfront, FRONTS[this.ringFront]?.name ?? "");
         for (const k of ORDER_KEYS) {
           const cd = sim.cooldowns?.[k] ?? 0;
-          E["cd_" + k].textContent = k === "tiepvien" ? `${sim.reinf?.charges ?? 0} lượt${cd > 0 ? " · " + Math.ceil(cd) + "s" : ""}` : k === "theota" && d.followers ? "đang theo" : cd > 0 ? Math.ceil(cd) + "s" : "";
+          setText(E["cd_" + k], k === "tiepvien" ? `${sim.reinf?.charges ?? 0} lượt${cd > 0 ? " · " + Math.ceil(cd) + "s" : ""}` : k === "theota" && d.followers ? "đang theo" : cd > 0 ? Math.ceil(cd) + "s" : "");
         }
       }
-      E.ringfoot.textContent = "Đồng hồ trận chậm ×0,2 khi vòng mở. Phím 1–4 hoặc chạm.";
+      setText(E.ringfoot, "Đồng hồ trận chậm ×0,2 khi vòng mở. Phím 1–4 hoặc chạm.");
     }
     this.guardFrame(d, E);
-    E.hint.textContent = hero.alive ? "" : "";
+    setText(E.hint, "");
     this.drawMap();
   }
 
@@ -441,19 +471,19 @@ export class HUD {
     const phaTran = () => {
       const pt = hero.phaTran;
       E.sk1.classList.toggle("ready", pt.cd <= 0);
-      E.sk1cd.textContent = pt.left > 0 ? `${pt.left} lần · ${Math.ceil(pt.window)}s` : pt.cd > 0 ? Math.ceil(pt.cd) : "";
+      setText(E.sk1cd, pt.left > 0 ? `${pt.left} lần · ${Math.ceil(pt.window)}s` : pt.cd > 0 ? Math.ceil(pt.cd) : "");
     };
     // ô: { ready, cd } với cd là chữ hiện ở góc ô (số giây hồi, "3 lần · 5s", "đọc hịch") — hero-skills.js hud()
     if (!slots) phaTran();
     else slots.forEach((s, i) => {
       const k = SLOT_TILE[i], tile = E[k]; if (!tile) return;
       tile.classList.toggle("ready", s.ready ?? !(s.cd > 0));
-      E[k + "cd"].textContent = s.text ?? s.cd ?? "";
+      setText(E[k + "cd"], s.text ?? s.cd ?? "");
     });
     const u = hero.ultInfo?.(), cost = u?.cost ?? HERO.tuyetKy.cost;
     const hkUlt = hk.tpc && hero.hkUltReady;
     E.sk2.classList.toggle("ready", u?.ready ?? (hero.ki >= cost || hkUlt));
-    E.sk2cd.textContent = u?.text ?? (typeof u?.cd === "string" ? u.cd : hkUlt ? "Hào Khí" : `${Math.floor(hero.ki / 100)}/${this.nKi}`);
+    setText(E.sk2cd, u?.text ?? (typeof u?.cd === "string" ? u.cd : hkUlt ? "Hào Khí" : `${Math.floor(hero.ki / 100)}/${this.nKi}`));
   }
 
   // Tag thế đất cạnh thanh máu (terrain-rules.js): chênh độ cao chân tướng với mục tiêu đang khóa (trong 2 × tagR m)
@@ -473,13 +503,13 @@ export class HUD {
   // kèm dòng vì sao (css/hud.css .hud-target.gate). Chữ chỉ ghi khi đổi (nhịp HUD 0,05 s).
   gateBox(g, E) {
     const c = E.target.classList;
-    c.add("on", "gate"); c.toggle("locked", g.locked); c.remove("broken");
+    c.toggle("on", true); c.toggle("gate", true); c.toggle("locked", g.locked); c.toggle("broken", false);
     if (g.name !== this.tgtName) { this.tgtName = g.name; E.tname.textContent = g.name; }
     if (g.text !== this.tnumText) { this.tnumText = g.text; E.tnum.textContent = g.text; }
     const why = g.why || "";
     if (why !== this.twhyText) { this.twhyText = why; E.twhy.textContent = why; }
-    E.thp.style.width = `${g.max > 0 ? Math.max(0, Math.min(100, (g.hp / g.max) * 100)) : 0}%`;
-    E.tpo.parentElement.style.display = "none";
+    setWidth(E.thp, pctW(g.max > 0 ? Math.max(0, Math.min(100, (g.hp / g.max) * 100)) : 0));
+    setShow(E.tpo.parentElement, "none");
   }
 
   nearestOfficer() {
@@ -501,7 +531,9 @@ export class HUD {
     E.combo.classList.toggle("on", n >= 3);
     if (n !== this.lastCombo) {
       E.combon.textContent = n;
-      if (n > this.lastCombo) { E.combo.classList.remove("pop"); void E.combo.offsetWidth; E.combo.classList.add("pop"); }
+      // nảy lại: đổi qua lại hai lớp cùng hoạt ảnh (pop / pop2, css/game.css) — đổi tên hoạt ảnh là chạy lại từ đầu, không cần ép layout
+      // (void offsetWidth) mỗi đòn trúng như trước
+      if (n > this.lastCombo) { const a = this.popA = !this.popA; E.combo.classList.toggle("pop", a); E.combo.classList.toggle("pop2", !a); }
       E.combo.dataset.tier = n >= 100 ? 3 : n >= 60 ? 2 : n >= 30 ? 1 : 0;
       this.lastCombo = n;
     }
@@ -510,13 +542,21 @@ export class HUD {
   // Bản đồ nhỏ: khung toạ độ ctx.battle.hud.bounds (mặc định Hàm Tử 600 × 400). Lớp nền và lớp trên của trận vẽ qua
   // hud.drawBase(M, ctx) / hud.drawTop(M, ctx), M = { c, W, H, X, Z, sx, sz, t }; phần chung: lính thật, sĩ quan, vật
   // phẩm, mũi tên tướng.
+  // Lớp nền tĩnh (đợt 19c): trận có hud.baseKey(M, ctx) → chuỗi khoá thì lớp nền vẽ một lần ra canvas phụ, mỗi lần chỉ chép (drawImage); vẽ lại
+  // khi khoá đổi (B15: tuyến hai mặt trận dời một nửa điểm ảnh, Cứ Điểm đổi chủ). Không có baseKey (B20 — tự đệm phần tĩnh, phần con nước vẽ
+  // mỗi lần) thì drawBase như cũ.
   drawMap() {
     const H0 = this.B.hud || {}, bd = H0.bounds || B15_BOUNDS;
     const c = this.mapCtx, W = this.mapW, H = this.mapH, sx = W / (bd.x1 - bd.x0), sz = H / (bd.z1 - bd.z0);
     const X = (x) => (x - bd.x0) * sx, Z = (z) => (z - bd.z0) * sz;
     const ctx = this.ctx, d = ctx.director;
     const M = { c, W, H, X, Z, sx, sz, t: this.t };
-    if (H0.drawBase) H0.drawBase(M, ctx); else { c.fillStyle = "#cdb888"; c.fillRect(0, 0, W, H); }
+    const key = H0.drawBase && H0.baseKey ? H0.baseKey(M, ctx) : null;
+    if (key != null) {
+      if (!this.mapBase) { const cv = this.mapBase = document.createElement("canvas"); cv.width = W; cv.height = H; this.mapBaseCtx = cv.getContext("2d"); }
+      if (key !== this.mapBaseKey) { this.mapBaseKey = key; H0.drawBase({ ...M, c: this.mapBaseCtx }, ctx); }
+      c.drawImage(this.mapBase, 0, 0);
+    } else if (H0.drawBase) H0.drawBase(M, ctx); else { c.fillStyle = "#cdb888"; c.fillRect(0, 0, W, H); }
     // lính thật
     for (const a of ctx.crowd.agents) {
       if (a.role === "actor" || a.state === "dead") continue;
@@ -573,7 +613,7 @@ const PIPS = ["", "●○○○○○", "●●○○○○", "●●●○○�
 // Ô C: đòn C kế tiếp. hero.nextHeavyInfo() → { id, icon?, name?, label?, hot? } (C2); không có thì nextHeavy + MOVE_INFO.
 export function updateAttackTiles(hero, E, st) {
   const chain = hero.state === "attack" && hero.move?.[0] === "N" ? Number(hero.move[1]) : hero.chainGrace > 0 ? hero.chain : 0;
-  E.atkNcd.textContent = PIPS[chain] || "";
+  setText(E.atkNcd, PIPS[chain] || "");
   E.atkN.classList.toggle("ready", chain > 0);
   const ni = hero.nextHeavyInfo?.();
   const nk = ni ? ni.id ?? ni.key : nextHeavy(hero);

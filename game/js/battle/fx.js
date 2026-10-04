@@ -10,7 +10,8 @@ import { heightAt } from "./world.js";
 const MAXP = 600;
 const BLOOD_A = new THREE.Color(0x8a1d12), BLOOD_B = new THREE.Color(0xb3261a);
 const DUST_A = new THREE.Color(0xc9a86a), DUST_B = new THREE.Color(0xe8d6a8);       // noBlood: vụn gỗ, bụi vàng nhạt
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler(), _v = new THREE.Vector3();
+const upload = (A, n) => { A.clearUpdateRanges(); A.addUpdateRange(0, n * A.itemSize); A.needsUpdate = true; };   // n phần tử đầu (n > 0)
 
 // Ảnh hiệu ứng sinh bằng Higgsfield (assets/SOURCES.md). Nạp một lần, dùng chung mọi trận. LOADED[tên]: Promise xong khi ảnh tải xong
 // (hoặc lỗi — trận vẫn chạy, sprite trống).
@@ -142,7 +143,7 @@ class Field {
       S[i * 4] = sc; S[i * 4 + 1] = p.rot; S[i * 4 + 2] = al; S[i * 4 + 3] = p.ds;
       C[i * 3] = p.r * k; C[i * 3 + 1] = p.g * k; C[i * 3 + 2] = p.b * k;
     }
-    for (const a of this.attrs) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }
+    if (n > 0) for (const a of this.attrs) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }   // n = 0: range (0, 0) là tải cả buffer
     this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0;
   }
 }
@@ -392,7 +393,7 @@ export class FX {
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];
       p.t += dt;
-      if (p.t >= p.T) { this.parts.splice(i, 1); continue; }
+      if (p.t >= p.T) { this.parts[i] = this.parts[this.parts.length - 1]; this.parts.pop(); continue; }   // bỏ không cấp phát (splice trả mảng mới)
       p.vy -= (p.grav ?? 1) * 14 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
     }
     for (const p of this.parts) {
@@ -401,7 +402,10 @@ export class FX {
       _m.compose(_p, _q, _s); this.pm.setMatrixAt(n, _m);
       this.pm.instanceColor.setXYZ(n, p.c.r, p.c.g, p.c.b); n++;
     }
-    this.pm.count = n; this.pm.instanceMatrix.needsUpdate = true; this.pm.instanceColor.needsUpdate = true;
+    // chỉ tải phần đang dùng; không hạt thì không tải (đợt 19c: trước đây 600 ô — 38 + 7 KB — mỗi khung, cả khi không có hạt nào;
+    // addUpdateRange(0, 0) trong WebGL2 là tải cả buffer nên phải bỏ hẳn)
+    this.pm.count = n;
+    if (n > 0) { upload(this.pm.instanceMatrix, n); upload(this.pm.instanceColor, n); }
 
     // sprite và tấm phẳng từ ảnh Higgsfield
     for (let i = this.sprites.length - 1; i >= 0; i--) {
@@ -437,7 +441,7 @@ export class FX {
       if (g.t >= g.T) { this.scene.remove(g.g); g.g.geometry.dispose(); g.g.material.dispose(); g.cb?.(); this.shockwave(g.x, g.z, 3); this.ghosts.splice(i, 1); }   // bóng riêng mỗi lần né: giải phóng GPU
     }
     // chữ nổi
-    const v = new THREE.Vector3();
+    const v = _v;
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i]; t.t += dt;
       if (t.t >= t.T) { t.el.remove(); this.texts.splice(i, 1); continue; }

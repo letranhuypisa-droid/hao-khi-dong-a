@@ -393,7 +393,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         if (d.result.won) { outroT = 0; outroTap = false; container.classList.add("outro-mode"); } else setTimeout(() => showEnd(d.result), 1800);
       }
       if (outroT >= 0 && d.over && (outroT >= OUTRO.sec || (outroT > 0.6 && (anyKey || outroTap)))) { outroT = -1; container.classList.remove("outro-mode"); showEnd(d.result); }
-      if (!d.over) { endShown = false; outroT = -1; container.classList.remove("outro-mode"); }
+      if (!d.over) { endShown = false; outroT = -1; container.classList.toggle("outro-mode", false); }   // toggle(…, false): không ghi lại class mỗi khung như remove
     };
     // Làm nóng (battle/gfx.js) trước khung đầu: sprite fx dựng sẵn, vòng báo đòn, cờ, vật phẩm, rig sĩ quan / boss / tướng vào sau
     // (BattleDef.rigs); biên dịch, vẽ một lượt lên canvas còn bị màn tải che. Xong (hoặc lỗi) mới hiện trận và chạy vòng lặp.

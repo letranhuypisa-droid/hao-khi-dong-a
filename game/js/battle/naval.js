@@ -110,6 +110,8 @@ export function strandSelect(ids, share, keep = []) {
 
 const _L = { x: 0, z: 0, h: 0, i: -1, d: 0 }, _L2 = { x: 0, z: 0, h: 0, i: -1, d: 0 };
 const _W = { x: 0, y: 0, z: 0 }, _W2 = { x: 0, y: 0, z: 0 }, _F = { h: 0 }, _C = { x0: 0, z0: 0, x1: 0, z1: 0, r: 0 }, _P = { x: 0, z: 0 };
+// collideExtra trả [x, z] dùng lại (đợt 19c): ground.collide đọc r[0], r[1] ngay rồi bỏ — không cấp phát mỗi lính mỗi bước
+const _XZ = [0, 0], xz = (x, z) => { _XZ[0] = x; _XZ[1] = z; return _XZ; };
 const GROUND = null;         // nút "mặt đất" trong đồ thị cửa (route)
 
 // ---- vật dựng phụ: ván bắc, ván dốc, xích (một InstancedMesh hộp đơn vị) ---------------------------------------------------
@@ -292,12 +294,12 @@ export class Naval {
     const D = o ? o.deck : null;
     if (D) {
       _P.x = x; _P.z = z;
-      if (D.contains(x, z, 0.02)) return D.clampInside(_P, r) ? [_P.x, _P.z] : null;
+      if (D.contains(x, z, 0.02)) return D.clampInside(_P, r) ? xz(_P.x, _P.z) : null;
       const h0 = D.heightAt(x, z, 3);
       const E = this.decks.find(x, z, 0, D, _F);
       if (E && Math.abs(_F.h - h0) <= NAV.step && this._mayRide(o, E)) { this._ride(o, E); return null; }
       if (!E && !this.deep(x, z) && Math.abs(this.world.groundY(x, z) - h0) <= NAV.step) { this._unride(o); return null; }
-      D.clampInside(_P, r, true); return [_P.x, _P.z];
+      D.clampInside(_P, r, true); return xz(_P.x, _P.z);
     }
     if (o) {
       const E = this.decks.find(x, z, 0, null, _F);
@@ -311,7 +313,7 @@ export class Naval {
       const px = pushCapsule(x, z, r, _C); if (px) { x = px[0]; z = px[1]; moved = true; }
     }
     if (this.deep(x, z)) { const p = this.shore(x, z); if (p) return p; }
-    return moved ? [x, z] : null;
+    return moved ? xz(x, z) : null;
   }
   // đò chuyển chỉ chở tướng và người theo (naval.ferry đặt lên); người khác không tự bước lên đò
   _mayRide(o, E) { return !E.boat?.isFerry || o === this.ctx.hero; }

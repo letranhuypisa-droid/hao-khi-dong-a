@@ -1150,6 +1150,8 @@ Texture 3D giao dạng **KTX2 (Basis Universal)**: UASTC cho tướng và normal
 | Boss, voi, kỳ hạm, cổng thành | ≤ 8 nghìn | ≤ 15 nghìn | Chi tiết hơn tướng thường để đọc được vai trò từ xa |
 | Thuyền thường | LOD0 ≤ 3 nghìn · LOD1 ≤ 800 | như điện thoại | §13.1 |
 
+Bản web hiện tại (đợt 19c, `battle/crowd.js`): mức lính theo khoảng cách camera 18 / 40 m (mọi kiểu lính, có trễ ±2 m nên lính đứng quanh ngưỡng không đổi lưới qua lại); IK chân, lò xo vạt áo, tua giáo chỉ cho lính LOD0; LOD2 tính lại tư thế mỗi 3 khung (khung khác dời ma trận theo chỗ vẽ). Lính ngoài khung nhìn camera (hình cầu quanh thân + lề 2 m) không tính tư thế, không vào lượt vẽ, không tải ma trận; vào lại khung thì tư thế, lò xo, trọng số IK tính lại từ đầu. Chỉ phần vẽ — mô phỏng không đọc.
+
 **Kiểm tra tam giác toàn cảnh** (trường hợp xấu: màn sông, mức mặc định của từng hạng):
 
 | Thành phần | T1 · Thấp 100 | T2 · Vừa 200 | T3 · Cao 400 | PC · Cực đại 1.500 |

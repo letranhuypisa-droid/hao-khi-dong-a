@@ -112,7 +112,8 @@
   clip-path: polygon(17px 0, calc(100% - 17px) 0, 100% 50%, calc(100% - 17px) 100%, 17px 100%, 0 50%); box-shadow: inset 0 0 0 1px rgba(255,226,150,.35); }
 .lb-go .gi::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; transform: skewX(-20deg);
   background: linear-gradient(90deg, transparent, rgba(255,240,200,.35), transparent); animation: sheen 3.8s ease-in-out 1s infinite; }
-@keyframes sheen { 0%, 60% { left: -40%; } 100% { left: 130%; } }
+/* vệt sáng chạy bằng transform (đợt 19c; trước đây đổi left: tính lại bố cục mỗi khung ở sảnh). 566,67% = 170% khung nút / 30% bề rộng vệt */
+@keyframes sheen { 0%, 60% { transform: skewX(-20deg) translateX(0); } 100% { transform: skewX(-20deg) translateX(566.67%); } }
 .lb-go i, .lb-go .gi > span { position: relative; z-index: 1; }
 .lb-go i { display: grid; place-items: center; width: 36px; height: 36px; }
 .lb-go i svg { width: 32px; height: 32px; stroke-width: 2; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }

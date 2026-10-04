@@ -118,8 +118,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hk-fill { height: 100%; background: linear-gradient(90deg, #7e2419, #c0392b 55%, #e0a24a); transition: width .3s; }
 .hk-over { position: absolute; right: 0; top: 0; height: 3px; background: #ffe7a0; }
 .hk-bar i { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(241,217,138,.55); }
-.hk-bar.ready { box-shadow: 0 0 14px rgba(255,210,122,.8); animation: pulse 1s infinite alternate; } .hk-bar.tpc .hk-fill { background: linear-gradient(90deg, #e0a24a, #ffe7a0); }
-@keyframes pulse { to { box-shadow: 0 0 26px rgba(255,210,122,1); } }
+.hk-bar.ready { box-shadow: 0 0 14px rgba(255,210,122,.8); } .hk-bar.ready::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 6px 1px rgba(255,236,170,.95); opacity: 0; animation: glow 1s infinite alternate; pointer-events: none; } .hk-bar.tpc .hk-fill { background: linear-gradient(90deg, #e0a24a, #ffe7a0); }
+/* Nhấp nháy sáng (đợt 19c): quầng sáng vẽ sẵn ở lớp ::after / ::before, hoạt ảnh chỉ đổi opacity — trình duyệt chạy nó trên compositor,
+   không vẽ lại phần tử mỗi khung. Trước đây @keyframes pulse đổi box-shadow (nhắc khóa chuột, nhãn chỉ đường hiện gần như suốt trận: vẽ lại
+   mỗi khung). Phần tử có overflow: hidden (.hk-bar, .sk) dùng quầng bên trong (inset). */
+@keyframes glow { from { opacity: 0; } to { opacity: 1; } }
 .hk-state { font-size: .75rem; color: var(--vang2); min-height: 1em; }
 .hud-time { background: rgba(21,18,16,.72); border: 1px solid #5a4838; border-radius: 8px; padding: 6px 12px; text-align: center; }
 .hud-time b { display: block; font-family: var(--serif); font-size: 1.2rem; } .hud-time b.late { color: #ffb09a; } .hud-time span { font-size: .7rem; color: var(--muted); }
@@ -167,12 +170,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .msg.tip { border-color: var(--vang2); background: rgba(34,28,24,.9); }
 .msg.tip::before { content: "GỢI Ý"; display: block; font-size: .6rem; font-weight: 700; letter-spacing: .14em; color: var(--vang2); }
 .hud-events { position: absolute; right: 12px; top: 250px; display: flex; flex-direction: column; gap: 4px; }
-.ev { background: rgba(120,30,20,.8); border: 1px solid var(--bad); border-radius: 6px; padding: 5px 10px; display: flex; gap: 10px; font-size: .8rem; animation: pulse2 1s infinite alternate; }
-@keyframes pulse2 { to { background: rgba(160,40,25,.85); } }
+.ev { position: relative; background: rgba(120,30,20,.8); border: 1px solid var(--bad); border-radius: 6px; padding: 5px 10px; display: flex; gap: 10px; font-size: .8rem; }
+.ev::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(200,60,35,.3); opacity: 0; animation: glow 1s infinite alternate; pointer-events: none; }
 .hud-ks { position: absolute; right: 12px; top: 330px; width: 244px; display: flex; flex-direction: column; gap: 4px; }
 .ks { background: rgba(21,18,16,.8); border: 1px solid #6b4f2e; border-left: 3px solid var(--vang); border-radius: 6px; padding: 5px 9px; font-size: .74rem; display: flex; flex-direction: column; }
 .ks b { font-family: var(--serif); color: var(--vang2); font-size: .8rem; } .ks i { font-style: normal; color: var(--muted); } .ks i em { font-style: normal; color: #cfe3b8; }
-.ks.sansang { border-color: #ffd27a; box-shadow: 0 0 12px rgba(255,210,122,.5); animation: pulse 0.8s infinite alternate; }
+.ks.sansang { position: relative; border-color: #ffd27a; box-shadow: 0 0 12px rgba(255,210,122,.5); } .ks.sansang::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; }
 .ks.thanhcong { border-left-color: var(--good); } .ks.thatbai { border-left-color: var(--bad); }
 .hud-target { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: 360px; opacity: 0; transition: opacity .2s; }
 .hud-target.on { opacity: 1; } .tname { text-align: center; font-family: var(--serif); color: #ffb09a; font-size: .9rem; }
@@ -188,7 +191,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-skills { position: absolute; right: 14px; bottom: 16px; display: flex; gap: 8px; }
 .sk { width: 76px; height: 70px; background: rgba(21,18,16,.78); border: 1px solid #5a4838; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .66rem; text-align: center; position: relative; }
 .sk b { font-size: .9rem; color: var(--vang2); } .sk i { font-style: normal; font-size: .7rem; color: var(--muted); }
-.sk.ready { border-color: var(--vang); box-shadow: 0 0 12px rgba(241,217,138,.45); } .sk.tpc.ready { background: rgba(155,45,32,.85); animation: pulse 0.8s infinite alternate; }
+.sk.ready { border-color: var(--vang); box-shadow: 0 0 12px rgba(241,217,138,.45); } .sk.tpc.ready { background: rgba(155,45,32,.85); }
+.sk.tpc.ready::before, .sk.hot::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 14px 2px rgba(255,210,122,.95); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; z-index: 2; }
 .ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.9); opacity: 0; transition: .15s; background: rgba(21,18,16,.9); border: 2px solid var(--vang); border-radius: 14px; padding: 12px 16px; width: 440px; pointer-events: none; }
 .ring.on { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
 .ring-title { font-family: var(--serif); color: var(--vang2); text-align: center; margin-bottom: 8px; } .ring-title span { text-decoration: underline; cursor: pointer; } .ring-title small { color: var(--muted); font-family: var(--sans); font-size: .7rem; }
@@ -272,6 +276,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-combo b { display: block; font-size: 3.2rem; font-weight: 900; line-height: .9; color: var(--vang2); text-shadow: 0 0 18px rgba(155,45,32,.95), 0 3px 0 #000; font-style: italic; }
 .hud-combo span { font-size: .72rem; letter-spacing: .24em; color: var(--trung); }
 .hud-combo.pop b { animation: combopop .22s ease-out; } @keyframes combopop { 0% { transform: scale(1.45); } 100% { transform: scale(1); } }
+.hud-combo.pop2 b { animation: combopop2 .22s ease-out; } @keyframes combopop2 { 0% { transform: scale(1.45); } 100% { transform: scale(1); } }   /* pop ↔ pop2: chạy lại hoạt ảnh không ép layout (hud.js combo) */
 .hud-combo[data-tier="1"] b { color: #ffd27a; } .hud-combo[data-tier="2"] b { color: #ffa25a; } .hud-combo[data-tier="3"] b { color: #ff6a4a; text-shadow: 0 0 22px rgba(255,120,60,.9), 0 3px 0 #000; }
 .hud-skills { flex-direction: column; align-items: flex-end; gap: 6px; }
 .skrow { display: flex; gap: 8px; }
@@ -284,7 +289,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .sk.ready .ico { opacity: .95; filter: none; }
 .skrow.atk .sk { width: 62px; height: 58px; font-size: .6rem; }
 .skrow.atk .sk > i { left: 0; right: 0; top: auto; bottom: 16px; text-align: center; font-size: .5rem; letter-spacing: .05em; }
-.sk.hot { border-color: #ffd27a; box-shadow: 0 0 16px rgba(255,210,122,.9); animation: pulse .5s infinite alternate; }
+.sk.hot { border-color: #ffd27a; box-shadow: 0 0 16px rgba(255,210,122,.9); } .sk.hot::before { animation-duration: .5s; }
 .sk.off .ico { opacity: .25; filter: grayscale(1); }
 .hud-ko { bottom: 168px; }
 .ring-grid .ric { width: 46px; height: 46px; border-radius: 8px; border: 1px solid #6b4f2e; margin-bottom: 4px; }
@@ -425,7 +430,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-wp .wp-in { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; }
 .hud-wp[data-mode="on"] .wp-in { transform: translate(-50%, -100%); }
 .hud-wp[data-mode="edge"] .wp-in { transform: translate(-50%, -50%); }
-.wp-box { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: rgba(21,18,16,.86); border: 1px solid var(--vang); border-radius: 9px; padding: 3px 11px; animation: wpGlow 1.2s infinite alternate; }
+.wp-box { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: rgba(21,18,16,.86); border: 1px solid var(--vang); border-radius: 9px; padding: 3px 11px; position: relative; }
+.wp-box::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 16px rgba(255,210,122,.85); opacity: 0; animation: glow 1.2s infinite alternate; pointer-events: none; }
 .wp-box b { display: block; font-family: var(--serif); color: var(--vang2); font-size: .82rem; }
 .wp-box span { font-size: .74rem; color: var(--trung); }
 .wp-dir { display: none; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 13px solid var(--vang2); filter: drop-shadow(0 1px 2px #000); }
@@ -437,10 +443,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hud-wp.alt .wp-box b { color: #ff8a6a; font-size: .74rem; }
 .hud-wp.alt .wp-dir { border-top-color: #ff8a6a; }
 .hud-wp.alt .wp-tip { border-top-color: #d8321e; }
-@keyframes wpGlow { to { box-shadow: 0 0 16px rgba(255,210,122,.85); } }
 
 /* Nhắc khóa chuột (bàn phím + chuột): chỉ hiện khi chuột chưa khóa */
-.hud-lockhint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: min(560px, 86%); text-align: center; background: rgba(21,18,16,.9); border: 1px solid var(--vang); border-radius: 18px; padding: 6px 16px; font-size: .82rem; color: var(--vang2); animation: pulse 1s infinite alternate; }
+.hud-lockhint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); max-width: min(560px, 86%); text-align: center; background: rgba(21,18,16,.9); border: 1px solid var(--vang); border-radius: 18px; padding: 6px 16px; font-size: .82rem; color: var(--vang2); }
+.hud-lockhint::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow 1s infinite alternate; pointer-events: none; }
 .hud-lockhint[hidden] { display: none; }
 .hud-b20 .hud-lockhint { bottom: 218px; }                                  /* trên dòng nhắc Tương tác của B20 (bottom 158 px) */
 

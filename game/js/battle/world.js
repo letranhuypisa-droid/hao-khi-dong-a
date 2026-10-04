@@ -152,15 +152,20 @@ export function buildWorld(scene, { shadows = true } = {}) {
     for (let k = 0; k < ix.length; k += 3) if (!(inland(ix[k]) && inland(ix[k + 1]) && inland(ix[k + 2]))) keep.push(ix[k], ix[k + 1], ix[k + 2]);
     wg.setIndex(keep);
   }
-  const water = new THREE.Mesh(wg, new THREE.MeshPhongMaterial({ color: 0x2f5d62, specular: 0xf1d98a, shininess: 60, flatShading: true, transparent: true, opacity: 0.88 }));
+  // sóng tính trong vertex shader (đợt 19c; cùng công thức y += 0,18·sin(1,1t + 0,09x + 0,07z) như bản cũ chạy trên CPU cho 2867 đỉnh rồi tải
+  // lại cả buffer vị trí 34 KB mỗi khung). flatShading lấy pháp tuyến từ đạo hàm màn hình nên mặt gãy vẫn theo sóng.
+  const uWave = { value: 0 };
+  const wMat = new THREE.MeshPhongMaterial({ color: 0x2f5d62, specular: 0xf1d98a, shininess: 60, flatShading: true, transparent: true, opacity: 0.88 });
+  wMat.onBeforeCompile = (sh) => {
+    sh.uniforms.uWave = uWave;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uWave;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y += 0.18 * sin(uWave * 1.1 + position.x * 0.09 + position.z * 0.07);");
+  };
+  wMat.customProgramCacheKey = () => "b15-water";
+  const water = new THREE.Mesh(wg, wMat);
   water.position.y = 0.35;
   scene.add(water);
-  const wBase = Float32Array.from(wg.attributes.position.array);
-  world.animated.push((t) => {
-    const a = wg.attributes.position.array;
-    for (let i = 0; i < a.length; i += 3) a[i + 1] = wBase[i + 1] + 0.18 * Math.sin(t * 1.1 + wBase[i] * 0.09 + wBase[i + 2] * 0.07);
-    wg.attributes.position.needsUpdate = true;
-  });
+  world.animated.push((t) => { uWave.value = t; });
 
   const mat = lambert();
   const addStatic = (geo, cast = true) => { const m = new THREE.Mesh(geo, mat); m.castShadow = cast && shadows; m.receiveShadow = true; scene.add(m); return m; };

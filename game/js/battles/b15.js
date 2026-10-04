@@ -36,6 +36,7 @@
 //   ? hud                                { bounds{x0,x1,z0,z1}, canvas?{w,h}, drawBase(M, ctx), drawTop(M, ctx),
 //                                          frontsHTML?(ctx), pinTip? } — bản đồ nhỏ, bảng mặt trận (hud.js). M = {c,W,H,X,Z,sx,sz,t}.
 //                                          pinTip: thẻ nhiệm vụ nằm cột trái và giữ câu tip của PHASES suốt pha (B15; B20 giữ bố cục cũ)
+//                                          baseKey?(M, ctx) → chuỗi: lớp nền vẽ một lần ra canvas phụ, vẽ lại khi chuỗi đổi (đợt 19c)
 //   ? Director.objectives()              → [{ id, label, x, y, z, r }] mục tiêu chính của pha: HUD vẽ nhãn chỉ đường (hud.js frame),
 //                                          bản đồ nhỏ nhấp nháy vòng vàng (B15, PHASES[i].target); không có thì không chỉ đường (B20)
 //   ? touch                              { interact?: true } — thêm nút cảm ứng Tương tác (B15 không có)
@@ -143,6 +144,16 @@ function drawBase({ c, W, H, X, Z, sx }, ctx) {
     }
   }
 }
+// Khoá lớp nền cho hud.js (đợt 19c: lớp nền vẽ một lần ra canvas phụ, vẽ lại khi khoá đổi): công sự làn đánh bật, chủ từng Cứ Điểm, tuyến hai mặt
+// trận theo nửa điểm ảnh bản đồ nhỏ (tuyến dời ít hơn thế thì vẽ chỗ cũ, lệch < 0,25 px).
+const FRONT_LIST = Object.values(FRONTS);
+function baseKey({ X }, ctx) {
+  const sim = ctx.sim;
+  let k = laneFeaturesOn() ? "f" : "";
+  for (const F of FRONT_LIST) k += "|" + Math.round(X(lineToX(F, sim.fronts[F.id].x)) * 2);
+  for (const b of BASES) k += sim.bases[b.id].owner === "ta" ? "t" : "d";
+  return k;
+}
 // sự kiện nhấp nháy, làng và bó tên, thuyền Kế Sách, bến cập
 function drawTop({ c, X, Z, t }, ctx) {
   const d = ctx.director;
@@ -218,7 +229,7 @@ export const B15 = {
   },
   // P4 và Tổng Phản Công đổi sang bài trận boss
   music: (d, hk) => (hk.tpc || d.phase === 3 ? "boss" : "battle"),
-  hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, drawTop, pinTip: true },   // pinTip: thẻ nhiệm vụ giữ câu "làm thế nào" suốt pha (hud.js)
+  hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, baseKey, drawTop, pinTip: true },   // pinTip: thẻ nhiệm vụ giữ câu "làm thế nào" suốt pha (hud.js)
   debug: null,
   rigs: ["X19"],                                         // Toa Đô ra ở P4: làm nóng trước khung đầu (battle/gfx.js)
 };

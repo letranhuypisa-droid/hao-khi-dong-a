@@ -18,6 +18,8 @@ export const DECK_CAP = 12;      // số boong được tra cùng lúc (R-world 
 
 const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+// clampInside: giữ toạ độ v trong [a + r, b − r] (mặt hẹp hơn 2r thì giữa mặt). Ngoài hàm (đợt 19c): trước đây một closure mỗi lần gọi.
+const fit = (v, a, b, r) => (b - a < 2 * r ? (a + b) / 2 : clamp(v, a + r, b - r));
 
 export function poseMatrix(m, x, y, z, yaw, pitch, roll) {
   const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch), cr = Math.cos(roll), sr = Math.sin(roll);
@@ -183,8 +185,7 @@ export class Deck {
     if (!force) for (const p of this.portals) if ((L.x - p.lx) ** 2 + (L.z - p.lz) ** 2 < p.r * p.r) return false;
     const cur = this.rects[L.i];
     let lx = L.x, lz = L.z;
-    const fit = (v, a, b) => (b - a < 2 * r ? (a + b) / 2 : clamp(v, a + r, b - r));
-    if (L.d > 0) { lx = fit(lx, cur.x0, cur.x1); lz = fit(lz, cur.z0, cur.z1); }
+    if (L.d > 0) { lx = fit(lx, cur.x0, cur.x1, r); lz = fit(lz, cur.z0, cur.z1, r); }
     else {
       const h0 = L.h;
       // bốn đầu dò: chỗ không tới được thì lùi tâm về mép mặt đang đứng (hoặc mép tường chặn)
