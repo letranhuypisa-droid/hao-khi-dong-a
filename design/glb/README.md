@@ -8,6 +8,7 @@ Mẫu 3D tĩnh tạo bằng Meshy API từ đúng prompt trong `design/glb-promp
 | `vu-khi/` | Đao, kiếm, giáo, cung, nỏ, chùy, khiên | `wpn_` |
 | `dao-cu/` | Mũi tên, cờ lưng, áo choàng, bành voi… | `prop_` |
 | `thu-cuoi/` | Ngựa, voi | `mount_` |
+| `moi-truong/` | Môi trường (mã `ENV_`): thuyền, công trình, đạo cụ cảnh, cây, đá, núi. Chưa có tệp nào | `env_` |
 
 `manifest.json` ghi từng tệp: mã task Meshy, model, số tam giác trước và sau khi nén, dung lượng, kích thước khung bao. Xem nhanh mọi mẫu: mở `xem.html` qua máy chủ tĩnh ở gốc repo (ví dụ `npx serve .` rồi vào `/design/glb/xem.html`). Ảnh tổng hợp nằm ở `xem-truoc/`.
 
@@ -70,6 +71,8 @@ cd design/tools && npm i && cd ../..
 export MESHY_API_KEY=...            # không ghi key vào repo
 node design/tools/meshy.mjs balance
 node design/tools/meshy.mjs list --only H34,H38 --prompt          # xem đúng prompt sẽ gửi
+node design/tools/meshy.mjs list --set tat-ca --hash              # băm, độ dài API, tam giác; so với manifest
+node design/tools/meshy.test.mjs                                  # không mạng: đọc tài liệu, 40 băm cũ không đổi
 # Bước 1: chỉ dựng lưới xám, rồi ghép ảnh lưới để soát
 node design/tools/meshy.mjs run --only H34,H38 --stage luoi
 node design/tools/meshy.mjs sheet design/glb/_raw/to-xem.png --only H34,H38
@@ -78,10 +81,30 @@ node design/tools/meshy.mjs sheet design/glb/_raw/to-xem.png --only H34,H38
 node design/tools/meshy.mjs run --only H34,H38
 ```
 
-`--set thu` là cặp thử H35 + song đao, `--set can` là 40 tệp game hiện cần (mặc định), `--set tat-ca` là cả 63 mục. Chạy lại chỉ làm phần chưa xong. Sửa prompt trong `glb-prompts.md` thì công cụ tự coi là mẫu mới.
+Bộ chọn (`--set`):
 
-Model: `--model` (mặc định `latest`) cho tướng, sĩ quan, người lính Tự do, cận vệ, ngựa; `--model-linh` cho lính đám đông và dân làng; `--model-vk` cho vũ khí, đạo cụ. Lần đầu đã dùng `--model-linh meshy-5 --model-vk meshy-5` để vừa ngân sách (lưới meshy-5 tốn 5 credit, `latest` tốn 20; texture 10). Song đao dùng `latest` vì bản meshy-5 ra dáng dao găm.
+| Bộ | Gồm |
+| --- | --- |
+| `thu` | Cặp thử H35 + song đao |
+| `can` | 40 tệp game đang dùng (mặc định của `run`); không bao giờ gồm mục mới |
+| `thieu` | Thứ game còn dựng bằng code: dân làng (`DAN_*`), áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú ở mục O |
+| `moi-truong` | Mọi mã `ENV_` |
+| `lam-lai` | Mọi mã `_v2`, `_v3` (làm lại mẫu cũ) |
+| `tuong-moi` | Tướng có tên (mã H.., X.., TT) chưa có GLB: H34, H38, H39 và tướng thêm từ `design/3d-ref/PROMPTS-TUONG.md` |
+| `tat-ca` | Mọi mục: 40 mã `can` trước, rồi theo thứ tự bảng |
 
-Prompt gửi API khác bản trong tài liệu ở ba chỗ, vì API v2 của Meshy bỏ qua `negative_prompt`: khối STYLE và POSE rút gọn; nhân vật thêm câu chặn "không vũ khí, không bao đao, không sừng, không áo choàng" (bản thử đầu của H35 tự mọc mũ có sừng kiểu kabuto và đeo hai thanh đao ở hông); ai không có mũ trong prompt thì thêm "No helmet."
+Các bộ mới tính từ mã và chữ mục, nên mục thêm sau tự vào đúng bộ; bộ chưa có mục nào thì công cụ báo và dừng. Chạy lại chỉ làm phần chưa xong. Tài liệu đọc được cả khi cây làm việc là CRLF (Windows, `core.autocrlf`). Lỗi trong tài liệu (thiếu PROMPT, tiền tố tệp lạ, dải tam giác sai, mục người thiếu `A-pose,`) báo ngay khi đọc, trước mọi lệnh.
+
+**Sửa prompt của mẫu đã có là mua lại và ghi đè.** Băm (`list --hash`) tính từ đúng bản gửi API, số tam giác và đối xứng; băm khác manifest thì `run` coi là mẫu mới, tốn credit và ghi đè tệp trong thư mục này. Muốn làm lại một mẫu cũ (mũ mọc sừng, tay dang ngang…), thêm mục mới mã `_v2` thay vì sửa mục cũ (`glb-prompts.md` mục 0.5): dòng bảng `H33_v2` · tệp `char_H33_tran-nhat-duat_v2.glb` · nhóm của mã gốc, và mục `### P1 · H33_v2 · …` có PROMPT viết bằng POSE v2 (mục 2.2). Mã `_v2` có dòng riêng trong `manifest.json`, tệp gốc riêng ở `_raw/`, tệp nén riêng (`nhan-vat/char_H33_tran-nhat-duat_v2.glb`), giữ quy tắc riêng của mã gốc (texture 2048 cho H35, H31, người lính Tự do; đối xứng cho ngựa) nhưng không mang theo bảng `FIX` của mã gốc trong `meshy.mjs`. Tệp cũ còn nguyên cho tới khi chọn xong.
+
+Chuyển bản nướng sang tệp `_v2` (khi đã soát và chọn bản mới): `glb-bake.mjs` đọc đường dẫn tệp từ `manifest.json` theo mã.
+
+- Vũ khí, mũi tên: đổi `src` của mục trong `design/tools/bake/catalog.mjs` `WEAPONS` sang mã mới (`src: "WPN_dadao_v2"`). Ngựa của kỵ binh: đổi `horse` của `KIT_LIST.NG_KY` (`horse: "MOUNT_ngua_nguyen_v2"`). Không phải sửa code.
+- Tướng, cận vệ, lính đám đông: khoá của `CHARS` và `KIT_LIST` vừa là mã manifest vừa là tên tệp game nạp (`char/H33.hkm`), nên đừng đổi khoá. Thêm `src: "H33_v2"` vào mục catalog và cho `glb-bake.mjs` đọc `man[c.src ?? code].path` thay cho `man[code].path` ở ba chỗ (phần `char`, và hai lệnh `bakeHorseKit`, `bakeKit` ở phần `kit`). Sửa nhỏ này để tới lúc cần, vì phần nướng đang được sửa song song ở nhánh khác.
+- Rồi nướng lại: `node design/tools/glb-bake.mjs char --only H33` (hoặc `kit`, `wpn`).
+
+Model: `--model` (mặc định `latest`) cho tướng, sĩ quan, người lính Tự do, cận vệ, ngựa; `--model-linh` cho lính đám đông và dân làng; `--model-vk` cho vũ khí, đạo cụ; `--model-mt` cho môi trường (mặc định bằng `--model-vk`). Lần đầu đã dùng `--model-linh meshy-5 --model-vk meshy-5` để vừa ngân sách (lưới meshy-5 tốn 5 credit, `latest` tốn 20; texture 10). Song đao dùng `latest` vì bản meshy-5 ra dáng dao găm.
+
+Prompt gửi API khác bản trong tài liệu ở ba chỗ, vì API v2 của Meshy bỏ qua `negative_prompt`: khối STYLE và POSE rút gọn; nhân vật thêm câu chặn "không vũ khí, không bao đao, không sừng, không áo choàng" (bản thử đầu của H35 tự mọc mũ có sừng kiểu kabuto và đeo hai thanh đao ở hông); ai không có mũ trong prompt thì thêm "No helmet." Mục mới viết bằng POSE v2 (`glb-prompts.md` mục 2.2) được đổi sang bản API riêng của khối đó, vẫn có câu chặn.
 
 Bản quyền: tệp tạo bằng gói Meshy trả phí thuộc người tạo; gói miễn phí theo CC BY 4.0 (phải ghi công Meshy). Ghi gói đã dùng vào `game/assets/SOURCES.md` khi đưa mẫu vào game.

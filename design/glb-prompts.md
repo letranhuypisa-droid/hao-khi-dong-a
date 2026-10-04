@@ -60,7 +60,8 @@ Tên tệp luôn suy ra được từ cột **Mã** ở bảng mục 1, theo ba 
 - **Tướng có tên** (mã H.., X..): `char_<mã>_<tên>.glb`. Mã giữ chữ hoa; tên viết thường không dấu, mỗi âm tiết nối bằng `-`. Ví dụ `char_H35_tran-quoc-toan.glb`.
 - **Sĩ quan chung, người lính Tự do, cận vệ, lính đám đông, dân làng** (mã OFF_.., LINH_.., CV_.., DV_.., NG_.., DAN_..): mã đã gồm cả tên, nên tệp là tiền tố + mã giữ nguyên. Nhân vật dùng rig: `char_<mã>.glb`, ví dụ `char_OFF_tuong.glb`, `char_CV_khien.glb`, `char_LINH_r01.glb`. Lính đám đông và dân làng: `unit_<mã>.glb`, ví dụ `unit_DV_GIAO.glb`, `unit_DAN_NAM.glb`.
 - **Vũ khí, đạo cụ, ngựa** (mã WPN_.., PROP_.., MOUNT_..): tiền tố viết thường (`wpn_`, `prop_`, `mount_`) + phần còn lại của mã, viết thường, `_` đổi thành `-`. Tên ghép đã viết liền trong mã thì giữ liền. Ví dụ `WPN_songdao` → `wpn_songdao.glb`, `WPN_dao_linh` → `wpn_dao-linh.glb`, `PROP_co_lung` → `prop_co-lung.glb`, `MOUNT_ngua_nguyen` → `mount_ngua-nguyen.glb`.
-- Làm lại thì thêm hậu tố `_v2`, `_v3`, đừng ghi đè tệp cũ.
+- **Môi trường** (mã ENV_..: thuyền, công trình, đạo cụ cảnh, cây, đá, núi): `env_` + phần còn lại của mã viết thường, `_` đổi thành `-`, ví dụ `ENV_thap_canh` → `env_thap-canh.glb`. Công cụ đặt tệp `env_` vào `design/glb/moi-truong/`; mã ENV_ phải đi với tệp `env_`.
+- Làm lại thì thêm hậu tố `_v2`, `_v3`, đừng ghi đè tệp cũ: mã thêm hậu tố, tệp thêm hậu tố ngay trước `.glb`, ví dụ `H33_v2` → `char_H33_tran-nhat-duat_v2.glb`, `DV_DAO_v2` → `unit_DV_DAO_v2.glb`. Cột Nhóm giữ nhóm của mã gốc (công cụ chọn model và cỡ texture theo nhóm). Công cụ báo lỗi nếu tệp của mã `_v2` thiếu hậu tố, hoặc hai mục trùng một tệp.
 
 ### 0.6 Chỗ các nguồn lệch nhau và lựa chọn của tài liệu
 
@@ -185,6 +186,16 @@ Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat 
 A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed.
 ```
 
+**POSE v2, cho mục mới** (từ đợt 19: tướng mới, dân làng, áo Tống, mục làm lại `_v2`). 40 mẫu đầu dùng khối trên và ra tay dang gần ngang (khoảng 74° so với buông thẳng), khuỷu gập, ngửa bàn tay như đang chìa ra, nên bộ dò khớp khi rig đặt sai khuỷu và cổ tay. Khối v2 đòi tay thẳng, khuỷu thẳng, bàn tay thả lỏng, ngón khép:
+
+```text
+A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed.
+```
+
+- **Đừng sửa khối POSE cũ trong 40 mục đã tạo.** `design/tools/meshy.mjs` băm đúng chữ của bản gửi API; đổi một chữ là băm đổi, lần `run` mặc định kế tiếp sẽ mua lại mẫu đó (cả 25 nhân vật khoảng 630 credit) và ghi đè GLB. Muốn làm lại một mẫu cũ với POSE v2 thì thêm mục mới mã `_v2` (mục 0.5).
+- Công cụ nhận cả hai khối, đúng từng chữ như trên, và đổi sang bản API ngắn hơn (v2 bỏ `mouth closed`, 121 ký tự). Bản API vẫn mở đầu bằng `A-pose,` (dấu phẩy) vì câu chặn vũ khí được chèn ngay trước chữ đó; viết `A-pose:` thì công cụ báo lỗi khi đọc tài liệu.
+- Bản API của mục người = mô tả + câu chặn (69 ký tự, thêm 11 khi prompt không có chữ helmet, hat, cap) + POSE + STYLE rút gọn. Với POSE v2, phần mô tả (trước khối POSE) giữ trong 300 ký tự thì bản API không quá 600; `node design/tools/meshy.mjs list --only <mã>` in độ dài.
+
 ### 2.3 NEGATIVE (dán vào ô Negative prompt nếu công cụ có)
 
 **NEGATIVE-NV**, cho nhân vật, lính, dân làng, ngựa và voi. Với ngựa thì thêm `, rider, person` vào cuối; với voi thì thêm `, rider, person, howdah, saddle`. Với người cưỡi NG_KY thì thêm `, horse, saddle, sitting, mounted`.
@@ -197,6 +208,12 @@ weapon, sword, spear, bow, shield, holding, cape, cloak, flag, T-pose, pedestal,
 
 ```text
 hand, person, character, holding, stand, rack, pedestal, base, wall mount, text, letters, runes, glowing, fantasy ornament, anime, chibi, cartoon, katana, European sword, gore, blood, baked lighting, baked shadows
+```
+
+**NEGATIVE-MT**, cho môi trường (mã `ENV_`: thuyền, công trình, đạo cụ cảnh, cây, đá). Không chặn giá, bệ, đế vì đó có thể là một phần của vật (giá binh khí, bia đá có đế):
+
+```text
+person, people, character, crowd, text, letters, calligraphy, logo, anime, chibi, cartoon, photorealistic, modern, glowing, fantasy ornament, gore, blood, baked lighting, baked shadows
 ```
 
 Những ý quan trọng nhất đã nằm sẵn trong PROMPT: với nhân vật là tay không và A-pose; với vũ khí và đạo cụ là không giá đỡ, không tay (`no stand, no hand`). Nhưng ô Negative còn giữ hai loại từ chặn mà PROMPT không có chỗ chứa: từ chặn lỗi thời đại (giáp samurai, mũ kabuto, áo nhà Thanh, áo triều Nguyễn, giáp tấm châu Âu) và từ chặn biếm hoạ kẻ địch (quái vật, sừng, đầu lâu, mặt phản diện; mục 2.6). Vì thế, nếu công cụ không có ô Negative thì phải soát kết quả kỹ hơn theo danh sách kiểm tra cuối tài liệu, nhất là tướng ta (dễ ra dáng samurai) và lính Nguyên (dễ ra dáng quái vật).
@@ -1114,7 +1131,7 @@ Mở tệp GLB ở `gltf-viewer.donmccurdy.com` hoặc `3dviewer.net` (kéo th�
 
 **Nhân vật, lính, dân làng**
 - [ ] A-pose: tay chếch xuống khoảng 45°, không dang thẳng (T-pose), không khép sát người.
-- [ ] Bàn tay **mở**, ngón hơi xoè, **tay không**: không cầm gì, không có vũ khí dính vào tay. Bao đao **rỗng** ở hông thì được; bao có chuôi đao thò ra thì làm lại (mục 0.3).
+- [ ] Bàn tay **mở**, ngón hơi xoè, **tay không**: không cầm gì, không có vũ khí dính vào tay. Bao đao **rỗng** ở hông thì được; bao có chuôi đao thò ra thì làm lại (mục 0.3). Mục viết bằng POSE v2 (mục 2.2): tay thẳng, khuỷu thẳng, bàn tay thả lỏng, ngón khép, không ngửa bàn tay.
 - [ ] Tỉ lệ người thật: không chibi, không đầu to, không tay chân ngắn cũn (trẻ con DAN_TRE thì theo tỉ lệ trẻ em tự nhiên).
 - [ ] Không áo choàng, không cờ lưng (hai thứ này để riêng ở nhóm H).
 - [ ] Chân rộng bằng vai, mặt nhìn thẳng, miệng khép.
