@@ -3,11 +3,15 @@
 // băm prompt (băm đổi thì `run` mặc định mua lại mẫu đó và ghi đè GLB). Soát cả nội dung mục môi trường K–O của tài liệu thật:
 // độ dài (tài liệu ≤ 630, API ≤ 600), khối STYLE, dải tam giác ≥ 300, kích thước thật, không xin chữ, dẫn chỗ code; nón lá, trâu.
 // Mục P làm lại (14 mã _v2: đúng tệp, nhóm, POSE v2, sửa đúng chỗ lệch), 15 tướng mới từ design/3d-ref (tay không, POSE v2,
-// tài liệu ≤ 565, API ≤ 600), mục người chưa tạo đều dùng POSE v2, mục 0.8 "Còn phải tạo" có lệnh và credit từng đợt.
+// tài liệu ≤ 565, API ≤ 600), mục người chưa tạo đều dùng POSE v2, mục 0.8 "Còn phải tạo" có lệnh và credit từng lượt.
+// Lỗi tài liệu bắt khi đọc (trùng mã dòng bảng hay mục ###, mục không dòng bảng, dải tam giác sai, Symmetry hai chiều, khối POSE
+// biến thể); bộ tuy-chon; chặn run mua lại mẫu đã xong khi băm đổi (guardRun), list --hash trả mã lỗi, --redo cất tệp cũ;
+// và các chỗ sửa sau soát (boong, cột, cán cờ thuyền; chữ cấp bậc ở tướng mới; mũ lông chóp ngắn; tường Việt; bánh xe nan).
 //   node design/tools/meshy.test.mjs
 // Nhập meshy.mjs như thư viện: tệp đó chỉ chạy lệnh khi là tệp chính (import.meta.main, Node ≥ 24.2).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -15,7 +19,7 @@ import { spawnSync } from "node:child_process";
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "../..");
 if (typeof import.meta.main !== "boolean") { console.log("cần Node ≥ 24.2 (import.meta.main)\n0 đạt, 1 trượt"); process.exit(1); }
-const { loadAssets, apiPrompt, hash, setOf, POSE, POSE2 } = await import("./meshy.mjs");
+const { loadAssets, apiPrompt, hash, setOf, POSE, POSE2, guardRun, hashRows, setAsideRaw } = await import("./meshy.mjs");
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -127,6 +131,23 @@ t("tat-ca: 40 mã can trước, rồi mọi mục khác, không trùng", () => {
   assert.deepEqual(ta.slice(0, 40), codes(setOf(all, "can"))); assert.equal(ta.length, all.length); assert.equal(new Set(ta).size, ta.length);
 });
 t("tên bộ lạ: không trả danh sách", () => assert.equal(setOf(all, "khong-co"), undefined));
+const OPTDOC = doc([row(80, "WPN_x", "wpn_x.glb", "G"), row(81, "ENV_thuyen_x", "env_thuyen-x.glb", "K"), row(82, "ENV_long_x", "env_long-x.glb", "K", "3–5k"),
+  row(83, "H35", "char_H35_tran-quoc-toan.glb", "A", "10–20k")],
+  [sec("G9", "WPN_x", thing("Axe.")), sec("K1", "ENV_thuyen_x", thing("Boat.")), sec("K10", "ENV_long_x", thing("Dragon boat.")).replace("tên ENV_long_x", "Long thuyền (tuỳ chọn)"),
+    sec("A1", "H35", person("General."))]);
+const oa = tryLoad(OPTDOC);
+t("moi-truong bỏ mục môi trường ghi \"(tuỳ chọn)\" ở đầu mục; tuy-chon = mục không thuộc bộ nào khác cộng các mục đó", () => {
+  assert.deepEqual(codes(setOf(oa, "moi-truong")), ["ENV_thuyen_x"]);
+  assert.deepEqual(codes(setOf(oa, "tuy-chon")), ["WPN_x", "ENV_long_x"]);
+});
+t("tuy-chon trên tài liệu thật: 12 mục tuỳ chọn và 3 mục môi trường tuỳ chọn; không có LINH_r2 (còn khối POSE cũ), không trùng bộ khác", () => {
+  const tc = codes(setOf(all, "tuy-chon"));
+  assert.deepEqual([...tc].sort(), ["WPN_daiphu", "WPN_quat", "WPN_daikiem_vandon", "WPN_doandao", "WPN_duisat", "WPN_moc_voi", "PROP_co_lung", "PROP_cape",
+    "PROP_banh_voi", "PROP_giap_voi", "MOUNT_ngua_tuong", "MOUNT_voi_chien", "ENV_long_thuyen", "ENV_mieu", "ENV_day_nui_xa"].sort());
+  const mt = codes(setOf(all, "moi-truong"));
+  assert.ok(!mt.includes("ENV_long_thuyen") && !mt.includes("ENV_mieu") && !mt.includes("ENV_day_nui_xa"));
+  assert.equal(mt.length + 3, all.filter((a) => a.code.startsWith("ENV_")).length);
+});
 
 console.log("POSE v2");
 t("POSE v2: bản API ngắn hơn, giữ \"A-pose,\" nên câu chặn vũ khí vẫn chèn ngay trước", () => {
@@ -162,6 +183,70 @@ t("mã _v2 mà tệp không có hậu tố _v2 → lỗi (sẽ ghi đè tệp c�
 });
 t("hai mục cùng một tệp → lỗi", () => {
   assert.throws(() => loadAssets(doc([row(98, "ENV_a", "env_a.glb", "K"), row(99, "ENV_b", "env_a.glb", "K")], [sec("K1", "ENV_a", thing("A.")), sec("K2", "ENV_b", thing("B."))])), /trùng/);
+});
+
+console.log("Lỗi tài liệu bắt ngay khi đọc (chép mục làm _v2, _v3 dễ sót)");
+const one = (rows, secs) => () => loadAssets(doc(rows, secs));
+t("hai dòng bảng cùng mã (chép dòng mà quên đổi mã) → lỗi, không lặng lẽ lấy dòng sau", () => {
+  assert.throws(one([row(60, "H35", "char_H35_a.glb", "A", "10–20k"), row(61, "H35", "char_H35_a_v2.glb", "A", "10–20k")], [sec("A1", "H35", person("General."))]), /H35: trùng mã/);
+});
+t("hai mục ### cùng mã (chép mục mà quên đổi mã) → lỗi, không lặng lẽ thay prompt", () => {
+  assert.throws(one([row(60, "H35", "char_H35_a.glb", "A", "10–20k")], [sec("A1", "H35", person("General.")), sec("P9", "H35", person("Other general."))]), /H35: hai mục ###/);
+});
+t("mục có PROMPT mà không có dòng bảng (xoá dòng, hoặc dòng thiếu cột) → lỗi", () => {
+  assert.throws(one([row(60, "ENV_a", "env_a.glb", "K")], [sec("K1", "ENV_a", thing("A.")), sec("K2", "ENV_b", thing("B."))]), /ENV_b: có mục PROMPT nhưng không có dòng bảng/);
+  const seven = "| 61 | ENV_b | `env_b.glb` | tên | K | 1–2k | — |";
+  assert.throws(one([row(60, "ENV_a", "env_a.glb", "K"), seven], [sec("K1", "ENV_a", thing("A.")), sec("K2", "ENV_b", thing("B."))]), /ENV_b: có mục PROMPT/);
+});
+t("dải tam giác: dấu phân cách nghìn, đơn vị lẫn, lo > hi, mục tiêu < 300 → lỗi; 0,5–1,5k và 100–300 vẫn nhận", () => {
+  for (const bad of ["1,000–2,000", "500–2k", "800–300", "100–200"])
+    assert.throws(one([row(60, "ENV_a", "env_a.glb", "K", bad)], [sec("K1", "ENV_a", thing("A."))]), /dải tam giác/, bad);
+  assert.equal(loadAssets(doc([row(60, "ENV_a", "env_a.glb", "K", "0,5–1,5k")], [sec("K1", "ENV_a", thing("A."))]))[0].tris, 1500);
+  assert.equal(loadAssets(doc([row(60, "PROP_x", "prop_x.glb", "H", "100–300")], [sec("H9", "PROP_x", thing("Arrow."))]))[0].tris, 300);
+});
+t("mục ghi cả Symmetry bật lẫn tắt → lỗi (không lặng lẽ chọn tắt)", () => {
+  assert.throws(one([row(60, "ENV_a", "env_a.glb", "K")], [sec("K1", "ENV_a", thing("A."), "Symmetry: bật. Nếu lệch thì thử Symmetry: tắt.")]), /Symmetry/);
+});
+t("prompt người phải có nguyên khối POSE hoặc POSE v2 (biến thể như \"45 °\" thì bản API dài, giữ cả mouth closed)", () => {
+  assert.throws(one([row(60, "H27", "char_H27_x.glb", "A", "10–20k")], [sec("A8", "H27", `King. ${POSE2.replace("45°", "45 °")} ${STYLE}`)]), /POSE/);
+});
+t("mọi mục trong tài liệu thật: bản API ≤ 600 ký tự (run từ chối bản dài hơn)", () => {
+  assert.ok(!all.err && all.length > 0);
+  assert.deepEqual(all.filter((a) => apiPrompt(a).length > 600).map((a) => `${a.code} ${apiPrompt(a).length}`), []);
+});
+t("trâu MOUNT_trau: negative không có chữ horns (prompt xin sừng); ngựa vẫn chặn sừng", () => {
+  const tr = all.find((a) => a.code === "MOUNT_trau"), ng = all.find((a) => a.code === "MOUNT_ngua_nguyen");
+  assert.ok(tr && !/horns/.test(tr.negative), tr?.negative); assert.match(ng.negative, /horns/);
+});
+
+console.log("Chặn mua lại mẫu đã có (run), list --hash");
+const gd = tryLoad(doc([row(60, "H35", "char_H35_a.glb", "A", "10–20k"), row(61, "X19", "char_X19_a.glb", "B", "10–20k")], [sec("A1", "H35", person("General.")), sec("B1", "X19", person("Mongol."))]));
+t("run: mẫu đã xong (done) mà băm khác manifest → dừng, nêu mã, chỉ --redo", () => {
+  const [h35] = gd;
+  assert.throws(() => guardRun([h35], { H35: { status: "done", hash: "0000000000" } }), /H35[\s\S]*--redo/);
+  assert.deepEqual([...guardRun([h35], { H35: { status: "done", hash: "0000000000" } }, "H35")], ["H35"]);
+  assert.equal(guardRun([h35], { H35: { status: "done", hash: hash(h35) } }).size, 0);
+  assert.equal(guardRun([h35], { H35: { status: "luoi", hash: "0000000000" } }).size, 0, "mới có lưới thì sửa prompt rồi dựng lại là bình thường");
+});
+t("run: --redo mã không nằm trong danh sách chạy → dừng (nếu không, mã đó mất khỏi manifest)", () => {
+  assert.throws(() => guardRun([gd[0]], {}, "X19"), /X19[\s\S]*không nằm trong/);
+});
+t("list --hash: hashRows đếm mã có trong manifest và mã giữ băm (khác thì lệnh trả mã lỗi)", () => {
+  const [h35, x19] = gd;
+  assert.deepEqual((({ same, had }) => ({ same, had }))(hashRows([h35, x19], { H35: { hash: hash(h35) } })), { same: 1, had: 1 });
+  const r = hashRows([h35, x19], { H35: { hash: "0000000000", path: "p" }, X19: { hash: hash(x19) } });
+  assert.deepEqual([r.same, r.had], [1, 2]); assert.match(r.lines[0], /≠ manifest 0000000000/); assert.match(r.lines[1], /= manifest/);
+});
+t("--redo: tệp gốc và ảnh lưới cũ cùng băm được đổi tên sang .cu-<giờ> (không xoá), để run tải lại và sheet không hiện lưới cũ", () => {
+  const dir = mkdtempSync(join(tmpdir(), "meshy-test-"));
+  try {
+    const base = "abc-char_H35_a";
+    writeFileSync(join(dir, base + ".glb"), "g"); writeFileSync(join(dir, base + "-luoi.png"), "p");
+    assert.equal(setAsideRaw(dir, base, "T1"), 2);
+    assert.deepEqual(readdirSync(dir).sort(), [base + "-luoi.cu-T1.png", base + ".cu-T1.glb"].sort());
+    assert.ok(!existsSync(join(dir, base + ".glb")));
+    assert.equal(setAsideRaw(dir, base, "T2"), 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 console.log("Tài liệu thật: môi trường K–O, thú, nón lá");
@@ -240,8 +325,8 @@ t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đ�
   const p = (c) => get(c).prompt, bad = [];
   const want = (c, ok, why) => { if (!ok) bad.push(`${c}: ${why}`); };
   want("H33_v2", /bowl/i.test(p("H33_v2")) && /tassel/i.test(p("H33_v2")) && !/spike|horn|crest/i.test(p("H33_v2")), "mũ bát vàng tua đỏ, không chóp nhọn");
-  want("X19_v2", /drum/i.test(p("X19_v2")) && /gold ball/i.test(p("X19_v2")) && !/spike/i.test(p("X19_v2")), "mũ lông hình trống, một quả cầu vàng");
-  want("OFF_photuong_v2", /drum/i.test(p("OFF_photuong_v2")) && /silver-grey ball/i.test(p("OFF_photuong_v2")) && !/spike|crown|crest/i.test(p("OFF_photuong_v2")), "mũ lông, cầu xám bạc, không mào");
+  want("X19_v2", /drum/i.test(p("X19_v2")) && /gold cone/i.test(p("X19_v2")) && !/spike/i.test(p("X19_v2")), "mũ lông hình trống, một chóp vàng ngắn");
+  want("OFF_photuong_v2", /drum/i.test(p("OFF_photuong_v2")) && /silver-grey cone/i.test(p("OFF_photuong_v2")) && !/spike|crown|crest/i.test(p("OFF_photuong_v2")), "mũ lông, chóp xám bạc, không mào");
   want("X20_v2", /fur hat/i.test(p("X20_v2")) && /gold spike/i.test(p("X20_v2")) && /heavy/i.test(p("X20_v2")) && /pauldrons|shoulder plates/i.test(p("X20_v2")), "mũ lông, chóp vàng, giáp nặng");
   for (const c of ["DV_DAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_cung_v2", "CV_songdao_v2"])
     want(c, !/\b(hat|helmet|cap)\b/i.test(p(c)) && /bare head/i.test(p(c)) && /red (cloth )?(head)?band|vermilion cloth band/i.test(p(c)) && apiPrompt(get(c)).includes("No helmet."), "đầu trần buộc khăn đỏ (nón lá gắn bằng code)");
@@ -279,8 +364,42 @@ t("mục 0.8 Còn phải tạo: trước bảng mục 1; có lệnh run --stage 
   const s = md.replace(/\r\n/g, "\n"), i = s.indexOf("\n### 0.8 "), j = s.indexOf("\n## 1. ");
   assert.ok(i > 0 && i < j, "thiếu mục 0.8 trước mục 1");
   const s08 = s.slice(i, j);
-  for (const w of ["--stage luoi", "meshy.mjs sheet", "credit", "--set thieu", "--set moi-truong", "--set lam-lai", "--set tuong-moi"]) assert.ok(s08.includes(w), w);
+  for (const w of ["--stage luoi", "meshy.mjs sheet", "credit", "--set thieu", "--set moi-truong", "--set lam-lai", "--set tuong-moi", "--set tuy-chon"]) assert.ok(s08.includes(w), w);
   assert.ok(/run --set lam-lai(?! --stage)/.test(s08), "thiếu lệnh tô texture (run không có --stage)");
+  for (let i = 1; i <= 6; i++) assert.ok(s08.includes(`# Lượt ${i}`), `thiếu lệnh lượt ${i}`);
+  assert.ok(!/# Đợt \d/.test(s08), "lượt tạo trong 0.8 không gọi là đợt (trùng chữ đợt của mục 0.4 và đợt 19)");
+});
+
+console.log("Tài liệu thật: sửa sau soát (đợt 19b)");
+const P = (c) => get(c).prompt;
+t("thuyền K1–K6: prompt ghi chiều cao boong, lầu, cột để giữ tỉ lệ boong đi được của HULLS (Meshy chỉ giữ tỉ lệ)", () => {
+  const want = { ENV_chien_thuyen_nguyen: ["2.6 m", "14.5 m"], ENV_ky_ham_nguyen: ["3 m", "6 m"], ENV_thuyen_ho_ve: ["1.8 m", "3.3 m"], ENV_thuyen_do_luong: ["0.8 m", "5.4 m"],
+    ENV_thuyen_chien_tran: ["0.7 m"], ENV_thuyen_tong: ["6 m"] };
+  const bad = Object.entries(want).flatMap(([c, ws]) => ws.filter((w) => !P(c).includes(w)).map((w) => `${c} thiếu ${w}`));
+  assert.deepEqual(bad, []);
+});
+t("thuyền: không xin cán cờ (cán cờ code giữ, đặt đúng flagAt); K8, K9 tắt đối xứng (sào, mái chèo một bên)", () => {
+  const ships = ["ENV_chien_thuyen_nguyen", "ENV_ky_ham_nguyen", "ENV_thuyen_ho_ve", "ENV_thuyen_do_luong", "ENV_thuyen_chien_tran"];
+  assert.deepEqual(ships.filter((c) => /bare (stern )?flagpole|flagpole at/i.test(P(c)) || !/no flagpole/i.test(P(c))), []);
+  assert.deepEqual(["ENV_thuyen_mui", "ENV_thung_cau"].filter((c) => get(c).sym !== "off"), []);
+});
+t("tướng mới không có chữ kéo về vương miện, áo rồng, cầm cung hay dáng thủ lĩnh man rợ; H28 không giáp buộc dây kiểu samurai", () => {
+  assert.deepEqual(NEW_GEN.filter((c) => /\b(emperor|imperial|prince|archer|veteran|brocade)\b/i.test(P(c))), []);
+  assert.ok(!/lacing/i.test(P("H28")));
+});
+t("mũ lông X19_v2, OFF_photuong_v2: một chóp ngắn ở chính giữa như mũ code, không quả cầu (núm mũ quan nhà Thanh)", () => {
+  assert.match(P("X19_v2"), /one short gold cone on the top centre/); assert.match(P("OFF_photuong_v2"), /one short silver-grey cone on the top centre/);
+  assert.ok(!/ball/.test(P("X19_v2") + P("OFF_photuong_v2")));
+});
+t("tường, cổng Hàm Tử ghi Việt, không merlon kiểu thành châu Âu; xe lương bánh nan; trống trận giá 1,1 m không dùi", () => {
+  assert.match(P("ENV_tuong_dat"), /Vietnamese/); assert.ok(!/merlon/i.test(P("ENV_tuong_dat"))); assert.match(P("ENV_cong_ham_tu"), /Vietnamese/);
+  for (const c of ["ENV_xe_luong", "ENV_xe_luong_vo"]) { assert.match(P(c), /spoked/, c); assert.ok(!/solid plank wheel/.test(P(c)), c); }
+  assert.match(P("ENV_trong_tran"), /1\.1 m tall two-post/); assert.ok(!/drumstick/.test(P("ENV_trong_tran")));
+});
+t("cây không có chữ nghề \"leaf cards\", xin không đế; không dùng \"hôm nay\" (viết \"hiện nay\", \"nay\")", () => {
+  assert.deepEqual(env.filter((a) => /leaf cards/.test(a.prompt)).map((a) => a.code), []);
+  assert.deepEqual(env.filter((a) => a.sec[0] === "N" && /tree|bamboo|palm|banana|grove/i.test(a.prompt) && !/no ground base/.test(a.prompt)).map((a) => a.code), []);
+  assert.ok(!md.includes("hôm nay"));
 });
 
 console.log("Lệnh list (không mạng)");
@@ -306,7 +425,7 @@ t("list --set tat-ca chạy được, mỗi mục một dòng", () => {
 t("--set lạ: báo đủ tên các bộ", () => {
   const r = cli("list", "--set", "khong-co");
   assert.notEqual(r.status, 0);
-  for (const s of ["thu", "can", "thieu", "moi-truong", "lam-lai", "tuong-moi", "tat-ca"]) assert.ok(r.stderr.includes(s), s);
+  for (const s of ["thu", "can", "thieu", "moi-truong", "lam-lai", "tuong-moi", "tuy-chon", "tat-ca"]) assert.ok(r.stderr.includes(s), s);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);
