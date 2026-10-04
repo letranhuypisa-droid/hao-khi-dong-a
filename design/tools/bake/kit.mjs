@@ -29,6 +29,9 @@ const MAP = { hips: "pelvis", torso: "torso", head: "torso", shL: "uaL", elL: "f
 const CI = Object.fromEntries(JOINT_NAMES.map((n, i) => [n, i]));
 // độ cao khớp chân, hông của bộ khúc người (soldier-motion.js HUMAN): hông 0,9; đùi 0,44; cẳng 0,36 (cổ chân 0,08)
 const YH = { hips: HP.pelvis[1], torso: HP.torso[1], hipOff: 0.02, thigh: 0.44, shin: 0.36, knee: HP.shL[1], ankle: HP.ftL[1] };
+// trọng số (human.mjs weights15) cho lưới lính thô (cạnh ~6 cm): dải vai giữ giữa khớp vai — dời 5 cm về phía tay như nhân vật rig
+// thì cả vòng đỉnh bắp tay sang thân / cẳng tay, khúc cánh tay còn 1,7% đỉnh (NG_CUNG; trước 4,2%)
+const KIT_W = { so: 0 };
 
 // Dáng gốc → tư thế nghỉ bộ khúc: v' = Σ w_j · R_j · B_j⁻¹ · v. R_j: khung nghỉ của khớp j (thế giới): place[j] là vị trí (khung chỉ
 // tịnh tiến) hoặc { p, q } (vị trí + quaternion: chân người cưỡi gập). Tay buông thẳng ở vai bộ khúc, chân ở hông bộ khúc; đầu giữ
@@ -51,17 +54,24 @@ function restPose(F, W, bind, place) {
   return out;
 }
 
-// 15 trọng số khớp → ≤ 2 khúc (map: khớp → tên khúc). Trả Uint8Array n × 4 (khúc 0, khúc 1, w0·255, 0).
-function skin2(W, n, map) {
+// 15 trọng số khớp → ≤ 2 khúc liền nhau (cha – con của bộ khúc skel; map: khớp → tên khúc): cặp (khúc, khúc cha) có tổng trọng số
+// lớn nhất, phần khúc khác bỏ. Trước đây lấy hai khúc nặng nhất bất kỳ: gấu áo trộn bàn chân + chậu, cẳng chân + chậu (kéo thành gai
+// tới đất khi bước), ngón tay chạm áo trộn cẳng tay + thân. Trả Uint8Array n × 4 (khúc 0, khúc 1, w0·255, 0).
+function skin2(W, n, map, skel = "human") {
   const NB = JOINTS.length, out = new Uint8Array(n * 4), acc = new Float32Array(JOINT_NAMES.length);
+  const par = SKELETONS[skel].map((j) => (j[1] ? CI[j[1]] : -1));
   for (let v = 0; v < n; v++) {
     acc.fill(0);
     for (let k = 0; k < NB; k++) acc[CI[map[JOINTS[k]]]] += W[v * NB + k];
-    let a = 0, b = -1;
-    for (let c = 1; c < acc.length; c++) if (acc[c] > acc[a]) a = c;
-    for (let c = 0; c < acc.length; c++) if (c !== a && (b < 0 || acc[c] > acc[b])) b = c;
+    let a = 0, b = -1, best = -1;
+    for (let c = 0; c < acc.length; c++) {
+      if (!(acc[c] > 0)) continue;
+      const p = par[c], s = acc[c] + (p >= 0 ? acc[p] : 0);
+      if (s > best) { best = s; a = c; b = p >= 0 && acc[p] > 1e-3 ? p : -1; }
+    }
+    if (b >= 0 && acc[b] > acc[a]) [a, b] = [b, a];
     const wa = acc[a], wb = b >= 0 ? acc[b] : 0, s = wa + wb || 1;
-    out[v * 4] = a; out[v * 4 + 1] = b >= 0 && wb > 1e-3 ? b : a; out[v * 4 + 2] = Math.round((wa / s) * 255);
+    out[v * 4] = a; out[v * 4 + 1] = b >= 0 ? b : a; out[v * 4 + 2] = Math.round((wa / s) * 255);
   }
   return out;
 }
@@ -135,10 +145,11 @@ function placeWeapon(raw, bone, piv, { p = [0, 0, 0], r = [0, 0, 0], s = 1 } = {
   return { pos, nor, uv: raw.uv, skin, idx: raw.idx };
 }
 
-// Tua giáo / đuôi (khung "tas", treo dọc −y từ neo ở gốc): côn đơn giản một màu (SWATCH).
-function tassel(colorUV, len = 0.33, r0 = 0.03, r1 = 0.066) {
-  const seg = 6, pos = [], nor = [], uv = [], idx = [];
-  const rings = [[0, r0 * 0.9], [-0.06, r0], [-len * 0.75, r1], [-len, 0.005]];
+// Tua giáo / đuôi (khung "tas", treo dọc −y từ neo ở gốc): côn đơn giản một màu (SWATCH). lod: 0 — 6 cạnh, 3 đoạn (36 tam giác);
+// 1 — 5 cạnh, 2 đoạn (20); 2 — 3 cạnh, 2 đoạn (12). Trước đây mọi mức đều 36 tam giác: ở LOD2 (~100–145) tua nặng hơn cả cán giáo.
+function tassel(colorUV, lod = 0, len = 0.33, r0 = 0.03, r1 = 0.066) {
+  const seg = [6, 5, 3][lod], pos = [], nor = [], uv = [], idx = [];
+  const rings = lod ? [[0, r0], [-len * 0.75, r1], [-len, 0.005]] : [[0, r0 * 0.9], [-0.06, r0], [-len * 0.75, r1], [-len, 0.005]];
   for (const [y, r] of rings) for (let k = 0; k < seg; k++) { const a = (k / seg) * Math.PI * 2; pos.push(Math.cos(a) * r, y, Math.sin(a) * r); nor.push(Math.cos(a), 0, Math.sin(a)); uv.push(...colorUV); }
   for (let q = 0; q < rings.length - 1; q++) for (let k = 0; k < seg; k++) { const a = q * seg + k, b = q * seg + ((k + 1) % seg), c = a + seg, d = b + seg; idx.push(a, c, b, b, c, d); }
   const n = pos.length / 3, skin = new Uint8Array(n * 4);
@@ -147,7 +158,7 @@ function tassel(colorUV, len = 0.33, r0 = 0.03, r1 = 0.066) {
 }
 // tua làm nguồn nướng (ảnh 1 × 1 màu) và lưới màu đỉnh
 const tasselSrc = (name) => ({ ...tassel([0.5, 0.5]), img: { data: Uint8Array.from(SWATCH[name]), w: 1, h: 1, ch: 3 } });
-const tasselColor = (name) => { const t = tassel([0, 0]), c = SWATCH[name].map((x) => x / 255); return { ...t, col: Float32Array.from({ length: t.pos.length }, (_, i) => c[i % 3]) }; };
+const tasselColor = (name, lod) => { const t = tassel([0, 0], lod), c = SWATCH[name].map((x) => x / 255); return { ...t, col: Float32Array.from({ length: t.pos.length }, (_, i) => c[i % 3]) }; };
 
 export const SWATCH = { son: [0x9b, 0x2d, 0x20], long: [0x5a, 0x46, 0x32] };
 
@@ -177,7 +188,7 @@ export async function bakeKit(file, c) {
   const cg = cutBoxes(await readGLB(file, Infinity), c.cut), g = cg.g;
   const F = fitHuman(g.pos, g.idx, { shY: HP.uaL[1], fix: c.fix, box: cg.bounds, name: c.name, kit: true });
   const bind = bindSkeleton(F, YH);
-  const W = weights15(F, YH);
+  const W = weights15(F, YH, KIT_W);
   // khung nghỉ: vai, khuỷu, cổ tay bộ khúc (tay buông), chân ở hông bộ khúc, đầu giữ chỗ mô hình
   const place = {
     hips: HP.pelvis, torso: HP.torso, head: [0, F.neckY, 0],
@@ -197,7 +208,7 @@ export async function bakeKit(file, c) {
   for (let L = 1; L < c.lods.length; L++) {
     const parts = [await weldLOD(body, c.lods[L], bodyCol)];
     for (let k = 0; k < c.weapons.length; k++) parts.push(await weldLOD(wps[k], c.weapons[k].wl[L], c.weapons[k].col));
-    if (c.tassel) parts.push(tasselColor(c.tassel));
+    if (c.tassel) parts.push(tasselColor(c.tassel, L));
     lods.push(assemble(parts, true));
   }
   // neo tua giáo (khung cẳng tay cầm giáo): chân mũi giáo đo lúc nướng (wpn.mjs meta.head) — soldier-motion.js TAS dùng thay neo
@@ -262,21 +273,23 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
   let rc = [0, 0, 0, 0];
   for (let v = 0; v < G.n; v++) if (Math.abs(DT[v] - tailLen) < 0.03) { rc[0] += G.P[v * 3]; rc[1] += G.P[v * 3 + 1]; rc[2] += G.P[v * 3 + 2]; rc[3]++; }
   const tailRoot = rc[3] ? [rc[0] / rc[3], rc[1] / rc[3], rc[2] / rc[3]] : [0, 1.2, -0.75];
-  // trọng số, dời chân về hông bộ khúc (chỉ tịnh tiến)
+  // trọng số, dời chân về hông bộ khúc (chỉ tịnh tiến). Dải chân → thân quanh khớp hông chân (0,92: 0,84–1,0; trước đây 0,78–0,98,
+  // khớp ở 30% dải); da theo chân giảm dần theo khoảng cách ngang tới cột chân (0,12–0,2): đỉnh bụng gần chân không bị chân kéo xuống
+  // khi phi (trước đây cả bụng trong 0,2 m theo chân — mảng tối dưới bụng). Phần dời chân giữ dải cũ 0,78–0,98 (dáng nghỉ không đổi).
   const n = V.length / 3, skin = new Uint8Array(n * 4), VR = new Float32Array(V.length);
   const lin = (x, a, b2) => Math.max(0, Math.min(1, (x - a) / (b2 - a)));
   for (let i = 0; i < n; i++) {
     const x = V[i * 3], y = V[i * 3 + 1], z = V[i * 3 + 2], wi = h.idx ? G.id[i] : i;
-    let bone = "pelvis", w = 1, dx = 0, dz = 0;
+    let bone = "pelvis", w = 1, ws = 1, dx = 0, dz = 0;
     const dt = DT[wi];
-    if (dt < tailLen + 0.06) { bone = "tas"; w = 1 - lin(dt, tailLen - 0.06, tailLen + 0.06); }
-    else if (y < 0.98) {
+    if (dt < tailLen + 0.06) { bone = "tas"; w = ws = 1 - lin(dt, tailLen - 0.06, tailLen + 0.06); }
+    else if (y < 1.0) {
       let best = null, bd = Infinity;
       for (const k in legs) { const d = Math.hypot(x - legs[k][0], z - legs[k][1]); if (d < bd) { bd = d; best = k; } }
-      if (bd < 0.2) { bone = best; w = 1 - lin(y, 0.78, 0.98); dx = XP[best][0] - legs[best][0]; dz = XP[best][2] - legs[best][1]; }
+      if (bd < 0.2) { bone = best; w = 1 - lin(y, 0.78, 0.98); ws = (1 - lin(y, 0.84, 1.0)) * (1 - lin(bd, 0.12, 0.2)); dx = XP[best][0] - legs[best][0]; dz = XP[best][2] - legs[best][1]; }
     }
     VR[i * 3] = x + dx * w; VR[i * 3 + 1] = y; VR[i * 3 + 2] = z + dz * w;
-    skin[i * 4] = CI[bone]; skin[i * 4 + 1] = CI.pelvis; skin[i * 4 + 2] = Math.round(w * 255);
+    skin[i * 4] = CI[bone]; skin[i * 4 + 1] = CI.pelvis; skin[i * 4 + 2] = Math.round(ws * 255);
   }
   const hnor = smoothNormals(VR, h.idx);
   const horse = { pos: VR, nor: hnor, uv: h.uv, skin, idx: h.idx, img: await rawImage(h.image) };
@@ -285,7 +298,7 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
   const cr = cutBoxes(await readGLB(riderFile, Infinity), c.cut), r = cr.g;
   const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix, box: cr.bounds, name: c.name, kit: true });
   const bind = bindSkeleton(F, YH);
-  const W = weights15(F, YH);
+  const W = weights15(F, YH, KIT_W);
   const seat = [0, XP.torso[1] - 0.08, XP.torso[2]];
   const DOWNV = new THREE.Vector3(0, -1, 0);
   const legFrame = (from, to) => ({ p: from, q: new THREE.Quaternion().setFromUnitVectors(DOWNV, new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize()) });
@@ -299,7 +312,7 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
     place["hip" + sd] = legFrame(hip, knee); place["knee" + sd] = legFrame(knee, ankle); place["ankle" + sd] = { p: ankle, q: legFrame(knee, ankle).q };
   }
   const RV = restPose(F, W, bind, place);
-  const rskin = skin2(W, RV.length / 3, RIDER_MAP2);
+  const rskin = skin2(W, RV.length / 3, RIDER_MAP2, "horse");
   const rider = { pos: RV, nor: smoothNormals(RV, r.idx), uv: r.uv, skin: rskin, idx: r.idx, img: await rawImage(r.image) };
 
   const hCol = sampleColors(h.uv, horse.img), rCol = sampleColors(r.uv, rider.img);

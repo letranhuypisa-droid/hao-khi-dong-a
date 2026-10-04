@@ -122,37 +122,37 @@
   "kind": "kit",
   "file": "kit/DV_DAO.hkm",
   "tex": "kit/DV_DAO.webp",
-  "tris": 620,
+  "tris": 618,
   "lods": [
-   620,
+   618,
    288,
-   112
+   118
   ],
-  "bytes": 61534
+  "bytes": 67688
  },
  "kit/DV_GIAO": {
   "kind": "kit",
   "file": "kit/DV_GIAO.hkm",
   "tex": "kit/DV_GIAO.webp",
-  "tris": 568,
+  "tris": 563,
   "lods": [
-   568,
-   276,
+   563,
+   262,
    124
   ],
-  "bytes": 65148
+  "bytes": 64028
  },
  "kit/DV_NO": {
   "kind": "kit",
   "file": "kit/DV_NO.hkm",
   "tex": "kit/DV_NO.webp",
-  "tris": 548,
+  "tris": 546,
   "lods": [
-   548,
+   546,
    260,
    102
   ],
-  "bytes": 64860
+  "bytes": 61396
  },
  "kit/NG_CUNG": {
   "kind": "kit",
@@ -161,10 +161,10 @@
   "tris": 546,
   "lods": [
    546,
-   246,
-   102
+   248,
+   100
   ],
-  "bytes": 52152
+  "bytes": 52084
  },
  "kit/NG_DAO": {
   "kind": "kit",
@@ -174,21 +174,21 @@
   "lods": [
    617,
    283,
-   109
+   117
   ],
-  "bytes": 56528
+  "bytes": 58806
  },
  "kit/NG_GIAO": {
   "kind": "kit",
   "file": "kit/NG_GIAO.hkm",
   "tex": "kit/NG_GIAO.webp",
-  "tris": 636,
+  "tris": 631,
   "lods": [
-   636,
-   313,
-   147
+   631,
+   297,
+   123
   ],
-  "bytes": 61388
+  "bytes": 58890
  },
  "kit/NG_KY": {
   "kind": "kit",
@@ -198,21 +198,21 @@
   "lods": [
    877,
    338,
-   138
+   140
   ],
-  "bytes": 128458
+  "bytes": 130906
  },
  "kit/NG_TANK": {
   "kind": "kit",
   "file": "kit/NG_TANK.hkm",
   "tex": "kit/NG_TANK.webp",
-  "tris": 589,
+  "tris": 588,
   "lods": [
-   589,
+   588,
    278,
    114
   ],
-  "bytes": 62418
+  "bytes": 62016
  },
  "wpn/chuy": {
   "kind": "wpn",

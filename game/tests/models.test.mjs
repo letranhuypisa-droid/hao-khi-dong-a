@@ -1,9 +1,10 @@
 // tests/models.test.mjs — đợt 19a: mô hình nướng sẵn (game/assets/models/** + index.json, design/tools/glb-bake.mjs) đúng hình người
 // và đúng chiều vũ khí: (a) 17 nhân vật rig — độ dài cánh tay, cẳng tay, hai bên lệch nhau, khớp lúc chạy trùng khung gắn, vai, cổ;
 // trục bản lề khuỷu theo mặt gập khuỷu của mô hình, đế giày (meta.foot), phần thừa đã cắt (sừng, bao đao); (b) trọng số da — mỗi xương
-// có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt; (c) vũ khí — kiếm, đao chuôi ở phía tay
-// và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z, chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua);
-// (d) lính đám đông — không trộn khúc không kề, tay theo khúc tay, mức chi tiết nào cũng còn vũ khí, neo tua giáo; (e) xương phụ (A4);
+// có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt, eo liền; (c) vũ khí — kiếm, đao chuôi ở
+// phía tay và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z, chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua);
+// (d) lính đám đông — không trộn khúc không kề, tay theo khúc tay, ngân sách tam giác mỗi mức, mức chi tiết nào cũng còn vũ khí, neo
+// tua giáo; (e) xương phụ (A4);
 // (f) bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs trên trục tay tổng hợp (khuỷu, "hand", tỉ lệ chung, kiểm dải).
 // Thuần Node: đọc .hkm bằng fs (định dạng bake/io.mjs, như glb.js parseHKM), không three, không node_modules. Số liệu lấy từ khung gắn
 // (nghịch đảo meta.inv) và meta.rest; bảng nướng (cỡ, chỗ cầm vũ khí của lính) từ design/tools/bake/catalog.mjs (dữ liệu thuần).
@@ -16,15 +17,13 @@ const MD = new URL("../assets/models/", import.meta.url);
 const { CHARS, WEAPONS, KIT_LIST } = await import("../../design/tools/bake/catalog.mjs");
 const { SKELETONS, JOINT_NAMES } = await import("../js/battle/soldier-motion.js");
 
-// mã kiểm:id → bước sửa. "*" = mọi mô hình của mục đó. Số đo lúc viết (đợt 19a A1) in kèm khi chạy.
+// mã kiểm:id → bước sửa. "*" = mọi mô hình của mục đó. Số đo lúc viết (đợt 19a A1) in kèm khi chạy. A3 (trọng số mềm, lính đám
+// đông) đã xoá khong-ke, ban-chan, mot-xuong, kit-ke, kit-vk. "GLB": rig không sửa được, cần dựng lại mẫu Meshy.
 const TODO = {
-  ...Object.fromEntries(["OFF_tuong", "X19"].map((id) => ["phan:" + id, "A3"])),
-  "khong-ke:*": "A3",
-  "ban-chan:*": "A3",
-  // OFF_tuong 45% → 56% ở A2: trọng số tay nay theo khớp ghi tay (trước đây tay gần như theo thân), dải trộn còn hẹp — A3 làm mượt
-  ...Object.fromEntries(["CV_cung", "CV_daidao", "CV_giao", "CV_khien", "CV_songdao", "H31", "H33", "H35", "H40", "LINH_r01", "LINH_r24", "OFF_doitruong", "OFF_photuong", "OFF_tuong", "X20", "X24"].map((id) => ["mot-xuong:" + id, "A3"])),
-  ...Object.fromEntries(["DV_DAO", "DV_GIAO", "DV_NO", "NG_CUNG", "NG_DAO", "NG_GIAO", "NG_TANK"].map((id) => ["kit-ke:" + id, "A3"])),
-  "kit-vk:DV_GIAO": "A3", "kit-vk:DV_DAO": "A3", "kit-vk:NG_DAO": "A3",          // LOD2: giáo mất cán; dao_linh 12 tam giác chỉ còn chắn tay + chuôi
+  // Tướng Nguyên chung: tay buông dính vạt áo, cánh tay trong ống tay áo rộng — lưới nướng chỉ 47–52 đỉnh cánh tay, 20–21 đỉnh bàn tay
+  // / 2954 (ống quanh chuỗi khớp ghi tay): vai 0,9–1,2%, bàn tay 0,4–0,5% dù trọng số theo đúng khớp (giữa cẳng tay 0,98 trọng số
+  // khuỷu). Đo ở đợt 19a A3; A2 đã ghi: cần mẫu mới tay tách khỏi áo.
+  "phan:OFF_tuong": "GLB",
   "phu:*": "A4",
 };
 // A4: tên xương phụ chốt ở bước A4 (mỗi nhân vật rig phải có đủ); null = chỉ đòi có ít nhất một xương ngoài 15 khớp
@@ -270,6 +269,21 @@ t("mot-xuong", `da mượt: đỉnh chỉ theo một xương ≤ ${Math.round(SI
   let one = 0; for (const [, ws] of skinOf(c)) if (ws.size === 1) one++;
   return one / c.g.count <= SINGLE_MAX ? "" : `một xương ${pc(one / c.g.count)}`;
 }));
+// eo liền: cạnh ngắn (< 3 cm) ngoài tay ở 0,85–1,35 m (khung gắn), trọng số thân hai đầu chênh ≤ 0,12 — trước đây thân nhảy 0 → 0,35
+// ở hông + 0,02 (thân xoắn 0,6 rad: đai xé tới 12–29 cm giữa hai đầu một cạnh)
+const ARM_BONES = new Set(["shL", "elL", "handL", "shR", "elR", "handR"]);
+t("eo", "eo liền: cạnh < 3 cm ngoài tay ở độ cao 0,85–1,35 m, trọng số thân hai đầu chênh ≤ 0,12 (không bậc)", () => forChars((c) => {
+  const P = c.g.position, I = c.g.index, wt = new Float32Array(c.g.count), arm = new Uint8Array(c.g.count);
+  for (const [v, ws] of skinOf(c)) { wt[v] = ws.get("torso") || 0; for (const b of ws.keys()) if (ARM_BONES.has(b)) arm[v] = 1; }
+  let worst = 0, at = null;
+  for (let q = 0; q < I.length; q += 3) for (let e = 0; e < 3; e++) {
+    const a = I[q + e], b = I[q + ((e + 1) % 3)];
+    if (arm[a] || arm[b] || Math.min(P[a * 3 + 1], P[b * 3 + 1]) < 0.85 || Math.max(P[a * 3 + 1], P[b * 3 + 1]) > 1.35) continue;
+    if (Math.hypot(P[a * 3] - P[b * 3], P[a * 3 + 1] - P[b * 3 + 1], P[a * 3 + 2] - P[b * 3 + 2]) >= 0.03) continue;
+    const d = Math.abs(wt[a] - wt[b]); if (d > worst) { worst = d; at = P[a * 3 + 1]; }
+  }
+  return worst <= 0.12 ? "" : `trọng số thân chênh ${f2(worst)} qua một cạnh ở y ${f2(at)}`;
+}));
 
 console.log("(c) Vũ khí wpn/*.hkm (khung chuẩn bake/wpn.mjs: gốc ở chỗ nắm, mũi theo +Z, bề rộng lưỡi ±Y)");
 // mặt cắt dọc Z: mỗi mặt phẳng z (bước 1 cm) lấy giao các cạnh tam giác và đỉnh gần → r = nửa bề ngang max(|x|, |y|), y lớn / nhỏ nhất
@@ -369,6 +383,13 @@ t("kit-tay", "lính bộ: tay theo khúc tay — không đỉnh thân / chậu n
     if (ln === "lod0") for (const [s, min] of [["uaL", 0.02], ["uaR", 0.02], ["faL", 0.015], ["faR", 0.015]]) if (!((dom[s] || 0) / g.count >= min)) out.push(`${ln} ${s} ${pc((dom[s] || 0) / g.count)}`);
   }
   return out.length ? [{ id, msg: out.join("; ") }] : [];
+}));
+// ngân sách lính bộ (design/systems.md §13.3, catalog.mjs KIT_LIST): cả người lẫn vũ khí, tua — trước đây tua giáo 36 tam giác ở mọi
+// mức (NG_GIAO LOD1 313, LOD2 147)
+const KIT_BUDGET = [640, 310, 145];
+t("kit-ngan-sach", `lính bộ: tam giác mỗi mức ≤ ${KIT_BUDGET.join(" / ")} (LOD0 / 1 / 2, cả vũ khí và tua)`, () => Object.entries(K).filter(([, k]) => k.meta.skel === "human").flatMap(([id, k]) => {
+  const n = Object.values(k.meshes).map((g) => g.index.length / 3), bad = n.map((x, i) => (x > KIT_BUDGET[i] ? `lod${i} ${x}` : "")).filter(Boolean);
+  return bad.length ? [{ id, msg: bad.join(", ") }] : [];
 }));
 // vũ khí trong lưới lính: tam giác gắn cứng vào khúc cẳng tay, nằm ngoài ống cẳng tay + bàn tay (r 0,1 m quanh đoạn piv → piv − 0,38 y);
 // chiếu lên trục dài nhất của hộp vũ khí mong đợi (piv + p + s·R(r)·[lo, hi] của wpn/*.hkm) → phần phủ. LOD0 phủ ≥ 50%, mức xa ≥ 70% LOD0.
