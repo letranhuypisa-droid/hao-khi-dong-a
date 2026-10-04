@@ -7,8 +7,9 @@
 //     --set: thu (cặp thử H35 + song đao), can (40 tệp game đang dùng; mặc định), thieu (game còn dựng bằng code: dân làng,
 //     áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú mục O), moi-truong (mã ENV_, trừ mục ghi "tuỳ chọn" ở đầu mục),
 //     lam-lai (mã _v2: làm lại ra tệp mới, không ghi đè tệp cũ), tuong-moi (tướng có tên chưa có GLB: H34, H38, H39, tướng thêm
-//     từ design/3d-ref), tuy-chon (mục không thuộc bộ nào khác, cộng môi trường tuỳ chọn; trừ LINH_r2 còn khối POSE cũ), tat-ca.
-//     --hash in mã, băm prompt, độ dài bản API, tam giác mục tiêu và so với manifest (≠ là băm đổi: lệnh trả mã 1).
+//     từ design/3d-ref), tuy-chon (mục không thuộc bộ nào khác, cộng môi trường tuỳ chọn; trừ LINH_r2 còn khối POSE cũ), tat-ca
+//     (run --set tat-ca cũng bỏ LINH_r2: chỉ dựng khi ghi trong --only). --only bỏ mã trùng.
+//     --hash in mã, băm prompt, độ dài bản API, tam giác mục tiêu và so với manifest (≠ là băm đổi ở mã đã trả tiền: lệnh trả mã 1).
 //   node design/tools/meshy.test.mjs                          # kiểm không mạng: đọc tài liệu, bộ chọn, 40 băm cũ không đổi
 //   node design/tools/meshy.mjs balance
 //   node design/tools/meshy.mjs run     [--set ...] [--only ...] [--model latest] [--model-linh meshy-5] [--model-vk meshy-5]
@@ -19,8 +20,8 @@
 //     Mẫu đã có lưới thì giữ model của lưới đó; muốn đổi thì --redo.
 //     --stage luoi chỉ dựng lưới xám (preview) và tải ảnh lưới; soát xong mới chạy lại không có --stage để tô texture,
 //     nên mẫu hỏng chỉ tốn tiền lưới. --redo bỏ kết quả cũ của các mã đó (mã phải nằm trong danh sách chạy) và dựng lại từ
-//     đầu; tệp gốc, ảnh cũ trong _raw/ đổi tên sang .cu-<giờ>, không xoá. Mẫu đã xong mà băm prompt khác manifest thì run dừng
-//     trước khi gọi Meshy, trừ khi mã đó có trong --redo (mua lại phải là cố ý).
+//     đầu; tệp gốc, ảnh cũ trong _raw/ đổi tên sang .cu-<giờ>, không xoá. Mẫu đã xong, hoặc đã mua lưới (preview_id), mà băm
+//     prompt khác manifest thì run dừng trước khi gọi Meshy, trừ khi mã đó có trong --redo (mua lại phải là cố ý).
 //   node design/tools/meshy.mjs sheet   <ra.png> [--set ...] [--only ...] [--size 256] [--cols 6]   # ghép ảnh Meshy thành một tờ
 //   node design/tools/meshy.mjs post    [--only ...]          # nén lại từ bản gốc đã tải, không tốn credit
 //
@@ -30,8 +31,9 @@
 // sang WebP (1024; H35, H31 và người lính Tự do 2048), đặt gốc dưới chân, và giảm lưới nếu Meshy trả quá dải tam giác
 // của bảng mục 1. Không lượng tử hoá lưới: game/js/riglab/autorig.js đọc thẳng position.array kiểu Float32.
 // Trạng thái từng mẫu (mã task, số tam giác, dung lượng) ghi ở design/glb/manifest.json, nên chạy lại chỉ làm phần còn thiếu.
-// Làm lại một mẫu đã có: thêm dòng mã _v2 (H33_v2 → char_H33_tran-nhat-duat_v2.glb) thay vì sửa prompt cũ — sửa prompt cũ là
-// đổi băm: run dừng và nêu mã, chỉ mua lại và ghi đè tệp cũ khi mã đó có trong --redo.
+// Làm lại một mẫu đã có: thêm dòng mã _v2 (H33_v2 → char_H33_tran-nhat-duat_v2.glb: tệp gốc thêm _v2, cùng nhóm, phải có
+// dòng mã gốc) thay vì sửa prompt cũ — sửa prompt cũ là đổi băm: run dừng và nêu mã, chỉ mua lại và ghi đè tệp cũ khi mã đó
+// có trong --redo.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -111,7 +113,7 @@ export function loadAssets(md = readFileSync(DOC, "utf8")) {
     if (!p) return;
     const off = /Symmetry: tắt/.test(body), on = /Symmetry: bật/.test(body);
     if (off && on) throw new Error(`${h[2]}: ghi cả "Symmetry: bật" và "Symmetry: tắt"; chỉ ghi một (lời khuyên dựng lại thì viết "đối xứng")`);
-    secs.set(h[2], { sec: h[1], prompt: p[1].trim(), sym: off ? "off" : on ? "on" : "auto", tuyChon: /tuỳ chọn/.test(h[3]) });
+    secs.set(h[2], { sec: h[1], prompt: p[1].trim(), sym: off ? "off" : on ? "on" : "auto", tuyChon: /(tuỳ|tùy)\s*chọn/i.test(h[3]) }); // hai cách bỏ dấu
   });
   for (const c of secs.keys()) if (!rows.has(c)) throw new Error(`${c}: có mục PROMPT nhưng không có dòng bảng (dòng thiếu cột?)`);
   // 23a LINH_r2: prompt E2 đổi màu áo (mục E của tài liệu).
@@ -124,9 +126,17 @@ export function loadAssets(md = readFileSync(DOC, "utf8")) {
     if (!s) throw new Error(`thiếu PROMPT cho ${r.code}`);
     const kind = KIND[r.file.match(/^[a-z]+_/)?.[0]];
     if (!kind) throw new Error(`${r.code}: tệp ${r.file} có tiền tố lạ; chỉ nhận ${Object.keys(KIND).join(" ")} (mục 0.5)`);
+    // thiếu .glb thì run ghi ảnh lưới (…-luoi.png) đè lên chỗ tệp gốc, rồi post() đọc ảnh như GLB sau khi đã trả tiền
+    if (!/^[a-z]+_[A-Za-z0-9_-]+\.glb$/.test(r.file)) throw new Error(`${r.code}: tên tệp ${r.file} phải là tiền tố + mã + .glb (mục 0.5)`);
     if (r.code.startsWith("ENV_") !== (kind === "moi-truong")) throw new Error(`${r.code}: mã ENV_ đi với tệp env_ và ngược lại (${r.file})`);
     const v = r.code.match(V2)?.[0];
     if (v && !r.file.endsWith(v + ".glb")) throw new Error(`${r.code}: tệp làm lại phải là …${v}.glb để không ghi đè tệp cũ (${r.file})`);
+    if (v) { // mã _v2 kế thừa quy tắc riêng (texture, đối xứng, negative) và thư mục của mã gốc: phải có mã gốc, đúng tệp, cùng nhóm
+      const b = rows.get(r.code.replace(V2, ""));
+      if (!b) throw new Error(`${r.code}: không có dòng mã gốc ${r.code.replace(V2, "")} (mục 0.5)`);
+      if (r.file !== b.file.replace(/\.glb$/, v + ".glb")) throw new Error(`${r.code}: tệp phải là tệp gốc thêm ${v}: ${b.file.replace(/\.glb$/, v + ".glb")} (đang ghi ${r.file})`);
+      if (r.group !== b.group) throw new Error(`${r.code}: cột nhóm ${r.group} phải giữ nhóm ${b.group} của mã gốc (model, cỡ texture chọn theo nhóm)`);
+    }
     if (files.has(r.file)) throw new Error(`${r.code}: trùng tệp ${r.file} với ${files.get(r.file)}`);
     files.set(r.file, r.code);
     const person = kind === "nhan-vat";
@@ -213,14 +223,16 @@ const SETS = {
 };
 export const setOf = (all, name) => (Object.hasOwn(SETS, name) ? SETS[name](all) : undefined);
 
-function pick(all) {
-  const only = opt("only");
-  if (only) return only.split(",").map((c) => all.find((a) => a.code === c.trim()) || die(`không có mã ${c}`));
-  const set = opt("set", "can"), list = setOf(all, set);
-  if (!list) die(`--set phải là ${Object.keys(SETS).join(" | ")}`);
-  if (!list.length) die(`--set ${set}: tài liệu chưa có mục nào thuộc bộ này`);
-  return list;
+// Danh sách chạy từ --only (bỏ mã trùng: hai worker cùng một mã thì mua hai lưới) hoặc --set. run --set bỏ LINH_r2 (còn
+// khối POSE cũ, mục 2.2): chỉ dựng khi ghi đích danh trong --only. Lỗi thì ném, main() in và thoát mã 2.
+export function pick(all, { only, set = "can", run = false } = {}) {
+  if (only) return [...new Set(only.split(",").map((c) => c.trim()).filter(Boolean))].map((c) => { const a = all.find((x) => x.code === c); if (!a) throw new Error(`không có mã ${c}`); return a; });
+  const list = setOf(all, set);
+  if (!list) throw new Error(`--set phải là ${Object.keys(SETS).join(" | ")}`);
+  if (!list.length) throw new Error(`--set ${set}: tài liệu chưa có mục nào thuộc bộ này`);
+  return run ? list.filter((a) => a.code !== "LINH_r2") : list;
 }
+const choose = (all) => { try { return pick(all, { only: opt("only"), set: opt("set", "can"), run: cmd === "run" }); } catch (e) { die(e.message); } };
 
 function die(m) { console.error(m); process.exit(2); }
 
@@ -326,23 +338,31 @@ function saveManifest(m) {
 }
 export const hash = (a) => createHash("sha1").update(apiPrompt(a) + "|" + a.tris + "|" + a.sym).digest("hex").slice(0, 10);
 
-// Chặn trước khi gọi Meshy: --redo chỉ nhận mã trong danh sách chạy (không thì mã đó mất khỏi manifest khi lưu), và mẫu đã
-// xong mà băm đổi (sửa chữ prompt cũ) thì không tự mua lại, ghi đè GLB; muốn mua lại thì ghi mã vào --redo. Trả tập mã redo.
+// Mã đã trả tiền: mẫu xong, hoặc lưới đã mua (preview_id) ở lượt --stage luoi, lỗi giữa chừng, hết credit trước khi tô.
+const paid = (m) => !!m && (m.status === "done" || !!m.preview_id);
+// Chặn trước khi gọi Meshy: --redo chỉ nhận mã trong danh sách chạy (không thì mã đó mất khỏi manifest khi lưu), và mã đã
+// trả tiền mà băm đổi (sửa chữ prompt giữa lượt lưới và lượt tô, hay sửa khối POSE2/STYLE bản API) thì không tự mua lại:
+// renderOne sẽ bỏ lưới cũ, mua lưới mới, hoặc ghi đè GLB đã có. Muốn mua lại thì ghi mã vào --redo. Trả tập mã redo.
 export function guardRun(list, man, redoOpt = "") {
   const redo = new Set(redoOpt.split(",").map((c) => c.trim()).filter(Boolean));
   const out = [...redo].filter((c) => !list.some((a) => a.code === c));
   if (out.length) throw new Error(`--redo ${out.join(",")}: không nằm trong danh sách chạy (thêm vào --only)`);
-  const stale = list.filter((a) => man[a.code]?.status === "done" && man[a.code].hash !== hash(a) && !redo.has(a.code)).map((a) => a.code);
-  if (stale.length) throw new Error(`băm prompt khác manifest, run sẽ mua lại và ghi đè GLB đã có: ${stale.join(", ")}. Sửa lại prompt cho khớp, thêm mục _v2, hoặc dùng --redo <mã> nếu cố ý mua lại`);
+  const stale = list.filter((a) => paid(man[a.code]) && man[a.code].hash !== hash(a) && !redo.has(a.code));
+  const done = stale.filter((a) => man[a.code].status === "done").map((a) => a.code), mesh = stale.filter((a) => man[a.code].status !== "done").map((a) => a.code);
+  if (stale.length) throw new Error([done.length && `băm prompt khác manifest, run sẽ mua lại và ghi đè GLB đã có: ${done.join(", ")}`,
+    mesh.length && `lưới đã mua theo prompt cũ (chưa tô texture), run sẽ bỏ lưới đó và mua lưới mới: ${mesh.join(", ")}`].filter(Boolean).join("; ")
+    + ". Sửa lại prompt cho khớp, thêm mục _v2, hoặc dùng --redo <mã> nếu cố ý mua lại");
   return redo;
 }
-// Dòng của list --hash và số mã có trong manifest (had) / còn giữ băm (same).
+// Dòng của list --hash và số mã đã trả tiền trong manifest (had) / còn giữ băm (same); mục chưa mua lưới tính như chưa tạo.
 export function hashRows(list, man) {
   let had = 0, same = 0;
   const lines = list.map((a) => {
     const h = hash(a), m = man[a.code], len = apiPrompt(a).length;
-    if (m) { had++; if (m.hash === h) same++; }
-    return `${a.code.padEnd(22)} ${h}  ${String(len).padStart(3)} ký tự${len > 600 ? " > 600!" : ""}  ${String(a.tris).padStart(6)} tg  ${!m ? "chưa tạo" : m.hash === h ? "= manifest" : `≠ manifest ${m.hash}: run sẽ dừng (mua lại thì --redo), ghi đè ${m.path}`}`;
+    if (paid(m)) { had++; if (m.hash === h) same++; }
+    const st = !paid(m) ? (m ? `chưa tạo (manifest: ${m.status}, chưa mua lưới)` : "chưa tạo") : m.hash === h ? "= manifest"
+      : m.status === "done" ? `≠ manifest ${m.hash}: run sẽ dừng (mua lại thì --redo), ghi đè ${m.path}` : `≠ manifest ${m.hash}: lưới đã mua theo băm cũ; run dừng, làm lại thì --redo`;
+    return `${a.code.padEnd(22)} ${h}  ${String(len).padStart(3)} ký tự${len > 600 ? " > 600!" : ""}  ${String(a.tris).padStart(6)} tg  ${st}`;
   });
   return { lines, had, same };
 }
@@ -416,7 +436,7 @@ async function sheet(list, man, out) {
 async function main() {
   const all = loadAssets();
   if (cmd === "list") {
-    const list = pick(all);
+    const list = choose(all);
     if (flag("hash")) {
       // Băm khác manifest = sửa chữ prompt của mẫu đã có: run sẽ dừng (mua lại phải qua --redo); lệnh trả mã 1 để kịch bản bắt được.
       const { lines, had, same } = hashRows(list, readManifest());
@@ -430,7 +450,7 @@ async function main() {
     return;
   }
   if (cmd === "balance") { console.log(`Credit còn: ${await balance()}`); return; }
-  const list = pick(all);
+  const list = choose(all);
   const man = readManifest();
   if (cmd === "sheet") { await sheet(list, man, resolve(args[1] && !args[1].startsWith("--") ? args[1] : join(RAW, "to-xem.png"))); return; }
   if (cmd === "post") {

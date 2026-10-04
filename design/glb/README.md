@@ -25,14 +25,14 @@ Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit. Từ �
 
 | Tệp | Lệch | Mục làm lại |
 | --- | --- | --- |
-| `char_H33` | Mũ vàng mọc cặp sừng (lần đầu thì đeo đao ở hông) | `H33_v2`: mũ bát vàng tua đỏ |
-| `char_X19` | Mũ có hai chóp nhọn như sừng | `X19_v2`: mũ lông hình trống, một chóp vàng ngắn ở chính giữa |
-| `char_X20` | Không có mũ lông và chóp vàng, dáng áo bào, giáp mỏng | `X20_v2`: mũ lông chóp vàng, giáp nặng tới gối |
+| `char_H33` | Mũ vàng mọc cặp sừng (lần đầu thì đeo đao ở hông) | `H33_v2`: mũ bát vàng, một chóp son ngắn ở chính giữa |
+| `char_X19` | Mũ có hai chóp nhọn như sừng | `X19_v2`: mũ lông trụ thẳng, một chóp vàng ngắn ở chính giữa |
+| `char_X20` | Không có mũ lông và chóp vàng, dáng áo bào, giáp mỏng | `X20_v2`: mũ lông trụ thẳng, một chóp vàng ngắn (chùm lông đỏ code dựng), giáp nặng tới gối |
 | `unit_DV_DAO` | Bao đao ở hông trái; đội nón thay vì khăn đỏ quấn đầu | `DV_DAO_v2`: đầu trần khăn son, thắt lưng trơn |
 | `wpn_dadao` | Lưỡi lớn nằm cạnh cán thay vì ở đầu cán (bước nướng đang bù bằng `side`, `flip`) | `WPN_dadao_v2`: lưỡi và cán thẳng hàng |
 | `char_LINH_r01`, `char_CV_giao`, `char_CV_cung`, `char_CV_songdao` | Đội mũ trụ đỏ thay vì nón lá; CV_giao có râu, CV_songdao ra mặt già tóc bạc | Mục `_v2` đầu trần buộc khăn đỏ, nón lá là `prop_non-la.glb` gắn bằng code (Meshy chưa dựng được nón lá vành rộng lần nào) |
 | `unit_DV_GIAO`, `unit_DV_NO` | Nón chóp nhỏ (giống mũ nhọn phe Nguyên), mũ lưỡi trai | `DV_GIAO_v2`, `DV_NO_v2`: nón lá ghi đúng cỡ code, vành rộng hơn vai |
-| `char_OFF_photuong` | Mũ có mào tua tủa thay vì chóp xám bạc | `OFF_photuong_v2`: mũ lông, một chóp xám bạc ngắn ở chính giữa |
+| `char_OFF_photuong` | Mũ có mào tua tủa thay vì chóp xám bạc | `OFF_photuong_v2`: mũ lông trụ thẳng, một chóp xám bạc ngắn ở chính giữa |
 | `char_OFF_doitruong` | Gần T-pose; tay phải không rig được | `OFF_doitruong_v2` |
 | `wpn_giao-dv` | Có một chùm cánh nhỏ dưới mũi giáo | `WPN_giao_dv_v2`: một lưỡi lá dẹt |
 | Mọi nhân vật | Tay dang gần ngang hơn A-pose 45° của tài liệu, khuỷu gập, nên bộ dò khớp đặt sai khuỷu | Mục `_v2` và mọi mục người mới viết bằng POSE v2 (`glb-prompts.md` mục 2.2) |
@@ -99,11 +99,11 @@ Bộ chọn (`--set`):
 | `lam-lai` | Mọi mã `_v2`, `_v3` (làm lại mẫu cũ, ra tệp mới cạnh tệp cũ): 14 mục ở mục P của tài liệu |
 | `tuong-moi` | Tướng có tên (mã H.., X.., TT) chưa có GLB: H34, H38, H39 và 15 tướng chuyển từ `design/3d-ref/PROMPTS-TUONG.md` (mục A8–A15, B7–B13), 18 mục |
 | `tuy-chon` | Mục không thuộc bộ nào ở trên (cờ lưng, áo choàng, vũ khí tuỳ chọn, ngựa tướng, voi, bành, giáp voi) và ba mục môi trường tuỳ chọn K10, L22, N17: 15 mục. Không gồm LINH_r2 (còn khối POSE cũ, chỉ chạy bằng `--only`) |
-| `tat-ca` | Mọi mục: 40 mã `can` trước, rồi theo thứ tự bảng |
+| `tat-ca` | Mọi mục: 40 mã `can` trước, rồi theo thứ tự bảng. `run --set tat-ca` bỏ LINH_r2 (chỉ dựng khi ghi trong `--only`) |
 
-Các bộ mới tính từ mã và chữ mục, nên mục thêm sau tự vào đúng bộ; bộ chưa có mục nào thì công cụ báo và dừng. Chạy lại chỉ làm phần chưa xong. Tài liệu đọc được cả khi cây làm việc là CRLF (Windows, `core.autocrlf`). Lỗi trong tài liệu báo ngay khi đọc, trước mọi lệnh: thiếu PROMPT, mục có PROMPT mà không có dòng bảng, trùng mã ở hai dòng bảng hay hai mục `###` (hay gặp khi chép mục làm `_v2`), tiền tố tệp lạ, dải tam giác sai (lo > hi, dấu phân cách nghìn, mục tiêu dưới 300), ghi cả `Symmetry: bật` lẫn `tắt`, mục người thiếu nguyên khối POSE hoặc POSE v2. `list` đánh dấu `> 600!` bản API quá dài.
+Các bộ mới tính từ mã và chữ mục, nên mục thêm sau tự vào đúng bộ; bộ chưa có mục nào thì công cụ báo và dừng. Chạy lại chỉ làm phần chưa xong. Tài liệu đọc được cả khi cây làm việc là CRLF (Windows, `core.autocrlf`). Lỗi trong tài liệu báo ngay khi đọc, trước mọi lệnh: thiếu PROMPT, mục có PROMPT mà không có dòng bảng, trùng mã ở hai dòng bảng hay hai mục `###` (hay gặp khi chép mục làm `_v2`), tiền tố tệp lạ, tên tệp không phải tiền tố + mã + `.glb`, mã `_v2` không có dòng mã gốc hay tệp, nhóm khác mã gốc, dải tam giác sai (lo > hi, dấu phân cách nghìn, mục tiêu dưới 300), ghi cả `Symmetry: bật` lẫn `tắt`, mục người thiếu nguyên khối POSE hoặc POSE v2. `list` đánh dấu `> 600!` bản API quá dài. `--only` bỏ mã trùng.
 
-**Sửa prompt của mẫu đã có là mua lại và ghi đè.** Băm (`list --hash`) tính từ đúng bản gửi API, số tam giác và đối xứng; băm khác manifest ở mẫu đã xong thì `run` dừng trước khi gọi Meshy và nêu mã (nếu cố ý mua lại, ghi đè tệp trong thư mục này, thì ghi mã vào `--redo`); `list --hash` trả mã 1 khi có dòng ≠. Muốn làm lại một mẫu cũ (mũ mọc sừng, tay dang ngang…), thêm mục mới mã `_v2` thay vì sửa mục cũ (`glb-prompts.md` mục 0.5): dòng bảng `H33_v2` · tệp `char_H33_tran-nhat-duat_v2.glb` · nhóm của mã gốc, và mục `### P1 · H33_v2 · …` có PROMPT viết bằng POSE v2 (mục 2.2). Mã `_v2` có dòng riêng trong `manifest.json`, tệp gốc riêng ở `_raw/`, tệp nén riêng (`nhan-vat/char_H33_tran-nhat-duat_v2.glb`), giữ quy tắc riêng của mã gốc (texture 2048 cho H35, H31, người lính Tự do; đối xứng cho ngựa) nhưng không mang theo bảng `FIX` của mã gốc trong `meshy.mjs`. Tệp cũ còn nguyên cho tới khi chọn xong.
+**Sửa prompt của mẫu đã có là mua lại và ghi đè.** Băm (`list --hash`) tính từ đúng bản gửi API, số tam giác và đối xứng; băm khác manifest ở mã đã trả tiền thì `run` dừng trước khi gọi Meshy và nêu mã: mẫu đã xong (nếu cố ý mua lại, ghi đè tệp trong thư mục này, thì ghi mã vào `--redo`), và cả mẫu mới có lưới mà sửa chữ trước lần tô texture (mua lại lưới cũng qua `--redo`); `list --hash` trả mã 1 khi có dòng ≠. Muốn làm lại một mẫu cũ (mũ mọc sừng, tay dang ngang…), thêm mục mới mã `_v2` thay vì sửa mục cũ (`glb-prompts.md` mục 0.5): dòng bảng `H33_v2` · tệp `char_H33_tran-nhat-duat_v2.glb` · nhóm của mã gốc, và mục `### P1 · H33_v2 · …` có PROMPT viết bằng POSE v2 (mục 2.2). Mã `_v2` có dòng riêng trong `manifest.json`, tệp gốc riêng ở `_raw/`, tệp nén riêng (`nhan-vat/char_H33_tran-nhat-duat_v2.glb`), giữ quy tắc riêng của mã gốc (texture 2048 cho H35, H31, người lính Tự do; đối xứng cho ngựa) nhưng không mang theo bảng `FIX` của mã gốc trong `meshy.mjs`. Tệp cũ còn nguyên cho tới khi chọn xong.
 
 Chuyển bản nướng sang tệp `_v2` (khi đã soát và chọn bản mới): `glb-bake.mjs` đọc đường dẫn tệp từ `manifest.json` theo mã.
 
