@@ -1,6 +1,7 @@
 // design/tools/meshy.test.mjs — kiểm meshy.mjs không cần mạng, không tốn credit: đọc design/glb-prompts.md (cả CRLF), mục K–P,
 // tệp môi trường env_, bộ chọn, POSE v2, mục làm lại _v2, lệnh list --hash; và mọi mã trong design/glb/manifest.json giữ nguyên
-// băm prompt (băm đổi thì `run` mặc định mua lại mẫu đó và ghi đè GLB).
+// băm prompt (băm đổi thì `run` mặc định mua lại mẫu đó và ghi đè GLB). Soát cả nội dung mục môi trường K–O của tài liệu thật:
+// độ dài (tài liệu ≤ 630, API ≤ 600), khối STYLE, dải tam giác ≥ 300, kích thước thật, không xin chữ, dẫn chỗ code; nón lá, trâu.
 //   node design/tools/meshy.test.mjs
 // Nhập meshy.mjs như thư viện: tệp đó chỉ chạy lệnh khi là tệp chính (import.meta.main, Node ≥ 24.2).
 import assert from "node:assert/strict";
@@ -159,6 +160,54 @@ t("mã _v2 mà tệp không có hậu tố _v2 → lỗi (sẽ ghi đè tệp c�
 });
 t("hai mục cùng một tệp → lỗi", () => {
   assert.throws(() => loadAssets(doc([row(98, "ENV_a", "env_a.glb", "K"), row(99, "ENV_b", "env_a.glb", "K")], [sec("K1", "ENV_a", thing("A.")), sec("K2", "ENV_b", thing("B."))])), /trùng/);
+});
+
+console.log("Tài liệu thật: môi trường K–O, thú, nón lá");
+const env = all.err ? [] : all.filter((a) => /^[K-O]/.test(a.sec));
+const bodies = md.replace(/\r\n/g, "\n").normalize("NFC").split("\n### ").filter((s) => /^[K-O]\d+ · /.test(s)).map((s) => s.split("\n## ")[0]);
+t("mỗi mục K, L, M, N, O có mục; bộ moi-truong không rỗng, mọi mã ENV_ nằm ở K–O", () => {
+  for (const L of "KLMNO") assert.ok(env.some((a) => a.sec[0] === L), `mục ${L} trống`);
+  const mt = setOf(all, "moi-truong");
+  assert.ok(mt.length > 0); assert.deepEqual(mt.filter((a) => !/^[K-O]/.test(a.sec)).map((a) => a.code), []);
+});
+t("mọi mục K–O: prompt tài liệu ≤ 630, bản API ≤ 600, kết thúc bằng STYLE, có \"Isolated single object\"", () => {
+  assert.ok(env.length > 0);
+  const bad = env.filter((a) => a.prompt.length > 630 || apiPrompt(a).length > 600 || !a.prompt.endsWith(STYLE) || !/isolated single object/i.test(a.prompt));
+  assert.deepEqual(bad.map((a) => `${a.code} ${a.prompt.length}/${apiPrompt(a).length}`), []);
+});
+t("mọi mục K–O: dải tam giác từ 300 trở lên, tam giác mục tiêu nằm trong dải", () => {
+  assert.ok(env.length > 0);
+  assert.deepEqual(env.filter((a) => a.range[0] < 300 || a.range[0] > a.range[1] || a.tris < a.range[0] || a.tris > a.range[1]).map((a) => a.code), []);
+});
+t("mọi mục K–O ghi kích thước thật (m, cm) trong prompt", () => {
+  assert.ok(env.length > 0);
+  assert.deepEqual(env.filter((a) => !/\d+(\.\d+)?\s?c?m\b/.test(a.prompt)).map((a) => a.code), []);
+});
+t("không mục K–O nào xin chữ: text, letters, writing chỉ đi sau \"no\" (cờ, chữ, bia do code vẽ)", () => {
+  assert.ok(env.length > 0);
+  const asks = (p) => /\b(text|letters?|lettering|writing|calligraphy|inscriptions?)\b/i.test(p.replace(/\bno (text|letters|lettering|writing|calligraphy|inscriptions?)\b/gi, ""));
+  assert.deepEqual(env.filter((a) => asks(a.prompt)).map((a) => a.code), []);
+});
+t("thuyền (mục K) ghi no water, no people; công trình (mục L) ghi no people", () => {
+  assert.ok(env.length > 0);
+  const bad = env.filter((a) => (a.sec[0] === "K" && !/no water/i.test(a.prompt)) || (/^[KL]/.test(a.sec) && !/no people/i.test(a.prompt)));
+  assert.deepEqual(bad.map((a) => a.code), []);
+});
+t("mỗi mục K–O dẫn chỗ game dùng (tệp:dòng), trừ mục tuỳ chọn chưa có trong game", () => {
+  assert.ok(bodies.length > 0);
+  const bad = bodies.filter((b) => !/tuỳ chọn/.test(b.split("\n")[0]) && !/`[\w./-]+\.(js|mjs|json|md):\d+/.test(b)).map((b) => b.split("\n")[0]);
+  assert.deepEqual(bad, []);
+});
+t("nón lá rời PROP_non_la: mục H, prop_non-la.glb, 84 cm × 22 cm như models.js", () => {
+  const a = all.find((x) => x.code === "PROP_non_la");
+  assert.ok(a, "chưa có PROP_non_la"); assert.equal(a.sec[0], "H"); assert.equal(a.file, "prop_non-la.glb"); assert.equal(a.kind, "dao-cu");
+  assert.match(a.prompt, /84 cm/); assert.match(a.prompt, /22 cm/);
+});
+t("trâu MOUNT_trau ở mục O, đối xứng bật; cò, quạ ở mục O; bộ thieu gồm cả mục O", () => {
+  const a = all.find((x) => x.code === "MOUNT_trau");
+  assert.ok(a, "chưa có MOUNT_trau"); assert.equal(a.sec[0], "O"); assert.equal(a.sym, "on"); assert.equal(a.kind, "thu-cuoi");
+  const o = env.filter((x) => x.sec[0] === "O").map((x) => x.code), th = codes(setOf(all, "thieu"));
+  assert.ok(o.length >= 3, o.join(" ")); for (const c of o) assert.ok(th.includes(c), c);
 });
 
 console.log("Lệnh list (không mạng)");

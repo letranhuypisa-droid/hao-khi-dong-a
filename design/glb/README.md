@@ -7,8 +7,8 @@ Mẫu 3D tĩnh tạo bằng Meshy API từ đúng prompt trong `design/glb-promp
 | `nhan-vat/` | Tướng, sĩ quan, người lính Tự do, cận vệ (`char_`), lính đám đông và dân làng (`unit_`) | `char_`, `unit_` |
 | `vu-khi/` | Đao, kiếm, giáo, cung, nỏ, chùy, khiên | `wpn_` |
 | `dao-cu/` | Mũi tên, cờ lưng, áo choàng, bành voi… | `prop_` |
-| `thu-cuoi/` | Ngựa, voi | `mount_` |
-| `moi-truong/` | Môi trường (mã `ENV_`): thuyền, công trình, đạo cụ cảnh, cây, đá, núi. Chưa có tệp nào | `env_` |
+| `thu-cuoi/` | Ngựa, voi, trâu | `mount_` |
+| `moi-truong/` | Môi trường (mã `ENV_`): thuyền, công trình, đạo cụ cảnh, cây, đá, núi, cò, quạ. Đã có 89 prompt (`glb-prompts.md` mục K–O), chưa có tệp nào; chưa có bước nướng môi trường (đầu mục K của tài liệu) | `env_` |
 
 `manifest.json` ghi từng tệp: mã task Meshy, model, số tam giác trước và sau khi nén, dung lượng, kích thước khung bao. Xem nhanh mọi mẫu: mở `xem.html` qua máy chủ tĩnh ở gốc repo (ví dụ `npx serve .` rồi vào `/design/glb/xem.html`). Ảnh tổng hợp nằm ở `xem-truoc/`.
 
