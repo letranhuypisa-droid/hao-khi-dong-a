@@ -622,12 +622,12 @@ function turnFeet(a, tn, S, yaw, dt, w, om) {
 // a: lính (kit, yaw, scale, state, role, y = độ cao trên đất, spd …); x, y, z: gốc (y đã gồm a.y, độ lún
 // khi chết); g0: độ cao đất dưới gốc; pose: tư thế đã trộn (chỉ đọc); dt: đồng hồ trận (0 khi hit-stop →
 // mô phỏng đứng yên); ground(x, z): hàm độ cao; near: trong LOD gần (IK + mô phỏng; xa thì vạt treo theo
-// đích, tua treo thẳng); out: NJ × 12 số affine.
+// đích, tua treo thẳng); out: NJ × 12 số affine; yaw: hướng vẽ (mặc định a.yaw — crowd.render truyền hướng nội suy, đợt 19c).
 const S = new Float32Array(NCH), FP = [0, 0], LS = [0, 0];
 const FW = new Float64Array(4);          // x, z bàn chân trái, phải (thế giới)
 const CT = new Float64Array(2);          // mức chạm đất trái, phải
-export function soldierFrame(a, skel, x, y, z, g0, pose, dt, ground, near, out) {
-  const m = motion(a), sc = a.scale || 1, yaw = a.yaw, horse = skel === "horse";
+export function soldierFrame(a, skel, x, y, z, g0, pose, dt, ground, near, out, yaw = a.yaw) {
+  const m = motion(a), sc = a.scale || 1, horse = skel === "horse";
   const sy = Math.sin(yaw), cy = Math.cos(yaw);
   S.set(pose);
 

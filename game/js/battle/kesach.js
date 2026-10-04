@@ -75,7 +75,7 @@ export class KeSachManager {
       mesh.castShadow = true;
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), new THREE.MeshLambertMaterial({ map: flagTexture("宋", "#b0752c", "#1d1a17"), side: THREE.DoubleSide }));
       flag.position.set(0.65, 5.4, 0.8); flag.rotation.y = Math.PI / 2; mesh.add(flag);
-      ctx.scene.add(mesh);
+      ctx.scene.add(mesh); ctx.view?.track(mesh, true);    // thuyền, cờ chạy theo bước mô phỏng: vẽ nội suy (battle/view.js)
       const p0 = def.route[0];
       this.boats.push({
         mesh, flag, idx: 1, x: p0.x - i * 14, z: p0.z, boatY: 0.3, yaw: Math.PI / 2,

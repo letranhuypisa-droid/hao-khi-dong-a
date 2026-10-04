@@ -2,6 +2,9 @@
 //
 // Vùng chiến đấu chạy bước cố định 1/60 s bằng bộ tích lũy, tối đa 4 bước mỗi khung rồi bỏ phần
 // dư (15.2). Hit-stop dừng đồng hồ trận; vòng Mệnh Lệnh làm chậm ×0,2.
+// Nhịp khung (đợt 19c): bộ tích lũy ở battle/pacing.js — vòng rAF thật giữ pha giữa bước (màn 60 Hz đúng một bước mỗi khung, cả sau
+// khung giật), tua bằng advance giữ y hệt cách cũ (tất định); vẽ giữa trạng thái đầu bước cuối và hiện tại theo α (battle/view.js:
+// rig, lính, thuyền, mũi tên, camera nhắm vị trí vẽ của tướng) — màn 90–144 Hz và lúc chậm hình chuyển động liền mạch. Chỉ phần vẽ đổi.
 //
 // Nhiều trận, nhiều tướng (đợt 9 lõi): phần riêng của trận nằm sau các móc của BattleDef (battles/b15.js — danh sách
 // móc ở đầu file đó), tướng theo HEROES[heroId] (data/heroes.js). Mặc định B15 + H35: đúng thứ tự dựng, thứ tự rút
@@ -17,6 +20,8 @@ import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
 import { FX, releaseFxTextures, preloadFx } from "./fx.js";
 import { createRenderer, Warm } from "./gfx.js";
+import { Pacer, STEP } from "./pacing.js";
+import { View } from "./view.js";
 import { GFX_LEVELS, GFX_NAME } from "../core/gfx.js";
 import * as Models from "./models.js";
 import { Atmosphere } from "./atmosphere.js";
@@ -34,8 +39,6 @@ import { fmtKeys, devOf, touchUI } from "../data/controls.js";
 import { readComic } from "../ui/comic.js";
 import { isCompact, touchArc, touchUnit } from "../ui/layout.js";
 import B15 from "../battles/b15.js";
-
-const STEP = 1 / 60;
 
 // Camera tránh tường thành (chỉ hình ảnh; hộp do BattleDef.camBoxes dựng — B15: tường Hàm Tử quan): pad khoảng chừa
 // trước mặt tường cho mặt phẳng gần 0,3 m, minH cần ngang tối thiểu (dưới mức này lookAt gần thẳng đứng thì xoay loạn),
@@ -79,6 +82,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     // Chữ phím trong gợi ý, băng chữ, HUD: viết {tpc}, {c}, {cmd}… trong câu, ctx.fmt đổi sang phím của thiết bị đang dùng
     // (bàn phím, cảm ứng, tay cầm — data/controls.js).
     ctx.fmt = (s) => fmtKeys(s, devOf(ctx));
+    ctx.view = new View();             // nội suy khi vẽ (battle/view.js): bản sao để vẽ, mô phỏng không đọc
     let input = null, camBoxes = [];
     try {
       resetGround();
@@ -98,6 +102,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       // Hero chưa đọc chỗ xuất hiện của trận (lõi tướng chưa nhận def): đặt theo BattleDef, chỉ cho trận khác B15
       const sp = def.heroSpawn;
       if (sp && def !== B15 && !ctx.hero.def) { ctx.hero.x = sp.x; ctx.hero.z = sp.z; ctx.hero.yaw = sp.yaw ?? ctx.hero.yaw; }
+      for (const tr of ctx.hero.trails || []) ctx.view.follow(tr.mesh, ctx.hero.rig.root);   // vệt lưỡi (toạ độ thế giới) dời theo tướng lúc vẽ
       input = new Input(canvas);
       ctx.hud = new HUD(hudRoot, ctx);
       new def.Director(ctx);
@@ -129,7 +134,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     };
     // chậm hình ngắn (Đòn Quyết, hạ sĩ quan): T giây giờ thật ở tốc k
     ctx.slowmo = (T, k) => { if (slowT <= 0 || k <= slowK) { slowK = k; } slowT = Math.max(slowT, T); };
-    const v3 = new THREE.Vector3();
+    const v3 = new THREE.Vector3(), hp = { x: 0, y: 0, z: 0 };    // hp: vị trí vẽ của tướng (view.pos)
     let W = 1, H = 1;
     ctx.project = (x, y, z) => { v3.set(x, y, z).project(camera); if (v3.z > 1) return null; return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; };
 
@@ -148,20 +153,21 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     syncCompact(container);
 
     // ---- tạm dừng, kết quả -----------------------------------------------------------------
-    let paused = false, finished = false, raf = 0, last = performance.now(), acc = 0, warm = null;   // warm: làm nóng (battle/gfx.js)
+    let paused = false, finished = false, raf = 0, last = performance.now(), warm = null;   // warm: làm nóng (battle/gfx.js)
+    const pacer = new Pacer(), view = ctx.view;                // bước cố định (battle/pacing.js), nội suy khi vẽ (battle/view.js)
     // Trận đã hết (director.over) thì không mở tạm dừng: bảng tạm dừng ghi đè bảng THẮNG/THUA, tắt đi thì lớp phủ
     // trống mà showEnd không hiện lại → kẹt trong trận chết, mất thưởng. Chặn ở cả ba đường (Esc/Start/"II",
     // mất khoá chuột, ẩn tab); nếu vẫn lọt thì tắt tạm dừng sẽ dựng lại bảng kết quả, "Rút quân" thì rời luôn.
     const pause = (on) => {
       if (finished) return;
       paused = on; overlay.innerHTML = on ? pauseHTML(save, ctx.hero?.id, ctx.battle, devOf(ctx), ctx.hud?.log, gfx) : ""; overlay.classList.toggle("on", on);
-      if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); }
+      if (on) { document.exitPointerLock?.(); bindPause(); ctx.audio.suspend(); music?.pause(); } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); pacer.reset(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
     const bindPause = () => {
       overlay.querySelector("[data-a=resume]").onclick = () => pause(false);
       const rt = overlay.querySelector("[data-a=retry]");
-      if (rt) rt.onclick = () => { ctx.director.restoreCheckpoint(); pause(false); };
+      if (rt) rt.onclick = () => { ctx.director.restoreCheckpoint(); view.cut(); pause(false); };
       overlay.querySelector("[data-a=quit]").onclick = () => {
         if (ctx.director.over) { finish(ctx.director.result); return; }
         ctx.director.lose("Rút quân khỏi trận.", false); pause(false);
@@ -193,7 +199,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         <button data-a="leave" class="${res.canRetry ? "" : "primary"}">${res.won ? "Xem kết quả" : "Rời trận"}</button></div></div>`;
       document.exitPointerLock?.();
       const r = overlay.querySelector("[data-a=retry]");
-      if (r) r.onclick = () => { overlay.classList.remove("on"); overlay.innerHTML = ""; ctx.director.restoreCheckpoint(); last = performance.now(); };
+      if (r) r.onclick = () => { overlay.classList.remove("on"); overlay.innerHTML = ""; ctx.director.restoreCheckpoint(); view.cut(); last = performance.now(); pacer.reset(); };
       overlay.querySelector("[data-a=leave]").onclick = () => finish(res);
     };
     const finish = (res) => {
@@ -224,7 +230,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         .then((r) => story.onDone?.(r), (err) => console.error(err))
         .finally(() => {
           storyOpen = false; if (finished) return;
-          paused = false; ctx.audio.unlock(); music?.resume(); last = performance.now();
+          paused = false; ctx.audio.unlock(); music?.resume(); last = performance.now(); pacer.reset();
           // nút tay cầm dùng để đóng comic không thành cạnh bấm mới (né, tạm dừng) ở khung đầu: đồng bộ padPrev rồi xoá
           input.poll(); input.endFrame();
           // cú bấm đóng comic còn trong cửa sổ user activation: khoá chuột lại luôn, khỏi mất một cú bấm
@@ -245,14 +251,15 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       if (paused || finished) return;
       if (rotateBlocked(container)) return;          // điện thoại cầm dọc: màn nhắc xoay ngang che trận (css/hud.css) — trận đứng chờ
       if (gfx.frame(ms)) resize();                   // độ phân giải động (Đồ hoạ Tự động): khung chậm kéo dài thì hạ một nấc
-      step(dt, input.poll(), true);
+      step(dt, input.poll(), true, true);
       input.pickMode = !!ctx.hud?.pickerOpen;   // bảng chọn điểm đến mở: D-pad tay cầm chọn 1–4 (input.js)
     };
-    // Tua trận bằng script (chỉ khi ?debug): chạy logic không cần requestAnimationFrame.
+    // Tua trận bằng script (chỉ khi ?debug): chạy logic không cần requestAnimationFrame. Bộ tích lũy chạy kiểu cũ (live = false: tất định).
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => {
       for (let t = 0; t < sec && !finished && !paused; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); }
     };
-    const step = (dt, inp, draw) => {
+    // live: khung rAF thật (pacing.js: giữ pha giữa bước, khoá pha); tua bằng advance thì false
+    const step = (dt, inp, draw, live = false) => {
       time += dt;
       ctx.touch = inp.touch; syncTouch();
       const d = ctx.director;
@@ -277,10 +284,10 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         if (slowT > 0) { slowT -= dt; scale *= slowK; }
         if (ctx.hitstopT > 0) { ctx.hitstopT -= dt; scale = 0; }
         ctx.hero.intake(inp);
-        acc += dt * scale;
-        let steps = 0;
-        while (acc >= STEP && steps < 4) {
-          acc -= STEP; steps++; ctx.clock += STEP;
+        pacer.begin(dt, scale, live);
+        while (pacer.next()) {
+          view.capture(ctx);                // trạng thái đầu bước (bản sao để vẽ, battle/view.js)
+          ctx.clock += STEP;
           ctx.naval?.update(STEP);          // B20 (naval.js): thuyền, boong, chở người trên boong — trước mọi người; B15 không có
           ctx.hero.update(STEP, inp);
           ctx.crowd.update(STEP);
@@ -288,10 +295,11 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
           d.update(STEP);
           if (ctx.hitstopT > 0) break;
         }
-        if (steps === 4) acc = 0;
+        pacer.end();
         for (let i = ctx.units.length - 1; i >= 0; i--) if (!ctx.units[i].alive) ctx.units.splice(i, 1);
       }
-      // camera
+      view.frame(pacer.alpha, ctx.clock);   // vẽ giữa đầu bước cuối (α = 0) và hiện tại (α = 1)
+      // camera: hướng theo trạng thái thật của tướng (cam.yaw tướng đọc khi đi), vị trí nhắm vào chỗ vẽ của tướng
       const h = ctx.hero;
       if (Math.abs(inp.camDX) + Math.abs(inp.camDY) > 0.01) cam.idle = 0; else cam.idle += dt;
       cam.yaw -= inp.camDX * (inp.touch ? 0.006 : 0.0026);
@@ -304,7 +312,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         cam.pull = Math.max(cam.pull, OUTRO.pull * e); cam.pitch += (OUTRO.pitch - cam.pitch) * Math.min(1, dt * 1.2); cam.yaw += dt * 0.05;
       }
       const dist = cam.dist + cam.pull * 5, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
-      const tx = h.x, ty = h.y + 1.6, tz = h.z;
+      view.pos(h, hp);
+      const tx = hp.x, ty = hp.y + 1.6, tz = hp.z;
       let cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = ty + dist * Math.sin(cam.pitch);
       // Cần camera cắt tường / tháp cổng / cửa Hàm Tử quan (hộp 2D, cắt cần theo phương ngang): kéo camera về phía
       // tướng tới trước mặt tường CAM_WALL.pad m và nâng lên (cần giữ dài ≥ keep × dist) → nhìn chếch xuống qua đầu
@@ -329,7 +338,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         }
       }
       cy = Math.max(cy, Math.max(heightAt(cx, cz), waterLevel(cx, cz)) + 1.2);   // B15: waterLevel() = −∞
-      if (h.deck) cy = Math.max(cy, h.y + 2.2);          // B20: tướng trên boong — camera không tụt xuống dưới mạn thuyền
+      if (h.deck) cy = Math.max(cy, hp.y + 2.2);         // B20: tướng trên boong — camera không tụt xuống dưới mạn thuyền
       const k = Math.min(1, dt * 10);
       cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
       if (time < 0.2) { cam.x = cx; cam.y = cy; cam.z = cz; }
@@ -340,7 +349,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const fov = 55 - fxk.fovPunch;
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       ctx.world.fadeOccluders(camera.position, tx, tz, dt);
-      const sun = ctx.world.sun, sd = ctx.atmo.sunDir; sun.position.set(h.x + sd.x * 120, sd.y * 120, h.z + sd.z * 120); sun.target.position.set(h.x, 0, h.z);
+      const sun = ctx.world.sun, sd = ctx.atmo.sunDir; sun.position.set(tx + sd.x * 120, sd.y * 120, tz + sd.z * 120); sun.target.position.set(tx, 0, tz);
 
       // cổng: rung khi trúng, đổ khi phá
       for (const id in ctx.world.gates) {
@@ -364,12 +373,13 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), fire);
       }
       ctx.world.update(time);
-      ctx.ambient?.update(ctx.clock);   // tự lấy hiệu đồng hồ trận: hit-stop đứng hình, vòng lệnh chậm ×0,2
+      ctx.ambient?.update(view.clock);  // giờ vẽ (đồng hồ trận lùi (1 − α) bước): hit-stop đứng hình, vòng lệnh chậm ×0,2, màn 120 Hz liền mạch
       ctx.crowd.render();
       ctx.fx.update(dt, W, H);
       hudAcc += dt;
       if (hudAcc > 0.05) { ctx.hud.update(hudAcc, W, H); hudAcc = 0; }
-      if (draw) renderer.render(scene, camera);
+      view.begin();                                // rig ở vị trí nội suy trong lúc vẽ, trả lại đúng từng bit ngay sau (battle/view.js)
+      try { if (draw) renderer.render(scene, camera); } finally { view.end(); }
       ctx.hud.frame?.(W, H);                       // nhãn chỉ đường bám mục tiêu mỗi khung (hud.js), không đợi nhịp 0,05 s
       ctx.hints?.update(dt, inp);                  // gợi ý lần đầu (hints.js); đọc cạnh bấm trước input.endFrame()
       const anyKey = Object.keys(inp.pressed).length > 0;     // đọc trước endFrame (inp === input, endFrame xoá pressed)

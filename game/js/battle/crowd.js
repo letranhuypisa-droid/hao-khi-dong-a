@@ -14,11 +14,15 @@
 // Thủy chiến (B20, chỉ khi có ctx.naval — B15 không có nên mọi nhánh dưới đây không chạy): lính đứng trên boong (a.deck,
 // naval.js chở theo toạ độ cục bộ), độ cao đứng qua naval.standY (boong / đất / mặt nước), đường qua ván bắc / ván dốc
 // (naval.route), rơi xuống nước sâu thì bơi vào bờ (trạng thái "swim", không có xác trôi), tên rơi tới mặt nước thì dừng.
+//
+// Nội suy khi vẽ (đợt 19c, battle/view.js): capture() chụp vị trí, hướng đầu mỗi bước mô phỏng (a.ix …), render() vẽ giữa đó và hiện tại theo
+// α (a.rx …), tư thế đích của lính gần nội suy theo giờ vẽ (target). Các trường a.i*, a.r*, a.tp*, a.tc* chỉ để vẽ — mô phỏng không đọc.
 
 import * as THREE from "three";
 import { blobGeometry, lambert } from "./models.js";
 import { skinnedKit, glbKit, poseFor, soldierFrame, resetMotion, advanceStride, smoothPose, legRate, NCH, BONE_FLOATS, BONE_TEX_W } from "./soldiers.js";
 import { model } from "./glb.js";
+import { lerpYaw, SNAP_D, STEP, MAX_STEPS } from "./pacing.js";
 import { heightAt, collide } from "./world.js";
 import { surfaceY } from "./ground.js";
 import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, SUPPLY, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
@@ -41,6 +45,7 @@ const LOD_FAR2 = 40 * 40;        // xa hơn 40 m: tính lại tư thế mỗi 3 
 // Lính GLB (glb.js, soldiers.js glbKit): mức chi tiết theo khoảng cách tới camera — LOD0 < 18 m, LOD1 < 40 m, LOD2 xa hơn
 // (design/systems.md §13.3: lính LOD0 ≤ 600 tam giác điện thoại, LOD1 ≤ 250, LOD2 ≤ 100; bản nướng sát các số đó)
 const LOD_D2 = [18 * 18, 40 * 40];
+const SNAP2 = SNAP_D * SNAP_D;   // dời quá chừng này trong một bước (dùng lại từ bể, dịch chuyển): vẽ ngay chỗ mới, không nội suy
 
 let NEXT_ID = 1;
 
@@ -91,8 +96,10 @@ export class Crowd {
       forced: false, kiting: false, march: false,           // forced: lính diễn "ép" thành thật vì sát tướng (director.updateZone, promotion.js); kiting: đang lùi giữ tầm (gợi ý Cung kỵ, hints.js); march: lính bù xuất từ cửa ngõ đang hành quân ra tuyến (supply.js, đợt 12c)
       // đặt lại khi dùng lại lính trong bể: dấu Binh Thư (core verify mục 2), boong / thuyền (naval.js)
       markT: 0, markMult: 1, tauntT: 0, tauntBy: null, deck: null, boat: null, _pins: null,
+      // bản sao để vẽ (đợt 19c): đầu bước cuối (capture), vị trí / hướng vẽ, giờ của hai đích tư thế (target); itk −1: chưa chụp — vẽ ngay chỗ thật
+      ix: 0, iz: 0, iy: 0, iyaw: 0, itk: -1, rx: 0, rz: 0, ry: 0, ryaw: 0, tc0: NaN, tc1: NaN,
     });
-    if (!a.pose) a.pose = new Float32Array(NCH);
+    if (!a.pose) { a.pose = new Float32Array(NCH); a.tp0 = new Float32Array(NCH); a.tp1 = new Float32Array(NCH); }
     resetMotion(a);                  // lò xo vạt áo, dây tua, trọng số IK của lần dùng trước (pool)
     a.hp = a.maxHp;
     this.agents.push(a);
@@ -657,20 +664,30 @@ export class Crowd {
   }
 
   // ---- vẽ ----------------------------------------------------------------------------------
-  // Hoạt ảnh chạy theo đồng hồ trận (ctx.clock), nên hit-stop đóng băng cả đám lính (kể cả lò xo vạt
-  // áo, dây tua: dtA = 0).
+  // Đầu mỗi bước mô phỏng (battle/view.js capture): vị trí, độ cao bay, hướng trước khi bước chạy — bản sao để vẽ.
+  capture(tick) { for (const a of this.agents) { a.ix = a.x; a.iz = a.z; a.iy = a.y; a.iyaw = a.yaw; a.itk = tick; } }
+
+  // Hoạt ảnh chạy theo giờ vẽ (ctx.view.clock: đồng hồ trận lùi (1 − α) bước; không có view thì ctx.clock), nên hit-stop đóng băng cả
+  // đám lính (kể cả lò xo vạt áo, dây tua: dtA = 0). Vị trí, hướng vẽ nội suy giữa đầu bước cuối và hiện tại theo α (đợt 19c).
   render() {
-    const clk = this.ctx.clock, dtA = Math.min(0.1, Math.max(0, clk - (this.lastClock ?? clk))), nav = this.ctx.naval;
-    this.lastClock = clk;
+    const V = this.ctx.view, clk = this.ctx.clock, rc = V ? V.clock : clk, al = V ? V.alpha : 1, tk = V ? V.tick : -1;
+    const dtA = Math.min(0.1, Math.max(0, rc - (this.lastClock ?? rc))), nav = this.ctx.naval;
+    this.lastClock = rc;
     const kSoft = 1 - Math.exp(-dtA * 18), kSnap = 1 - Math.exp(-dtA * 55);
     const counts = {}, hero = this.ctx.hero, frame = ++this.frame;
     for (const k of KIT_IDS) counts[k] = 0;
-    // lính GLB: chia mức chi tiết trước (lính cùng mức phải nằm liền nhau trong texture khớp), uBase mỗi mức
+    // vị trí vẽ của mọi lính; lính GLB: chia mức chi tiết trước (lính cùng mức phải nằm liền nhau trong texture khớp), uBase mỗi mức
     const cam = this.ctx.camera?.position, lodN = {}, lodC = {};
     for (const k of KIT_IDS) if (this.meshes[k].glb) { lodN[k] = [0, 0, 0]; lodC[k] = [0, 0, 0]; }
     for (const a of this.agents) {
+      let x = a.x, z = a.z, y = a.y, yaw = a.yaw;
+      if (a.itk === tk && al < 1) {
+        const dx = x - a.ix, dz = z - a.iz;
+        if (dx * dx + dz * dz <= SNAP2) { x = a.ix + dx * al; z = a.iz + dz * al; y = a.iy + (y - a.iy) * al; yaw = lerpYaw(a.iyaw, yaw, al); }
+      }
+      a.rx = x; a.rz = z; a.ry = y; a.ryaw = yaw;
       if (!lodN[a.kit]) continue;
-      const d2 = cam ? (a.x - cam.x) ** 2 + (a.z - cam.z) ** 2 : 0;
+      const d2 = cam ? (x - cam.x) ** 2 + (z - cam.z) ** 2 : 0;
       a.lod = d2 < LOD_D2[0] ? 0 : d2 < LOD_D2[1] ? 1 : 2;
       if (a.lod >= this.meshes[a.kit].meshes.length) a.lod = this.meshes[a.kit].meshes.length - 1;
       lodN[a.kit][a.lod]++;
@@ -685,21 +702,22 @@ export class Crowd {
       counts[a.kit]++;
       if (M.glb) lodC[a.kit][a.lod]++;
       // đứng yên thì khỏi lấy lại; trên boong (boong chạy, dập dềnh) và đang bơi thì lấy mỗi khung (naval.standY)
-      if (a.deck || a.gx !== a.x || a.gz !== a.z || a.state === "swim") { a.gy = nav ? nav.standY(a) : heightAt(a.x, a.z); a.gx = a.x; a.gz = a.z; }
+      const x = a.rx, z = a.rz;
+      if (a.deck || a.gx !== x || a.gz !== z || a.state === "swim") { a.gy = nav ? nav.standY(a) : heightAt(x, z); a.gx = x; a.gz = z; }
       const gy = a.gy;
       const sink = a.state === "dead" && a.dieT > 1.8 ? (a.dieT - 1.8) * 1.0 : 0;
-      const far = (a.x - hero.x) ** 2 + (a.z - hero.z) ** 2 > LOD_FAR2;
+      const far = (x - hero.x) ** 2 + (z - hero.z) ** 2 > LOD_FAR2;
       if (!a.mc) a.mc = new Float32Array(BONE_FLOATS);
       if (!(far && a.poseInit && (frame + a.id) % 3 !== 0)) {
-        poseFor(a, a.kit, a.K, clk, _pose);
         const P = a.pose;
-        if (!a.poseInit || far) { P.set(_pose); a.poseInit = true; }
+        if (!a.poseInit || far) { poseFor(a, a.kit, a.K, clk, _pose); P.set(_pose); a.poseInit = true; a.tc1 = NaN; }
         else {
+          this.target(a, clk, rc, _pose);
           const k = a.atkT < 0.14 || a.state === "hit" ? kSnap : kSoft;
           smoothPose(P, _pose, k, Math.max(k, 1 - Math.exp(-dtA * legRate(a))));
         }
         // tư thế → IK chân (bản nháp) → lò xo vạt → ma trận khớp → tua giáo/đuôi ngựa, thẳng vào a.mc
-        soldierFrame(a, M.skel, a.x, gy + a.y - sink, a.z, gy, P, dtA, heightAt, !far, a.mc);
+        soldierFrame(a, M.skel, x, gy + a.ry - sink, z, gy, P, dtA, heightAt, !far, a.mc, a.ryaw);
       }
       M.data.set(a.mc, i * BONE_FLOATS);
 
@@ -715,7 +733,7 @@ export class Crowd {
       }
       if (M.glb) M.colors[a.lod].setXYZ(li, _c.r, _c.g, _c.b); else M.color.setXYZ(i, _c.r, _c.g, _c.b);
       if (nb < 2200 && sink < 0.5 && a.state !== "swim") {
-        _p.set(a.x, gy + 0.06, a.z); _s.setScalar(a.K.mounted ? 1.5 : a.scale);
+        _p.set(x, gy + 0.06, z); _s.setScalar(a.K.mounted ? 1.5 : a.scale);
         _m.compose(_p, _q.identity(), _s); this.blob.setMatrixAt(nb++, _m);
       }
     }
@@ -733,14 +751,34 @@ export class Crowd {
       if (!M.glb) { M.color.clearUpdateRanges(); M.color.addUpdateRange(0, n * 3); M.color.needsUpdate = true; }
     }
     this.blob.count = nb; this.blob.instanceMatrix.needsUpdate = true;
+    // mũi tên: lùi theo vận tốc về giờ vẽ (bay thẳng trong một bước; tên vừa buông không lùi quá chỗ buông)
+    const lag = V ? V.lag : 0;
     let na = 0;
     for (const r of this.arrows) {
       if (na >= 200) break;
-      _p.set(r.x, r.y, r.z);
+      const b = Math.min(lag, r.t);
+      _p.set(r.x - r.vx * b, r.y - r.vy * b, r.z - r.vz * b);
       _e.set(-Math.atan2(r.vy, Math.hypot(r.vx, r.vz)), Math.atan2(r.vx, r.vz), 0); _q.setFromEuler(_e);
       _m.compose(_p, _q, _s.setScalar(1)); this.arrowMesh.setMatrixAt(na++, _m);
     }
     this.arrowMesh.count = na; this.arrowMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // Đích tư thế của lính gần ở giờ vẽ rc vào out: poseFor chỉ chạy khi có bước mới (đồng hồ trận đổi) — đích trước giữ ở a.tp0 (giờ a.tc0),
+  // đích mới ở a.tp1 (a.tc1 = clk) — rồi nội suy theo rc: màn 120 Hz, chậm hình thấy bước chân, nhát vung liền mạch, và khung không có bước
+  // khỏi tính lại poseFor. Lần đầu, vừa từ xa về, nhảy giờ quá MAX_STEPS bước: lấy đích mới, không nội suy.
+  target(a, clk, rc, out) {
+    if (!a.tp0) { a.tp0 = new Float32Array(NCH); a.tp1 = new Float32Array(NCH); }
+    if (a.tc1 !== clk) {
+      const T = a.tp0; a.tp0 = a.tp1; a.tp1 = T;
+      poseFor(a, a.kit, a.K, clk, a.tp1);
+      if (clk > a.tc1 && clk - a.tc1 < (MAX_STEPS + 0.5) * STEP) a.tc0 = a.tc1; else { a.tp0.set(a.tp1); a.tc0 = clk; }
+      a.tc1 = clk;
+    }
+    const T0 = a.tp0, T1 = a.tp1, w = a.tc1 > a.tc0 ? (rc - a.tc0) / (a.tc1 - a.tc0) : 1;
+    if (w >= 1) out.set(T1);
+    else if (w <= 0) out.set(T0);
+    else for (let c = 0; c < NCH; c++) out[c] = T0[c] + (T1[c] - T0[c]) * w;
   }
 }
 

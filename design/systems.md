@@ -427,6 +427,7 @@ m_luong = 1 ; ×0.5 khi kho lương bị đốt (120 s) ; ×0.5 vĩnh viễn sau
 
 **Tính xác định trên web (v1.3)**: bao cả Worker mô phỏng lẫn vùng chiến đấu, vì vùng là nơi sinh KO và lượt vung trừ Q.
 - Vùng chiến đấu chạy **bước cố định 1/60 s** bằng bộ tích lũy, độc lập với `requestAnimationFrame`: 30 fps là 2 bước mỗi khung; tối đa 4 bước rồi bỏ phần dư (chống xoáy chết). Input lượng tử theo số bước.
+  Nhịp khung (đợt 19c, `battle/pacing.js`, `battle/view.js`): vòng rAF thật giữ phần dư của bộ tích lũy ở giữa bước (khung chạm trần chỉ bỏ phần thừa; khoá pha khi dt ≈ bội 1/60) nên màn 60 Hz đúng một bước mỗi khung; mỗi khung vẽ giữa trạng thái đầu bước cuối và hiện tại theo α = phần dư / bước (màn 90–144 Hz, chậm hình liền mạch). Chỉ bản sao để vẽ — mô phỏng, tua bằng script (`advance`) không đổi.
 - Không dùng hàm Math siêu việt (`sin`, `atan2`, `exp`, `pow`) trong mô phỏng và vùng, vì độ chính xác phụ thuộc trình duyệt, hệ điều hành và CPU. PRNG có seed, Q là số nguyên, lượng giác qua bảng tra. Hình học trúng đòn chỉ dùng tích vô hướng và bình phương khoảng cách; nón so với cos ngưỡng lấy từ bảng.
 - **Vector vàng**: 20 file (seed + chuỗi input ghi theo số bước → vết Q, tuyến, Hào Khí, KO theo tick) phải khớp tuyệt đối trên Chromium, WebKit và Gecko, ở Tùy chỉnh 50, Thấp và Cực đại, ở 30 lẫn 60 fps. Mô-đun mô phỏng và vùng chạy được trong Node để CI kiểm không cần trình duyệt.
 

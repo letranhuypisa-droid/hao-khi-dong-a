@@ -57,6 +57,7 @@ import { RAFT, zc, hw } from "../data/river-b20.js";
 import { WADE_MAX, TERRAIN_B20, mudAt as mudB20, TIDE } from "../data/terrain-b20.js";
 import { MAP, BOARD } from "../data/battle-b20.js";
 import { makeRng } from "../core/rng.js";
+import { lerpYaw, SNAP_D } from "./pacing.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -980,11 +981,24 @@ export class Naval {
   }
 
   // ---- vẽ ----------------------------------------------------------------------------------------------------------------
+  // Nội suy khi vẽ (đợt 19c, battle/view.js): capture đầu mỗi bước chụp tư thế thuyền (b.iv), render vẽ thuyền ở tư thế b.rv giữa đó và hiện
+  // tại theo α (thuyền mới, dời quá SNAP_D m: tư thế thật); cờ sóng theo giờ vẽ. b.iv, b.rv chỉ để vẽ.
+  capture(tick) {
+    for (const b of this.boats) { const v = b.iv || (b.iv = new Float64Array(6)); v[0] = b.x; v[1] = b.y; v[2] = b.z; v[3] = b.yaw; v[4] = b.pitch; v[5] = b.roll; b.itk = tick; }
+  }
   // see: điểm máy quay đang nhìn cần thấy (ngực tướng; cảnh bắt sống: người bị bắt) — thân thuyền, buồm, lầu chắn giữa thì mờ chấm
   // (FleetRenderer._seeThrough); null: tắt (cảnh kết nhìn cả khúc sông).
   render(camera, see = null) {
+    const V = this.ctx.view, al = V ? V.alpha : 1;
+    for (const b of this.boats) {
+      const r = b.rv || (b.rv = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 }), v = b.iv;
+      if (al < 1 && v && b.itk === V.tick && (b.x - v[0]) ** 2 + (b.z - v[2]) ** 2 <= SNAP_D * SNAP_D) {
+        r.x = v[0] + (b.x - v[0]) * al; r.y = v[1] + (b.y - v[1]) * al; r.z = v[2] + (b.z - v[2]) * al;
+        r.yaw = lerpYaw(v[3], b.yaw, al); r.pitch = v[4] + (b.pitch - v[4]) * al; r.roll = v[5] + (b.roll - v[5]) * al;
+      } else { r.x = b.x; r.y = b.y; r.z = b.z; r.yaw = b.yaw; r.pitch = b.pitch; r.roll = b.roll; }
+    }
     if (see) this.fleet.setSee(camera.position, see.x, see.y, see.z); else this.fleet.setSee(camera.position, 0, -1e4, 0);
-    this.fleet.sync(this.boats, camera, this.t);
+    this.fleet.sync(this.boats, camera, this.t - (V ? V.lag : 0));
     const B = this.bits; B.begin();
     for (const L of this.links) {
       const P = L.plank, a = P.toWorld(0, -0.3, _W, 0), ax = a.x, ay = a.y, az = a.z, b = P.toWorld(0, L.len + 0.3, _W2, 0);
