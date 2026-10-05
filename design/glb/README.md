@@ -21,7 +21,7 @@ Còn phải tạo gì, theo thứ tự nào, mỗi lượt tốn bao nhiêu cred
 ![Nhân vật](xem-truoc/nhan-vat.webp)
 ![Vũ khí, đạo cụ, ngựa](xem-truoc/vu-khi.webp)
 
-Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit. Từ đợt 19b mỗi mẫu lệch có một mục làm lại mã `_v2` ở mục P của tài liệu (`--set lam-lai`, 14 mục, khoảng 420 credit); tệp cũ giữ nguyên cho tới khi soát và chọn bản mới:
+Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit. Từ đợt 19b mỗi mẫu lệch có một mục làm lại mã `_v2` ở mục P của tài liệu (`--set lam-lai`, 14 mục, khoảng 405 credit); tệp cũ giữ nguyên cho tới khi soát và chọn bản mới:
 
 | Tệp | Lệch | Mục làm lại |
 | --- | --- | --- |
@@ -29,9 +29,9 @@ Còn lệch so với `glb-prompts.md`, chưa làm lại vì hết credit. Từ �
 | `char_X19` | Mũ có hai chóp nhọn như sừng | `X19_v2`: mũ lông trụ thẳng, một chóp vàng ngắn ở chính giữa |
 | `char_X20` | Không có mũ lông và chóp vàng, dáng áo bào, giáp mỏng | `X20_v2`: mũ lông trụ thẳng, một chóp vàng ngắn (chùm lông đỏ code dựng), giáp nặng tới gối |
 | `unit_DV_DAO` | Bao đao ở hông trái; đội nón thay vì khăn đỏ quấn đầu | `DV_DAO_v2`: đầu trần khăn son, thắt lưng trơn |
-| `wpn_dadao` | Lưỡi lớn nằm cạnh cán thay vì ở đầu cán (bước nướng đang bù bằng `side`, `flip`) | `WPN_dadao_v2`: lưỡi và cán thẳng hàng |
+| `wpn_dadao` | Lưỡi lớn nằm cạnh cán thay vì ở đầu cán (bước nướng đang bù bằng `side`, `flip`) | `WPN_dadao_v2`: tả lưỡi trước, lưỡi và cán thẳng hàng; dựng lưới bằng meshy-5 trước (`latest` từng chỉ ra cây gậy) |
 | `char_LINH_r01`, `char_CV_giao`, `char_CV_cung`, `char_CV_songdao` | Đội mũ trụ đỏ thay vì nón lá; CV_giao có râu, CV_songdao ra mặt già tóc bạc | Mục `_v2` đầu trần buộc khăn đỏ, nón lá là `prop_non-la.glb` gắn bằng code (Meshy chưa dựng được nón lá vành rộng lần nào) |
-| `unit_DV_GIAO`, `unit_DV_NO` | Nón chóp nhỏ (giống mũ nhọn phe Nguyên), mũ lưỡi trai | `DV_GIAO_v2`, `DV_NO_v2`: nón lá ghi đúng cỡ code, vành rộng hơn vai |
+| `unit_DV_GIAO`, `unit_DV_NO` | Nón chóp nhỏ (giống mũ nhọn phe Nguyên), mũ lưỡi trai | `DV_GIAO_v2`, `DV_NO_v2`: đầu trần khăn then; nón gộp vào bộ lính khi nướng (PROP_non_la co về cỡ code), không thử nón lần thứ bảy |
 | `char_OFF_photuong` | Mũ có mào tua tủa thay vì chóp xám bạc | `OFF_photuong_v2`: mũ lông trụ thẳng, một chóp xám bạc ngắn ở chính giữa |
 | `char_OFF_doitruong` | Gần T-pose; tay phải không rig được | `OFF_doitruong_v2` |
 | `wpn_giao-dv` | Có một chùm cánh nhỏ dưới mũi giáo | `WPN_giao_dv_v2`: một lưỡi lá dẹt |
@@ -86,7 +86,7 @@ node design/tools/meshy.mjs sheet design/glb/_raw/to-xem.png --only H34,H38
 node design/tools/meshy.mjs run --only H34,H38
 ```
 
-Lệnh đủ cho từng lượt còn lại (dân làng và nón lá, môi trường, làm lại, tướng mới, tuỳ chọn), kèm credit ước tính: mục 0.8 của `glb-prompts.md`.
+Lệnh đủ cho từng lượt còn lại (dân làng và nón lá, làm lại, môi trường, tướng mới, tuỳ chọn), kèm credit ước tính: mục 0.8 của `glb-prompts.md`.
 
 Bộ chọn (`--set`):
 

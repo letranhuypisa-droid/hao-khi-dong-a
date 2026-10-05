@@ -14,7 +14,7 @@ prompt ở đây là prompt vẽ ảnh (Nano Banana, rồi Image to 3D), dài kh
 | `PROMPTS-TUONG.md`: H27–H30, H32, H36, H37, TT, X16–X18, X21–X23, X25 | Mục A8–A15, B7–B13: tay không, POSE v2, người cưỡi ngựa (X16, X21) đứng A-pose, ngựa là tệp riêng |
 | `PROMPTS-TUONG.md`: TONG (cung thủ quân Tống) | Mục C4 `DV_AOTONG` (lính đám đông), không thêm mục riêng |
 | `PROMPTS-LINH.md` | Mục C, D (lính đám đông, đã tạo GLB) |
-| `PROMPTS-MOI-TRUONG.md` | Mục K–O (89 mục), viết lại theo đúng kích thước và số cột buồm, mái chèo game đang dựng; chỗ lệch ghi ở từng mục |
+| `PROMPTS-MOI-TRUONG.md` | Mục K–O (89 mục môi trường, cộng trâu), viết lại theo đúng kích thước và số cột buồm, mái chèo game đang dựng; chỗ lệch ghi ở từng mục |
 
 Binh khí của tướng là tệp riêng (`glb-prompts.md` mục G); binh khí riêng của 15 tướng mới chưa có prompt (mục 0.8 của tài liệu đó).
 

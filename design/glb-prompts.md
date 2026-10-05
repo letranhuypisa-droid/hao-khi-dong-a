@@ -107,22 +107,24 @@ Tên tệp luôn suy ra được từ cột **Mã** ở bảng mục 1, theo ba 
 | 3. Chưa có trong game | H34, H38, H39 và 15 tướng thời Trần từ `design/3d-ref/PROMPTS-TUONG.md` (mục A8–A15, B7–B13) | `tuong-moi` (18) | Chưa có trận dùng (B12–B14, B16–B19 chưa dựng; H34, H38 hiện "sắp có" ở B20) |
 | 4. Tuỳ chọn | Cờ lưng, áo choàng (code đã dựng vải có lắc), vũ khí tuỳ chọn G14–G19, ngựa tướng, voi chiến, bành, giáp voi; long thuyền K10, miếu L22, dãy núi xa N17 | `tuy-chon` (15) | Không |
 
-LINH_r2 (dòng 23a) không thuộc bộ nào: công cụ dựng nó từ prompt LINH_r24 nên còn khối POSE cũ (tay dang gần ngang) và câu mũ từng mọc sừng ở H33; muốn tạo thì thêm mục riêng viết bằng POSE v2 trước (mục 2.2). `list --set tat-ca` có in nó, nhưng `run --set tat-ca` bỏ nó; chỉ `run --only LINH_r2` mới dựng.
+Mức là thứ game còn thiếu, không phải thứ tự mua. Bảng lượt dưới đây mua làm lại (mức 2) ngay sau lượt 1: 14 mục ấy sửa chỗ lệch người chơi đang thấy, và chỉ cần đổi `src` của bước nướng đang có cộng code gắn nón lá của lượt 1; môi trường (mức 1) phải chờ chế độ nướng `env` mới làm ở lượt 3 rồi mới vào được game.
+
+LINH_r2 (dòng 23a) không thuộc bộ nào: công cụ dựng nó từ prompt LINH_r24 nên còn khối POSE cũ (tay dang gần ngang) và câu mũ từng mọc sừng ở H33; muốn tạo thì thêm mục riêng viết bằng POSE v2 trước (mục 2.2). `list --set tat-ca` có in nó, nhưng `run --set tat-ca` bỏ nó; chỉ `run --only LINH_r2` mới dựng. Công cụ ghi Symmetry bật cho nó (áo cân hai bên như LINH_r24; ghi vào mục E2 thì đổi băm LINH_r24 đã tạo).
 
 Chưa có prompt, phải viết sau: binh khí riêng của 15 tướng mới (kiếm khắc sóng và khiên mây H27, cờ lệnh H28, ván thuyền H29, bút lông H30, sóc H37, giáo móc X17, kích mạ vàng X18, kích X23, giáo lưỡi rộng X25; cột Đi kèm ở bảng mục 1 ghi vũ khí có sẵn dùng tạm). Ba vũ khí lệch nhẹ chưa có mục làm lại: `wpn_songdao` ra kiếm thẳng mũi nhọn hai cạnh thay vì đao mũi vát, `wpn_dao-linh` không hếch mũi, `wpn_daikiem` chắn tay kiểu châu Âu. Không cần credit: H31 lệch khuỷu trái phải và LINH_r24 khuỷu cao là lỗi bộ dò khớp, sửa trong `design/tools/bake/landmarks.mjs` hoặc ghi khớp tay trong catalog.
 
 **Thứ tự tạo theo lượt**
 
-Gọi là "lượt" cho khỏi lẫn với đợt làm việc của dự án (đợt 19) và bảng đợt ở mục 0.4. Mỗi lượt ba bước: dựng lưới xám (`--stage luoi`, chỉ tốn tiền lưới), ghép ảnh lưới thành một tờ để soát, rồi chạy lại không có `--stage` để tô texture. Lưới hỏng thì dựng lại riêng mã đó trước khi tô: `run --only <mã> --redo <mã> --stage luoi` (mã trong `--redo` phải có trong danh sách chạy; công cụ đổi tên tệp gốc và ảnh lưới cũ trong `_raw/` sang `.cu-<giờ>`, không xoá, nên `sheet` hiện lưới mới). Thêm `--dry` vào lệnh `run` thì công cụ chỉ in ước tính credit, không gọi Meshy. Lần tô texture công cụ giữ model của lưới, nên tuỳ chọn model chỉ có tác dụng ở lần dựng lưới; muốn đổi model của một lưới đã có thì `--redo` mã đó.
+Gọi là "lượt" cho khỏi lẫn với đợt làm việc của dự án (đợt 19) và bảng đợt ở mục 0.4. Lượt 2 (làm lại) chỉ cần lượt 1; lượt 4 chờ lượt 3 vào được game; lượt 5 không phụ thuộc lượt nào; ba mục môi trường của lượt 6 cần bước nướng `env` của lượt 3. Mỗi lượt ba bước: dựng lưới xám (`--stage luoi`, chỉ tốn tiền lưới), ghép ảnh lưới thành một tờ để soát, rồi chạy lại không có `--stage` để tô texture. Lưới hỏng thì dựng lại riêng mã đó trước khi tô: `run --only <mã> --redo <mã> --stage luoi` (mã trong `--redo` phải có trong danh sách chạy; công cụ đổi tên tệp gốc và ảnh lưới cũ trong `_raw/` sang `.cu-<giờ>`, không xoá, nên `sheet` hiện lưới mới). Thêm `--dry` vào lệnh `run` thì công cụ chỉ in ước tính credit, không gọi Meshy. Lần tô texture công cụ giữ model của lưới, nên tuỳ chọn model chỉ có tác dụng ở lần dựng lưới; muốn đổi model của một lưới đã có thì `--redo` mã đó.
 
-Credit tính theo bảng giá trong `meshy.mjs`: lưới 20 với `latest` (mặc định), 5 với `meshy-5`; texture 10 mỗi mẫu. `--model-mt` (môi trường) mặc định bằng `--model-vk`; trâu, ngựa, voi là thú cưỡi nên theo `--model`. Mẫu đã xong ở lượt trước thì công cụ bỏ qua, nên số dưới đây đã trừ phần trùng (cò, quạ ở lượt 1; 9 mục môi trường ở lượt 2). Số tính bằng đúng bảng giá và cách chọn model của `run`, không gọi mạng.
+Credit tính theo bảng giá trong `meshy.mjs`: lưới 20 với `latest` (mặc định), 5 với `meshy-5`; texture 10 mỗi mẫu. `--model-mt` (môi trường) mặc định bằng `--model-vk`; trâu, ngựa, voi là thú cưỡi nên theo `--model`. Mẫu đã xong ở lượt trước thì công cụ bỏ qua, nên số dưới đây đã trừ phần trùng (cò, quạ ở lượt 1; 10 mục môi trường thử ở lượt 3). Số tính bằng đúng bảng giá và cách chọn model của `run`, không gọi mạng.
 
 | Lượt | Gồm | Credit: lưới + texture | Claude làm sau lượt này |
 | --- | --- | --- | --- |
-| 1 | `thieu`, 12 mục | 90 + 120 = **210**: DV_AOTONG và trâu bằng `latest`, dân, đạo cụ, chim bằng meshy-5; tất cả `latest` 240 + 120 = 360 | Code gắn nón lá vào khớp đầu khi có thân GLB (`models.js`) và gộp nón vào bộ lính (`design/tools/bake/kit.mjs`); nướng bộ lính cho dân làng (thay thân code ở `ambient.js`) và quân áo Tống (chọn cung hay giáo, đổi lính thả ở `kesach.js`); gộp quang gánh, tay nải vào bộ dân; ống tên rời vào bước nướng vũ khí (`wpn`) để làm ống tên rơi cạnh xác ngựa (`scenery.js:422-430`). Trâu, chim chờ bước nướng môi trường (lượt 2), cắt thành phần rời cho code tự cử động (`ambient.js:13-15`) |
-| 2 | 9 mục môi trường thử: thuyền chiến quân Trần (người chơi đứng), chiến thuyền Nguyên, kỳ hạm, cổng, cánh cổng, tường Hàm Tử, lều lương, khóm tre, cột đá vôi A | lưới bằng meshy-5, cùng model sẽ mua hàng loạt ở lượt 4: 45 + 90 = **135**; mục nào hỏng thì dựng lại lưới bằng `latest` (thêm 20 mỗi mục); tất cả `latest` 180 + 90 = 270 | Chế độ nướng tĩnh `env` mới trong `design/tools/glb-bake.mjs`: giảm lưới, phóng về cột "Kích thước thật", đặt lại gốc, tách cán cờ code của thuyền, nướng texture thành màu đỉnh, LOD (đầu mục K). Đo boong và cột của ba thuyền theo đầu mục K. Mã đặt mẫu vào cảnh thay khối code (`boats.js` LOD0, cổng và tường, lều, `kit.js`) làm ở một lượt sau. Đếm tam giác cảnh B15, B20, Võ trường trước và sau khi đặt mẫu (`design/tools/scene-tris.mjs`, đầu mục K): B20 không vượt 120 nghìn, B15 không tăng. Chờ 9 mục này vào được game rồi mới mua lượt 4, vì có thể phải sửa câu chữ; meshy-5 hỏng nhiều thì lượt 4 dùng `latest` |
-| 3 | `lam-lai`, 14 mục | 280 + 140 = **420** (cả mục bằng `latest`, như mục P khuyên); nếu thêm `--model-linh meshy-5 --model-vk meshy-5` thì 205 + 140 = 345 | Soát tờ ảnh; chuyển bước nướng sang tệp `_v2` (vũ khí: đổi `src` trong catalog; nhân vật, bộ lính: thêm `src` và cho `glb-bake.mjs` đọc `man[c.src ?? code].path`, xem `design/glb/README.md`); nướng lại; bỏ khớp ghi tay nếu bộ dò khớp ra đúng; bỏ `side`, `flip` của đại đao; gắn nón lá cho bốn vai đầu trần (code của lượt 1) |
-| 4 | Phần còn lại của `moi-truong`, 74 mục | `--model-mt meshy-5`: 370 + 740 = **1.110**; `latest` 1.480 + 740 = 2.220 | Như lượt 2, thêm mã đặt từng cảnh; đếm tam giác cảnh trước và sau mỗi cảnh bằng `design/tools/scene-tris.mjs` (B20 ≤ 120 nghìn, B15 không tăng). Vật vẽ hàng trăm lần (cây, tre, cọc, lau, đá, cột đá vôi) và mô-đun lặp dọc tường, vòng rào, làn đánh (L3, L4, M5–M8, M10) phải nướng giảm về ngân sách trong game ghi ở từng mục, tức số tam giác code hiện nay; cao hơn chỉ khi làm kèm mức chi tiết gần, xa (LOD) như bộ vẽ hạm đội; giảm tới đó mà hỏng dáng thì giữ code cho vật ấy. Mấy mô-đun lặp này rẻ (15 credit mỗi mục) nhưng lợi ít nhất, nên có thể để sau cùng (chạy `--only` với danh sách in bởi `list --set moi-truong`, bỏ các mã ấy) |
+| 1 | `thieu`, 12 mục | 105 + 120 = **225**: DV_AOTONG, DAN_NAM và trâu bằng `latest`, dân còn lại, đạo cụ, chim bằng meshy-5; tất cả `latest` 240 + 120 = 360 | Code gắn nón lá vào khớp đầu khi có thân GLB (`models.js`) và gộp nón vào bộ lính (`design/tools/bake/kit.mjs`); nướng bộ lính cho dân làng (thay thân code ở `ambient.js`) và quân áo Tống (chọn cung hay giáo, đổi lính thả ở `kesach.js`); gộp quang gánh, tay nải vào bộ dân; ống tên rời vào bước nướng vũ khí (`wpn`) để làm ống tên rơi cạnh xác ngựa (`scenery.js:422-430`). Trâu, chim chờ bước nướng môi trường (lượt 3), cắt thành phần rời cho code tự cử động (`ambient.js:13-15`) |
+| 2 | `lam-lai`, 14 mục | người bằng `latest` (như mục P), đại đao dựng lưới bằng meshy-5 trước: 265 + 140 = **405**; đại đao hỏng thì dựng lại bằng `latest` (thêm 20); nếu thêm `--model-linh meshy-5 --model-vk meshy-5` thì 205 + 140 = 345; tất cả `latest` 280 + 140 = 420 | Soát tờ ảnh; chuyển bước nướng sang tệp `_v2` (vũ khí: đổi `src` trong catalog; nhân vật, bộ lính: thêm `src` và cho `glb-bake.mjs` đọc `man[c.src ?? code].path`, xem `design/glb/README.md`); nướng lại; bỏ khớp ghi tay nếu bộ dò khớp ra đúng; bỏ `side`, `flip` của đại đao; gắn nón lá cho bốn vai đầu trần (code của lượt 1); gộp nón vào bộ lính DV_GIAO_v2, DV_NO_v2 (PROP_non_la co về 64 × 15 cm và 52 × 24 cm, nhuộm rơm; ENV_non_tre_roi thay vào sau lượt 4) |
+| 3 | 10 mục môi trường thử: thuyền chiến quân Trần (người chơi đứng), chiến thuyền Nguyên, kỳ hạm, thuyền hộ vệ (người chơi đánh chiếm), cổng, cánh cổng, tường Hàm Tử, lều lương, khóm tre, cột đá vôi A | lưới bằng meshy-5, cùng model sẽ mua hàng loạt ở lượt 4: 50 + 100 = **150**; mục nào hỏng thì dựng lại lưới bằng `latest` (thêm 20 mỗi mục); tất cả `latest` 200 + 100 = 300 | Chế độ nướng tĩnh `env` mới trong `design/tools/glb-bake.mjs`: giảm lưới, phóng về cột "Kích thước thật", đặt lại gốc, tách cán cờ code của thuyền, nướng texture thành màu đỉnh, LOD (đầu mục K). Đo boong, lầu và cột của ba thuyền Nguyên theo đầu mục K, và boong thuyền Trần (0,7 / 12). Mã đặt mẫu vào cảnh thay khối code (`boats.js` LOD0, cổng và tường, lều, `kit.js`) làm ở một lượt sau. Đếm tam giác cảnh B15, B20, Võ trường trước và sau khi đặt mẫu (`design/tools/scene-tris.mjs`, đầu mục K): B20 không vượt 120 nghìn, B15 không tăng. Chờ 10 mục này vào được game rồi mới mua lượt 4, vì có thể phải sửa câu chữ; meshy-5 hỏng nhiều thì lượt 4 dùng `latest` |
+| 4 | Phần còn lại của `moi-truong`, 73 mục | `--model-mt meshy-5`: 365 + 730 = **1.095**; `latest` 1.460 + 730 = 2.190 | Như lượt 3, thêm mã đặt từng cảnh; đếm tam giác cảnh trước và sau mỗi cảnh bằng `design/tools/scene-tris.mjs` (B20 ≤ 120 nghìn, B15 không tăng). Vật vẽ hàng trăm lần (cây, tre, cọc, lau, đá, cột đá vôi) và mô-đun lặp dọc tường, vòng rào, làn đánh (L3, L4, M5–M8, M10) phải nướng giảm về ngân sách trong game ghi ở từng mục, tức số tam giác code hiện nay; cao hơn chỉ khi làm kèm mức chi tiết gần, xa (LOD) như bộ vẽ hạm đội; giảm tới đó mà hỏng dáng thì giữ code cho vật ấy. Mấy mô-đun lặp này rẻ (15 credit mỗi mục) nhưng lợi ít nhất, nên có thể để sau cùng (chạy `--only` với danh sách in bởi `list --set moi-truong`, bỏ các mã ấy) |
 | 5 | `tuong-moi`, 18 mục | 360 + 180 = **540** (`latest`) | Rig và nướng như 17 nhân vật đang có (thêm vào `CHARS` của catalog), thêm cấu hình `RIGS` khi có trận dùng họ; viết prompt binh khí riêng; ngựa cho X16, X21 (đổi màu mẫu ngựa có sẵn hoặc làm ngựa tướng) |
 | 6 | `tuy-chon`, 15 mục, theo nhu cầu | vũ khí, đạo cụ, môi trường bằng meshy-5, ngựa tướng và voi `latest`: 105 + 150 = **255**; `latest` 300 + 150 = 450 | Tuỳ mục (voi: rig bốn chân, bành gắn lưng) |
 
@@ -131,23 +133,26 @@ Cả sáu lượt theo lựa chọn in đậm khoảng 2.670 credit, chưa tính
 Lệnh cho từng lượt (chạy ở gốc repo; key đặt bằng `MESHY_API_KEY`, không ghi vào repo):
 
 ```bash
-# Lượt 1. DV_AOTONG dựng lưới bằng latest trước: meshy-5 từng bỏ qua câu tả đầu của DV_DAO,
-# mà khăn cổ xanh ngọc là dấu nhận quân Tống. Lần chạy cả bộ sau đó giữ model của lưới đã có.
+# Lượt 1. DV_AOTONG và DAN_NAM dựng lưới bằng latest trước: meshy-5 từng bỏ qua câu tả đầu của DV_DAO, mà khăn
+# cổ xanh ngọc là dấu nhận quân Tống, còn DAN_NAM phải đầu trần để gắn nón lá. Lần chạy cả bộ sau đó giữ model của
+# lưới đã có. DAN_NU, DAN_TRE mọc nón, mũ trên tờ ảnh thì: run --only <mã> --redo <mã> --stage luoi --model-linh latest
 node design/tools/meshy.mjs list --set thieu --hash
-node design/tools/meshy.mjs run --only DV_AOTONG --stage luoi
+node design/tools/meshy.mjs run --only DV_AOTONG,DAN_NAM --stage luoi
 node design/tools/meshy.mjs run --set thieu --stage luoi --model-linh meshy-5 --model-vk meshy-5
 node design/tools/meshy.mjs sheet design/glb/_raw/luot1-luoi.png --set thieu
 node design/tools/meshy.mjs run --set thieu --model-linh meshy-5 --model-vk meshy-5
 
-# Lượt 2. Mục hỏng: run --only <mã> --redo <mã> --stage luoi --model-mt latest
-node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a --stage luoi --model-mt meshy-5
-node design/tools/meshy.mjs sheet design/glb/_raw/luot2-luoi.png --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
-node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
-
-# Lượt 3
+# Lượt 2 (làm lại). Đại đao dựng lưới bằng meshy-5 trước (mục P13); hỏng thì:
+#   run --only WPN_dadao_v2 --redo WPN_dadao_v2 --stage luoi --model-vk latest
+node design/tools/meshy.mjs run --only WPN_dadao_v2 --stage luoi --model-vk meshy-5
 node design/tools/meshy.mjs run --set lam-lai --stage luoi
-node design/tools/meshy.mjs sheet design/glb/_raw/luot3-luoi.png --set lam-lai
+node design/tools/meshy.mjs sheet design/glb/_raw/luot2-luoi.png --set lam-lai
 node design/tools/meshy.mjs run --set lam-lai
+
+# Lượt 3 (10 mục môi trường thử). Mục hỏng: run --only <mã> --redo <mã> --stage luoi --model-mt latest
+node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_thuyen_ho_ve,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a --stage luoi --model-mt meshy-5
+node design/tools/meshy.mjs sheet design/glb/_raw/luot3-luoi.png --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_thuyen_ho_ve,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
+node design/tools/meshy.mjs run --only ENV_thuyen_chien_tran,ENV_chien_thuyen_nguyen,ENV_ky_ham_nguyen,ENV_thuyen_ho_ve,ENV_cong_ham_tu,ENV_canh_cong,ENV_tuong_dat,ENV_leu_luong,ENV_khom_tre,ENV_nui_da_a
 
 # Lượt 4
 node design/tools/meshy.mjs run --set moi-truong --stage luoi --model-mt meshy-5
@@ -394,7 +399,8 @@ Công cụ AI hiểu tên màu tốt hơn mã hex. Prompt dùng tên màu; mã h
 | nỉ lều Mông Cổ | `#b8bdbf` / `#8d8f86` | pale grey felt | Lều tròn trong Hàm Tử quan |
 | đá vôi | `#a7a295` | pale grey limestone | Cột đá vôi B20, tảng đá |
 | lá cây | `#4f6a32` / `#5e7a3a` | dark green / leaf green | Cây, tre, đước |
-| đồng | `#7a5a2a` | dark bronze | Vạc lửa, trống đồng |
+| đồng | `#7a5a2a` | dark bronze | Bát vạc lửa (`scenery.js:1014`); đinh đồng ở M11 |
+| trống đồng Võ trường | `#6a5a3a` / `#8f7a4a` (code: thân gỗ, mặt da như trống trận) | dark green-brown bronze | Trống đồng M12: code vẽ bằng khối trống trận (`scenery.js:987`), prompt theo màu đồng thật |
 | đá bia | `#8a8474` | grey stone | Bia đá Sát Thát |
 | gỗ cháy | `#2a221a` | charred black | Khung lều cháy |
 | trâu | `#687078` | slate-grey | Trâu |
@@ -525,7 +531,7 @@ Strong Vietnamese war-elephant handler, 13th-century Tran dynasty, about 35, bro
 
 ### A8 · H27 · Trần Thái Tông · vua, chưa có trong game
 
-Vua đầu tiên nhà Trần, tự cầm quân năm 1258 ở Bình Lệ Nguyên và Đông Bộ Đầu (B12, B13; hai trận này chưa có trong game, `game/js/data/battles.js`). Chính sử (`canon.json:2260`); diện mạo là Hư cấu, theo `design/3d-ref/PROMPTS-TUONG.md` H27. Khoảng 40 tuổi năm 1258 (sinh 1218). Áo son sẫm viền vàng, giáp then viền vàng, mũ lụa đen có đồ trang sức vàng. Lọng vàng của kỹ năng "Ngự Giá Thân Chinh" là đạo cụ code, không thuộc mẫu. Prompt không ghi `emperor`: chữ ấy kéo về vương miện, áo rồng; áo son sẫm và mũ lụa đen đủ nói vai vua. Đồ trang sức vàng viết là một trâm vàng nhỏ ở trước mũ (`gold pin`), không `gold ornament`: món trang sức tả chung chung trên đỉnh mũ từng ra mào kiểu vương miện (ghi chú B9).
+Vua đầu tiên nhà Trần, tự cầm quân năm 1258 ở Bình Lệ Nguyên và Đông Bộ Đầu (B12, B13; hai trận này chưa có trong game, `game/js/data/battles.js`). Chính sử (`canon.json:2260`); diện mạo là Hư cấu, theo `design/3d-ref/PROMPTS-TUONG.md` H27. Khoảng 40 tuổi năm 1258 (sinh 1218). Áo son sẫm viền vàng, giáp then viền vàng, mũ lụa đen có đồ trang sức vàng. Lọng vàng của kỹ năng "Ngự Giá Thân Chinh" là đạo cụ code, không thuộc mẫu. Prompt không ghi `emperor`: chữ ấy kéo về vương miện, áo rồng; áo son sẫm và mũ lụa đen đủ nói vai vua. Đồ trang sức vàng viết là một trâm vàng nhỏ ở trước mũ (`gold pin`), không `gold ornament`: món trang sức tả chung chung trên đỉnh mũ từng ra mào kiểu vương miện (mục P3, suy luận).
 
 PROMPT (dán thẳng):
 ```text
@@ -565,7 +571,7 @@ Vua thứ ba nhà Trần, cùng Thượng hoàng và Hưng Đạo vương lãnh 
 
 PROMPT (dán thẳng):
 ```text
-Young Vietnamese commander in the field, 13th-century Tran dynasty, about 30, serene face, thin moustache. Topknot under a small soft round black silk cap with a small gold pin at the front. Dark red robe with gold borders, light black lacquer lamellar armor with gold trim, jade belt, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Young Vietnamese commander in the field, 13th-century Tran dynasty, about 30, serene face, thin moustache. Topknot under a small soft round black silk cap with a small gold pin at the front. Dark red robe with gold borders, thin black lacquer lamellar armor with gold trim, jade belt, black boots. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 10–20k; cao 1,72 m **(đề xuất)**. **Symmetry: bật.**
@@ -787,7 +793,7 @@ Careful practical Han Chinese naval supply commander of the Yuan, 13th century, 
 
 ### B13 · X25 · A Bát Xích (來阿八赤, Abachi) · tướng Đường Ngột mở đường, chưa có trong game
 
-Tướng Nguyên người Đường Ngột (Tangut), cầm quân mở đường khi quân Nguyên rút năm 1288 (B20, chỉ ở sa bàn Kế Sách "Chặn đường bộ Nội Bàng"; bản đánh trực tiếp chưa có, canon `openQuestions`). Chính sử (`canon.json:5285`). Khoảng 45 **(đề xuất)**, mặt rộng, râu ngắn; mũ nỉ viền lông trùm mũ sắt, áo xanh lục sẫm. Prompt chỉ tả mũ nỉ vành lông; mũ sắt bên trong không thấy, tả hai lớp thì dễ ra lớp chồng lộn xộn.
+Tướng Nguyên người Đường Ngột (Đảng Hạng, Tangut), cầm quân mở đường khi quân Nguyên rút năm 1288 (B20, chỉ ở sa bàn Kế Sách "Chặn đường bộ Nội Bàng"; bản đánh trực tiếp chưa có, canon `openQuestions`). Chính sử (`canon.json:5285`). Khoảng 45 **(đề xuất)**, mặt rộng, râu ngắn; mũ nỉ viền lông trùm mũ sắt, áo xanh lục sẫm. Prompt chỉ tả mũ nỉ vành lông; mũ sắt bên trong không thấy, tả hai lớp thì dễ ra lớp chồng lộn xộn.
 
 PROMPT (dán thẳng):
 ```text
@@ -1204,7 +1210,7 @@ PROMPT (dán thẳng):
 Long-hafted great axe, 13th-century Mongol-Yuan, about 2.2 m long, brown wooden haft with iron bands, broad crescent single-bladed grey steel head with a back spike, iron butt cap. Vertical, head up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: cách đuôi cán khoảng 0,6 m; **grip2** cách gốc 0,45 m về phía đuôi **(đề xuất)**. Lưỡi rìu +Z. 1–3k.
+- **Gốc**: cách đuôi cán khoảng 0,6 m; **grip2** cách gốc 0,45 m về phía đuôi **(đề xuất)**. Lưỡi rìu +Z. 1–3k. **Symmetry: tắt** (lưỡi một bên, gai sau).
 
 ### G15 · WPN_quat · Quạt Chiêu Văn (tuỳ chọn)
 
@@ -1215,7 +1221,7 @@ PROMPT (dán thẳng):
 Large folding fan, 13th-century Vietnam, split bamboo ribs and plain ivory paper, about 45 cm long, shown half open, dark lacquered outer guards with a gold rivet, no writing or pictures. Floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: đầu đinh tán (chỗ cầm), nan quạt dọc +Y. 1–2k.
+- **Gốc**: đầu đinh tán (chỗ cầm), nan quạt dọc +Y. 1–2k. **Symmetry: bật** (quạt mở đều hai bên nan giữa).
 
 ### G16 · WPN_daikiem_vandon · Đại kiếm Vân Đồn (tuỳ chọn)
 
@@ -1226,7 +1232,7 @@ PROMPT (dán thẳng):
 Heavy two-handed greatsword, 13th-century Vietnam, about 1.6 m long, thick dark steel single-edged blade with an iron-clad spine, plain square iron crossguard, long grip wrapped in rough hemp cord stained with charcoal dust. Vertical, point up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: sát dưới chắn tay; **grip2** cách gốc 0,2 m về phía núm. 1–3k.
+- **Gốc**: sát dưới chắn tay; **grip2** cách gốc 0,2 m về phía núm. 1–3k. **Symmetry: tắt** (lưỡi một cạnh, sống bọc sắt).
 
 ### G17 · WPN_doandao · Đoản đao Yết Kiêu (tuỳ chọn)
 
@@ -1237,7 +1243,7 @@ PROMPT (dán thẳng):
 Short Vietnamese knife-saber, 13th century, about 50 cm long, straight single-edged grey steel blade, wooden grip wrapped in dark cord, tiny iron guard. Vertical, point up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: giữa chuôi. 0,5–1,5k.
+- **Gốc**: giữa chuôi. 0,5–1,5k. **Symmetry: tắt** (lưỡi một cạnh).
 
 ### G18 · WPN_duisat · Dùi sắt đục thuyền (tuỳ chọn)
 
@@ -1248,7 +1254,7 @@ PROMPT (dán thẳng):
 Iron boat-breaking chisel, 13th century, about 35 cm long, thick square iron shaft tapering to a flat chisel edge, round flat striking head, cord loop at the top. Vertical, chisel edge up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: giữa thân, mũi đục +Y. 300–1000.
+- **Gốc**: giữa thân, mũi đục +Y. 300–1000. **Symmetry: bật.**
 
 ### G19 · WPN_moc_voi · Móc voi (tuỳ chọn)
 
@@ -1259,7 +1265,7 @@ PROMPT (dán thẳng):
 Elephant goad, 13th-century Vietnam, about 70 cm long, dark wooden handle wrapped in red cord, bronze head with one straight spike and one curved hook. Vertical, spike up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Gốc**: giữa cán, mũi nhọn +Y, móc cong quay +Z. 300–1000.
+- **Gốc**: giữa cán, mũi nhọn +Y, móc cong quay +Z. 300–1000. **Symmetry: tắt** (móc một bên).
 
 ---
 
@@ -1276,7 +1282,7 @@ PROMPT (dán thẳng):
 Tall back banner: slim straight black lacquered pole about 2 m long with a small gold finial, plain dark red rectangular silk flag 50 cm wide and 1.2 m tall hanging from the upper pole, thin pale gold border, completely blank. Floating, isolated single object, no stand, no person. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 0,5–1,5k. Cán và vải là hai object riêng nếu tách được. Gốc ở chân cán; cán gắn sau lưng (`models.js:338-352`).
+- **Kỹ thuật**: 0,5–1,5k. Cán và vải là hai object riêng nếu tách được. Gốc ở chân cán; cán gắn sau lưng (`models.js:338-352`). **Symmetry: tắt** (vải treo một bên cán).
 
 ### H2 · PROP_cape · Áo choàng dùng chung
 
@@ -1287,7 +1293,7 @@ PROMPT (dán thẳng):
 Short military cloak hanging straight down as if from the shoulders, about 90 cm long, 45 cm wide at the top flaring to 56 cm, plain light grey cloth, thin darker hem band, simple folds, no clasp. Back view, floating, isolated single object, no body, no mannequin. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 0,5–2k. Gốc ở mép trên giữa (chỗ gắn lưng). Claude chia ba khúc xương để mô phỏng vải như hiện nay.
+- **Kỹ thuật**: 0,5–2k. Gốc ở mép trên giữa (chỗ gắn lưng). Claude chia ba khúc xương để mô phỏng vải như hiện nay. **Symmetry: bật.**
 
 ### H3 · PROP_mui_ten · Mũi tên
 
@@ -1373,7 +1379,7 @@ PROMPT (dán thẳng):
 Elephant howdah: low square wooden platform about 1.4 m wide with a short black lacquered railing and gold corner caps, on a vermilion saddle cloth with gold border hanging down both sides, girth ropes. Isolated single object, no elephant, no person. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 1–3k. Gốc ở giữa đáy (chỗ đặt lên lưng voi). Sàn gỗ và vải phủ là hai object riêng nếu tách được; vải phủ Claude có thể cho lắc nhẹ.
+- **Kỹ thuật**: 1–3k. Gốc ở giữa đáy (chỗ đặt lên lưng voi). Sàn gỗ và vải phủ là hai object riêng nếu tách được; vải phủ Claude có thể cho lắc nhẹ. **Symmetry: bật.**
 - **Negative**: NEGATIVE-VK.
 
 ### I5 · PROP_giap_voi · Giáp đầu voi (tuỳ chọn)
@@ -1385,7 +1391,7 @@ PROMPT (dán thẳng):
 Elephant head armor: curved black lacquered lamellar plate covering the forehead down to the top of the trunk, gold trim, red tassel on top, leather straps. Isolated single object, no elephant, no person. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 0,5–1,5k. Gốc ở mép trên giữa (chỗ gắn đỉnh đầu voi). Tua đỏ Claude dựng bằng code.
+- **Kỹ thuật**: 0,5–1,5k. Gốc ở mép trên giữa (chỗ gắn đỉnh đầu voi). Tua đỏ Claude dựng bằng code. **Symmetry: bật.**
 - **Negative**: NEGATIVE-VK.
 
 ---
@@ -1396,22 +1402,22 @@ Chỉ có ở B15, là cảnh nền dân chạy loạn (`ambient.js`). Dân khô
 
 ### J1 · DAN_NAM · Dân làng nam
 
-Gánh quang gánh. Màu theo `soldiers.js:394-437`: áo nâu củ nâu `#5e4330`, thắt lưng `#8a7550`, quần thâm `#2b2825`, nón lá `#d8c48e`. Tạo **đầu trần** (búi tóc, khăn vấn): Meshy chưa dựng được nón lá vành rộng lần nào (mục P), nên nón lấy từ PROP_non_la (mục H5) thu nhỏ khoảng ×0,8, nhuộm `#d8c48e`, gộp vào bộ lính khi nướng (nón code Ø 0,68 m, cao 0,18 m, `soldiers.js:487`).
+Gánh quang gánh. Màu theo `soldiers.js:394-437`: áo nâu củ nâu `#5e4330`, thắt lưng `#8a7550`, quần thâm `#2b2825`, nón lá `#d8c48e`. Tạo **đầu trần** (búi tóc, khăn vấn): Meshy chưa dựng được nón lá vành rộng lần nào (mục P), nên nón lấy từ PROP_non_la (mục H5) thu nhỏ khoảng ×0,8, nhuộm `#d8c48e`, gộp vào bộ lính khi nướng (nón code Ø 0,68 m, cao 0,18 m, `soldiers.js:487`). Nón lá mà mọc dính đầu thì thành hai nón, nên câu đầu đứng riêng, mở bằng `Bare head:` như P5, và lưới dựng bằng `latest` cùng DV_AOTONG (meshy-5 từng bỏ qua câu tả đầu của DV_DAO; mục 0.8, lượt 1). Thắt lưng viết `dull tan`, không `khaki` (chữ màu quân phục về sau, không có trong bảng 2.5).
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese peasant man, 13th century, about 40, lean, plain face, black hair bun at the nape under a dark headcloth. Brown hip-length tunic with sleeves rolled past the elbows, khaki sash, black trousers rolled to mid-calf, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese peasant man, 13th century, about 40, lean, plain face. Bare head: black hair bun at the nape under a dark headcloth. Brown hip-length tunic with sleeves rolled past the elbows, dull tan sash, black trousers rolled to mid-calf, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,65 m. **Symmetry: bật.** **Đi kèm**: PROP_quang_ganh, PROP_non_la. Gậy tre của cụ già Claude dựng bằng code.
 
 ### J2 · DAN_NU · Dân làng nữ
 
-Đội tay nải, ôm tay nải hoặc bế con. Áo nâu `#684832` tay dài, váy đen `#221f1c` hai tấm, khăn vấn `#2e2622`, không đội nón.
+Đội tay nải, ôm tay nải hoặc bế con. Áo nâu `#684832` tay dài, váy đen `#221f1c` hai tấm, khăn vấn `#2e2622`, không đội nón. Khăn vấn viết `head wrap wound round the head`, không `turban` (kéo về khăn quấn Nam Á, Trung Đông).
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese peasant woman, 13th century, about 30, gentle tired face, hair wrapped in a dark cloth turban. Long-sleeved brown tunic, khaki sash, black two-panel skirt to mid-calf with dark hem, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese peasant woman, 13th century, about 30, gentle tired face, hair under a dark cloth head wrap wound round the head. Long-sleeved brown tunic, dull tan sash, black two-panel skirt to mid-calf with dark hem, barefoot. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,55 m. **Symmetry: bật.** Váy hai tấm có lắc như vạt áo lính. **Đi kèm**: PROP_tay_nai.
@@ -1455,32 +1461,37 @@ Indigo cloth bundle, about 36 cm wide, soft folds, tied with a knot on top showi
 
 **Quy ước chung cho mục K–O** (môi trường và thú, từ đợt 19):
 
-- **Mã, tệp, bảng.** Mã `ENV_…` đi với tệp `env_….glb` trong `design/glb/moi-truong/` (mục 0.5); trâu giữ tiền tố `mount_` (thư mục `thu-cuoi/`). Mỗi mục có bảng riêng ngay dưới đầu mục, cùng 8 cột như bảng mục 1: cột 7 là kích thước thật, cột 8 là khối code mà tệp thay. Liệt kê bằng `node design/tools/meshy.mjs list --set moi-truong` (86 mục, thêm `--prompt` để in bản gửi API); ba mục ghi tuỳ chọn ở đầu mục (K10, L22, N17) nằm ở `--set tuy-chon`, thú và nón lá ở `--set thieu`. Thứ tự mua theo mục 0.8: lượt 2 dựng lưới 9 mục thử bằng `--model-mt meshy-5`, soát, tô, đưa vào được game rồi mới mua phần còn lại ở lượt 4; mỗi lượt dựng lưới (`--stage luoi`, chỉ tốn tiền lưới) và soát ảnh trước khi tô. Giá riêng phần môi trường theo bảng trong `meshy.mjs` (89 mục, kể cả ba mục tuỳ chọn): 89 × 30 = 2.670 credit nếu mọi mục bằng `latest`, 89 × 15 = 1.335 nếu mọi mục bằng `--model-mt meshy-5` (meshy-5 từng dựng nỏ thành súng, xem FIX `WPN_no`, nên soát ảnh lưới kỹ). Số 2.670 ở cuối bảng lượt của mục 0.8 là cả sáu lượt theo lựa chọn in đậm, trùng số chỉ là tình cờ.
+- **Mã, tệp, bảng.** Mã `ENV_…` đi với tệp `env_….glb` trong `design/glb/moi-truong/` (mục 0.5); trâu giữ tiền tố `mount_` (thư mục `thu-cuoi/`). Mỗi mục có bảng riêng ngay dưới đầu mục, cùng 8 cột như bảng mục 1: cột 7 là kích thước thật, cột 8 là khối code mà tệp thay. Liệt kê bằng `node design/tools/meshy.mjs list --set moi-truong` (86 mục, thêm `--prompt` để in bản gửi API); ba mục ghi tuỳ chọn ở đầu mục (K10, L22, N17) nằm ở `--set tuy-chon`, thú và nón lá ở `--set thieu`. Thứ tự mua theo mục 0.8: lượt 3 dựng lưới 10 mục thử bằng `--model-mt meshy-5`, soát, tô, đưa vào được game rồi mới mua phần còn lại ở lượt 4; mỗi lượt dựng lưới (`--stage luoi`, chỉ tốn tiền lưới) và soát ảnh trước khi tô. Giá riêng phần môi trường theo bảng trong `meshy.mjs` (89 mục, kể cả ba mục tuỳ chọn): 89 × 30 = 2.670 credit nếu mọi mục bằng `latest`, 89 × 15 = 1.335 nếu mọi mục bằng `--model-mt meshy-5` (meshy-5 từng dựng nỏ thành súng, xem FIX `WPN_no`, nên soát ảnh lưới kỹ). Số 2.670 ở cuối bảng lượt của mục 0.8 là cả sáu lượt theo lựa chọn in đậm, trùng số chỉ là tình cờ.
 - **Độ dài.** Prompt môi trường dài tới 630 ký tự: công cụ rút khối STYLE bớt 30 ký tự nên bản gửi API không quá 600 (giới hạn của Meshy). Dán tay vào web Meshy thì dán bản API in bởi `list --only <mã> --prompt`.
 - **Kích thước.** Số mét trong prompt chỉ giúp công cụ giữ đúng tỉ lệ, nên prompt phải ghi đủ những tỉ lệ mà code cần (boong, mạn, cột của thuyền). Meshy chuẩn hoá mọi mẫu về khoảng 1,9 đơn vị theo trục dài nhất (`size_xyz` trong `design/glb/manifest.json`: nhân vật, khiên, mũi tên, ngựa đều ra 1,89–1,90), nên bước nướng môi trường sau này phải phóng về đúng cột "Kích thước thật" của bảng, như `WEAPONS.len` của vũ khí (`design/tools/bake/catalog.mjs:30-45`).
 - **Gốc toạ độ.** Công cụ luôn đặt gốc giữa đáy (`center({ pivot: "below" })` trong `post()` của `meshy.mjs`). Bước nướng đặt lại gốc cho vật cần gốc khác: thuyền ở đường mớn nước giữa thân, mũi +Z (`boats.js:5`); khúc gỗ phao ở tâm; cọc Bạch Đằng, cọc gãy và đá tảng về khối đơn vị của code (mục M1, N10). Cột đá vôi: chân thấy được của mẫu ở y 0 (vòng −0,1 của `karstGeo`), rồi bước nướng đùn thêm một váy thẳng xuống y −1,2 lần bán kính chân như code (`kit.js:127`), vì instance đặt ở mặt đất thấp nhất − 0,6 m trên bờ dốc (`scenery-b20.js:339`); đừng đặt đáy mẫu ở −1,2 lần bán kính, như vậy là chôn mất khoảng một phần ba cột. Đảo đá C thì hàm ếch nằm ngang mặt nước (N16).
-- **Chưa có bước nướng môi trường.** Game không đọc GLB khi chạy: mọi mẫu được nướng sang `.hkm` + WebP, và `design/tools/glb-bake.mjs` mới biết nhân vật, bộ lính, vũ khí (`char`, `kit`, `wpn`). Môi trường cần thêm chế độ `env`: giảm lưới, đổi đơn vị, đặt gốc, và nên nướng texture thành màu đỉnh để gộp vào đúng InstancedMesh hay lưới gộp đang có (không thêm lượt vẽ, khớp kiểu sơn mài màu phẳng). Chỉ vật camera tới gần 3–10 m mới nên giữ texture: thuyền người chơi đứng, cổng Hàm Tử, kỳ hạm, nhà bạt, khán đài.
-- **Tam giác.** Cột "Tam giác" là số gửi Meshy (thấp nhất 300; dựng thô hơn thì Meshy hỏng hình), không phải số trong game. Trong game, vật vẽ nhiều lần (InstancedMesh: cây, tre, lau, đá, cọc, cột đá vôi, bè, khúc gỗ phao, phao mốc), mô-đun lặp dọc tường, vòng rào, làn đánh (L3, L4, M5–M8, M10) và vật gộp vào lưới tĩnh `b20-statics` của B20 giữ **đúng số tam giác code hiện nay** mỗi bản (`trong game ≤ …` ở phần Kỹ thuật từng mục, đếm trên bản gốc). Chỉ được cao hơn khi làm kèm mức chi tiết gần, xa (LOD) như bộ vẽ hạm đội (`boats.js`: LOD0 gần, LOD1 xa, `TRI_BUDGET` ở `boats.js:99`): bản xa không quá số code, bản gần chỉ cho số ít bản quanh camera, và phần tăng phải bù ở chỗ khác. Giảm tới số ấy mà hỏng dáng thì giữ code cho vật ấy. Đếm tổng cảnh bằng `design/tools/scene-tris.mjs` (kịch bản của `game/tools/shot.mjs`, đếm cả vật đang ẩn) trước và sau mỗi lượt đưa mẫu vào game (mục 0.8, lượt 2 và 4):
+- **Chưa có bước nướng môi trường.** Game không đọc GLB khi chạy: mọi mẫu được nướng sang `.hkm` + WebP, và `design/tools/glb-bake.mjs` mới biết nhân vật, bộ lính, vũ khí (`char`, `kit`, `wpn`). Môi trường cần thêm chế độ `env`: giảm lưới, đổi đơn vị, đặt gốc, và nên nướng texture thành màu đỉnh để gộp vào đúng InstancedMesh hay lưới gộp đang có (không thêm lượt vẽ, khớp kiểu sơn mài màu phẳng). Chỉ vật camera tới gần 3–10 m mới nên giữ texture: thuyền người chơi đứng, thuyền hộ vệ (người chơi đánh chiếm trên boong, K3), cổng Hàm Tử, kỳ hạm, nhà bạt, khán đài.
+- **Tam giác.** Cột "Tam giác" là số gửi Meshy (thấp nhất 300; dựng thô hơn thì Meshy hỏng hình), không phải số trong game. Trong game, vật vẽ nhiều lần (InstancedMesh: cây, tre, lau, đá, cọc, cột đá vôi, bè, khúc gỗ phao, phao mốc), mô-đun lặp dọc tường, vòng rào, làn đánh (L3, L4, M5–M8, M10) và vật gộp vào lưới tĩnh `b20-statics` của B20 giữ **đúng số tam giác code hiện nay** mỗi bản (`trong game ≤ …` ở phần Kỹ thuật từng mục, đếm trên bản gốc). Chỉ được cao hơn khi làm kèm mức chi tiết gần, xa (LOD) như bộ vẽ hạm đội (`boats.js`: LOD0 gần, LOD1 xa, `TRI_BUDGET` ở `boats.js:99`): bản xa không quá số code, bản gần chỉ cho số ít bản quanh camera, và phần tăng phải bù ở chỗ khác. Giảm tới số ấy mà hỏng dáng thì giữ code cho vật ấy. Đếm tổng cảnh bằng `design/tools/scene-tris.mjs` (kịch bản của `game/tools/shot.mjs`, đếm cả vật đang ẩn) trước và sau mỗi lượt đưa mẫu vào game (mục 0.8, lượt 3 và 4):
   - **B20** nay 120.730 tam giác trên hợp đồng ≤ ~120 nghìn (`scenery-b20.js:13`), nên sau khi thay vẫn không quá 120 nghìn. Trong đó `b20-statics` 8.553 (bến, tháp canh, bản doanh, tời neo; số từng vật ghi ở mục của nó): các vật gộp vào đó cộng lại không quá 8.553, thêm tối đa 1.500 nếu bớt được chừng ấy ở chỗ khác.
   - **B15** (lưới của `buildWorld`, kể cả mặt đất, nay 472.254; cả khung có lính đo headless 688.827, trong khi trần toàn cảnh là 200 nghìn ở T1, 300 nghìn ở T2, riêng địa hình và đạo cụ khoảng 50–60 nghìn, `design/systems.md:1125`, `design/systems.md:1160`) không được tăng: mẫu đơn lẻ nhìn gần (cổng, cây đa, tháp, lều, nhà) muốn nhiều tam giác hơn code thì phải có LOD hoặc bớt ở chỗ khác.
   - **Võ trường** nay 57.000: cây và rào giữ số code; khán đài, đài chỉ huy, lầu trống là vật đơn lẻ nhìn gần.
 - **Texture** 1024 cho mọi mục môi trường (công cụ chưa có cỡ riêng từng mục).
-- **Không người, không nước, không đất**, trừ vật vốn là một khối địa hình (gò đá, chân cột đá vôi). **Không chữ**: lá cờ, chữ trên cờ, chữ bia vẫn do code vẽ (`flagBatch` ở `kit.js:266`, `flagTexture` ở `models.js:463`, CanvasTexture của bia ở `scenery.js:995-1001`), prompt chỉ xin cán cờ trần. API v2 bỏ qua ô Negative nên mọi ý chặn đã nằm sẵn trong prompt; khối NEGATIVE-MT (mục 2.3) chỉ dùng khi dán tay vào công cụ có ô Negative.
+- **Không người, không nước, không đất**, trừ vật vốn là một khối địa hình (gò đá, chân cột đá vôi). Vật đặt trên đất (xác ngựa, xe vỡ, lều, khán đài, trống, bia) không tả mặt đất (`on the ground`, `training ground`) mà tả dáng vật, và ghi `no ground`: tấm đất Meshy dựng kèm sẽ vỡ việc gộp vào `laneBig`, `b20-statics` và lệch va chạm code. Câu chỉ để cấm một vật mà phần tả đã đủ thì bỏ (Meshy không giữ câu phủ định, mục P), chỉ giữ các ý chặn chung của cảnh (người, nước, đất, chữ). **Không chữ**: lá cờ, chữ trên cờ, chữ bia vẫn do code vẽ (`flagBatch` ở `kit.js:266`, `flagTexture` ở `models.js:463`, CanvasTexture của bia ở `scenery.js:995-1001`), prompt chỉ xin cán cờ trần. API v2 bỏ qua ô Negative nên mọi ý chặn đã nằm sẵn trong prompt; khối NEGATIVE-MT (mục 2.3) chỉ dùng khi dán tay vào công cụ có ô Negative.
 - **Màu** theo bảng 2.5 (phần môi trường ở cuối bảng).
 - **Sử liệu.** Hình dáng thuyền, công trình, đạo cụ là Hư cấu dựa trên cảnh game đang dựng (đầu tệp `boats.js`, `scenery.js`, `scenery-b20.js`), trừ chỗ ghi Chính sử (bãi cọc Bạch Đằng, `scenery-b20.js:6-8`). Game có B15 Hàm Tử, B20 Bạch Đằng, Võ trường; Thăng Long, Vạn Kiếp, Chương Dương chưa có cảnh (`game/js/data/battles.js`), nên chưa cần mẫu riêng cho các trận đó.
 
-Thuyền K1–K5 thay hình gần (LOD0) của từng loại thuyền B20. Code giữ hình LOD1, hình thay thế ở xa, mặt đi được, tường, cửa lên xuống (`HULLS`, `boats.js:33-97`, `deck.js`), và lá cờ (`flagAt`, vẽ riêng). **Cán cờ cũng do code giữ**: que cán cờ nằm trong hình thân của `BUILD` (`boats.js:392`, `boats.js:436`, `boats.js:482`, `boats.js:497`, `boats.js:511`) mà GLB thay, nên bước nướng tách riêng que đó, giữ làm một phần code đặt cạnh LOD0 của GLB, đúng chân của `flagAt`; vì thế prompt K1–K5 ghi `No flagpole.` (cán Meshy tự đặt sẽ lệch `flagAt`, lá cờ treo lơ lửng, hoặc thuyền có hai cán). Thuyền Tống K6 thì lá cờ treo trên chính cột buồm của mẫu. Mẫu phải khớp boong và tường của `HULLS` vì lính đứng và đánh trên boong: prompt ghi chiều cao boong, mạn, lầu và cột theo code (`HULLS.deckY`, `SPECS`, `boats.js:188-220`; cột ở `BUILD`), vì Meshy chỉ giữ tỉ lệ. Sau `--stage luoi`, đo trên lưới: chiều cao boong chia chiều dài so với `deckY / len` (chiến thuyền 2,6 / 24 = 0,108; đỉnh cột chính (2,6 + 14,5) / 24 = 0,71), vị trí z của cột so với tường cột `mastW` của boong, và chiều dài lầu sau chia chiều dài thân: chiến thuyền khoảng 0,26 (mặt trước lầu ở z −6,2, tường lầu x ±3,3, z −12,5…−6,2, nóc 5,2; `boats.js:38`), kỳ hạm khoảng 0,33 (mặt trước ở z −6,05, mặt lầu đi được z −15,5…−6,05 ở cao 6,0; `boats.js:49`, `boats.js:54`). Lầu của mẫu dài hơn thì lính đứng boong từ z −6,0 sẽ đứng trong lầu. Lệch quá khoảng 10% thì sửa câu, dựng lại lưới trước khi tô. Bộ vẽ hạm đội dùng một vật liệu đã vá shader nhìn xuyên (`boats.js:761-793`): vật liệu có texture của LOD0 phải vá cùng cách, không thì thân và buồm hết mờ khi chắn camera.
+Thuyền K1–K5 thay hình gần (LOD0) của từng loại thuyền B20. Code giữ hình LOD1, hình thay thế ở xa, mặt đi được, tường, cửa lên xuống (`HULLS`, `boats.js:33-97`, `deck.js`), và lá cờ (`flagAt`, vẽ riêng). **Cán cờ cũng do code giữ**: que cán cờ nằm trong hình thân của `BUILD` (`boats.js:392`, `boats.js:436`, `boats.js:482`, `boats.js:497`, `boats.js:511`) mà GLB thay, nên bước nướng tách riêng que đó, giữ làm một phần code đặt cạnh LOD0 của GLB, đúng chân của `flagAt`. Prompt K1–K5 không nhắc cán cờ, kể cả để cấm: câu phủ định không giữ được ở Meshy (`No horns` của X19, `No helmet.` của DV_DAO vẫn ra sừng, ra mũ; mục P), nên prompt tả đỉnh cột và lan can đuôi trơn (`bare mast tops`). Meshy vẫn dựng cán thì bước nướng cắt bỏ (cán Meshy tự đặt sẽ lệch `flagAt`, lá cờ treo lơ lửng, hoặc thuyền có hai cán). Thuyền Tống K6 thì lá cờ treo trên chính cột buồm của mẫu. Mẫu phải khớp boong và tường của `HULLS` vì lính đứng và đánh trên boong: prompt ghi chiều cao boong, mạn, lầu và cột theo code (`HULLS.deckY`, `SPECS`, `boats.js:188-220`; cột ở `BUILD`), mọi độ cao tính từ mớn nước như code, vì Meshy chỉ giữ tỉ lệ. Sau `--stage luoi`, đo trên lưới (độ cao tính từ mớn nước, chia chiều dài thân; vị trí z của cột so với tường cột `mastW` của boong):
+- **Chiến thuyền K1**: boong 2,6 / 24 = 0,108; đỉnh cột chính (2,6 + 14,5) / 24 = 0,71; lầu sau dài khoảng 0,26 thân (mặt trước lầu ở z −6,2, tường lầu x ±3,3, z −12,5…−6,2, nóc 5,2; `boats.js:38`).
+- **Kỳ hạm K2**: lầu dài khoảng 0,33 thân (mặt trước ở z −6,05); mặt lầu đi được z −15,5…−6,05 ở cao 6,0, tức 6,0 / 36 = 0,167; lối lên duy nhất là cầu thang giữa thân x ±1,1 dài 8 m, chân ở z +2,0 cao 3,0, tức khoảng 0,56 chiều dài tính từ đuôi (`boats.js:49-50`); đình ở cuối mặt lầu, tâm z −13,7, bốn cột x ±2,2 ở z −15 và −12,4 là tường của boong (đình 4,4 × 2,6 m), nóc đình 11,1–11,2 là chân cán cờ soái (`boats.js:54`, `boats.js:428-436`). Đình nằm giữa mặt lầu thì bốn tường cột thành vật chắn vô hình trên chỗ đánh boss; thang ngắn dốc thì lính đi trên dốc vô hình dài 8 m.
+- **Thuyền hộ vệ K3**: boong 1,8 / 16 = 0,11; lầu sau z −8,5…−4,2, khoảng 0,27 thân; nóc lầu 3,3 / 16 = 0,21, là chân cán cờ (`boats.js:482`); hai cột ở z +1 và +5,6 so với `mastW(1, 0,3)`, `mastW(5,6, 0,25)` (`boats.js:60-68`). Thuyền hộ vệ là sàn bị đánh chiếm nhiều nhất B20 (Cứ Điểm động, 12 quân và một đội trưởng mỗi chiếc; `battle-b20.js:287`, `director-b20.js:521-525`), nên nằm trong 10 mục thử của lượt 3.
+
+Lầu của mẫu dài hơn thì lính đứng boong (chiến thuyền từ z −6,0) sẽ đứng trong lầu; ngắn hơn thì tường vô hình chắn khoảng boong trống. Lệch quá khoảng 10% thì sửa câu, dựng lại lưới trước khi tô. Bộ vẽ hạm đội dùng một vật liệu đã vá shader nhìn xuyên (`boats.js:761-793`): vật liệu có texture của LOD0 phải vá cùng cách, không thì thân và buồm hết mờ khi chắn camera.
 
 | # | Mã | Tệp | Tên | Nhóm | Tam giác | Kích thước thật (nướng về số này) | Thay cho (code) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 64 | ENV_chien_thuyen_nguyen | `env_chien-thuyen-nguyen.glb` | Chiến thuyền Nguyên (ba cột buồm) | K | 2–3k | 24 × 7 m, boong 2,6 m, mạn 0,9 m, lầu sau dài 0,26 thân, nóc 5,2 m; cột 14,5 / 10 m trên boong, 6,5 m trên nóc lầu | `BUILD.junk`, LOD0 |
 | 65 | ENV_ky_ham_nguyen | `env_ky-ham-nguyen.glb` | Kỳ hạm Ô Mã Nhi | K | 6–8k | 36 × 9 m, boong 3 m, lầu sau dài 0,33 thân, nóc lầu 6 m, mái đình 11 m; cột 19 / 13 m trên boong | `BUILD.flagship`, LOD0 |
-| 66 | ENV_thuyen_ho_ve | `env_thuyen-ho-ve.glb` | Thuyền hộ vệ Nguyên | K | 1,5–2,5k | 16 × 4,5 m, boong 1,8 m, nóc lầu 3,3 m, cột 10 m | `BUILD.escort`, LOD0 |
+| 66 | ENV_thuyen_ho_ve | `env_thuyen-ho-ve.glb` | Thuyền hộ vệ Nguyên | K | 1,5–2,5k | 16 × 4,5 m, boong 1,8 m, lầu sau dài 0,27 thân, nóc lầu 3,3 m; cột 10 / 6,5 m trên boong | `BUILD.escort`, LOD0 |
 | 67 | ENV_thuyen_do_luong | `env_thuyen-do-luong.glb` | Thuyền dò luồng Nguyên | K | 0,8–1,2k | 9 × 2,2 m, boong 0,8 m, cột 5,4 m | `BUILD.scout`, LOD0 |
 | 68 | ENV_thuyen_chien_tran | `env_thuyen-chien-tran.glb` | Thuyền chiến nhẹ quân Trần | K | 2–3k | 12 × 2,6 m, boong 0,7 m | `BUILD.light`, LOD0 (cả "lead" ×1,35) |
 | 69 | ENV_thuyen_tong | `env_thuyen-tong.glb` | Thuyền quân Tống (Triệu Trung) | K | 1–2k | 9 × 2,8 m, cột 6 m ở z +0,8 | khối hộp `kesach.js` |
 | 70 | ENV_thuyen_song_nguyen | `env_thuyen-song-nguyen.glb` | Thuyền chiến Nguyên trên sông Hồng (B15) | K | 1–2k | 11 × 3,4 m, cột 8 m | 7 lưới riêng `world.js` |
-| 71 | ENV_thuyen_mui | `env_thuyen-mui.glb` | Thuyền nan mui ở bến | K | 0,5–1k | 4,2 × 1,2 m | `skiffGeo`, 8 lưới riêng |
+| 71 | ENV_thuyen_mui | `env_thuyen-mui.glb` | Thuyền mui ở bến | K | 0,5–1k | 4,2 × 1,2 m | `skiffGeo`, 8 lưới riêng |
 | 72 | ENV_thung_cau | `env_thung-cau.glb` | Thúng câu | K | 300–800 | Ø 1,8 m, sâu 0,5 m | trụ 8 cạnh `scenery.js`, `scenery-b20.js` |
 | 73 | ENV_long_thuyen | `env_long-thuyen.glb` | Long thuyền nhà Trần (tuỳ chọn) | K | 3–5k | dài 20 m | chưa có trong game |
 
@@ -1490,29 +1501,29 @@ Dùng ở B20: 16 chiến thuyền của hạm đội, cộng thuyền chỉ huy
 
 PROMPT (dán thẳng):
 ```text
-Yuan war junk, 13th century, 24 m long and 7 m wide, whole hull and keel visible. Weathered brown hull, dark indigo trim. Flat deck 2.6 m above the waterline, bulwark 0.9 m. High stern castle over the aft quarter, roof 5.2 m above the waterline, indigo-blue shields on the rails. Three masts: main amidships 14.5 m above the deck, raked 10 m foremast near the bow, 6.5 m mizzen on the castle, each with a faded indigo-blue batten lug sail. No flagpole. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan war junk, 13th century, 24 m long and 7 m wide, whole hull and keel visible. Weathered brown hull, dark indigo trim. Flat deck 2.6 m above the waterline, bulwark 0.9 m. High stern castle over the aft quarter, roof 5.2 m above the waterline, indigo-blue rail shields. Three masts: main amidships 14.5 m above the deck, raked 10 m foremast near the bow, 6.5 m mizzen on the castle, faded indigo-blue batten lug sails. Bare mast tops and stern rail. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 2–3k (code LOD0 1.276 tam giác; ngân sách LOD0 3.000, `TRI_BUDGET` ở `boats.js:99`). Gốc ở mớn nước giữa thân, mũi +Z. **Symmetry: tắt** (cột lái lệch mạn, buồm xoay chéo như code).
 
 ### K2 · ENV_ky_ham_nguyen · Kỳ hạm Ô Mã Nhi
 
-Dùng ở B20, một chiếc; pha 6 đánh boss ngay trên boong (`battle-b20.js:71`). Thay `BUILD.flagship` (`boats.js:395-460`). Boong nhiều tầng code giữ (`HULLS.flagship`, `boats.js:46-59`): mặt lầu x ±3,7, z −15,5…−6,05 ở cao 6,0; cầu thang giữa thân x ±1,1, từ z −6,05 cao 6,0 xuống z 2,0 cao 3,0; boong dưới cao 3,0; bốn cột đình ở x ±2,2, z −15 và −12,4; cán cờ soái ở `flagAt` [0; 15,5; −13,7]. Kích thước: dài 36 m, rộng 9 m, mớn 1,9 m, mái đình tới khoảng 11 m, cột chính 19 m trên boong. Hai cột buồm, chính ở z +4,5 và mũi ở z +12,8 (`boats.js:455-458`). Mặt tiền lầu cột son, cửa sổ viền vàng; đình bốn cột son, mái hai tầng ngói sẫm, đầu đao vàng; đuôi nheo chàm bốn góc lầu; trống trận son trên lầu; bảng đuôi son lồng chàm có đĩa vàng; tời và hai neo ở mũi. Lầu chiếm khoảng một phần ba thân phía đuôi (z −18…−6,05 trên thân 36 m), quyết chỗ chân cầu thang và mặt lầu đi được ở cao 6,0, nên prompt ghi `over the aft third` và cột chính 19 m; để đủ chỗ trong 600 ký tự, prompt bỏ cửa sổ, mắt thuyền, khiên treo mạn, tời, neo. 3d-ref ghi ba cột và "tháp chỉ huy giữa thân" là lệch với game. Hư cấu.
+Dùng ở B20, một chiếc; pha 6 đánh boss ngay trên boong (`battle-b20.js:71`). Thay `BUILD.flagship` (`boats.js:395-460`). Boong nhiều tầng code giữ (`HULLS.flagship`, `boats.js:46-59`): mặt lầu x ±3,7, z −15,5…−6,05 ở cao 6,0; cầu thang giữa thân x ±1,1, từ z −6,05 cao 6,0 xuống z 2,0 cao 3,0; boong dưới cao 3,0; bốn cột đình ở x ±2,2, z −15 và −12,4; cán cờ soái ở `flagAt` [0; 15,5; −13,7]. Kích thước: dài 36 m, rộng 9 m, mớn 1,9 m, mái đình tới khoảng 11 m, cột chính 19 m trên boong. Hai cột buồm, chính ở z +4,5 và mũi ở z +12,8 (`boats.js:455-458`). Mặt tiền lầu cột son, cửa sổ viền vàng; đình bốn cột son, mái hai tầng ngói sẫm, đầu đao vàng; đuôi nheo chàm bốn góc lầu; trống trận son trên lầu; bảng đuôi son lồng chàm có đĩa vàng; tời và hai neo ở mũi. Lầu chiếm khoảng một phần ba thân phía đuôi (z −18…−6,05 trên thân 36 m), quyết chỗ chân cầu thang và mặt lầu đi được ở cao 6,0, nên prompt ghi `over the aft third` và cột chính 19 m. Mặt lầu 6 m và nóc đình 11 m ghi rõ tính từ mớn nước như code (`6 m up` đứng ngay sau boong 3 m dễ đọc thành 9 m); cầu thang ghi dài, từ giữa thân; đình ghi ở cuối mặt lầu (số đo ở đầu mục K). Mái viết `gently curved eaves`, không `gold upturned corners`: đầu đao cong vút mạ vàng kéo về lầu Minh – Thanh (như L1), mái Tống – Nguyên cong nhẹ; đầu đao vàng nhỏ của code thêm lúc nướng nếu cần. Thân `weathered brown` như K1, K3 (gỗ thuyền Nguyên `#6b4c34` ở bảng 2.5; `dark brown` là màu nâu `#4a3524`). Để đủ chỗ trong 600 ký tự, prompt bỏ chữ thế kỷ (Yuan đã chỉ thời), cửa sổ, mắt thuyền, khiên treo mạn, tời, neo và trống trận; trống code dựng lại cạnh LOD0 như cán cờ nếu cần. 3d-ref ghi ba cột và "tháp chỉ huy giữa thân" là lệch với game. Hư cấu.
 
 PROMPT (dán thẳng):
 ```text
-Yuan flagship junk, 13th century, 36 m long and 9 m wide, whole hull and keel visible. Dark brown hull, vermilion trim, open deck 3 m above the waterline. Tall castle over the aft third with vermilion columns, flat top a terrace 6 m up, reached by a central stair; on it a pavilion of four vermilion columns, two-tier dark tile roof, gold upturned corners, red war drum. Two masts, main 19 m above the deck, faded indigo-blue batten lug sails. No flagpole. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan flagship junk, 36 m long, 9 m wide, whole hull and keel visible. Weathered brown hull, vermilion trim, deck 3 m above the waterline. Castle over the aft third, terrace 6 m above the waterline, reached by a long central stair from midships. At the rear of the terrace a four-column vermilion pavilion, two-tier dark tile roof, gently curved eaves, top 11 m above the waterline. Two masts, main 19 m above the deck, indigo batten sails. Bare mast tops. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 6–8k (code LOD0 1.756, LOD1 494; ngân sách kỳ hạm 8.000, `boats.js:99`). Texture 1024 như mọi mục môi trường; boss đánh trên boong nên nếu cần nét hơn thì thêm luật 2048 cho riêng mã này trong `meshy.mjs`. **Symmetry: tắt** (trống trận lệch mạn, buồm xoay).
+- **Kỹ thuật**: 6–8k (code LOD0 1.756, LOD1 494; ngân sách kỳ hạm 8.000, `boats.js:99`). Texture 1024 như mọi mục môi trường; boss đánh trên boong nên nếu cần nét hơn thì thêm luật 2048 cho riêng mã này trong `meshy.mjs`. **Symmetry: tắt** (buồm xoay chéo như code).
 
 ### K3 · ENV_thuyen_ho_ve · Thuyền hộ vệ Nguyên
 
-Dùng ở B20: 6 chiếc ở pha 2 và 8 chiếc đợt hai E7–E14 ở pha 4, tới 14 thân (`battle-b20.js:62-66`, `director-b20.js:23`). Thay `BUILD.escort` (`boats.js:462-483`). Boong code giữ (`HULLS.escort`, `boats.js:60-68`): mặt đi x ±1,85, z −4…6,8 ở cao 1,8; lầu lái x ±2,4, z −8,5…−4,2, nóc 3,3. Kích thước 16 × 4,5 m, mớn 0,9 m, mạn khoảng 0,65 m trên boong. Hai cột (`boats.js:477-480`): cột chính 10 m ở z +1, cột mũi chúi 6,5 m ở z +5,6; 3d-ref ghi một cột là lệch. Không dùng mẫu này cho thuyền quân Tống ở Kế Sách: màu chàm của Nguyên không hợp quân đồng minh, thuyền Tống là K6.
+Dùng ở B20: 6 chiếc ở pha 2 và 8 chiếc đợt hai E7–E14 ở pha 4, tới 14 thân (`battle-b20.js:62-66`, `director-b20.js:23`). Thay `BUILD.escort` (`boats.js:462-483`). Boong code giữ (`HULLS.escort`, `boats.js:60-68`): mặt đi x ±1,85, z −4…6,8 ở cao 1,8; lầu lái x ±2,4, z −8,5…−4,2, nóc 3,3. Kích thước 16 × 4,5 m, mớn 0,9 m, mạn khoảng 0,65 m trên boong. Hai cột (`boats.js:477-480`): cột chính 10 m ở z +1, cột mũi chúi 6,5 m ở z +5,6; 3d-ref ghi một cột là lệch. Thuyền hộ vệ là sàn bị lên đánh nhiều nhất B20: Cứ Điểm động chiếm được, mỗi chiếc 12 quân và một đội trưởng (`battle-b20.js:287`, `director-b20.js:521-525`). Vì thế prompt ghi như K1: lầu lái chiếm khoảng một phần tư thân phía đuôi (z −8,5…−4,2 trên thân 16 m, `over the aft quarter`), nóc 3,3 m **tính từ mớn nước** (1,5 m trên boong; cán cờ code đứng trên nóc này, `boats.js:482`), cột chính giữa thân 10 m trên boong, cột mũi 6,5 m gần mũi. Để đủ chỗ, prompt bỏ đuôi phẳng và mắt thuyền. Số đo sau lưới ở đầu mục K; mẫu nằm trong 10 mục thử của lượt 3 và nên giữ texture. Không dùng mẫu này cho thuyền quân Tống ở Kế Sách: màu chàm của Nguyên không hợp quân đồng minh, thuyền Tống là K6.
 
 PROMPT (dán thẳng):
 ```text
-Small Yuan dynasty escort junk, 13th century, 16 m long and 4.5 m wide, whole hull and keel visible. Flat transom bow and stern, weathered brown wood hull with dark indigo trim, open deck 1.8 m above the waterline, low stern cabin with a door and a flat roof 3.3 m up, stern rudder, round indigo-blue shields on the rails, painted bow eyes. Two masts, main 10 m and raked foremast, with faded indigo-blue batten lug sails. No flagpole. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Small Yuan escort junk, 13th century, 16 m long and 4.5 m wide, whole hull and keel visible. Weathered brown hull, dark indigo trim, open deck 1.8 m above the waterline, low stern cabin with a door over the aft quarter, flat roof 3.3 m above the waterline, stern rudder, round indigo-blue rail shields. Two masts: main amidships 10 m above the deck, raked 6.5 m foremast near the bow, faded indigo-blue batten lug sails. Bare mast tops and stern rail. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–2,5k (code LOD0 794, LOD1 268; ngân sách 3.000). **Symmetry: tắt** (buồm xoay chéo).
@@ -1523,7 +1534,7 @@ Dùng ở B20: thuyền tiên phong pha 1 và thuyền dò mốc cọc pha 2–3
 
 PROMPT (dán thẳng):
 ```text
-Narrow Yuan scout boat, 13th century, 9 m long and 2.2 m wide, open wooden hull with keel visible, deck 0.8 m above the waterline, weathered brown wood with a dark indigo rail stripe, two plank thwarts, one mast 5.4 m tall amidships with a small faded indigo-blue batten lug sail, two oars on each side, a long thin sounding pole lying along the deck. No cabin, no awning, no flagpole. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Narrow Yuan scout boat, 13th century, 9 m long and 2.2 m wide, open wooden hull with keel visible, deck 0.8 m above the waterline, weathered brown wood with a dark indigo rail stripe, two plank thwarts, one mast 5.4 m tall amidships with a small faded indigo-blue batten lug sail, two oars on each side, a long thin sounding pole lying along the deck, bare mast top. No cabin, no awning. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,8–1,2k (code LOD0 496, LOD1 170). **Symmetry: tắt** (buồm xoay, sào lệch).
@@ -1534,7 +1545,7 @@ Dùng ở B20: sàn của người chơi suốt pha 1 (tướng và 10 quân đ�
 
 PROMPT (dán thẳng):
 ```text
-Slender 13th-century Vietnamese Tran dynasty war boat, 12 m long and 2.6 m wide, whole hull and keel visible. Black lacquer lower hull, vermilion upper planks, thin gold band, cream bow eyes with red pupils. Bow and stern curve up into small gilded stylized dragon-head and dragon-tail finials. Five oars on each side with vermilion blades. Open flat plank deck 0.7 m above the waterline with five thwarts. No sail, no cabin, no awning, no flagpole. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Slender 13th-century Vietnamese Tran dynasty war boat, 12 m long and 2.6 m wide, whole hull and keel visible. Black lacquer lower hull, vermilion upper planks, thin gold band, cream bow eyes with red pupils. Bow and stern curve up into small gilded stylized dragon-head and dragon-tail finials. Five oars on each side with vermilion blades. Open flat plank deck 0.7 m above the waterline with five thwarts. No sail, no cabin, no awning. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 2–3k (code LOD0 602; ngân sách 3.000). Người chơi đứng trên thuyền này cả pha 1 nên nên giữ texture. **Symmetry: bật.**
@@ -1561,13 +1572,13 @@ Small Yuan river war boat, 13th century, 11 m long and 3.4 m wide, whole flat-bo
 
 - **Kỹ thuật**: 1–2k (code khoảng 50). **Symmetry: bật.**
 
-### K8 · ENV_thuyen_mui · Thuyền nan mui ở bến
+### K8 · ENV_thuyen_mui · Thuyền mui ở bến
 
-Dùng ở B15 và Tự do: 8 thuyền nhỏ, hai chiếc ở đầu mỗi bến gỗ bờ bắc, dập dềnh (`scenery.js:215-228`). Thay `skiffGeo`: thân hộp 1,2 × 0,45 × 4,2 m, mũi nhọn, mui tre đan nửa trụ Ø 1,8 m dài 1,6 m ở giữa thân, một sào chống. Hiện mỗi thuyền một lưới (8 lượt vẽ); dùng GLB thì gộp một InstancedMesh. Bản kiểm kê cũ ghi chỗ này là thúng tròn là sai: thúng là mục K9.
+Dùng ở B15 và Tự do: 8 thuyền nhỏ, hai chiếc ở đầu mỗi bến gỗ bờ bắc, dập dềnh (`scenery.js:215-228`). Thay `skiffGeo`: thân hộp 1,2 × 0,45 × 4,2 m, mũi nhọn, mui tre đan nửa trụ Ø 1,8 m dài 1,6 m ở giữa thân, một sào chống. Hiện mỗi thuyền một lưới (8 lượt vẽ); dùng GLB thì gộp một InstancedMesh. Bản kiểm kê cũ ghi chỗ này là thúng tròn là sai: thúng là mục K9. Chú thích code gọi là "thuyền nan" (`scenery.js:208`) nhưng vẽ thân gỗ nâu, nên mẫu là thuyền gỗ có mui và tên mục bỏ chữ "nan" (thuyền nan là thân tre đan, như thúng K9). Prompt không dùng `sampan` (chữ gốc Quảng Đông, kéo về thuyền Hoa Nam hiện đại).
 
 PROMPT (dán thẳng):
 ```text
-Small Vietnamese river sampan, 13th century, 4.2 m long and 1.2 m wide, shallow brown wooden hull with a pointed bow, an arched awning of woven bamboo over the middle, one long wooden pole resting along the side. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Small Vietnamese river boat, 13th century, 4.2 m long and 1.2 m wide, shallow brown wooden hull with a pointed bow, an arched awning of woven bamboo over the middle, one long wooden pole resting along the side. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k (code khoảng 70). **Symmetry: tắt** (sào nằm lệch một mạn, x 0,5 ở `scenery.js:218`; bật thì sào có thể nhân đôi hoặc mất).
@@ -1631,7 +1642,7 @@ Dùng ở B15 và Tự do: hai cổng A3, B3 trên tường tây Hàm Tử quan 
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese fortified gatehouse of a 13th-century river pass, 15.6 m wide and 10.2 m tall: two square towers 3.2 m wide and 7 m tall of tan rammed earth framed with brown wood posts, standing 9.2 m apart, joined on top by a heavy timber beam carrying a covered fighting gallery with wooden railings under a four-sided dark brown terracotta tile roof. The gateway between the towers is an empty opening with no doors. Isolated single object, no wall attached, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese fortified gatehouse of a 13th-century river pass, 15.6 m wide and 10.2 m tall: two square towers 3.2 m wide and 7 m tall of tan rammed earth framed with brown wood posts, standing 9.2 m apart, joined on top by a heavy timber beam carrying a covered fighting gallery with wooden railings under a four-sided dark brown terracotta tile roof. The gateway between the towers is an empty opening. Isolated single object, no wall attached, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 2,5–4k (code 44 mỗi nhà cổng, hai cổng). Vật đơn lẻ nhìn gần: phần tăng so với code phải bù ở chỗ khác trong B15 (đầu mục K). Nên giữ texture (pha 3 đánh sát cổng). **Symmetry: bật.**
@@ -1706,11 +1717,11 @@ Mongol felt tent (ger), 13th century, 4.8 m across and 3.2 m tall: round wall 1.
 
 ### L8 · ENV_leu_vuong_nguyen · Lều vuông quân Nguyên
 
-Dùng ở B15 và Tự do: 4 lều trong mỗi doanh trại A2, B2 (`world.js:234`); hiện nay là đúng hàm `tent()` hình chóp của quân ta, màu rơm và xám. Mẫu riêng để trại Nguyên khác trại Trần bằng dáng: lều vách đứng mái bốn mặt, vuông 3,2 m, cao 2,6 m (chiếm chỗ gần bằng chóp code: đáy chéo 4,4 m, cao 2,4 m). Doanh trại A2, B2 đổi chủ khi đánh (`battle-b15.js:50`, `battle-b15.js:53`; `setBaseOwner` chỉ đổi màu cờ, `world.js:348-353`), nên như tháp L5, lều không mang màu phe: vải xám, dải viền vải nhạt để bước nướng nhuộm được theo chủ trại nếu muốn (code nay dùng màu trung tính `PAL.vai`, `PAL.xam`). Lều vải kiểu quân Hán trong quân Nguyên (Hư cấu).
+Dùng ở B15 và Tự do: 4 lều trong mỗi doanh trại A2, B2 (`world.js:234`); hiện nay là đúng hàm `tent()` hình chóp của quân ta, màu rơm và xám. Mẫu riêng để trại Nguyên khác trại Trần bằng dáng: lều vách đứng mái bốn mặt, vuông 3,2 m, cao 2,6 m (chiếm chỗ gần bằng chóp code: đáy chéo 4,4 m, cao 2,4 m). Doanh trại A2, B2 đổi chủ khi đánh (`battle-b15.js:50`, `battle-b15.js:53`; `setBaseOwner` chỉ đổi màu cờ, `world.js:348-353`), nên như tháp L5, lều không mang màu phe: vải xám, dải viền vải nhạt để bước nướng nhuộm được theo chủ trại nếu muốn (code nay dùng màu trung tính `PAL.vai`, `PAL.xam`). Lều vải kiểu quân Hán trong quân Nguyên (Hư cấu). Vải viết `coarse grey hemp cloth` (vải gai), không `canvas`: chữ ấy đi cùng dây néo, cọc dễ ra lều cắm trại hiện đại (L9 cũng vậy).
 
 PROMPT (dán thẳng):
 ```text
-Yuan army square wall tent, 13th century: square base 3.2 m, upright canvas walls 1.3 m high under a four-sided sloping roof reaching 2.6 m, grey canvas with pale cloth hem bands, door flap tied open, guy ropes to wooden pegs. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan army square wall tent, 13th century: square base 3.2 m, upright walls 1.3 m high under a four-sided sloping roof reaching 2.6 m, coarse grey hemp cloth with pale cloth hem bands, door flap tied open, guy ropes to wooden pegs. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k (code 20 mỗi lều, 8 lều). Vật đơn lẻ: phần tăng so với code phải bù ở chỗ khác trong B15. **Symmetry: tắt** (cửa một bên).
@@ -1721,7 +1732,7 @@ Dùng ở Tự do, nhiệm vụ "Đánh úp trại": 3 lều lương là mục t
 
 PROMPT (dán thẳng):
 ```text
-Yuan army grain-store tent, 13th century, 5 m long, 4 m wide and 3 m tall: ridge tent of grey canvas on a brown wood frame, side flaps rolled up to show stacked hemp rice sacks and bound bundles of fodder inside. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan army grain-store tent, 13th century, 5 m long, 4 m wide and 3 m tall: ridge tent of coarse grey hemp cloth on a brown wood frame, side flaps rolled up to show stacked hemp rice sacks and bound bundles of fodder inside. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,8–1,5k. **Symmetry: tắt** (vạt cuốn).
@@ -1739,11 +1750,11 @@ Burnt-out tent frame: five charred black wooden poles 2.2 m long leaning in a ri
 
 ### L11 · ENV_leu_tran · Lều quân Trần
 
-Dùng ở B15 (5 lều bản doanh ta, `world.js:190-194`, đặt ở `world.js:221`), B20 (6 lều quanh bản doanh Hưng Đạo vương, `scenery-b20.js:286`, đặt ở `scenery-b20.js:505-509`) và Võ trường (16 lều, `scenery.js:1037-1041`: chóp r 3,2 cao 3,2 kéo 1,5 lần theo một chiều, tức đáy 4,5 × 6,8 m, cao 3,2 m, cột giữa 3,6 m, vạt cửa 1,2 × 1,6 m; bước nướng phóng mẫu 3,1 × 2,4 m theo X ×1,45, Z ×2,2, Y ×1,33). Thay chóp bốn mặt: đáy chéo 4,4 m (cạnh 3,1 m), cao 2,4 m, scale 0,8–1,4; vạt cửa then 0,6 × 1,2 m. Code nhuộm màu từng lều (son, son sẫm, vải, xám, `#c9b98f`), nên vải để màu rơm nhạt để nhuộm được.
+Dùng ở B15 (5 lều bản doanh ta, `world.js:190-194`, đặt ở `world.js:221`), B20 (6 lều quanh bản doanh Hưng Đạo vương, `scenery-b20.js:286`, đặt ở `scenery-b20.js:505-509`) và Võ trường (14 lều: vòng lặp 16 lần, bỏ lần rơi vào lối từ bốn cổng, `scenery.js:1041-1045`; dựng ở `scenery.js:1037-1040`: chóp bốn mặt r 3,2 cao 3,2, cột giữa 3,6 m, vạt cửa 1,2 × 1,6 m). `part()` co trước rồi mới xoay (`models.js:18-24`), nên `sz 1,5` kéo chóp theo trục đi qua một đỉnh, rồi mới xoay π/4: đáy là hình thoi đường chéo 6,4 × 9,6 m, cạnh 5,8 m, hộp bao 6,8 × 6,8 m, không phải chữ nhật (code có lẽ định làm chữ nhật, suy luận). Mẫu cố ý nướng thành chữ nhật 4,5 × 6,8 m: cùng diện tích (30,6 m² so với 30,7 m²), không ra quá đỉnh xa nhất của hình thoi (4,8 m từ tâm), va chạm tròn r 2,4 giữ nguyên; bước nướng phóng mẫu 3,1 × 2,4 m theo X ×1,45, Z ×2,2, Y ×1,33. Mái nhà làng (hộp bao 5,1 × 5,1 m) và mái cổng Hàm Tử trong code cũng lệch kiểu ấy; prompt L1, L13 không dựa vào chỗ lệch nên giữ nguyên. Thay chóp bốn mặt: đáy chéo 4,4 m (cạnh 3,1 m), cao 2,4 m, scale 0,8–1,4; vạt cửa then 0,6 × 1,2 m. Code nhuộm màu từng lều (son, son sẫm, vải, xám, `#c9b98f`), nên vải để màu rơm nhạt để nhuộm được.
 
 PROMPT (dán thẳng):
 ```text
-13th-century Vietnamese army field tent: square pyramid tent 3.1 m wide and 2.4 m tall, plain straw-colored cloth reaching the ground, black door flap at the front, short pole tip at the apex, guy ropes to wooden pegs at the corners. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+13th-century Vietnamese army field tent: square pyramid tent 3.1 m wide and 2.4 m tall, plain straw-colored cloth walls down to the base, black door flap at the front, short pole tip at the apex, guy ropes to wooden pegs at the corners. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 300–800 gửi Meshy; trong game ≤ 20 mỗi lều như code ở B15 và B20 (6 lều trong `b20-statics`), Võ trường ≤ 32 (thêm cột giữa); cao hơn thì phải có LOD hoặc bớt ở chỗ khác. **Symmetry: tắt** (cửa một bên).
@@ -1754,7 +1765,7 @@ Dùng ở B20: nhà bạt giữa bản doanh trên gò bờ bắc, quay ra cổn
 
 PROMPT (dán thẳng):
 ```text
-Open-sided field command pavilion of a 13th-century Vietnamese army camp: raised plank floor 9.4 by 7.2 m, eight round dark red lacquered columns 3.4 m tall, black lacquer beam frame, gabled roof of stretched vermilion cloth with a gold ridge band, ridge 5.5 m high, a straw-colored cloth screen along the back, a low vermilion table with a gold top and a black lacquer chair inside. No tiles. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Open-sided field command pavilion of a 13th-century Vietnamese army camp: raised plank floor 9.4 by 7.2 m, eight round dark red lacquered columns 3.4 m tall, black lacquer beam frame, gabled roof of stretched vermilion cloth with a gold ridge band, ridge 5.5 m high, a straw-colored cloth screen along the back, a low vermilion table with a gold top and a black lacquer chair inside. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 2–3k gửi Meshy; trong game ≤ 300 như code (trong `b20-statics`); cao hơn thì phải bớt ở chỗ khác trong B20 (đầu mục K). **Symmetry: bật.**
@@ -1805,18 +1816,18 @@ One 2.5 m bay of a wooden pier: deck 2.6 m wide of brown boards laid crosswise o
 
 ### L17 · ENV_cau_tau_dau · Đầu bến chữ T
 
-Dùng ở B20: đầu hai bến phục binh (`scenery-b20.js:425-434`): sàn ngang 6 m, dọc 4 m, cùng cao 2,3 m; 4 cọc buộc thuyền r 0,16 m cao quá sàn 0,9 m có cuộn dây; thang xuống lúc nước ròng ở mép ngoài. Cọc dài 4 m như L16.
+Dùng ở B20: đầu hai bến phục binh (`scenery-b20.js:425-434`): sàn ngang 6 m, dọc 4 m, cùng cao 2,3 m, ván chạy dọc theo bến; 4 cọc buộc thuyền r 0,16 m cao quá sàn 0,9 m có cuộn dây; thang xuống lúc nước ròng ở mép ngoài. Cọc dài 4 m như L16. Mặt đi được là hai hình chữ nhật, thân bến và đầu bến (`world-b20.js:289-293`); thân bến dựng từ các nhịp L16, nên mẫu này chỉ là tấm đầu bến chữ nhật, prompt không ghi `T-shaped pier head` (dễ ra cả chữ T, có thêm một đoạn thân trùng với nhịp L16).
 
 PROMPT (dán thẳng):
 ```text
-T-shaped wooden pier head 6 m wide and 4 m deep: deck of brown boards on round dark log piles 4 m long, four tall mooring posts at the corners with coils of dark rope, a wooden ladder hanging down the front edge. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Rectangular pier-head platform 6 m wide and 4 m deep, the end of a T-shaped jetty, no walkway attached: deck of brown boards laid front to back on round dark log piles 4 m long, four tall mooring posts at the corners with coils of dark rope, a wooden ladder hanging down the front edge. Isolated single object, no water, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,6–1k gửi Meshy; trong game ≤ 426 mỗi đầu bến như code (sàn, cọc, cuộn dây 276 cộng thang 150; hai đầu bến trong `b20-statics`). **Symmetry: bật.**
 
 ### L18 · ENV_ben_go · Bến gỗ nhỏ (B15)
 
-Dùng ở B15 và Tự do: 4 bến gỗ bờ bắc dài 8–12 m (`scenery.js:209-214`, gọi ở `scenery.js:222`). Thay ván 2,4 × 1,0 m dày 0,12 m cách 1,1 m, lệch nhẹ, hai màu xen; cọc r 0,12–0,14 m dài 3 m mỗi 3,3 m hai bên; sàn cao 0,95 m. Mẫu dài 10 m, bước nướng co giãn theo chiều dài. Thuyền nan đậu ở đầu bến là mục K8.
+Dùng ở B15 và Tự do: 4 bến gỗ bờ bắc dài 8–12 m (`scenery.js:209-214`, gọi ở `scenery.js:222`). Thay ván 2,4 × 1,0 m dày 0,12 m cách 1,1 m, lệch nhẹ, hai màu xen; cọc r 0,12–0,14 m dài 3 m mỗi 3,3 m hai bên; sàn cao 0,95 m. Mẫu dài 10 m, bước nướng co giãn theo chiều dài. Thuyền mui đậu ở đầu bến là mục K8.
 
 PROMPT (dán thẳng):
 ```text
@@ -1831,7 +1842,7 @@ Dùng ở Võ trường và màn hướng dẫn (cảnh đầu tiên người ch
 
 PROMPT (dán thẳng):
 ```text
-One 6 m wide bay of a wooden spectator stand at a 13th-century Vietnamese army training ground: three stepped plank tiers 1.6 m deep with tops at 0.5, 1.1 and 1.7 m, four round dark red columns 4.6 m tall, gabled roof of vermilion clay tiles with a gold ridge band, ridge 5.5 m, open front and sides. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+One 6 m wide bay of a 13th-century Vietnamese wooden spectator stand: three stepped plank tiers 1.6 m deep with tops at 0.5, 1.1 and 1.7 m, four round dark red columns 4.6 m tall, gabled roof of vermilion clay tiles with a gold ridge band, ridge 5.5 m, open front and sides. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,8–1,5k (code khoảng 180). **Symmetry: bật.**
@@ -1842,7 +1853,7 @@ Dùng ở Võ trường (`scenery.js:980-990`, va chạm r 4,2). Thay bệ gỗ 
 
 PROMPT (dán thẳng):
 ```text
-Reviewing dais of a 13th-century Vietnamese army training ground: solid brown timber platform 7 by 6 m and 1.8 m high with a dark brown plank top, a stair of five steps at the front left corner, dark red railings along both sides, a vermilion lacquered seat with a gold top near the back, a golden ceremonial parasol with a short fringe on a black pole above the seat, top 6.3 m, a low two-post drum stand on the right side. No drum. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+13th-century Vietnamese army reviewing dais: solid brown timber platform 7 by 6 m and 1.8 m high with a dark brown plank top, a stair of five steps at the front left corner, dark red railings along both sides, a vermilion lacquered seat with a gold top near the back, a golden ceremonial parasol with a short fringe on a black pole above the seat, top 6.3 m, an empty low two-post drum stand on the right side. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–2,5k (code khoảng 250). **Symmetry: tắt** (bậc ở góc trước trái, giá trống bên phải).
@@ -1864,7 +1875,7 @@ Chưa có trong game. Mốc mới cạnh cây đa đầu làng (làng ở `world
 
 PROMPT (dán thẳng):
 ```text
-Small 13th-century Vietnamese village shrine, 3 by 3 m and 3 m tall: low brick base with three steps, four dark wooden columns, hipped roof of dark clay tiles with gently upturned corners, a plain stone altar table inside. No statue, no text. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Small 13th-century Vietnamese village shrine, 3 by 3 m and 3 m tall: low brick base with three steps, four dark wooden columns, hipped roof of dark clay tiles with gently upturned corners, a bare plain stone altar table inside. No text. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,8–1,5k. **Symmetry: bật.**
@@ -1877,7 +1888,7 @@ Quy ước chung ở đầu mục K. Phần lớn đạo cụ trên hai làn đ�
 
 **Vật code dựng mà không có mục riêng** (dùng tệp có sẵn, hoặc giữ code):
 
-- Dấu chiến trận B15 (`scenery.js:238-253`, thêm ở `scenery.js:862-864`): giáo cắm đất (tới 290 cây) dùng `wpn_giao-dv`; bó tên cắm (tới 390 bó) dùng `prop_mui-ten`; khiên rơi (tới 190, code nhuộm theo phe) dùng `wpn_khien-tron-ng` hoặc `wpn_khien-nhat-dv`; cung rơi cạnh xác ngựa (`scenery.js:414-421`) dùng `wpn_cung-ng`, ống tên rơi là PROP_ong_ten. Bước nướng gộp vào đúng InstancedMesh đang có, giữ ngân sách gần code (giáo 24, bó tên 60, khiên 60 tam giác); không giảm được tới đó thì giữ code.
+- Dấu chiến trận B15 (`scenery.js:238-253`, thêm ở `scenery.js:862-864`): giáo cắm đất (tới 290 cây) dùng `wpn_giao-dv`; bó tên cắm (tới 390 bó) dùng `prop_mui-ten`; khiên rơi (tới 190) là một InstancedMesh lưới mặt khiên trắng, code nhuộm từng tấm bằng màu instance theo phe (nâu, lông, son sẫm, chàm; `scenery.js:244`, `scenery.js:251`, `scenery.js:864`), nên mỗi InstancedMesh một mẫu khiên (`wpn_khien-tron-ng`; muốn có `wpn_khien-nhat-dv` thì tách hai InstancedMesh theo phe) và bước nướng ghi màu đỉnh gần trắng (chỉ giữ sáng tối), không thì màu nhuộm nhân vào texture đã sẫm làm khiên gần đen; cung rơi cạnh xác ngựa (`scenery.js:414-421`) dùng `wpn_cung-ng`, ống tên rơi là PROP_ong_ten. Bước nướng gộp vào đúng InstancedMesh đang có, giữ ngân sách gần code (giáo 24, bó tên 60, khiên 60 tam giác); không giảm được tới đó thì giữ code.
 - Mũi giáo gãy trong hố ngập (`scenery.js:671-678`) và cờ đổ nằm đất (`scenery.js:837-849`): giữ code (vài chục tam giác, nằm sát đất).
 - Cờ rách trên cán 3,3 m mũi sắt ở lũy Nguyên (`scenery.js:473-478`) và cán cờ đuôi nheo quân Trần (`scenery.js:619-624`): cán dùng M34 co lại, vải cờ code vẽ.
 - Cọc hào thành (`scenery.js:643-651`: cọc đơn dài 1,5–1,95 m, ngả 0,55–0,85 rad về phía hào, mũi gỗ mới): dùng một cọc tách từ M6, hoặc giữ code; khúc M6 3 m ngả khoảng 20° không hợp.
@@ -1885,6 +1896,7 @@ Quy ước chung ở đầu mục K. Phần lớn đạo cụ trên hai làn đ�
 - Cán cờ ngoài M34: cờ nhiệm vụ Tự do và cờ sáu chữ H35 cắm khi dùng kỹ năng dùng M34 co và nhuộm (ghi ở M34); cán cờ B20 cũng vậy (bến `scenery-b20.js:443`, tháp `scenery-b20.js:468`, cờ lệnh có núm vàng `scenery-b20.js:499`, cờ "陳" `scenery-b20.js:503`); que cờ trên đỉnh hai cột cổng bản doanh (`scenery-b20.js:492`) giữ code cùng cổng.
 - Thủy chiến B20 (`naval.js:990-1012`): ván bắc giữa hai thuyền, xích sắt Liên Hoàn nối mạn, cầu lên thuyền mắc cạn có bậc và tay vịn: giữ code (mặt đi được của `naval.js`, hoặc thanh mảnh); đồ vỡ dưới chân cầu (hai thùng, một cột buồm gãy) dùng M15, M16 hoặc giữ code.
 - Mây của `addSky` (`scenery.js:899-943`) và `addSkyKit` (`kit.js:197-245`): giữ code (khoảng 240 tam giác mỗi đám, 12–14 đám mỗi cảnh, một InstancedMesh).
+- Lũy và ụ B15: phên đan kè xen khoang ván (`scenery.js:531-541`; M7 chỉ là tấm ván), cọc chân kè (`scenery.js:518-521`), cọc đổ và tấm ván bắc sụt dưới hào trước lũy (`scenery.js:626-641`), cục đất lở (`scenery.js:383`); vạch bắn Võ trường (`scenery.js:1033`): giữ code (vài chục tam giác mỗi chỗ, áp mặt đất hay mái lũy).
 
 
 | # | Mã | Tệp | Tên | Nhóm | Tam giác | Kích thước thật (nướng về số này) | Thay cho (code) |
@@ -1897,7 +1909,7 @@ Quy ước chung ở đầu mục K. Phần lớn đạo cụ trên hai làn đ�
 | 101 | ENV_coc_luy_nguyen | `env_coc-luy-nguyen.glb` | Hàng cọc lũy Nguyên (khúc 3 m) | M | 300–800 | 3 m, cọc 1,8–2,1 m | cọc đỉnh lũy `rampart` |
 | 102 | ENV_ke_van | `env_ke-van.glb` | Tấm kè ván mái lũy | M | 300–600 | 2 × 2,5 m | kè ván `rampart` |
 | 103 | ENV_coc_tre_tran | `env_coc-tre-tran.glb` | Hàng cọc tre ụ đất quân Trần (khúc 3 m) | M | 300–600 | 3 m, cọc 1,25–1,7 m | cọc tre `earthwork` |
-| 104 | ENV_ho_chong | `env_ho-chong.glb` | Cụm chông hố chông | M | 300–800 | Ø 3,2 m (0,66 × bán kính hố 2,3–2,6 m), chông 0,65–1,05 m | chông và phên hố `chong` |
+| 104 | ENV_ho_chong | `env_ho-chong.glb` | Cụm chông hố chông | M | 300–800 | Ø 3,2 m (0,66 × bán kính hố 2,3–2,6 m), chông 0,65–1,05 m | chông hố `chong` (hai tấm phên giữ code) |
 | 105 | ENV_rao_tre | `env_rao-tre.glb` | Rào ruộng tre chẻ (khúc 4 m) | M | 300–600 | 4 m, cột 1,2 m | `raoRuong` |
 | 106 | ENV_trong_tran | `env_trong-tran.glb` | Trống trận trên giá | M | 0,5–1k | Ø 1,9 m, mặt trống cao 2,1 m | `drumParts` |
 | 107 | ENV_trong_dong | `env_trong-dong.glb` | Trống đồng Đông Sơn | M | 0,5–1k | nướng về Ø 1,9 m như game (cao khoảng 1,4 m; trống thật Ø 0,8 m) | trống trên đài chỉ huy |
@@ -1933,7 +1945,7 @@ Dùng ở B20: khoảng 900 cọc ở ba bãi M1–M3, lộ ra khi nước ròng
 
 PROMPT (dán thẳng):
 ```text
-One hewn ironwood river stake, 2 m long and 25 cm thick, roughly round, the top cut by axe into a four-sided point, no iron cap, dark wet mud band at the bottom, bark patches, pale fresh wood at the point. Standing upright. Isolated single object, no water. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+One hewn ironwood river stake, 2 m long and 25 cm thick, roughly round, the top cut by axe into a bare wooden four-sided point, dark wet mud band at the bottom, bark patches, pale fresh wood at the point. Standing upright. Isolated single object, no water. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 25 mỗi cọc như code (810 cọc nguyên, cộng 90 cọc gãy M2); cao hơn chỉ khi có LOD gần, xa (đầu mục K), không thì giữ code. Bước nướng đưa mẫu về đúng khối đơn vị của `stakeGeo` (cao 1, bán kính 1, gốc ở chân), không về 2 m × 0,25 m: instance nhân thẳng (r·2,4; L; r·2,4) (`scenery-b20.js:232-235`, `scenery-b20.js:370`), nướng về số thật thì cọc ra dài 3,3–4,5 m, mảnh 0,03–0,11 m. **Symmetry: tắt.**
@@ -2017,14 +2029,14 @@ Row of sharpened bamboo stakes 3 m long: six green-yellow bamboo poles 1.3 to 1.
 
 ### M9 · ENV_ho_chong · Cụm chông hố chông
 
-Dùng ở B15 và Tự do: bốn hố chông trên làn đánh, bán kính 2,4 / 2,6 / 2,3 / 2,4 m (`terrain-b15.js:40-43`; dựng ở `scenery.js:681-693`): chông tre cao 0,65–1,05 m, round(8 × bán kính) cây (18–21 cây) rải trong bán kính 0,66 lần bán kính hố, tức vùng chông rộng 3,0–3,4 m; vài cây gãy; tấm phên che hố bị giẫm sụt rộng 1,3 m, dài khoảng 2 m (từ 1,12 tới 0,3 lần bán kính), vắt một mép. Lòng hố là địa hình do code dựng; mẫu chỉ có chông và tấm phên, Ø 3,2 m. Bước nướng co XZ theo từng hố (1,32 × bán kính), giữ Y để chông vẫn cao như code.
+Dùng ở B15 và Tự do: bốn hố chông trên làn đánh, bán kính 2,4 / 2,6 / 2,3 / 2,4 m (`terrain-b15.js:40-43`; dựng ở `scenery.js:681-693`): chông tre cao 0,65–1,05 m, round(8 × bán kính) cây (18–21 cây) rải trong bán kính 0,66 lần bán kính hố, tức vùng chông rộng 3,0–3,4 m; vài cây gãy. Hai tấm phên che hố (`scenery.js:688-692`): tấm bị giẫm sụt rộng 1,3 m, dài khoảng 2 m, một mép vắt trên miệng hố (1,12 lần bán kính, tức 2,6–2,9 m từ tâm), mép kia chúi xuống tì lên đầu chông (0,3 lần bán kính, cao 0,62 m); tấm thứ hai 0,9 × 1,1 m nằm phẳng ngoài miệng hố (1,25 lần bán kính). Cả hai ra ngoài vùng chông Ø 3,2 m, nên vẽ trong mẫu thì sau khi co về vùng chông tấm phên treo trên hố, không tì lên miệng: hai tấm phên giữ code, mẫu chỉ có chông, Ø 3,2 m. Lòng hố là địa hình do code dựng. Bước nướng co XZ theo từng hố (1,32 × bán kính), giữ Y để chông vẫn cao như code.
 
 PROMPT (dán thẳng):
 ```text
-Bamboo spike trap: about twenty sharpened pale bamboo spikes 0.7 to 1 m tall standing in a round cluster 3.2 m wide, a few broken short, and a sagging woven bamboo cover mat 1.3 m wide and 2 m long propped across one side. Isolated single object, no hole, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Bamboo spike trap: about twenty sharpened pale bamboo spikes 0.7 to 1 m tall standing in a loose round cluster 3.2 m wide, leaning slightly at different angles, a few broken short. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 300–800 gửi Meshy; trong game ≤ khoảng 260 mỗi hố như code (chông 12 tam giác mỗi cây cộng hai tấm phên). **Symmetry: tắt.**
+- **Kỹ thuật**: 300–800 gửi Meshy; trong game ≤ 250 mỗi hố như chông code (12 tam giác mỗi cây, 18–21 cây); hai tấm phên giữ code. **Symmetry: tắt.**
 
 ### M10 · ENV_rao_tre · Rào ruộng tre chẻ (khúc 4 m)
 
@@ -2039,22 +2051,22 @@ Field fence section 4 m long: three split-bamboo posts 1.2 m tall, two horizonta
 
 ### M11 · ENV_trong_tran · Trống trận trên giá
 
-Dùng ở B20: trống trận trong bản doanh (`scenery-b20.js:298-302`, đặt ở `scenery-b20.js:512`). Trống báo trên hai tháp canh là thùng nằm ngang không giá (`scenery-b20.js:467`), đã gồm trong mẫu tháp L6, không dùng mẫu này. Thay thân trống gỗ nâu `#6a5a3a` Ø 1,9 m dày 0,95 m dựng đứng, mặt da `#8f7a4a` quay lên, núm vàng giữa mặt ở cao 2,1 m, trên giá hai trụ 1,1 m và đòn ngang 1,9 m ở cao 1,05 m: giá cao khoảng nửa tổng chiều cao. Thân nâu, không son (3d-ref ghi son là lệch với game). Code không có dùi trống nên prompt không xin.
+Dùng ở B20: trống trận trong bản doanh (`scenery-b20.js:298-302`, đặt ở `scenery-b20.js:512`). Trống báo trên hai tháp canh là thùng nằm ngang không giá (`scenery-b20.js:467`), đã gồm trong mẫu tháp L6, không dùng mẫu này. Thay thân trống gỗ nâu `#6a5a3a` Ø 1,9 m dày 0,95 m dựng đứng, mặt da `#8f7a4a` quay lên, núm vàng giữa mặt ở cao 2,1 m, trên giá hai trụ 1,1 m và đòn ngang 1,9 m ở cao 1,05 m: giá cao khoảng nửa tổng chiều cao. Thân nâu, không son (3d-ref ghi son là lệch với game). Code không có dùi trống nên prompt không xin. Đinh viết `dark bronze studs` như bảng 2.5 và H36, không `brass` (đồng thau vàng bóng, kéo về đồ đời sau).
 
 PROMPT (dán thẳng):
 ```text
-Large 13th-century Vietnamese war drum on a stand: barrel drum 1.9 m across and 95 cm deep standing upright with its hide head facing up, brown wood body with rows of brass studs, a gold boss in the centre of the head 2.1 m above the ground, set on a 1.1 m tall two-post wooden stand with a crossbar. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Large 13th-century Vietnamese war drum on a stand: barrel drum 1.9 m across and 95 cm deep standing upright with its hide head facing up, brown wood body with rows of dark bronze studs, a gold boss in the centre of the head 2.1 m above the base, set on a 1.1 m tall two-post wooden stand with a crossbar. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k gửi Meshy; trong game ≤ 152 như code (trong `b20-statics`). **Symmetry: bật.**
 
 ### M12 · ENV_trong_dong · Trống đồng Đông Sơn
 
-Dùng ở Võ trường: trống đồng trên giá cạnh ghế đài chỉ huy (`scenery.js:987-988`). Code vẽ đúng khối của trống trận: Ø 1,9 m, cao 0,9 m, mặt có núm vàng. Trống đồng Đông Sơn thật (loại Heger I như trống Ngọc Lũ) rộng khoảng 0,8 m, cao 0,6 m; prompt theo tỉ lệ trống thật; bước nướng phóng đều tới Ø 1,9 m như khối code, giữ cỡ nhìn từ xa của game và vừa giá trống hai trụ của đài L20 (`scenery.js:988`). Không thay khít khối code: trống code cao 0,9 m, mẫu phóng đều cao 1,43 m, là chủ ý; ép Y về 0,9 m thì trống bẹt mất dáng Đông Sơn. Mặt trống vì thế cao hơn code khoảng 0,5 m; chỗ ấy không có va chạm, không ai đứng. Mặt trống có ngôi sao giữa và các vành hoa văn hình học; bỏ cảnh người, chim cho gọn ở cỡ game. Đặt trống trên đài là Hư cấu.
+Dùng ở Võ trường: trống đồng trên giá cạnh ghế đài chỉ huy (`scenery.js:987-988`). Code vẽ đúng khối của trống trận: Ø 1,9 m, cao 0,9 m, mặt có núm vàng. Trống đồng Đông Sơn thật (loại Heger I như trống Ngọc Lũ) rộng khoảng 0,8 m, cao 0,6 m; prompt theo tỉ lệ trống thật; bước nướng phóng đều tới Ø 1,9 m như khối code, giữ cỡ nhìn từ xa của game và vừa giá trống hai trụ của đài L20 (`scenery.js:988`). Không thay khít khối code: trống code cao 0,9 m, mẫu phóng đều cao 1,43 m, là chủ ý; ép Y về 0,9 m thì trống bẹt mất dáng Đông Sơn. Mặt trống vì thế cao hơn code khoảng 0,5 m; chỗ ấy không có va chạm, không ai đứng. Mặt trống có ngôi sao 14 cánh ở giữa như trống Ngọc Lũ và các vành hoa văn hình học; bỏ cảnh người, chim cho gọn ở cỡ game. Đặt trống trên đài là Hư cấu.
 
 PROMPT (dán thẳng):
 ```text
-Dong Son bronze drum, about 80 cm across and 60 cm tall, dark green-brown bronze, flat top with a raised twelve-pointed star in the centre and concentric bands of simple geometric rings, slightly bulging upper body, straight waist, flared foot, four small side handles. Isolated single object, no stand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Dong Son bronze drum, about 80 cm across and 60 cm tall, dark green-brown bronze, flat top with a raised fourteen-pointed star in the centre and concentric bands of simple geometric rings, slightly bulging upper body, straight waist, flared foot, four small side handles. Isolated single object, no stand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k. **Symmetry: bật.**
@@ -2131,7 +2143,7 @@ Dùng ở B15 và Tự do: 4 xe hỏng trên bãi (`scenery.js:254-263`, nhánh 
 
 PROMPT (dán thẳng):
 ```text
-Broken two-wheeled wooden supply cart tilted about 15 degrees toward one side: plank bed 1.6 by 2.8 m with low side boards, one spoked wheel on the axle, the other wheel off and lying flat on the ground beside the low side, bare axle end resting low, intact central draw pole, no cargo. Isolated single object, no animal, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Broken two-wheeled wooden supply cart tilted about 15 degrees toward one side: plank bed 1.6 by 2.8 m with low side boards, one spoked wheel on the axle, the other wheel lying flat beside the low side, bare axle end resting low, intact central draw pole, no cargo. Isolated single object, no ground, no animal, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,6–1,2k. **Symmetry: tắt.**
@@ -2175,7 +2187,7 @@ Dùng ở Võ trường: 5 bia ở trường bắn (`scenery.js:1023-1031`): hai
 
 PROMPT (dán thẳng):
 ```text
-Archery target, 13th century: round woven straw butt 2 m across painted with cream and vermilion rings, held upright between two wooden posts, top 2.8 m above the ground. No arrows. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Archery target, 13th century: round woven straw butt 2 m across painted with cream and vermilion rings, held upright between two wooden posts, top 2.8 m above the post feet. No arrows. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 300–800. **Symmetry: bật.**
@@ -2208,7 +2220,7 @@ Dùng ở B15 và Tự do: 16 xác ngựa trên làn đánh, quạ đậu quanh 
 
 PROMPT (dán thẳng):
 ```text
-Dead horse lying still on its side, about 4 m from nose to tail tip, legs stretched out stiff, head and neck flat on the ground, eyes closed, bay-brown coat, dark brown mane and tail, black hooves, a simple wooden saddle on a plain light grey saddle cloth. Clean coat, no blood, no wounds, no arrows. Isolated single object, no rider. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Dead horse lying still on its side, about 4 m from nose to tail tip, legs stretched out stiff, head and neck resting low, level with the body, eyes closed, bay-brown coat, dark brown mane and tail, black hooves, a simple wooden saddle on a plain light grey saddle cloth. Clean coat, no blood, no wounds, no arrows. Isolated single object, no ground, no rider. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k. **Symmetry: tắt.**
@@ -2338,7 +2350,7 @@ Bundle of three arrows standing upright, 1.2 m tall: brown wooden shafts with sm
 
 ## N. Cây, đá, núi (môi trường)
 
-Quy ước chung ở đầu mục K. Cây, tre, đá, cột đá vôi đều là InstancedMesh co giãn và nhuộm màu từng cây (`tintTrees`, `kit.js:103-114`), phần lớn đổ bóng: mẫu phải nướng về ngân sách ghi ở từng mục và để màu lá vừa phải để nhuộm được. Lá dạng khối đặc, không dùng tấm lá trong suốt (alpha) để khỏi vẽ chồng. Cỏ, hoa dại, lúa (hàng nghìn khóm 9–12 tam giác) giữ code.
+Quy ước chung ở đầu mục K. Cây, tre, đá, cột đá vôi đều là InstancedMesh co giãn và nhuộm màu từng cây (`tintTrees`, `kit.js:103-114`), phần lớn đổ bóng: mẫu phải nướng về ngân sách ghi ở từng mục và để màu lá vừa phải để nhuộm được. Đá (N10–N12) và lau B20 (N9) khác: lưới code màu trắng, màu từng bản là màu instance (`ROCK` ở `scenery.js:169-171` và `scenery-b20.js:358-361`; lau HSL ở `kit.js:97`, `scenery-b20.js:355-357`), nên bước nướng ghi màu đỉnh gần trắng (chỉ giữ sáng tối, vệt rêu nhạt); để màu texture thì màu instance nhân vào làm đá, lau tối đi khoảng một nửa. Cách khác: đổi các InstancedMesh ấy sang màu instance trắng và giữ màu của mẫu. Lá dạng khối đặc, không dùng tấm lá trong suốt (alpha) để khỏi vẽ chồng. Cỏ, hoa dại, lúa (hàng nghìn khóm 9–12 tam giác) giữ code.
 
 | # | Mã | Tệp | Tên | Nhóm | Tam giác | Kích thước thật (nướng về số này) | Thay cho (code) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -2457,7 +2469,7 @@ PROMPT (dán thẳng):
 Clump of tall river reeds 1.7 m tall: about a dozen straight olive stems with long narrow leaves, a few bent, pale feathery plumes at the tips. Simple solid blades. Isolated single object, no water. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 12 mỗi khóm ở B20 (800 khóm) và ≤ 24 ở B15 (khoảng 450 khóm) như code. Meshy khó giữ dáng ở số ấy, nên thực tế giữ code, trừ khi làm LOD gần, xa. **Symmetry: tắt.**
+- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 12 mỗi khóm ở B20 (800 khóm) và ≤ 24 ở B15 (khoảng 450 khóm) như code. Meshy khó giữ dáng ở số ấy, nên thực tế giữ code, trừ khi làm LOD gần, xa. Ở B20 bước nướng ghi màu đỉnh gần trắng, màu từng khóm do HSL của code (đầu mục N); lưới lau B15 có màu sẵn (`world.js:336`). **Symmetry: tắt.**
 
 ### N10 · ENV_da_a · Tảng đá tròn
 
@@ -2468,7 +2480,7 @@ PROMPT (dán thẳng):
 Weathered grey-brown river boulder about 1 m wide and 65 cm tall, rounded and slightly flattened, a few cracks and small moss patches. Isolated single object. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 mỗi tảng ở B20 (130 tảng) và ≤ 36 ở B15 (260 tảng) như code; cao hơn chỉ khi có LOD gần, xa. **Symmetry: tắt.**
+- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 mỗi tảng ở B20 (130 tảng) và ≤ 36 ở B15 (260 tảng) như code; cao hơn chỉ khi có LOD gần, xa. Màu đỉnh gần trắng, màu do `ROCK` của code nhân vào (đầu mục N). **Symmetry: tắt.**
 
 ### N11 · ENV_da_b · Tảng đá góc cạnh
 
@@ -2479,7 +2491,7 @@ PROMPT (dán thẳng):
 Angular grey limestone rock about 1 m wide and 80 cm tall with sharp broken faces and edges, light weathering, a little moss on top. Isolated single object. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 (B20) và ≤ 36 (B15) như N10. **Symmetry: tắt.**
+- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 (B20) và ≤ 36 (B15) như N10; màu đỉnh gần trắng như N10. **Symmetry: tắt.**
 
 ### N12 · ENV_da_c · Phiến đá dẹt
 
@@ -2490,7 +2502,7 @@ PROMPT (dán thẳng):
 Flat slab of grey-brown stone about 1.2 m long and 40 cm thick with tilted layers, rounded worn edges and lichen spots. Isolated single object. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
-- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 (B20) và ≤ 36 (B15) như N10. **Symmetry: tắt.**
+- **Kỹ thuật**: 300–600 gửi Meshy; trong game ≤ 20 (B20) và ≤ 36 (B15) như N10; màu đỉnh gần trắng như N10. **Symmetry: tắt.**
 
 ### N13 · ENV_go_da · Gò đá
 
@@ -2616,8 +2628,8 @@ Mẫu đã tạo ở đợt đầu mà lệch prompt, soát bằng ảnh `design
 - **Đối xứng.** Áo cân hai bên thì bật (mục 0.2), để hai tay ra cùng một góc; 40 mẫu đầu, trừ mẫu có đồ lệch, để Auto, và có mẫu lệch trái phải rõ (H35 cẳng tay 0,26 và 0,15). Đồ chỉ có ở một bên (hộp tên DV_NO, bao tay và ống tên CV_cung, lưỡi đại đao một cạnh) thì tắt.
 - **Bảng `FIX` của mã gốc không theo sang mã `_v2`** (`apiPrompt` trong `meshy.mjs`), nên câu đã sửa và dựng ra đúng (mũ Mông Cổ, giáp vảy của OFF_doitruong) được viết thẳng vào prompt. Câu chặn vũ khí là bản chung: `Unarmed: no sword, scabbard or weapon on the body.`, thêm `No helmet.` khi prompt không có chữ helmet, hat, cap, rồi `No horns, no cape.`. Độ dài API in bởi `list` đã gồm câu này.
 - **Đỉnh mũ.** Mỗi mũ chỉ xin một chi tiết cứng, có số và chỗ (`one short … cone on the top centre`), đúng như chóp nón của mũ code (`mutuong`, `mulong`, `models.js:220-222`). Tua, chùm lông, dải vải là phần mềm Claude dựng bằng code (mục 0.3; tua mũ code đã có, `models.js:78`); chữ `spike`, `tassel`, `plume` và hai chi tiết chồng trên đỉnh là đúng kiểu đã mọc sừng, mào ở H33, X19, OFF_photuong. Mũ lông tả là trụ thẳng (`straight-sided cylindrical`), không ví với cái trống: `drum` dễ ra mặt da căng, đinh tán (suy luận).
-- **Nón lá.** Meshy chưa dựng được nón lá vành rộng lần nào (6/6 lần, cả meshy-5 lẫn `latest`). Người lính Tự do bậc 0–1 và ba cận vệ đội nón vì thế tạo **đầu trần buộc khăn đỏ** (câu của H35, đã dựng đúng); nón là tệp PROP_non_la (mục H5) gắn vào khớp đầu bằng code. Lính đám đông DV_GIAO, DV_NO vẫn thử nón trong prompt, tả bằng hình và cỡ của code; hỏng lần nữa thì làm như trên: thân đầu trần, nón gộp vào bộ lính khi nướng.
-- **Model.** DV_DAO bản meshy-5 bỏ qua câu tả đầu, đại đao bản meshy-5 từng mất lưỡi, nên chạy cả mục này bằng `latest` (`--model-linh latest --model-vk latest`, mục 0.8).
+- **Nón lá.** Meshy chưa dựng được nón lá vành rộng lần nào (6/6 lần, cả meshy-5 lẫn `latest`). Người lính Tự do bậc 0–1 và ba cận vệ đội nón vì thế tạo **đầu trần buộc khăn đỏ** (câu của H35, đã dựng đúng); nón là tệp PROP_non_la (mục H5) gắn vào khớp đầu bằng code. Lính đám đông DV_GIAO, DV_NO cũng vậy: thử lần thứ bảy, thứ tám bằng `latest` (30 credit mỗi mẫu) là phí, nên thân **đầu trần quấn khăn then**, đúng vòng khăn dưới nón code (`soldiers.js:242`, `soldiers.js:252`), và nón gộp vào bộ lính khi nướng (`design/tools/bake/kit.mjs`): PROP_non_la (lượt 1) co về Ø 64 × 15 cm (DV_GIAO) và Ø 52 × 24 cm (DV_NO), nhuộm rơm `#b9a37a`; khi có ENV_non_tre_roi (M28, đúng nón `helmDv` có vòng đai then, lượt 4) thì thay vào.
+- **Model.** DV_DAO bản meshy-5 bỏ qua câu tả đầu, nên người chạy bằng `latest` (mặc định). Đại đao thì ngược lại (ghi chú FIX `WPN_dadao` trong `meshy.mjs`): lần đầu meshy-5 dựng thành kiếm; lần hai `latest`, câu còn tả cán trước, chỉ ra cây gậy; lần ba meshy-5 với câu đưa lưỡi lên đầu ra được lưỡi, tuy nằm cạnh cán (bản đang dùng). Vì thế WPN_dadao_v2 tả lưỡi trước và dựng lưới bằng meshy-5 trước (5 credit), hỏng mới dựng lại bằng `latest` (mục 0.8, lượt 2).
 
 | # | Mã | Tệp | Tên | Nhóm | Tam giác | Lệch ở bản cũ | Bản làm lại |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -2626,8 +2638,8 @@ Mẫu đã tạo ở đợt đầu mà lệch prompt, soát bằng ảnh `design
 | 171 | OFF_photuong_v2 | `char_OFF_photuong_v2.glb` | Phó tướng Nguyên (làm lại) | B | 10–15k | Mào tua tủa như vương miện; cẳng tay trái 0,03 | Mũ lông trụ thẳng, một chóp xám bạc ngắn ở chính giữa |
 | 172 | X20_v2 | `char_X20_o-ma-nhi_v2.glb` | Ô Mã Nhi (làm lại) | B | 10–20k | Không mũ lông, không chóp vàng; dáng áo bào, giáp mỏng; tay gần ngang | Mũ lông trụ thẳng, một chóp vàng ngắn (chùm lông đỏ code dựng), giáp nặng từ vai tới gối |
 | 173 | DV_DAO_v2 | `unit_DV_DAO_v2.glb` | Đao khiên (làm lại) | C | 1,5–3k | Đội nón thay khăn đỏ; bao đao hông trái | Đầu trần, khăn son buộc trán, thắt lưng trơn |
-| 174 | DV_GIAO_v2 | `unit_DV_GIAO_v2.glb` | Giáo binh (làm lại) | C | 1,5–3k | Nón chóp nhỏ nhọn, giống mũ nhọn phe Nguyên | Nón lá Ø 64 cm cao 15 cm, vành rộng hơn vai |
-| 175 | DV_NO_v2 | `unit_DV_NO_v2.glb` | Nỏ thủ (làm lại) | C | 1,5–3k | Mũ lưỡi trai thay nón | Nón lá Ø 52 cm cao 24 cm, vành rộng hơn vai |
+| 174 | DV_GIAO_v2 | `unit_DV_GIAO_v2.glb` | Giáo binh (làm lại) | C | 1,5–3k | Nón chóp nhỏ nhọn, giống mũ nhọn phe Nguyên | Đầu trần khăn then; nón (Ø 64 cm, cao 15 cm) gộp vào bộ lính khi nướng |
+| 175 | DV_NO_v2 | `unit_DV_NO_v2.glb` | Nỏ thủ (làm lại) | C | 1,5–3k | Mũ lưỡi trai thay nón | Đầu trần khăn then; nón (Ø 52 cm, cao 24 cm) gộp vào bộ lính khi nướng |
 | 176 | LINH_r01_v2 | `char_LINH_r01_v2.glb` | Người lính Tự do bậc 0–1 (làm lại) | E | 10–20k | Mũ trụ đỏ thay nón lá; tay gần ngang | Đầu trần khăn đỏ; nón là PROP_non_la gắn bằng code |
 | 177 | CV_giao_v2 | `char_CV_giao_v2.glb` | Cận vệ Giáo thủ (làm lại) | F | 4–8k | Mũ trụ đỏ; ria và chòm râu dù prompt ghi không râu | Đầu trần khăn đỏ, mặt trẻ cạo nhẵn; nón PROP_non_la |
 | 178 | CV_cung_v2 | `char_CV_cung_v2.glb` | Cận vệ Cung thủ (làm lại) | F | 4–8k | Mũ trụ đỏ; cẳng tay trái rig 0,11 | Đầu trần khăn đỏ; nón PROP_non_la |
@@ -2693,22 +2705,22 @@ Vietnamese Tran dynasty infantryman, 13th century, young beardless face. Bare he
 
 ### P6 · DV_GIAO_v2 · Giáo binh, làm lại nón
 
-Làm lại C1. Bản cũ: nón chóp nhỏ nhọn, nhìn như mũ trụ nhọn của phe Nguyên, trái quy ước hai phe khác cả dáng mũ (`soldiers.js:196-197`, `models.js:3-5`). Code: nón rơm chóp thấp Ø 0,64 m, cao 0,15 m, màu rơm `#b9a37a`, vòng khăn then dưới nón (`soldiers.js:242`). Prompt ghi đúng cỡ ấy và `brim wider than the shoulders` thay cho `low wide conical`. Vành mỏng có thể vỡ khi Meshy dựng lại lưới 3k tam giác; hỏng thì làm thân đầu trần và gộp PROP_non_la vào bộ lính khi nướng (mục H5).
+Làm lại C1. Bản cũ: nón chóp nhỏ nhọn, nhìn như mũ trụ nhọn của phe Nguyên, trái quy ước hai phe khác cả dáng mũ (`soldiers.js:196-197`, `models.js:3-5`). Code: nón rơm chóp thấp Ø 0,64 m, cao 0,15 m, màu rơm `#b9a37a`, vòng khăn then dưới nón (`soldiers.js:242`). Meshy chưa dựng được nón vành rộng lần nào (6/6, đầu mục P), nên thân **đầu trần**, búi tóc, khăn then quấn trán đúng vòng khăn dưới nón code; nón gộp vào bộ lính khi nướng (PROP_non_la co về 64 × 15 cm, hoặc ENV_non_tre_roi khi có; mục H5, M28).
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese Tran dynasty infantryman, 13th century, young beardless face. Straw rice hat (non la): a flat cone 64 cm across and 15 cm tall, brim wider than the shoulders. Vermilion tunic, black lacquer chest plate, narrow vermilion apron, wide back flap, black trousers, straw leg wraps, black shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese Tran dynasty infantryman, 13th century, young beardless face. Bare head: topknot under a black cloth band round the forehead. Vermilion tunic, black lacquer chest plate, narrow vermilion apron, wide back flap, black trousers, straw leg wraps, black shoes. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: bật.** Đi kèm như C1.
 
 ### P7 · DV_NO_v2 · Nỏ thủ, làm lại nón
 
-Làm lại C3. Bản cũ: mũ lưỡi trai thay cho nón. Code: nón rơm Ø 0,52 m, cao 0,24 m (chóp cao hơn, vành hẹp hơn nón giáo binh nhưng vẫn rộng hơn vai), vòng then dưới nón (`soldiers.js:252`); hộp tên nâu lệch trái sau lưng (`soldiers.js:253`). Chữ `narrow-brimmed` và `padded vest` của bản cũ bị hiểu thành mũ lưỡi trai (suy luận); bản này ghi cỡ nón và viết `cloth armor vest`.
+Làm lại C3. Bản cũ: mũ lưỡi trai thay cho nón. Code: nón rơm Ø 0,52 m, cao 0,24 m (chóp cao hơn, vành hẹp hơn nón giáo binh nhưng vẫn rộng hơn vai), vòng then dưới nón (`soldiers.js:252`); hộp tên nâu lệch trái sau lưng (`soldiers.js:253`). Chữ `narrow-brimmed` và `padded vest` của bản cũ bị hiểu thành mũ lưỡi trai (suy luận); bản này viết `cloth armor vest` và, như P6, tạo đầu trần khăn then; nón gộp vào bộ lính khi nướng (PROP_non_la co về 52 × 24 cm).
 
 PROMPT (dán thẳng):
 ```text
-Vietnamese Tran dynasty foot soldier, 13th century, beardless face. Straw rice hat (non la): a cone 52 cm across and 24 cm tall, brim wider than the shoulders. Vermilion tunic, straw-colored cloth armor vest, apron and back flap, black trousers and shoes, leg wraps, brown wooden box on the back. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Vietnamese Tran dynasty foot soldier, 13th century, beardless face. Bare head: topknot under a black cloth band round the forehead. Vermilion tunic, straw-colored cloth armor vest, apron and back flap, black trousers and shoes, leg wraps, brown wooden box on the back. A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 1,5–3k; cao 1,75 m. **Symmetry: tắt** (hộp tên lệch trái). Đi kèm như C3.
@@ -2770,11 +2782,11 @@ Long infantry spear, 13th-century Vietnam, about 3 m long. Slim straight brown w
 
 ### P13 · WPN_dadao_v2 · Đại đao cán dài, làm lại chỗ gắn lưỡi
 
-Làm lại G3 (đã sửa FIX một lần). Bản cũ: lưỡi lớn nằm cạnh phần trên của cán như lá cờ. Bước nướng đang bù bằng `side: true, flip: true` (`design/tools/bake/catalog.mjs:33`), nên đây là sửa cho đẹp, không gấp. Câu `like a Chinese guandao` không nói lưỡi và cán thẳng hàng, mà lưỡi quan đao vốn lệch trục, nên công cụ gắn lưỡi bên hông (suy luận). Chạy `latest` (meshy-5 từng mất lưỡi). Khi chuyển bước nướng sang tệp này thì bỏ `side`, `flip` của mục `dadao` trong catalog.
+Làm lại G3 (đã sửa FIX một lần). Bản cũ: lưỡi lớn nằm cạnh phần trên của cán như lá cờ. Bước nướng đang bù bằng `side: true, flip: true` (`design/tools/bake/catalog.mjs:33`), nên đây là sửa cho đẹp, không gấp. Câu `like a Chinese guandao` không nói lưỡi và cán thẳng hàng, mà lưỡi quan đao vốn lệch trục, nên công cụ gắn lưỡi bên hông (suy luận). Lịch sử model (ghi chú FIX trong `meshy.mjs`): lần đầu meshy-5 dựng thành kiếm; lần hai `latest` với câu tả cán trước chỉ ra cây gậy; lần ba meshy-5 với câu đưa lưỡi lên đầu ra được lưỡi, nằm cạnh cán (bản cũ này). Prompt mới vì thế mở bằng lưỡi, nói gốc lưỡi gắn thẳng lên đầu cán, và dựng lưới bằng meshy-5 trước (`run --only WPN_dadao_v2 --stage luoi --model-vk meshy-5`, 5 credit, mục 0.8 lượt 2); hỏng thì dựng lại bằng `--redo WPN_dadao_v2 --model-vk latest`. Khi chuyển bước nướng sang tệp này thì bỏ `side`, `flip` của mục `dadao` trong catalog.
 
 PROMPT (dán thẳng):
 ```text
-Long pole glaive, 13th-century East Asia, 2.6 m long. Plain brown wooden pole; its top end goes straight into the base of one big curved single-edged grey steel blade 75 cm long and 26 cm wide, blade and pole in one straight line, gold ring at the joint, iron butt cap. Vertical, blade up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+One big curved single-edged grey steel glaive blade 75 cm long and 26 cm wide, its base fixed straight onto the top of a plain brown wooden pole, blade and pole in one straight line, 2.6 m long in total, gold ring at the joint, iron butt cap. 13th-century East Asian pole glaive. Vertical, blade up, floating, isolated single object, no stand, no hand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Gốc** và grip2 như G3. 1–3k. **Symmetry: tắt** (lưỡi một cạnh, cong về một phía).

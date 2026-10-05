@@ -10,6 +10,9 @@
 // Soát vòng 2: run chặn cả lưới đã mua mà băm đổi, list --hash ghi riêng dòng ấy; tên tệp tiền tố + mã + .glb; mã _v2 có mã gốc,
 // đúng tệp, cùng nhóm; --only bỏ mã trùng; run --set tat-ca bỏ LINH_r2; "tùy chọn" hai cách bỏ dấu; trần tam giác trong game bằng
 // số code (đầu mục K, design/tools/scene-tris.mjs); cỡ chông, lầu và cột thuyền, bè, cò; mũ một chóp cứng; Symmetry ghi rõ.
+// Soát vòng 3: kiểm đối số trước mọi lệnh (--x=y, cờ lạ, cờ thiếu giá trị), dải tam giác (chữ sau số, trần 30k, sàn 300), POST
+// không gửi lại khi lỗi mạng hay 5xx, --redo cất tệp sau khi đọc được credit, câu báo mã đã mua cả texture; boong thuyền hộ vệ,
+// kỳ hạm; chông chỉ có chông; lều Võ trường hình thoi; màu đỉnh gần trắng cho vật nhuộm instance; câu phủ định, mặt đất; đại đao.
 //   node design/tools/meshy.test.mjs
 // Nhập meshy.mjs như thư viện: tệp đó chỉ chạy lệnh khi là tệp chính (import.meta.main, Node ≥ 24.2).
 import assert from "node:assert/strict";
@@ -22,7 +25,7 @@ import { spawnSync } from "node:child_process";
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "../..");
 if (typeof import.meta.main !== "boolean") { console.log("cần Node ≥ 24.2 (import.meta.main)\n0 đạt, 1 trượt"); process.exit(1); }
-const { loadAssets, apiPrompt, hash, setOf, pick, POSE, POSE2, guardRun, hashRows, setAsideRaw } = await import("./meshy.mjs");
+const { loadAssets, apiPrompt, hash, setOf, pick, POSE, POSE2, guardRun, hashRows, setAsideRaw, checkArgs, shouldRetry } = await import("./meshy.mjs");
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -203,11 +206,17 @@ t("mục có PROMPT mà không có dòng bảng (xoá dòng, hoặc dòng thiế
   const seven = "| 61 | ENV_b | `env_b.glb` | tên | K | 1–2k | — |";
   assert.throws(one([row(60, "ENV_a", "env_a.glb", "K"), seven], [sec("K1", "ENV_a", thing("A.")), sec("K2", "ENV_b", thing("B."))]), /ENV_b: có mục PROMPT/);
 });
-t("dải tam giác: dấu phân cách nghìn, đơn vị lẫn, lo > hi, mục tiêu < 300 → lỗi; 0,5–1,5k và 100–300 vẫn nhận", () => {
-  for (const bad of ["1,000–2,000", "500–2k", "800–300", "100–200"])
+t("dải tam giác: dấu phân cách nghìn, đơn vị lẫn, lo > hi, lo < 300, hi > 30k → lỗi; 0,5–1,5k nhận; 100–300 chỉ nhận ở PROP_mui_ten (đã tạo)", () => {
+  for (const bad of ["1,000–2,000", "500–2k", "800–300", "100–200", "100–400", "1–40k"])
     assert.throws(one([row(60, "ENV_a", "env_a.glb", "K", bad)], [sec("K1", "ENV_a", thing("A."))]), /dải tam giác/, bad);
   assert.equal(loadAssets(doc([row(60, "ENV_a", "env_a.glb", "K", "0,5–1,5k")], [sec("K1", "ENV_a", thing("A."))]))[0].tris, 1500);
-  assert.equal(loadAssets(doc([row(60, "PROP_x", "prop_x.glb", "H", "100–300")], [sec("H9", "PROP_x", thing("Arrow."))]))[0].tris, 300);
+  assert.throws(one([row(60, "PROP_x", "prop_x.glb", "H", "100–300")], [sec("H9", "PROP_x", thing("Arrow."))]), /dải tam giác/);
+  assert.equal(loadAssets(doc([row(60, "PROP_mui_ten", "prop_mui-ten.glb", "H", "100–300")], [sec("H3", "PROP_mui_ten", thing("Arrow."))]))[0].tris, 300);
+});
+t("dải tam giác: chữ đứng sau số (\"300–600 khối\") không bị đọc thành k (nghìn); \"1–2k tam giác\" vẫn là nghìn", () => {
+  const [a] = loadAssets(doc([row(60, "ENV_a", "env_a.glb", "K", "300–600 khối")], [sec("K1", "ENV_a", thing("A."))]));
+  assert.deepEqual(a.range, [300, 600]); assert.equal(a.tris, 600);
+  assert.deepEqual(loadAssets(doc([row(60, "ENV_a", "env_a.glb", "K", "1–2k tam giác")], [sec("K1", "ENV_a", thing("A."))]))[0].range, [1000, 2000]);
 });
 t("mục ghi cả Symmetry bật lẫn tắt → lỗi (không lặng lẽ chọn tắt)", () => {
   assert.throws(one([row(60, "ENV_a", "env_a.glb", "K")], [sec("K1", "ENV_a", thing("A."), "Symmetry: bật. Nếu lệch thì thử Symmetry: tắt.")]), /Symmetry/);
@@ -297,6 +306,52 @@ t("đầu mục ghi \"tùy chọn\" (ù + y) cũng là tuỳ chọn", () => {
   assert.deepEqual(codes(setOf(loadAssets(d), "moi-truong")), ["ENV_thuyen_x"]);
 });
 
+console.log("Soát vòng 3: đối số, gửi lại, cất tệp, câu báo");
+const bad = (argv) => { try { checkArgs(argv); return null; } catch (e) { return e.message; } };
+t("checkArgs: --x=y, cờ lạ hay gõ sai, cờ thiếu giá trị (cuối dòng hoặc giá trị là cờ khác), cờ lặp, đối số rời, lệnh lạ → lỗi", () => {
+  for (const argv of [["list", "--set=moi-truong"], ["list", "--sett", "x"], ["list", "--only"], ["list", "--only", "--hash"], ["list", "--dry"],
+    ["run", "--stage=luoi"], ["run", "--stages", "luoi"], ["run", "--set", "lam-lai", "--model-mt"], ["run", "--model-mt=meshy-5"],
+    ["run", "--model-mt", "meshy5"], ["run", "--jobs", "0"], ["run", "--jobs", "ba"], ["run", "--set", "can", "--set", "thieu"], ["run", "moi-truong"],
+    ["sheet", "--set", "thieu", "ra.png"], ["sheet", "ra.png", "--cols", "x"], ["post", "--hash"], ["balance", "--set", "can"], ["runn"], ["--set", "can"]])
+    assert.ok(bad(argv), `nhận nhầm: ${argv.join(" ")}`);
+  assert.match(bad(["list", "--set=moi-truong"]), /--set=moi-truong/); assert.match(bad(["run", "--stages", "luoi"]), /--stages/);
+  assert.match(bad(["run", "--set", "lam-lai", "--model-mt"]), /--model-mt/);
+});
+t("checkArgs: các dạng lệnh trong mục 0.8 và README đều nhận", () => {
+  for (const argv of [[], ["list"], ["list", "--set", "tat-ca", "--hash"], ["list", "--only", "ENV_ky_ham_nguyen", "--prompt"], ["balance"],
+    ["run", "--set", "thieu", "--stage", "luoi", "--model-linh", "meshy-5", "--model-vk", "meshy-5"], ["run", "--only", "WPN_dadao_v2", "--stage", "luoi", "--model-vk", "meshy-5"],
+    ["run", "--only", "A,B", "--redo", "A", "--stage", "luoi", "--model-mt", "latest", "--jobs", "2", "--dry"], ["run", "--model", "meshy-6"],
+    ["sheet", "design/glb/_raw/luot4-luoi.png", "--set", "moi-truong", "--cols", "10", "--size", "200"], ["sheet", "--only", "H35"],
+    ["post", "--only", "H35"], ["post", "--set", "can"]])
+    assert.equal(bad(argv), null, argv.join(" "));
+});
+t("lệnh list: --set=… , cờ gõ sai, --only thiếu mã → thoát mã 2, không in danh sách", () => {
+  for (const argv of [["--set=moi-truong"], ["--sett", "x"], ["--only"]]) {
+    const r = spawnSync(process.execPath, [join(here, "meshy.mjs"), "list", ...argv], { cwd: ROOT, encoding: "utf8", env: { ...process.env, MESHY_API_KEY: "", MESHY_API_KEY_FILE: "" } });
+    assert.equal(r.status, 2, argv.join(" ")); assert.equal(r.stdout.trim(), "", argv.join(" "));
+  }
+});
+t("shouldRetry: GET gửi lại khi lỗi mạng, 429, 5xx; POST (lưới, texture, có trả tiền) chỉ gửi lại khi 429", () => {
+  assert.equal(typeof shouldRetry, "function");
+  for (const s of [undefined, 429, 500, 503]) assert.equal(shouldRetry("GET", s), true, `GET ${s}`);
+  assert.equal(shouldRetry("GET", 404), false); assert.equal(shouldRetry("POST", 429), true);
+  for (const s of [undefined, 500, 502, 400]) assert.equal(shouldRetry("POST", s), false, `POST ${s}`);
+});
+t("run --redo: cất tệp cũ trong _raw/ chỉ sau khi đọc được credit (balance lỗi thì manifest và tệp vẫn khớp)", () => {
+  const src = readFileSync(join(here, "meshy.mjs"), "utf8"), m = src.slice(src.indexOf("async function main("));
+  const b = m.indexOf("let left = await balance()"), s = m.indexOf("setAsideRaw(RAW");
+  assert.ok(b > 0 && s > 0, "không thấy let left = await balance() hay setAsideRaw trong main()"); assert.ok(s > b, "setAsideRaw chạy trước balance() của run");
+});
+t("chặn mua lại: mã đã mua cả texture (refine_id) mà băm đổi → câu báo nói lưới và texture, không nói \"chưa tô texture\"", () => {
+  const [h35] = gd, m = { H35: { status: "loi", preview_id: "x", refine_id: "y", hash: "0123456789" } };
+  assert.throws(() => guardRun([h35], m), (e) => /lưới và texture/.test(e.message) && !/chưa tô texture/.test(e.message));
+  assert.match(hashRows([h35], m).lines[0], /lưới và texture đã mua theo băm cũ/);
+});
+t("mọi mục chưa tạo ghi Symmetry rõ (không còn auto); LINH_r2 bật như áo LINH_r24", () => {
+  assert.deepEqual(all.filter((a) => !man[a.code] && a.sym === "auto").map((a) => a.code), []);
+  assert.equal(all.find((a) => a.code === "LINH_r2").sym, "on");
+});
+
 console.log("Tài liệu thật: môi trường K–O, thú, nón lá");
 const env = all.err ? [] : all.filter((a) => /^[K-O]/.test(a.sec));
 const bodies = md.replace(/\r\n/g, "\n").normalize("NFC").split("\n### ").filter((s) => /^[K-O]\d+ · /.test(s)).map((s) => s.split("\n## ")[0]);
@@ -368,7 +423,7 @@ t("mục P: người viết bằng POSE v2, tài liệu ≤ 565, API ≤ 600 k�
     : a.prompt.length > 550 || apiPrompt(a).length > 600 || !a.prompt.endsWith(STYLE) || !/isolated single object/i.test(a.prompt));
   assert.deepEqual(bad.map((a) => `${a.code} ${a.prompt.length}/${apiPrompt(a).length}`), []);
 });
-t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đầu trần khăn đỏ, nón lá vành rộng, giáo một lưỡi, lưỡi đại đao thẳng cán", () => {
+t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đầu trần khăn đỏ, đầu trần khăn then (nón gộp khi nướng), giáo một lưỡi, lưỡi đại đao thẳng cán", () => {
   assert.deepEqual(missing(P_CODES), []);
   const p = (c) => get(c).prompt, bad = [];
   const want = (c, ok, why) => { if (!ok) bad.push(`${c}: ${why}`); };
@@ -379,8 +434,9 @@ t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đ�
   want("X20_v2", /cylindrical brown fur hat/i.test(p("X20_v2")) && /one short gold cone on the top centre/.test(p("X20_v2")) && !/spike|plume|drum/i.test(p("X20_v2")) && /heavy/i.test(p("X20_v2")) && /pauldrons|shoulder plates/i.test(p("X20_v2")), "mũ lông, một chóp vàng, không chùm lông (code dựng), giáp nặng");
   for (const c of ["DV_DAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_cung_v2", "CV_songdao_v2"])
     want(c, !/\b(hat|helmet|cap)\b/i.test(p(c)) && /bare head/i.test(p(c)) && /red (cloth )?(head)?band|vermilion cloth band/i.test(p(c)) && apiPrompt(get(c)).includes("No helmet."), "đầu trần buộc khăn đỏ (nón lá gắn bằng code)");
+  // Meshy chưa dựng được nón lá vành rộng lần nào (6/6): thân đầu trần, nón gộp vào bộ lính khi nướng (mục P)
   for (const c of ["DV_GIAO_v2", "DV_NO_v2"])
-    want(c, /non la/i.test(p(c)) && /wider than the shoulders/i.test(p(c)) && /\d+ cm across/.test(p(c)) && !/helmet|pointed/i.test(p(c)), "nón lá vành rộng hơn vai, có cỡ, khác mũ nhọn Nguyên");
+    want(c, /bare head/i.test(p(c)) && /black cloth band/i.test(p(c)) && !/\b(hat|helmet|cap|non la)\b/i.test(p(c)) && apiPrompt(get(c)).includes("No helmet."), "đầu trần khăn then, không xin nón");
   for (const c of ["CV_giao_v2", "CV_songdao_v2"]) want(c, /smooth-shaven/i.test(p(c)), "mặt trẻ cạo nhẵn (bản cũ ra râu, tóc bạc)");
   want("WPN_giao_dv_v2", /\bone flat leaf-shaped\b/i.test(p("WPN_giao_dv_v2")) && !/four-sided/i.test(p("WPN_giao_dv_v2")), "một lưỡi lá dẹt");
   want("WPN_dadao_v2", /one straight line/i.test(p("WPN_dadao_v2")), "lưỡi và cán thẳng hàng");
@@ -427,9 +483,10 @@ t("thuyền K1–K6: prompt ghi chiều cao boong, lầu, cột để giữ tỉ
   const bad = Object.entries(want).flatMap(([c, ws]) => ws.filter((w) => !P(c).includes(w)).map((w) => `${c} thiếu ${w}`));
   assert.deepEqual(bad, []);
 });
-t("thuyền: không xin cán cờ (cán cờ code giữ, đặt đúng flagAt); K8, K9 tắt đối xứng (sào, mái chèo một bên)", () => {
+t("thuyền: không nhắc cán cờ, kể cả để cấm (cán cờ code giữ, đặt đúng flagAt); thuyền có cột tả đỉnh cột trơn; K8, K9 tắt đối xứng", () => {
   const ships = ["ENV_chien_thuyen_nguyen", "ENV_ky_ham_nguyen", "ENV_thuyen_ho_ve", "ENV_thuyen_do_luong", "ENV_thuyen_chien_tran"];
-  assert.deepEqual(ships.filter((c) => /bare (stern )?flagpole|flagpole at/i.test(P(c)) || !/no flagpole/i.test(P(c))), []);
+  assert.deepEqual(ships.filter((c) => /flagpole/i.test(P(c))), []);
+  assert.deepEqual(ships.slice(0, 4).filter((c) => !/bare mast tops?/i.test(P(c))), []);
   assert.deepEqual(["ENV_thuyen_mui", "ENV_thung_cau"].filter((c) => get(c).sym !== "off"), []);
 });
 t("tướng mới không có chữ kéo về vương miện, áo rồng, cầm cung hay dáng thủ lĩnh man rợ; H28 không giáp buộc dây kiểu samurai", () => {
@@ -512,6 +569,75 @@ t("POSE v2 (ngón khép) được miễn ở mục 0.3, 0.7 và danh sách kiể
   for (const l of mdN.split("\n").filter((l) => /ngón hơi xoè|Ngón tay rời nhau/.test(l) && !l.startsWith("A-pose") && !l.includes("Character turnaround"))) assert.match(l, /POSE v2/, l);
   assert.ok(!mdN.includes("Nên chạy `run --set moi-truong --stage luoi` trước"));
   assert.ok(!/finial/.test(body("X18"))); assert.ok(!mdN.includes("N10, ("));
+});
+
+console.log("Tài liệu thật: sửa sau soát vòng 3 (đợt 19b)");
+const Khead = mdN.includes("\n## K. ") ? mdN.split("\n## K. ")[1].split("\n### K1 ")[0] : "";
+const Mhead = mdN.includes("\n## M. ") ? mdN.split("\n## M. ")[1].split("\n| # |")[0] : "";
+const s08v3 = mdN.slice(mdN.indexOf("\n### 0.8 "), mdN.indexOf("\n## 1. "));
+const luot = (n) => (s08v3.split("```bash")[1] || "").split("\n# Lượt ").find((b) => b.startsWith(`${n}.`) || b.startsWith(`${n}\n`) || b.startsWith(`${n} `)) || "";
+t("K3 thuyền hộ vệ: lầu một phần tư sau, nóc 3,3 m tính từ mớn nước, cột chính 10 m giữa thân, cột mũi 6,5 m; đo ở lượt thử, giữ texture", () => {
+  for (const w of ["aft quarter", "3.3 m above the waterline", "10 m above the deck", "6.5 m foremast near the bow"]) assert.ok(P("ENV_thuyen_ho_ve").includes(w), `K3 thiếu ${w}`);
+  for (const w of ["0,11", "0,27", "0,21", "+5,6", "0,167", "0,56", "−13,7", "11,1"]) assert.ok(Khead.includes(w), `đầu mục K thiếu ${w}`);
+  assert.match(Khead, /giữ texture: [^\n.]*thuyền hộ vệ/);
+  assert.match(luot(3), /ENV_thuyen_ho_ve/); assert.match(tableRow("ENV_thuyen_ho_ve"), /0,27 thân/);
+});
+t("K2 kỳ hạm: mặt lầu 6 m tính từ mớn nước, cầu thang dài từ giữa thân, đình ở cuối mặt lầu, nóc đình 11 m trên mớn nước; thân nâu sương gió, đầu đao cong nhẹ", () => {
+  const p = P("ENV_ky_ham_nguyen");
+  for (const w of ["6 m above the waterline", "long central stair", "rear of the terrace", "11 m above the waterline", "gently curved eaves", "Weathered brown hull"]) assert.ok(p.includes(w), `K2 thiếu ${w}`);
+  assert.ok(!/upturned|Dark brown hull/.test(p));
+});
+t("M9 chông: mẫu chỉ có chông; hai tấm phên (một vắt miệng hố, một nằm ngoài hố) giữ code", () => {
+  assert.ok(!/\bmat\b/i.test(P("ENV_ho_chong"))); assert.match(body("ENV_ho_chong"), /hai tấm phên[^\n]*giữ code/);
+});
+t("L11 lều Võ trường: 14 lều; chóp code co trước khi xoay nên đáy là hình thoi 6,4 × 9,6 m, mẫu cố ý nướng thành chữ nhật 4,5 × 6,8 m", () => {
+  const b = body("ENV_leu_tran");
+  assert.ok(!/16 lều/.test(b)); assert.match(b, /14 lều/); assert.match(b, /hình thoi/); assert.match(b, /6,4 × 9,6/); assert.match(b, /chữ nhật 4,5 × 6,8/);
+});
+t("lưới trắng nhuộm bằng màu instance (đá, lau B20, khiên rơi): bước nướng ghi màu đỉnh gần trắng; mỗi InstancedMesh khiên một mẫu", () => {
+  for (const c of ["ENV_lau_say", "ENV_da_a", "ENV_da_b", "ENV_da_c"]) assert.match(tech(c), /gần trắng/, c);
+  assert.match(Mhead, /khiên rơi[^\n]*gần trắng/); assert.match(Mhead, /mỗi InstancedMesh một mẫu khiên/);
+});
+t("bảng 2.5: hàng đồng #7a5a2a chỉ cho vạc lửa; trống đồng có hàng riêng ghi màu code #6a5a3a", () => {
+  const T = mdN.split("### 2.5 ")[1].split("### 2.6 ")[0], dong = T.split("\n").find((l) => l.includes("`#7a5a2a`")) || "";
+  assert.ok(dong && !/trống/.test(dong), dong); assert.match(T, /trống đồng[^\n]*#6a5a3a/);
+});
+t("L17 đầu bến là tấm sàn chữ nhật, không kèm lối cầu (lối cầu là L16)", () => {
+  assert.match(P("ENV_cau_tau_dau"), /^Rectangular pier-head platform 6 m wide and 4 m deep/); assert.ok(!/T-shaped wooden pier head/.test(P("ENV_cau_tau_dau")));
+});
+t("vật code không mục riêng gồm phên đan kè, cọc chân kè, cọc và ván dưới hào, cục đất lở, vạch bắn Võ trường", () => {
+  for (const w of ["phên đan kè", "cọc chân kè", "dưới hào", "cục đất lở", "vạch bắn"]) assert.ok(Mhead.includes(w), w);
+});
+t("P13 đại đao: tả lưỡi trước cán; ghi đúng lịch sử model; lượt 2 dựng lưới đại đao bằng meshy-5 trước", () => {
+  assert.match(P("WPN_dadao_v2"), /^One big curved single-edged grey steel glaive blade/);
+  assert.ok(!/meshy-5 từng mất lưỡi/.test(mdN)); assert.match(body("WPN_dadao_v2"), /latest[^\n.]*cây gậy/);
+  assert.match(luot(2), /run --only WPN_dadao_v2 --stage luoi --model-vk meshy-5/);
+});
+t("thứ tự lượt: lượt 2 làm lại (chỉ cần lượt 1), lượt 3 mười mục môi trường thử, lượt 4 phần còn lại", () => {
+  assert.match(luot(2), /--set lam-lai/); assert.ok(!/ENV_/.test(luot(2)));
+  assert.match(luot(3), /ENV_ky_ham_nguyen/); assert.equal((luot(3).match(/--only (\S+) --stage luoi/) || ["", ""])[1].split(",").length, 10);
+  assert.match(luot(4), /--set moi-truong/);
+  assert.match(s08v3, /\| 2 \| `lam-lai`/); assert.match(s08v3, /\| 3 \| 10 mục môi trường thử/);
+});
+t("DAN_NAM mở câu đầu bằng Bare head; lượt 1 dựng lưới DAN_NAM bằng latest cùng DV_AOTONG", () => {
+  assert.match(P("DAN_NAM"), /Bare head: black hair bun/); assert.match(luot(1), /run --only DV_AOTONG,DAN_NAM --stage luoi/);
+});
+t("không nhắc vật chỉ để cấm khi câu tả đã đủ: mũ sắt cọc, tượng miếu, ngói nhà bạt, cửa cổng", () => {
+  assert.ok(!/iron cap/.test(P("ENV_coc_bach_dang"))); assert.match(P("ENV_coc_bach_dang"), /bare wooden four-sided point/);
+  assert.ok(!/statue/i.test(P("ENV_mieu"))); assert.match(P("ENV_mieu"), /bare plain stone altar table/);
+  assert.ok(!/tiles/i.test(P("ENV_nha_bat_chi_huy"))); assert.ok(!/no doors/.test(P("ENV_cong_ham_tu")));
+});
+t("đạo cụ, công trình không phải địa hình: không tả mặt đất, có no ground", () => {
+  const c8 = ["ENV_ho_chong", "ENV_trong_tran", "ENV_xe_luong_vo", "ENV_bia_rom", "ENV_xac_ngua", "ENV_leu_tran", "ENV_khan_dai", "ENV_dai_chi_huy"];
+  assert.deepEqual(c8.filter((c) => !/no ground/.test(P(c)) || /on the ground|above the ground|reaching the ground|training ground/.test(P(c))), []);
+});
+t("chữ màu, chất liệu lệch thời (mục chưa tạo): không brass, khaki, turban, canvas, sampan, light black; trống đồng 14 cánh như Ngọc Lũ; K8 tên thuyền mui", () => {
+  assert.deepEqual(all.filter((a) => !man[a.code] && /brass|khaki|turban|canvas|sampan|light black/i.test(a.prompt)).map((a) => a.code), []);
+  assert.match(P("ENV_trong_dong"), /fourteen-pointed star/); assert.match(tableRow("ENV_thuyen_mui"), /\| Thuyền mui ở bến \|/);
+});
+t("ghi chú: A8 dẫn mục P3, B13 nối Đường Ngột với Đảng Hạng; 3d-ref README đếm K–O là 89 mục môi trường cộng trâu", () => {
+  assert.match(body("H27"), /\(mục P3, suy luận\)/); assert.match(body("X25"), /Đường Ngột \(Đảng Hạng, Tangut\)/);
+  assert.match(readFileSync(join(ROOT, "design/3d-ref/README.md"), "utf8"), /89 mục môi trường, cộng trâu/);
 });
 
 console.log("Lệnh list (không mạng)");

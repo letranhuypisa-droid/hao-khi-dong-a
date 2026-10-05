@@ -20,8 +20,11 @@
 //     Mẫu đã có lưới thì giữ model của lưới đó; muốn đổi thì --redo.
 //     --stage luoi chỉ dựng lưới xám (preview) và tải ảnh lưới; soát xong mới chạy lại không có --stage để tô texture,
 //     nên mẫu hỏng chỉ tốn tiền lưới. --redo bỏ kết quả cũ của các mã đó (mã phải nằm trong danh sách chạy) và dựng lại từ
-//     đầu; tệp gốc, ảnh cũ trong _raw/ đổi tên sang .cu-<giờ>, không xoá. Mẫu đã xong, hoặc đã mua lưới (preview_id), mà băm
-//     prompt khác manifest thì run dừng trước khi gọi Meshy, trừ khi mã đó có trong --redo (mua lại phải là cố ý).
+//     đầu; tệp gốc, ảnh cũ trong _raw/ đổi tên sang .cu-<giờ> (sau khi đọc được credit), không xoá. Mẫu đã xong, hoặc đã mua
+//     lưới (preview_id), mà băm prompt khác manifest thì run dừng trước khi gọi Meshy, trừ khi mã đó có trong --redo (mua lại
+//     phải là cố ý). Lệnh tạo task (POST, có trả tiền) chỉ gửi lại khi Meshy trả 429; lỗi mạng, 5xx thì dừng mã đó và nhắc xem
+//     task mồ côi trên trang Meshy.
+//   Mọi lệnh kiểm đối số trước: cờ lạ hay gõ sai, --cờ=giá-trị, cờ thiếu giá trị, model lạ đều dừng (mã 2), không gọi Meshy.
 //   node design/tools/meshy.mjs sheet   <ra.png> [--set ...] [--only ...] [--size 256] [--cols 6]   # ghép ảnh Meshy thành một tờ
 //   node design/tools/meshy.mjs post    [--only ...]          # nén lại từ bản gốc đã tải, không tốn credit
 //
@@ -62,6 +65,39 @@ const cmd = args[0] || "list";
 const opt = (k, d) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1] : d; };
 const flag = (k) => args.includes("--" + k);
 
+// Cờ từng lệnh, kiểm trước mọi lệnh. opt() chỉ tìm đúng "--k" rồi lấy chữ kế, nên "--stage=luoi", "--stages luoi" hay
+// "--model-mt" ở cuối dòng bị bỏ qua lặng lẽ: run mua luôn texture cho lưới chưa soát, hoặc dựng bằng latest đắt gấp bốn.
+const CMDS = {
+  list: ["set", "only", "prompt", "hash"],
+  balance: [],
+  run: ["set", "only", "model", "model-linh", "model-vk", "model-mt", "jobs", "dry", "stage", "redo"],
+  sheet: ["set", "only", "size", "cols"],
+  post: ["set", "only"],
+};
+const BOOL = new Set(["prompt", "hash", "dry"]);
+export function checkArgs(argv) {
+  const cmd = argv[0] || "list", seen = new Set();
+  if (!Object.hasOwn(CMDS, cmd)) throw new Error(`lệnh không rõ: ${cmd} (${Object.keys(CMDS).join(" | ")})`);
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith("--")) {
+      if (cmd === "sheet" && i === 1) continue; // tệp ảnh ra
+      throw new Error(`đối số lạ "${a}"${cmd === "sheet" ? " (tệp ảnh ra phải đứng ngay sau sheet)" : ""}`);
+    }
+    const k = a.slice(2);
+    if (k.includes("=")) throw new Error(`${a}: viết cách, không dấu = (--${k.replace("=", " ")})`);
+    if (!CMDS[cmd].includes(k)) throw new Error(`${cmd} không nhận ${a}; chỉ nhận: ${CMDS[cmd].map((x) => "--" + x).join(" ") || "không cờ nào"}`);
+    if (seen.has(k)) throw new Error(`${a} ghi hai lần`);
+    seen.add(k);
+    if (BOOL.has(k)) continue;
+    const v = argv[++i];
+    if (v === undefined || v.startsWith("--")) throw new Error(`${a} thiếu giá trị`);
+    if (k.startsWith("model") && !/^(latest|meshy-\d+)$/.test(v)) throw new Error(`${a} ${v}: model phải là latest hoặc meshy-<số> (meshy-5, meshy-6)`);
+    if (["jobs", "size", "cols"].includes(k) && !/^[1-9]\d*$/.test(v)) throw new Error(`${a} ${v}: phải là số nguyên dương`);
+    if (k === "stage" && v !== "luoi") throw new Error("--stage chỉ nhận luoi");
+  }
+}
+
 // ---------- đọc tài liệu prompt ----------
 
 const NEG_NV = "weapon, sword, spear, bow, shield, holding, cape, cloak, flag, T-pose, pedestal, base, anime, chibi, cartoon, photorealistic, text, logo, samurai armor, kabuto, Qing dynasty clothing, queue braid, European plate armor, Nguyen dynasty court dress, monster, demon, orc, horns, skull, fangs, grotesque, caricature, evil villain, gore, blood, baked lighting, baked shadows";
@@ -72,12 +108,15 @@ const NEG_MT = "person, people, character, crowd, text, letters, calligraphy, lo
 const KIND = { char_: "nhan-vat", unit_: "nhan-vat", wpn_: "vu-khi", prop_: "dao-cu", mount_: "thu-cuoi", env_: "moi-truong" };
 const V2 = /_v\d+$/; // mã làm lại: H33_v2, tệp …_v2.glb
 
+// "k" chỉ là nghìn khi đứng riêng sau số: "300–600 khối" là 300–600, không phải 300k–600k.
 function parseRange(s) {
-  const m = s.replace(/,/g, ".").match(/([\d.]+)\s*–\s*([\d.]+)\s*(k?)/);
+  const m = s.replace(/,/g, ".").match(/([\d.]+)\s*–\s*([\d.]+)(?:\s*(k)(?![\p{L}\d]))?/u);
   if (!m) return null;
   const k = m[3] ? 1000 : 1;
   return [Math.round(+m[1] * k), Math.round(+m[2] * k)];
 }
+// Mức dưới 300 chỉ còn ở mũi tên, tạo trước quy tắc này (đổi cột thì vẫn cùng băm, nhưng bảng mục 1 mất số trong game).
+const LO_UNDER_300 = ["PROP_mui_ten"];
 
 // Không cần nặng: tướng 10–20k lấy gần mức dưới, cận vệ lấy giữa, lính đám đông và vũ khí (vốn đã nhẹ) lấy mức trên cho rõ.
 function targetTris([lo, hi]) {
@@ -95,8 +134,10 @@ export function loadAssets(md = readFileSync(DOC, "utf8")) {
     if (c.length < 10 || !/^\d+a?$/.test(c[1])) continue;
     const range = parseRange(c[6]);
     if (!range) throw new Error(`${c[2]}: cột tam giác "${c[6]}" phải là lo–hi, gạch nối dài (ví dụ 1–2k, 300–800)`);
-    // "1,000–2,000" đọc thành 1–2, "500–2k" thành 500k–2k: bắt qua lo > hi hoặc mục tiêu dưới mức thấp nhất Meshy dựng được
-    if (range[0] > range[1] || targetTris(range) < 300) throw new Error(`${c[2]}: dải tam giác "${c[6]}" sai (lo ≤ hi, mục tiêu ≥ 300, không dấu phân cách nghìn)`);
+    // "1,000–2,000" đọc thành 1–2, "500–2k" thành 500k–2k: bắt qua lo > hi, mức dưới 300 (thấp nhất Meshy dựng được) hoặc
+    // mức trên quá 30k (nhiều nhất trong tài liệu là 20k)
+    if (range[0] > range[1] || targetTris(range) < 300 || (range[0] < 300 && !LO_UNDER_300.includes(c[2])) || range[1] > 30000)
+      throw new Error(`${c[2]}: dải tam giác "${c[6]}" sai (300 ≤ lo ≤ hi ≤ 30k, không dấu phân cách nghìn)`);
     if (rows.has(c[2])) throw new Error(`${c[2]}: trùng mã ở hai dòng bảng (chép dòng làm _v2 thì đổi cả mã)`);
     rows.set(c[2], { no: c[1], code: c[2], file: c[3].replace(/`/g, ""), name: c[4], group: c[5], range });
   }
@@ -116,9 +157,10 @@ export function loadAssets(md = readFileSync(DOC, "utf8")) {
     secs.set(h[2], { sec: h[1], prompt: p[1].trim(), sym: off ? "off" : on ? "on" : "auto", tuyChon: /(tuỳ|tùy)\s*chọn/i.test(h[3]) }); // hai cách bỏ dấu
   });
   for (const c of secs.keys()) if (!rows.has(c)) throw new Error(`${c}: có mục PROMPT nhưng không có dòng bảng (dòng thiếu cột?)`);
-  // 23a LINH_r2: prompt E2 đổi màu áo (mục E của tài liệu).
+  // 23a LINH_r2: prompt E2 đổi màu áo (mục E của tài liệu). Đối xứng bật (áo cân hai bên); mục E2 không ghi, mà thêm dòng
+  // Symmetry vào E2 là đổi băm LINH_r24 đã tạo.
   const e2 = secs.get("LINH_r24");
-  if (e2) secs.set("LINH_r2", { sec: "E2a", sym: e2.sym, tuyChon: true, prompt: e2.prompt.replace("Dark red robe", "Brick-red robe").replace("four dark red skirt flaps", "four brick-red skirt flaps") });
+  if (e2) secs.set("LINH_r2", { sec: "E2a", sym: "on", tuyChon: true, prompt: e2.prompt.replace("Dark red robe", "Brick-red robe").replace("four dark red skirt flaps", "four brick-red skirt flaps") });
 
   const out = [], files = new Map();
   for (const r of rows.values()) {
@@ -245,18 +287,26 @@ function apiKey() {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Gửi lại hay không (status trống = lỗi mạng). POST tạo task lưới hay texture, có trả tiền: lỗi mạng hoặc 5xx có thể là Meshy
+// đã nhận task mà mất phản hồi, gửi lại là mua hai lần và task đầu không vào manifest; chỉ 429 (chưa nhận) mới gửi lại.
+export const shouldRetry = (method, status) => (method === "POST" ? status === 429 : status === undefined || status === 429 || status >= 500);
+const ORPHAN = ". Meshy có thể đã nhận task mà mất phản hồi: xem danh sách task trên trang Meshy (task mồ côi vẫn trừ credit) trước khi chạy lại";
+
 async function call(method, path, body) {
   for (let attempt = 0; ; attempt++) {
     let res;
     try {
       res = await fetch(API + path, { method, headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
     } catch (e) {
-      if (attempt < 4) { await sleep(2000 * 2 ** attempt); continue; }
-      throw new Error(`${method} ${path}: ${e.cause?.message || e.message}`);
+      if (shouldRetry(method) && attempt < 4) { await sleep(2000 * 2 ** attempt); continue; }
+      throw new Error(`${method} ${path}: ${e.cause?.message || e.message}${method === "POST" ? ORPHAN : ""}`);
     }
     const text = await res.text();
-    if (res.status === 429 || res.status >= 500) { if (attempt < 6) { await sleep(5000 * (attempt + 1)); continue; } }
-    if (!res.ok) { const err = new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 400)}`); err.status = res.status; err.body = text; throw err; }
+    if (shouldRetry(method, res.status) && attempt < 6) { await sleep(5000 * (attempt + 1)); continue; }
+    if (!res.ok) {
+      const err = new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 400)}${method === "POST" && res.status >= 500 ? ORPHAN : ""}`);
+      err.status = res.status; err.body = text; throw err;
+    }
     return text ? JSON.parse(text) : {};
   }
 }
@@ -348,8 +398,11 @@ export function guardRun(list, man, redoOpt = "") {
   const out = [...redo].filter((c) => !list.some((a) => a.code === c));
   if (out.length) throw new Error(`--redo ${out.join(",")}: không nằm trong danh sách chạy (thêm vào --only)`);
   const stale = list.filter((a) => paid(man[a.code]) && man[a.code].hash !== hash(a) && !redo.has(a.code));
-  const done = stale.filter((a) => man[a.code].status === "done").map((a) => a.code), mesh = stale.filter((a) => man[a.code].status !== "done").map((a) => a.code);
+  const kind = (m) => (m.status === "done" ? "done" : m.refine_id ? "tex" : "mesh"); // texture đã gọi (refine_id) là đã trả tiền texture
+  const of = (k) => stale.filter((a) => kind(man[a.code]) === k).map((a) => a.code);
+  const [done, tex, mesh] = ["done", "tex", "mesh"].map(of);
   if (stale.length) throw new Error([done.length && `băm prompt khác manifest, run sẽ mua lại và ghi đè GLB đã có: ${done.join(", ")}`,
+    tex.length && `đã mua lưới và texture theo prompt cũ (chưa tải, nén xong), run sẽ bỏ cả hai và mua lại: ${tex.join(", ")}`,
     mesh.length && `lưới đã mua theo prompt cũ (chưa tô texture), run sẽ bỏ lưới đó và mua lưới mới: ${mesh.join(", ")}`].filter(Boolean).join("; ")
     + ". Sửa lại prompt cho khớp, thêm mục _v2, hoặc dùng --redo <mã> nếu cố ý mua lại");
   return redo;
@@ -361,7 +414,8 @@ export function hashRows(list, man) {
     const h = hash(a), m = man[a.code], len = apiPrompt(a).length;
     if (paid(m)) { had++; if (m.hash === h) same++; }
     const st = !paid(m) ? (m ? `chưa tạo (manifest: ${m.status}, chưa mua lưới)` : "chưa tạo") : m.hash === h ? "= manifest"
-      : m.status === "done" ? `≠ manifest ${m.hash}: run sẽ dừng (mua lại thì --redo), ghi đè ${m.path}` : `≠ manifest ${m.hash}: lưới đã mua theo băm cũ; run dừng, làm lại thì --redo`;
+      : m.status === "done" ? `≠ manifest ${m.hash}: run sẽ dừng (mua lại thì --redo), ghi đè ${m.path}`
+      : `≠ manifest ${m.hash}: ${m.refine_id ? "lưới và texture" : "lưới"} đã mua theo băm cũ; run dừng, làm lại thì --redo`;
     return `${a.code.padEnd(22)} ${h}  ${String(len).padStart(3)} ký tự${len > 600 ? " > 600!" : ""}  ${String(a.tris).padStart(6)} tg  ${st}`;
   });
   return { lines, had, same };
@@ -434,6 +488,7 @@ async function sheet(list, man, out) {
 }
 
 async function main() {
+  try { checkArgs(args); } catch (e) { die(e.message); }
   const all = loadAssets();
   if (cmd === "list") {
     const list = choose(all);
@@ -477,9 +532,10 @@ async function main() {
     return n + (same && m.preview_id ? 0 : PREVIEW(modelOf(a))) + (stage === "luoi" || (same && m.refine_id) ? 0 : REFINE);
   }, 0);
   if (flag("dry")) { console.log(`${list.length} mẫu, ước tính ${need} credit (${model} / lính ${modelLinh} / vũ khí ${modelVk} / môi trường ${modelMt})`); return; }
+  let left = await balance();
+  // Cất tệp cũ của mã --redo sau khi đọc được credit: balance lỗi (thiếu key, mất mạng) thì manifest chưa lưu, tệp phải còn chỗ cũ.
   const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
   for (const a of list) if (redo.has(a.code) && setAsideRaw(RAW, `${hash(a)}-${a.file}`.replace(/\.glb$/, ""), stamp)) console.log(`  ${a.code}: tệp cũ trong _raw/ đổi tên .cu-${stamp}`);
-  let left = await balance();
   console.log(`Credit còn: ${left}; ${list.length} mẫu, ước tính ${need} credit`);
   const budget = { take: (n) => { if (left < n) return false; left -= n; return true; } };
   const queue = [...list]; const errors = [];
