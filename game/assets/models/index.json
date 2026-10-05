@@ -4,119 +4,119 @@
   "file": "char/CV_cung.hkm",
   "tex": "char/CV_cung.webp",
   "tris": 4999,
-  "bytes": 209786
+  "bytes": 210682
  },
  "char/CV_daidao": {
   "kind": "char",
   "file": "char/CV_daidao.hkm",
   "tex": "char/CV_daidao.webp",
   "tris": 5000,
-  "bytes": 195850
+  "bytes": 196738
  },
  "char/CV_giao": {
   "kind": "char",
   "file": "char/CV_giao.hkm",
   "tex": "char/CV_giao.webp",
   "tris": 5000,
-  "bytes": 193946
+  "bytes": 194910
  },
  "char/CV_khien": {
   "kind": "char",
   "file": "char/CV_khien.hkm",
   "tex": "char/CV_khien.webp",
   "tris": 4999,
-  "bytes": 220284
+  "bytes": 221184
  },
  "char/CV_songdao": {
   "kind": "char",
   "file": "char/CV_songdao.hkm",
   "tex": "char/CV_songdao.webp",
   "tris": 4999,
-  "bytes": 203758
+  "bytes": 204654
  },
  "char/H31": {
   "kind": "char",
   "file": "char/H31.hkm",
   "tex": "char/H31.webp",
   "tris": 9000,
-  "bytes": 418754
+  "bytes": 419650
  },
  "char/H33": {
   "kind": "char",
   "file": "char/H33.hkm",
   "tex": "char/H33.webp",
   "tris": 5998,
-  "bytes": 269250
+  "bytes": 270146
  },
  "char/H35": {
   "kind": "char",
   "file": "char/H35.hkm",
   "tex": "char/H35.webp",
   "tris": 8999,
-  "bytes": 392082
+  "bytes": 392974
  },
  "char/H40": {
   "kind": "char",
   "file": "char/H40.hkm",
   "tex": "char/H40.webp",
   "tris": 5995,
-  "bytes": 269880
+  "bytes": 270776
  },
  "char/LINH_r01": {
   "kind": "char",
   "file": "char/LINH_r01.hkm",
   "tex": "char/LINH_r01.webp",
   "tris": 9000,
-  "bytes": 385870
+  "bytes": 386762
  },
  "char/LINH_r24": {
   "kind": "char",
   "file": "char/LINH_r24.hkm",
   "tex": "char/LINH_r24.webp",
   "tris": 9000,
-  "bytes": 409540
+  "bytes": 410428
  },
  "char/OFF_doitruong": {
   "kind": "char",
   "file": "char/OFF_doitruong.hkm",
   "tex": "char/OFF_doitruong.webp",
   "tris": 4996,
-  "bytes": 218714
+  "bytes": 219606
  },
  "char/OFF_photuong": {
   "kind": "char",
   "file": "char/OFF_photuong.hkm",
   "tex": "char/OFF_photuong.webp",
   "tris": 5994,
-  "bytes": 254832
+  "bytes": 255724
  },
  "char/OFF_tuong": {
   "kind": "char",
   "file": "char/OFF_tuong.hkm",
   "tex": "char/OFF_tuong.webp",
   "tris": 5989,
-  "bytes": 280294
+  "bytes": 281166
  },
  "char/X19": {
   "kind": "char",
   "file": "char/X19.hkm",
   "tex": "char/X19.webp",
   "tris": 7463,
-  "bytes": 332232
+  "bytes": 333124
  },
  "char/X20": {
   "kind": "char",
   "file": "char/X20.hkm",
   "tex": "char/X20.webp",
   "tris": 7500,
-  "bytes": 294098
+  "bytes": 294994
  },
  "char/X24": {
   "kind": "char",
   "file": "char/X24.hkm",
   "tex": "char/X24.webp",
   "tris": 7498,
-  "bytes": 280662
+  "bytes": 281558
  },
  "kit/DV_DAO": {
   "kind": "kit",

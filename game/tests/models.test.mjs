@@ -4,10 +4,13 @@
 // có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt, eo liền; (c) vũ khí — kiếm, đao chuôi ở
 // phía tay và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z, chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua);
 // (d) lính đám đông — không trộn khúc không kề, tay theo khúc tay, ngân sách tam giác mỗi mức, mức chi tiết nào cũng còn vũ khí, neo
-// tua giáo; (e) xương phụ (A4);
+// tua giáo; (e) xương phụ (A4: lưng, cổ, xương đòn, xoắn cẳng tay — game/js/battle/rig-helpers.js) — đủ xương, đúng cha / bộ dẫn,
+// có trọng số, khung gắn = bộ dẫn áp vào khung gắn khớp nguồn (lúc chạy tư thế gắn → da đơn vị), bàn tay xoắn / thân xoắn ở tư thế
+// gắn không thắt cổ tay, eo (da tính bằng ma trận gắn + bộ dẫn như glb.js);
 // (f) bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs trên trục tay tổng hợp (khuỷu, "hand", tỉ lệ chung, kiểm dải).
 // Thuần Node: đọc .hkm bằng fs (định dạng bake/io.mjs, như glb.js parseHKM), không three, không node_modules. Số liệu lấy từ khung gắn
-// (nghịch đảo meta.inv) và meta.rest; bảng nướng (cỡ, chỗ cầm vũ khí của lính) từ design/tools/bake/catalog.mjs (dữ liệu thuần).
+// (nghịch đảo meta.inv) và meta.rest; bảng nướng (cỡ, chỗ cầm vũ khí của lính) từ design/tools/bake/catalog.mjs (dữ liệu thuần);
+// bảng xương phụ, bộ dẫn từ game/js/battle/rig-helpers.js (thuần).
 // TODO: lỗi đã đo trên tài sản hiện có, bước sau của đợt 19a sửa (A2 khung xương + vũ khí, A3 trọng số + lính đám đông, A4 xương phụ):
 // in "bỏ qua (TODO …)", không tính trượt. Mục ngoài TODO mà đỏ là trượt thật (giữ phần đang đúng); mục TODO đã xanh thì in nhắc xoá.
 //   node game/tests/models.test.mjs
@@ -16,18 +19,17 @@ import { readFileSync, existsSync } from "node:fs";
 const MD = new URL("../assets/models/", import.meta.url);
 const { CHARS, WEAPONS, KIT_LIST } = await import("../../design/tools/bake/catalog.mjs");
 const { SKELETONS, JOINT_NAMES } = await import("../js/battle/soldier-motion.js");
+const { HELPERS, HELPER_NAMES, driveQuat } = await import("../js/battle/rig-helpers.js");
 
 // mã kiểm:id → bước sửa. "*" = mọi mô hình của mục đó. Số đo lúc viết (đợt 19a A1) in kèm khi chạy. A3 (trọng số mềm, lính đám
-// đông) đã xoá khong-ke, ban-chan, mot-xuong, kit-ke, kit-vk. "GLB": rig không sửa được, cần dựng lại mẫu Meshy.
+// đông) đã xoá khong-ke, ban-chan, mot-xuong, kit-ke, kit-vk; A4 (xương phụ) đã xoá phu. "GLB": rig không sửa được, cần dựng lại
+// mẫu Meshy.
 const TODO = {
   // Tướng Nguyên chung: tay buông dính vạt áo, cánh tay trong ống tay áo rộng — lưới nướng chỉ 47–52 đỉnh cánh tay, 20–21 đỉnh bàn tay
   // / 2954 (ống quanh chuỗi khớp ghi tay): vai 0,9–1,2%, bàn tay 0,4–0,5% dù trọng số theo đúng khớp (giữa cẳng tay 0,98 trọng số
   // khuỷu). Đo ở đợt 19a A3; A2 đã ghi: cần mẫu mới tay tách khỏi áo.
   "phan:OFF_tuong": "GLB",
-  "phu:*": "A4",
 };
-// A4: tên xương phụ chốt ở bước A4 (mỗi nhân vật rig phải có đủ); null = chỉ đòi có ít nhất một xương ngoài 15 khớp
-const HELPERS = null;
 
 let pass = 0, fail = 0, skip = 0;
 // fn trả danh sách lỗi [{ id, msg }] (rỗng = đạt); lỗi có trong TODO thì bỏ qua
@@ -227,10 +229,14 @@ t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao D
 
 console.log("(b) Trọng số da nhân vật rig");
 // phần trọng số tối thiểu mỗi xương (% số đỉnh, Σw / n): rig đúng đều qua; tay, khuỷu ~0% là tay chết (rig hỏng)
-const MIN_SHARE = { hips: 1.5, torso: 15, head: 3, sh: 2, el: 1, hand: 0.5, hip: 0.8, knee: 0.5, ankle: 0.3 };
-t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 1%, vai ≥ 2%, cổ ≥ 3%…)", () => forChars((c) => {
+// khuỷu ≥ 0,9% (A1–A3: 1%): X19 tay phải ống tay áo bọc cẳng tay theo vai — A3 1,03%, A4 khuỷu + xoắn 0,93% (dải vai lấy thêm 0,15%)
+const MIN_SHARE = { hips: 1.5, torso: 15, head: 3, sh: 2, el: 0.9, hand: 0.5, hip: 0.8, knee: 0.5, ankle: 0.3 };
+// xương phụ nhận trọng số thay khớp (A4): lưng (bụng, ngực dưới), xương đòn (đỉnh vai) tính vào thân, xoắn (nửa cẳng tay phía cổ tay)
+// tính vào khuỷu — thân riêng còn 7,9–14,8%, khuỷu X19 0,2–0,4%
+const SHARE_OF = { spine: "torso", clavL: "torso", clavR: "torso", twistL: "elL", twistR: "elR" };
+t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 1%, vai ≥ 2%, cổ ≥ 3%…; xương phụ tính vào khớp nó thay)", () => forChars((c) => {
   const S = Object.fromEntries(c.B.map((b) => [b, 0]));
-  for (const [, ws] of skinOf(c)) for (const [b, w] of ws) S[b] += w;
+  for (const [, ws] of skinOf(c)) for (const [b, w] of ws) S[SHARE_OF[b] || b] += w;
   const bad = [];
   for (const b of CORE15) { const min = MIN_SHARE[b] ?? MIN_SHARE[b.slice(0, -1)], s = (S[b] / c.g.count) * 100; if (!(s >= min)) bad.push(`${b} ${s.toFixed(1)}% (< ${min})`); }
   return bad.join(", ");
@@ -269,12 +275,14 @@ t("mot-xuong", `da mượt: đỉnh chỉ theo một xương ≤ ${Math.round(SI
   let one = 0; for (const [, ws] of skinOf(c)) if (ws.size === 1) one++;
   return one / c.g.count <= SINGLE_MAX ? "" : `một xương ${pc(one / c.g.count)}`;
 }));
-// eo liền: cạnh ngắn (< 3 cm) ngoài tay ở 0,85–1,35 m (khung gắn), trọng số thân hai đầu chênh ≤ 0,12 — trước đây thân nhảy 0 → 0,35
-// ở hông + 0,02 (thân xoắn 0,6 rad: đai xé tới 12–29 cm giữa hai đầu một cạnh)
-const ARM_BONES = new Set(["shL", "elL", "handL", "shR", "elR", "handR"]);
-t("eo", "eo liền: cạnh < 3 cm ngoài tay ở độ cao 0,85–1,35 m, trọng số thân hai đầu chênh ≤ 0,12 (không bậc)", () => forChars((c) => {
-  const P = c.g.position, I = c.g.index, wt = new Float32Array(c.g.count), arm = new Uint8Array(c.g.count);
-  for (const [v, ws] of skinOf(c)) { wt[v] = ws.get("torso") || 0; for (const b of ws.keys()) if (ARM_BONES.has(b)) arm[v] = 1; }
+// eo liền: cạnh ngắn (< 3 cm) ngoài tay ở 0,85–1,35 m (khung gắn), phần góc thân hai đầu chênh ≤ 0,12 — trước đây thân nhảy 0 → 0,35
+// ở hông + 0,02 (thân xoắn 0,6 rad: đai xé tới 12–29 cm giữa hai đầu một cạnh). Phần góc thân của đỉnh: Σ trọng số × phần góc thân
+// xương đó theo (thân và mọi xương con của thân 1, lưng — xương phụ — phần góc của nó, hông 0).
+const ARM_BONES = new Set(["shL", "elL", "handL", "shR", "elR", "handR", "twistL", "twistR"]);
+const torsoShare = (c) => { const sp = c.meta.drive?.spine?.[2] ?? 0, m = new Map(); for (const b of c.B) m.set(b, b === "spine" ? sp : up(b, c.P).includes("torso") ? 1 : 0); return m; };
+t("eo", "eo liền: cạnh < 3 cm ngoài tay ở độ cao 0,85–1,35 m, phần góc thân (thân 1, lưng ½) hai đầu chênh ≤ 0,12 (không bậc)", () => forChars((c) => {
+  const P = c.g.position, I = c.g.index, wt = new Float32Array(c.g.count), arm = new Uint8Array(c.g.count), ts = torsoShare(c);
+  for (const [v, ws] of skinOf(c)) { for (const [b, w] of ws) { wt[v] += w * ts.get(b); if (ARM_BONES.has(b)) arm[v] = 1; } }
   let worst = 0, at = null;
   for (let q = 0; q < I.length; q += 3) for (let e = 0; e < 3; e++) {
     const a = I[q + e], b = I[q + ((e + 1) % 3)];
@@ -446,18 +454,107 @@ t("kit-vk", "mức chi tiết nào cũng còn vũ khí (phủ trục dài: LOD0 
   return out.length ? [{ id, msg: out.join("; ") }] : [];
 }));
 
-console.log("(e) Xương phụ (A4)");
-t("phu", "nhân vật rig có xương phụ (ngoài 15 khớp) có cha (meta.parent) và có trọng số (≥ 0,1%)", () => forChars((c) => {
-  const extra = c.B.filter((b) => !CORE15.includes(b)), bad = [];
-  if (HELPERS) { for (const h of HELPERS) if (!c.B.includes(h)) bad.push("thiếu " + h); }
-  else if (!extra.length) return "chưa có xương phụ (chỉ 15 khớp)";
-  const S = Object.fromEntries(c.B.map((b) => [b, 0]));
+console.log("(e) Xương phụ (A4: game/js/battle/rig-helpers.js)");
+// ma trận 4×4 cột trước (như three): nhân, nghịch đảo cứng, dựng từ quaternion + dời, quaternion của phần xoay, áp điểm
+const mm = (a, b) => { const o = new Array(16); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { let s = 0; for (let k = 0; k < 4; k++) s += a[i + 4 * k] * b[k + 4 * j]; o[i + 4 * j] = s; } return o; };
+const rinv = (m) => { const o = [m[0], m[4], m[8], 0, m[1], m[5], m[9], 0, m[2], m[6], m[10], 0, 0, 0, 0, 1]; for (let k = 0; k < 3; k++) o[12 + k] = -(o[k] * m[12] + o[4 + k] * m[13] + o[8 + k] * m[14]); return o; };
+const fromQT = ([x, y, z, w], t = [0, 0, 0]) => [1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y), 0, 2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x), 0,
+  2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y), 0, t[0], t[1], t[2], 1];
+function quatOf(m) {
+  const [a, b, c, , d, e, f, , g, h, k] = m, tr = a + e + k;               // cột: a b c = x; d e f = y; g h k = z
+  if (tr > 0) { const s = 0.5 / Math.sqrt(tr + 1); return [(f - h) * s, (g - c) * s, (b - d) * s, 0.25 / s]; }
+  if (a > e && a > k) { const s = 2 * Math.sqrt(1 + a - e - k); return [0.25 * s, (d + b) / s, (g + c) / s, (f - h) / s]; }
+  if (e > k) { const s = 2 * Math.sqrt(1 + e - a - k); return [(d + b) / s, 0.25 * s, (h + f) / s, (g - c) / s]; }
+  const s = 2 * Math.sqrt(1 + k - a - e); return [(g + c) / s, (h + f) / s, 0.25 * s, (b - d) / s];
+}
+const apply = (m, p) => [0, 1, 2].map((r) => m[r] * p[0] + m[r + 4] * p[1] + m[r + 8] * p[2] + m[r + 12]);
+const bindW = (c, b) => rinv(c.meta.inv.slice(c.B.indexOf(b) * 16, c.B.indexOf(b) * 16 + 16));
+// tư thế: khung gắn, rồi xoay thêm cục bộ rot[khớp] (quaternion); xương phụ dựng như glb.js (gốc meta.rest, góc = bộ dẫn áp vào góc
+// cục bộ của khớp nguồn). Trả ma trận da (thế giới × nghịch đảo gắn) mỗi xương.
+function poseSkin(c, rot) {
+  const W = {}, BW = Object.fromEntries(c.B.map((b) => [b, bindW(c, b)]));
+  const hp = c.meta.parent || {}, order = [...CORE15, ...c.B.filter((b) => !CORE15.includes(b))];
+  for (const b of order) {
+    if (hp[b]) {
+      const [src, kind, share] = c.meta.drive[b], L = mm(rinv(BW[PARENT15[src]]), BW[src]), q = quatOf(rot[src] ? mm(L, fromQT(rot[src])) : L);
+      W[b] = mm(W[hp[b]], fromQT(driveQuat(kind, share, q[0], q[1], q[2], q[3], [0, 0, 0, 0]), c.meta.rest[b]));
+    } else {
+      const L = PARENT15[b] ? mm(rinv(BW[PARENT15[b]]), BW[b]) : BW[b];
+      W[b] = mm(PARENT15[b] ? W[PARENT15[b]] : fromQT([0, 0, 0, 1]), rot[b] ? mm(L, fromQT(rot[b])) : L);
+    }
+  }
+  return c.B.map((b) => mm(W[b], c.meta.inv.slice(c.B.indexOf(b) * 16, c.B.indexOf(b) * 16 + 16)));
+}
+function skinPos(c, M) {
+  const P = c.g.position, si = c.g.skinIndex, sw = c.g.skinWeight, out = new Float64Array(P.length);
+  for (let v = 0; v < c.g.count; v++) {
+    const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]];
+    for (let q = 0; q < 4; q++) { const w = sw[v * 4 + q] / 255; if (!w) continue; const r = apply(M[si[v * 4 + q]], p); for (let k = 0; k < 3; k++) out[v * 3 + k] += w * r[k]; }
+  }
+  return out;
+}
+const qAxis = (ax, a) => { const s = Math.sin(a / 2); return [ax[0] * s, ax[1] * s, ax[2] * s, Math.cos(a / 2)]; };
+// khoảng cách tới đường thẳng qua a, b
+const lineDist = (p, a, b) => { const ab = sub3(b, a), ap = sub3(p, a), u = dt3(ap, ab) / dt3(ab, ab); return Math.hypot(...sub3(ap, ab.map((x) => x * u))); };
+// phần trọng số tối thiểu (% số đỉnh) mỗi xương phụ: xương có mà không ai theo là xương chết
+const HELP_MIN = { spine: 3, neck: 0.5, clav: 0.2, twist: 0.3 };
+t("phu", `nhân vật rig có đủ ${HELPER_NAMES.length} xương phụ, cha (meta.parent) và bộ dẫn (meta.drive) đúng bảng rig-helpers.js, có trọng số (lưng ≥ 3%, cổ ≥ 0,5%, xương đòn ≥ 0,2%, xoắn ≥ 0,3%)`, () => forChars((c) => {
+  const bad = [], S = Object.fromEntries(c.B.map((b) => [b, 0]));
   for (const [, ws] of skinOf(c)) for (const [b, w] of ws) S[b] += w;
-  for (const h of extra) {
-    if (!c.meta.parent || !c.B.includes(c.meta.parent[h])) bad.push(`${h} không có cha trong meta.parent`);
-    if (!(S[h] / c.g.count >= 0.001)) bad.push(`${h} ${pc(S[h] / c.g.count)}`);
+  for (const h of HELPER_NAMES) {
+    if (!c.B.includes(h)) { bad.push("thiếu " + h); continue; }
+    const H = HELPERS[h], d = c.meta.drive?.[h];
+    if (c.meta.parent?.[h] !== H.parent) bad.push(`${h} cha ${c.meta.parent?.[h]} ≠ ${H.parent}`);
+    if (!d || d[0] !== H.src || d[1] !== H.kind || d[2] !== H.share) bad.push(`${h} bộ dẫn ${JSON.stringify(d)} ≠ ${H.src}/${H.kind}/${H.share} (nướng lại)`);
+    if (!c.meta.rest?.[h]) bad.push(`${h} thiếu meta.rest`);
+    const min = HELP_MIN[h] ?? HELP_MIN[h.slice(0, -1)], s = (S[h] / c.g.count) * 100;
+    if (!(s >= min)) bad.push(`${h} ${s.toFixed(2)}% (< ${min})`);
+  }
+  const extra = c.B.filter((b) => !CORE15.includes(b) && !HELPER_NAMES.includes(b));
+  if (extra.length) bad.push("xương lạ " + extra.join(", "));
+  return bad.join(", ");
+}));
+t("khop-phu", "khung gắn xương phụ = khung gắn cha × (gốc meta.rest, bộ dẫn áp vào góc gắn cục bộ khớp nguồn) ±1 mm, ±0,3° — lúc chạy (glb.js) tư thế gắn cho da đơn vị", () => forChars((c) => {
+  if (!c.meta.parent) return "";
+  const bad = [];
+  for (const h of HELPER_NAMES) {
+    if (!c.B.includes(h) || !c.meta.drive?.[h]) continue;
+    const [src, kind, share] = c.meta.drive[h], q = quatOf(mm(rinv(bindW(c, PARENT15[src])), bindW(c, src)));
+    const want = mm(bindW(c, c.meta.parent[h]), fromQT(driveQuat(kind, share, q[0], q[1], q[2], q[3], [0, 0, 0, 0]), c.meta.rest[h])), got = bindW(c, h);
+    const dp = Math.hypot(want[12] - got[12], want[13] - got[13], want[14] - got[14]), dq = quatOf(mm(rinv(want), got)), da = 2 * Math.acos(Math.min(1, Math.abs(dq[3]))) * 180 / Math.PI;
+    if (dp > 0.001 || da > 0.3) bad.push(`${h} lệch ${(dp * 1000).toFixed(1)} mm, ${da.toFixed(2)}°`);
   }
   return bad.join(", ");
+}));
+// bàn tay xoắn ±π/2 quanh trục cẳng tay (tư thế gắn, mọi khớp khác yên): đỉnh nửa cẳng tay phía cổ tay (chiếu 0,5–1 đoạn khuỷu → cổ tay,
+// cách trục 1–9 cm), khoảng cách tới trục sau / trước. Trộn thẳng bàn tay + khuỷu 50/50 lệch 90°: cos 45° = 0,71 (cổ tay giấy gói kẹo);
+// xoắn cẳng tay nửa góc: cos 22,5° = 0,92.
+t("xoan-co-tay", "bàn tay xoắn 90° (tư thế gắn): cẳng tay gần cổ tay còn ≥ 0,85 bề dày (khoảng cách tới trục cẳng tay, nhỏ nhất)", () => forChars((c) => {
+  const M = poseSkin(c, { handL: qAxis([0, 1, 0], Math.PI / 2), handR: qAxis([0, 1, 0], -Math.PI / 2) }), S = skinPos(c, M), P = c.g.position, out = [];
+  for (const s of ["L", "R"]) {
+    const e = c.J["el" + s], h = c.J["hand" + s], ab = sub3(h, e);
+    let mn = Infinity, n = 0;
+    for (let v = 0; v < c.g.count; v++) {
+      const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]], u = dt3(sub3(p, e), ab) / dt3(ab, ab), r0 = lineDist(p, e, h);
+      if (u < 0.5 || u > 1 || r0 < 0.01 || r0 > 0.09) continue;
+      n++; mn = Math.min(mn, lineDist([S[v * 3], S[v * 3 + 1], S[v * 3 + 2]], e, h) / r0);
+    }
+    if (n && mn < 0.85) out.push(`${s} ${f2(mn)}`);
+  }
+  return out.join(", ");
+}));
+// thân xoắn 0,8 rad quanh trục đứng (tư thế gắn): đỉnh eo (hông + 0,05 … + 0,35, không theo tay) — khoảng cách tới trục đứng qua khớp
+// thân sau / trước. Hông + thân 50/50: cos 0,4 = 0,92; hông – lưng – thân: cos 0,2 = 0,98.
+t("xoan-eo", "thân xoắn 0,8 rad (tư thế gắn): eo còn ≥ 0,95 bề dày (khoảng cách tới trục đứng qua khớp thân, nhỏ nhất)", () => forChars((c) => {
+  const M = poseSkin(c, { torso: qAxis([0, 1, 0], 0.8) }), S = skinPos(c, M), P = c.g.position, T = c.J.torso, y0 = c.J.hips[1];
+  const arm = new Uint8Array(c.g.count); for (const [v, ws] of skinOf(c)) for (const b of ws.keys()) if (ARM_BONES.has(b)) arm[v] = 1;
+  let mn = Infinity, at = 0;
+  for (let v = 0; v < c.g.count; v++) {
+    const y = P[v * 3 + 1]; if (arm[v] || y < y0 + 0.05 || y > y0 + 0.35) continue;
+    const r0 = Math.hypot(P[v * 3] - T[0], P[v * 3 + 2] - T[2]); if (r0 < 0.03) continue;
+    const k = Math.hypot(S[v * 3] - T[0], S[v * 3 + 2] - T[2]) / r0; if (k < mn) { mn = k; at = y; }
+  }
+  return mn >= 0.95 ? "" : `${f3(mn)} ở y ${f2(at)}`;
 }));
 
 console.log("(f) Bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs (trục tay tổng hợp, cao chuẩn hoá 1,9)");

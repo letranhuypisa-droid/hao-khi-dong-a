@@ -1,5 +1,8 @@
 // design/tools/bake/char.mjs — nhân vật dùng rig khớp nối của game (battle/models.js makeRig: tướng, sĩ quan, cận vệ, người
-// lính Tự do): lưới Meshy → lưới da gắn đúng 15 khớp rig, kèm ma trận gắn nghịch đảo và vị trí khớp tay, cổ riêng của mô hình.
+// lính Tự do): lưới Meshy → lưới da gắn đúng 15 khớp rig + 6 xương phụ (lưng, cổ, xương đòn, xoắn cẳng tay — game/js/battle/
+// rig-helpers.js; glb.js dựng lúc gắn thân, tự quay theo khớp nguồn, hoạt ảnh không biết tới), kèm ma trận gắn nghịch đảo và vị trí
+// khớp tay, cổ riêng của mô hình. meta.bones: 15 khớp rồi xương phụ; meta.rest: khớp (khung cha) + gốc xương phụ; meta.parent,
+// meta.drive: cha, [khớp nguồn, cách quay, phần góc] của xương phụ.
 //
 // Mô hình giữ dáng gốc (tay đưa ra trước hoặc chữ A); khung gắn đặt ở khớp dò được (human.mjs). Lúc chạy, game đặt góc khớp như
 // rig cũ (0 = tay chân buông thẳng), lưới đi theo bằng skinning chuẩn (khớp lúc chạy × nghịch đảo khung gắn). Hông, thân, khớp
@@ -13,16 +16,16 @@
 // nướng texture mới từ lưới đó (rebake.mjs) — đường may UV của Meshy chặn giảm lưới (tướng khác dừng ở 7–9 nghìn thay vì 6).
 
 import { readGLB, smoothNormals, packMesh, quantWeights, rawImage } from "./io.mjs";
-import { JOINTS, fitHuman, cutBoxes, bindSkeleton, weights15, topK } from "./human.mjs";
+import { JOINTS, fitHuman, cutBoxes, bindSkeleton, bindHelpers, weights15, topK } from "./human.mjs";
 import { weldSimplify, rebake } from "./rebake.mjs";
 
 const Y = { hips: 0.92, torso: 0.96, hipOff: 0.02, thigh: 0.45, shin: 0.4, knee: 0.45, ankle: 0.05 };
 
 // Đế giày của lưới trong khung cổ chân gắn (cổ chân ở (legX, ankle), trục thẳng): đỉnh dưới cổ chân + 0,02, cách trục chân ≤ 0,12,
 // trọng số cổ chân ≥ 0,6 (gấu áo dài chạm đất theo hông, không tính) mỗi bên → sole (đế thấp hơn cổ chân), toe / heel (z xa nhất
-// trước / sau), footZ (giữa đế) — trung bình hai bên. W: trọng số 15 khớp (weights15).
-function footOf(V, W, legX, ankleY) {
-  const out = [], NB = JOINTS.length;
+// trước / sau), footZ (giữa đế) — trung bình hai bên. W: trọng số NB xương mỗi đỉnh (weights15; cổ chân theo chỉ số trong JOINTS).
+function footOf(V, W, NB, legX, ankleY) {
+  const out = [];
   for (const sd of ["L", "R"]) {
     const ja = JOINTS.indexOf("ankle" + sd);
     let y0 = Infinity, z0 = Infinity, z1 = -Infinity;
@@ -39,9 +42,9 @@ function footOf(V, W, legX, ankleY) {
 export async function bakeChar(file, { tris, tex = 512, wc01 = false, fix = null, cut = null, name = "?" } = {}) {
   const c = cutBoxes(await readGLB(file, tris), cut), g = c.g;
   const F = fitHuman(g.pos, g.idx, { shY: 1.48, fix, box: c.bounds, name, wc01 });
-  const { inv, restLocal } = bindSkeleton(F, Y);
-  const rest = Object.fromEntries(Object.entries(restLocal).map(([k, v]) => [k, v.map((x) => +x.toFixed(4))]));
-  const W = weights15(F, Y), { idx: si, w: sw } = topK(W, JOINTS.length, 4);
+  const bind = bindSkeleton(F, Y), HB = bindHelpers(bind), bones = [...JOINTS, ...HB.names], NB = bones.length;
+  const rest = Object.fromEntries(Object.entries(bind.restLocal).map(([k, v]) => [k, v.map((x) => +x.toFixed(4))]));
+  const W = weights15(F, Y, {}, HB), { idx: si, w: sw } = topK(W, NB, 4);
   const nor = smoothNormals(F.V, g.idx);
   const low = await weldSimplify(F.V, g.idx, tris);
   const r = await rebake({ pos: low.pos, nor: smoothNormals(low.pos, low.idx), idx: low.idx }, [{ pos: F.V, nor, uv: g.uv, idx: g.idx, img: await rawImage(g.image) }], tex);
@@ -51,7 +54,7 @@ export async function bakeChar(file, { tris, tex = 512, wc01 = false, fix = null
   let ymax = 0; for (let i = 1; i < F.V.length; i += 3) ymax = Math.max(ymax, F.V[i]);
   return {
     mesh, image: r.image, tris: r.part.idx.length / 3, trisBefore: g.trisBefore, warnings: F.lm.warnings, how: F.how, cut: c.cut,
-    meta: { kind: "char", bones: JOINTS, inv: inv.flatMap((m) => m.toArray().map((x) => +x.toFixed(6))), rest, wc01, scale: +F.s.toFixed(4), norm: [+F.s.toFixed(5), +F.ox.toFixed(5), +F.oz.toFixed(5)], top: +ymax.toFixed(3),
-      foot: footOf(F.V, W, F.legX, Y.hips - Y.hipOff - Y.thigh - Y.shin), arms: F.how, ...(c.cut ? { cut: c.cut } : {}) },
+    meta: { kind: "char", bones, inv: [...bind.inv, ...HB.inv].flatMap((m) => m.toArray().map((x) => +x.toFixed(6))), rest: { ...rest, ...HB.rest }, parent: HB.parent, drive: HB.drive, wc01, scale: +F.s.toFixed(4), norm: [+F.s.toFixed(5), +F.ox.toFixed(5), +F.oz.toFixed(5)], top: +ymax.toFixed(3),
+      foot: footOf(F.V, W, NB, F.legX, Y.hips - Y.hipOff - Y.thigh - Y.shin), arms: F.how, ...(c.cut ? { cut: c.cut } : {}) },
   };
 }

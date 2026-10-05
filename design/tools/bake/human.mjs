@@ -10,9 +10,12 @@
 // vẫn thuộc về tay, không dính vào ngực; tay ghi tay / đối xứng theo chiếu lên chuỗi xương — axialGeo), đầu, thân, hông theo độ cao,
 // chân theo bên và độ cao, vạt áo xa trục chân dựa hông — rồi làm mượt trên lưới hàn (đỉnh ngoài dải neo yên), chỉ trộn xương kề
 // nhau, ≤ 4 xương. Trước đây (đến đợt 19a A2) dải cứng hẹp không làm mượt: 64% đỉnh một xương, eo nhảy bậc, mũi giày theo hông.
+// Xương phụ (đợt 19a A4, chỉ nhân vật rig; lính đám đông giữ 15 khớp): lưng, cổ, xương đòn, xoắn cẳng tay (game/js/battle/rig-helpers.js)
+// — bindHelpers dựng khung gắn, weights15(…, HB) chia dải eo, cổ, vai, cẳng tay cho chúng trong cùng trường vùng + làm mượt.
 
 import * as THREE from "three";
 import { landmarks, armJoints, armProblems, armAsym, mirrorArm, axialGeo, ARM_RULE, ARM_OK, ARM_KIT } from "./landmarks.mjs";
+import { HELPERS, HELPER_NAMES, driveQuat } from "../../../game/js/battle/rig-helpers.js";
 
 export const JOINTS = ["hips", "torso", "head", "shL", "elL", "handL", "shR", "elR", "handR", "hipL", "kneeL", "ankleL", "hipR", "kneeR", "ankleR"];
 export const PARENT = { hips: null, torso: "hips", head: "torso", shL: "torso", elL: "shL", handL: "elL", shR: "torso", elR: "shR", handR: "elR",
@@ -190,20 +193,61 @@ export function bindSkeleton(F, Y) {
   return { B, inv, restLocal };
 }
 
+// Xương phụ trên khung gắn (bind: bindSkeleton): cha, khớp nguồn, cách quay, phần góc theo rig-helpers.js HELPERS. Gốc (khung cha):
+// lưng ở khớp thân, cổ ở khớp cổ — cùng gốc nên vùng nửa góc nối liền vùng đủ góc (xoắn, gập quanh cùng một điểm); xương đòn ở đầu
+// xương ức (x = clavX × x vai, cùng độ cao, độ sâu với vai: tay giơ quá ngang vai thì cơ thang, đầu vai nhấc lên quanh đó); xoắn ở
+// giữa cẳng tay (trên trục cẳng tay). Góc gắn = bộ dẫn (driveQuat) áp vào góc gắn cục bộ của khớp nguồn — thân, đầu, bàn tay gắn góc 0
+// nên lưng, cổ, xoắn gắn góc 0; xương đòn gắn góc 0 khi tay mô hình (đưa ra trước, chữ A) chưa quá ngang vai (mọi mẫu hiện có). Lúc
+// chạy glb.js đặt cùng gốc (meta.rest), cùng bộ dẫn (meta.drive): tư thế gắn → ma trận da đơn vị.
+// Trả { names, inv (ma trận gắn nghịch đảo), rest (gốc, khung cha, 4 số lẻ), parent, drive, piv (gốc thế giới khung gắn) }.
+export const HELP_PRM = { clavX: 0.15 };
+export function bindHelpers(bind, P = {}) {
+  const prm = { ...HELP_PRM, ...P }, B = bind.B, r4 = (a) => a.map((x) => +x.toFixed(4));
+  const rest = { spine: r4(B.torso.position.toArray()), neck: r4(B.head.position.toArray()) };
+  for (const sd of ["L", "R"]) {
+    const sh = B["sh" + sd].position;
+    rest["clav" + sd] = r4([sh.x * prm.clavX, sh.y, sh.z]);
+    rest["twist" + sd] = r4([0, B["hand" + sd].position.y / 2, 0]);
+  }
+  const o = [0, 0, 0, 0], H = {}, parent = {}, drive = {};
+  for (const n of HELPER_NAMES) {
+    const h = HELPERS[n], b = new THREE.Bone(), q = B[h.src].quaternion;
+    driveQuat(h.kind, h.share, q.x, q.y, q.z, q.w, o);
+    b.name = n; b.position.fromArray(rest[n]); b.quaternion.set(o[0], o[1], o[2], o[3]);
+    B[h.parent].add(b); H[n] = b; parent[n] = h.parent; drive[n] = [h.src, h.kind, h.share];
+  }
+  B.hips.updateWorldMatrix(true, true);
+  const piv = Object.fromEntries(HELPER_NAMES.map((n) => [n, new THREE.Vector3().setFromMatrixPosition(H[n].matrixWorld).toArray()]));
+  return { names: HELPER_NAMES, inv: HELPER_NAMES.map((n) => new THREE.Matrix4().copy(H[n].matrixWorld).invert()), rest, parent, drive, piv };
+}
+
 // ---- trọng số da ---------------------------------------------------------------------------------------------------------------
 // Nhóm xương được trộn với nhau (mọi cặp trong nhóm kề nhau: game/tests/models.test.mjs khong-ke): thân trên + một vai, tay, hông +
 // một đùi, chuỗi chân. Không có thân + đùi (vạt áo xoắn theo thân), hông + gối / bàn chân (vạt áo, mũi giày kéo tới chậu), hai chân.
 const JI = Object.fromEntries(JOINTS.map((x, i) => [x, i]));
 const CLIQUES = [["hips", "torso", "head", "shL"], ["hips", "torso", "head", "shR"], ["shL", "elL", "handL"], ["shR", "elR", "handR"],
   ["hips", "hipL"], ["hips", "hipR"], ["hipL", "kneeL", "ankleL"], ["hipR", "kneeR", "ankleR"]].map((c) => c.map((b) => JI[b]));
+// Có xương phụ (thứ tự xương JOINTS + HELPER_NAMES, như meta.bones): eo hông – lưng – thân, cổ thân – cổ – đầu, vai thân – xương đòn –
+// cánh tay (+ cổ), cơ thang thân – xương đòn – cổ – đầu, tay vai – khuỷu – xoắn – bàn tay. Lưng (con của hông) không trộn với vai,
+// xương đòn, cổ (cách 3 đốt).
+const NAMES_H = [...JOINTS, ...HELPER_NAMES], JH = Object.fromEntries(NAMES_H.map((x, i) => [x, i]));
+const CLIQUES_H = [["hips", "spine", "torso"], ["torso", "neck", "head"],
+  ...["L", "R"].flatMap((s) => [["torso", "clav" + s, "sh" + s, "neck"], ["torso", "clav" + s, "neck", "head"], ["hips", "torso", "sh" + s],
+    ["sh" + s, "el" + s, "twist" + s, "hand" + s], ["hips", "hip" + s], ["hip" + s, "knee" + s, "ankle" + s]])].map((c) => c.map((b) => JH[b]));
 // Dải trộn (m; nửa bề rộng, smoothstep): bh cổ tay, be khuỷu, bs vai — so dời dải vai về phía tay (nách, sườn ngực theo thân; bắp vai
 // trộn); bn cổ; eo: thân tăng đều (tuyến tính) từ hông + w0 (ngang khớp đùi) tới hông + w1 (giữa ngực) — thân xoắn, gập chia đều như
 // cột sống; top hông → đùi dưới đỉnh đùi; kb gối; a0…a1 cổ chân. Vạt áo: cách trục chân (cả đoạn bàn chân) rin…rin + rw thì dựa hông,
 // giữa thân (|x| < mid) hẳn theo hông, ra hai bên tới cR (0 hông … 1 đùi); đáy chậu: dưới hông 0,14, sát giữa (|x| < 0,05) theo hông.
 // Làm mượt iters lượt, hệ số lam; headRigid: trên cổ chừng này là mũ, tóc (cứng theo đầu); prune: bỏ trọng số nhỏ hơn. Số dải chọn
 // theo tỉ lệ tam giác xấu ở 7 + 12 tư thế lab (đợt 19a A3; dải hẹp hơn / rộng hơn chừng ±30% chỉ đổi vài phần trăm).
+// Xương phụ (chỉ khi có HB): xương đòn lấy phần thân ở vai, cơ thang — dọc đoạn đầu xương ức → khớp vai u (0 ức … 1 vai) từ cU0 tới
+// cU1, trên vai + cY0 … vai + cY1 (nách, sườn ngực dưới đó theo thân), trước / sau vai |Δz| cZ0 … cZ1 thì bớt dần; xoắn lấy phần
+// khuỷu của cẳng tay từ dải cổ tay qua đoạn cẳng tay thuần (0 hết dải cổ tay … 1 chạm dải khuỷu) tới tw0, về khuỷu dần tới tw1 — hết
+// trước dải khuỷu (trước đây đo theo cả đoạn cổ tay → khuỷu: xoắn lấn vào dải khuỷu, khuỷu trộn vai + khuỷu + xoắn, H31 N1 +12 tam
+// giác xấu). Vùng xương đòn chọn theo tam giác xấu ở đợt 19a A4 (rộng hơn / hẹp hơn đều xấu hơn chút ít).
 export const WEIGHT_PRM = { bh: 0.05, be: 0.1, bs: 0.08, so: -0.05, bn: 0.1, w0: -0.02, w1: 0.42, top: 0.22, kb: 0.05, a0: -0.01, a1: 0.07,
-  rin: 0.075, rw: 0.12, cR: 0.7, mid: 0.1, toeZ: 0.2, heelZ: -0.08, iters: 300, lam: 0.5, headRigid: 0.06, prune: 0.02 };
+  rin: 0.075, rw: 0.12, cR: 0.7, mid: 0.1, toeZ: 0.2, heelZ: -0.08, iters: 300, lam: 0.5, headRigid: 0.06, prune: 0.02,
+  cU0: 0, cU1: 0.6, cY0: -0.12, cY1: -0.04, cZ0: 0.06, cZ1: 0.14, tw0: 0.35, tw1: 0.85 };
 const sstep = (x, a, b) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const segDist = (p, a, b) => {
   const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
@@ -211,32 +255,38 @@ const segDist = (p, a, b) => {
   return Math.hypot(ap[0] - u * ab[0], ap[1] - u * ab[1], ap[2] - u * ab[2]);
 };
 // w (NB) → out: giữ nhóm xương kề nhau (trong mặt nạ) nặng nhất, chuẩn hoá. false: không nhóm nào có trọng số.
-function toClique(w, out, oo, mask) {
-  const NB = JOINTS.length;
+function toClique(w, out, oo, mask, NB, CL) {
   let best = -1, bm = 0;
-  for (let c = 0; c < CLIQUES.length; c++) { let m = 0; for (const b of CLIQUES[c]) if (mask & (1 << b)) m += w[b]; if (m > bm) { bm = m; best = c; } }
+  for (let c = 0; c < CL.length; c++) { let m = 0; for (const b of CL[c]) if (mask & (1 << b)) m += w[b]; if (m > bm) { bm = m; best = c; } }
   if (best < 0) return false;
   for (let b = 0; b < NB; b++) out[oo + b] = 0;
-  for (const b of CLIQUES[best]) if (mask & (1 << b)) out[oo + b] = w[b] / bm;
+  for (const b of CL[best]) if (mask & (1 << b)) out[oo + b] = w[b] / bm;
   return true;
 }
 
 // Trọng số 15 khớp mỗi đỉnh (Float32Array n × 15, tổng 1, ≤ 4 xương, chỉ xương kề nhau). Y: { hips, hipOff, knee, ankle } độ cao khung
 // gắn (khung đã chuẩn hoá); P: thay WEIGHT_PRM. Tính trên lưới hàn của bộ dò (lm.info.weld: đường may UV liền), rồi ra từng đỉnh.
+// HB (bindHelpers, nhân vật rig): thêm xương phụ — n × 21 (thứ tự JOINTS + HELPER_NAMES).
 // (1) Trường vùng mềm: tay theo khoảng cách đo dọc mặt lưới từ đầu ngón (F.geo: tay ghi tay / thay thế có trường riêng); ngoài tay:
 //     đầu, thân, hông theo độ cao — eo liền một dải dài (trước đây dải 12 cm, thân nhảy 0 → 0,35 ở hông + 0,02: thân xoắn thì đai xé
 //     ~6 cm); dưới eo toạ độ chuỗi chân c (0 hông, 1 đùi, 2 cẳng, 3 bàn chân) theo độ cao, vạt áo kéo c về phía hông. Khoảng cách tới
 //     trục chân tính cả đoạn bàn chân (trước đây đo từ trục đứng: mũi giày thành "vạt áo", theo hông — giày gai). c chỉ trộn hai xương
 //     liền nhau: gấu áo ngang cổ chân không bao giờ trộn bàn chân + chậu.
-// (2) Làm mượt trên lưới hàn (Jacobi): đỉnh thuần một xương (ngoài mọi dải) và đỉnh chỉ có đầu / thân / hông (dải cổ, eo theo độ cao,
-//     đã liền — làm mượt kéo eo về phía vùng nối nhiều hơn, thành bậc ở mép trên dải) neo yên; đỉnh khác lấy trung bình láng giềng theo
-//     1 / độ dài cạnh (hai đỉnh gần nhau trọng số gần nhau: tam giác nhỏ, cạnh ngắn không bị kéo giãn — trung bình đều kéo giãn chúng
-//     gấp mấy lần), chỉ trên các xương đỉnh đó có từ trường vùng (dải giữ chỗ: tay không lan tới khuỷu, thân không xuống vạt áo), mỗi
-//     lượt chiếu về một nhóm xương kề nhau (CLIQUES). Không làm mượt thì dải smoothstep còn gãy theo lưới: tam giác xấu nhiều gấp ~1,6.
+//     Xương phụ: dải eo, cổ chia theo phần góc — phần góc thân (0 hông … 1 thân, tăng đều như trên) thành hai xương liền nhau trong hông
+//     (0), lưng (phần góc lưng, ½), thân (1): mỗi đỉnh theo đúng phần góc thân như trước nhưng hai xương trộn chỉ lệch nửa góc (bụng xoắn,
+//     gập không thắt); cổ như vậy với thân, cổ, đầu. Xương đòn lấy phần thân ở bắp vai, cơ thang (WEIGHT_PRM cU…, cY…, cZ…); xoắn lấy
+//     phần khuỷu ở nửa cẳng tay phía cổ tay, hết trước dải khuỷu (tw0, tw1) — dải cổ tay thành bàn tay + xoắn: bàn tay xoắn 1,8 rad thì
+//     cổ tay còn ≥ 0,9 bề dày (trộn thẳng bàn tay + khuỷu: 0,62–0,64).
+// (2) Làm mượt trên lưới hàn (Jacobi): đỉnh thuần một xương (ngoài mọi dải) và đỉnh chỉ có đầu / thân / hông (+ lưng, cổ: dải cổ, eo theo
+//     độ cao, đã liền — làm mượt kéo eo về phía vùng nối nhiều hơn, thành bậc ở mép trên dải) neo yên; đỉnh khác lấy trung bình láng
+//     giềng theo 1 / độ dài cạnh (hai đỉnh gần nhau trọng số gần nhau: tam giác nhỏ, cạnh ngắn không bị kéo giãn — trung bình đều kéo
+//     giãn chúng gấp mấy lần), chỉ trên các xương đỉnh đó có từ trường vùng (dải giữ chỗ: tay không lan tới khuỷu, thân không xuống vạt
+//     áo), mỗi lượt chiếu về một nhóm xương kề nhau (CLIQUES; có xương phụ: CLIQUES_H). Không làm mượt thì dải smoothstep còn gãy theo
+//     lưới: tam giác xấu nhiều gấp ~1,6.
 // (3) Mũ, tóc trên cổ cứng theo đầu; bỏ trọng số < prune, chuẩn hoá.
-export function weights15(F, Y, P = {}) {
+export function weights15(F, Y, P = {}, HB = null) {
   const prm = { ...WEIGHT_PRM, ...P };
-  const { V, s, lm, neckY, legX } = F, n = V.length / 3, NB = JOINTS.length;
+  const { V, s, lm, neckY, legX } = F, n = V.length / 3, NB = HB ? NAMES_H.length : JOINTS.length, CL = HB ? CLIQUES_H : CLIQUES, BI = HB ? JH : JI;
   const G = lm.info.weld, wid = lm.info.weldId, geo = F.geo || lm.info.geo, m = G.n;
   const Pm = new Float32Array(m * 3);
   for (let v = 0; v < n; v++) { const g = wid[v]; Pm[g * 3] = V[v * 3]; Pm[g * 3 + 1] = V[v * 3 + 1]; Pm[g * 3 + 2] = V[v * 3 + 2]; }
@@ -259,19 +309,38 @@ export function weights15(F, Y, P = {}) {
     const k = Math.min(1, (0.7 * up) / (prm.be + prm.bs - prm.so), (0.7 * fo) / (prm.bh + prm.be));
     arm[sd] = { DF: g.DF, dH, dE, dS, bh: prm.bh * k, be: prm.be * k, bs: prm.bs * k, so: prm.so * k };
   }
-  const bit = (name) => 1 << JI[name];
+  const bit = (name) => 1 << BI[name];
+  // xương phụ: phần góc lưng, cổ (meta.drive); xương đòn: đầu xương ức (gốc, khung gắn) → khớp vai
+  const sS = HB && HB.drive.spine[2], sN = HB && HB.drive.neck[2];
+  const CV = HB && { L: [HB.piv.clavL, F.J.shL], R: [HB.piv.clavR, F.J.shR] };
+  const clavW = (x, y, z) => {
+    const [c, sh] = CV[x < 0 ? "L" : "R"], u = (Math.abs(x) - Math.abs(c[0])) / (Math.abs(sh[0]) - Math.abs(c[0]));
+    return sstep(u, prm.cU0, prm.cU1) * sstep(y, sh[1] + prm.cY0, sh[1] + prm.cY1) * (1 - sstep(Math.abs(z - sh[2]), prm.cZ0, prm.cZ1));
+  };
   // phần thân (k: phần còn lại sau tay) của đỉnh ở (x, y, z) → W[o…]
   const body = (o, x, y, z, k) => {
     const wHd = sstep(y, neckY - prm.bn, neckY + prm.bn), wT = Math.max(0, Math.min(1, (y - hY - prm.w0) / (prm.w1 - prm.w0)));
-    W[o + JI.head] += k * wHd; W[o + JI.torso] += k * (1 - wHd) * wT;
-    const low = k * (1 - wHd) * (1 - wT); if (low <= 0) return;
+    let low;
+    if (HB) {
+      // phần góc đầu wHd → đầu (1) / cổ (sN) / dưới cổ (0), phần góc thân wT → thân (1) / lưng (sS) / hông (0): hai xương liền nhau
+      const hH = wHd > sN ? (wHd - sN) / (1 - sN) : 0, hN = wHd > sN ? 1 - hH : wHd / sN, r = wHd > sN ? 0 : k * (1 - hN);
+      W[o + BI.head] += k * hH; W[o + BI.neck] += k * hN;
+      const tT = wT > sS ? (wT - sS) / (1 - sS) : 0, tS = wT > sS ? 1 - tT : wT / sS, g = tT > 0 ? clavW(x, y, z) : 0;
+      W[o + BI.torso] += r * tT * (1 - g); W[o + BI.spine] += r * tS;
+      if (g > 0) W[o + BI[x < 0 ? "clavL" : "clavR"]] += r * tT * g;
+      low = wT > sS ? 0 : r * (1 - tS);
+    } else {
+      W[o + BI.head] += k * wHd; W[o + BI.torso] += k * (1 - wHd) * wT;
+      low = k * (1 - wHd) * (1 - wT);
+    }
+    if (low <= 0) return;
     const sd = x < 0 ? "L" : "R", L = LG[sd], p = [x, y, z];
     let c = sstep(y, yTop, yTop - prm.top) + sstep(y, kY + prm.kb, kY - prm.kb) + sstep(y, aY + prm.a1, aY + prm.a0);
     const r = Math.min(segDist(p, L[0], L[1]), segDist(p, L[1], L[2]), segDist(p, L[2], L[3]), segDist(p, L[2], L[4]));
     const rin = prm.rin + 0.03 * sstep(y, 0.3, 0.8), rho = sstep(r, rin, rin + prm.rw);
     c = c * (1 - rho) + Math.min(c, prm.cR * sstep(Math.abs(x), 0, prm.mid)) * rho;
     c -= (1 - sstep(Math.abs(x), 0, 0.05)) * sstep(y, yC - 0.06, yC + 0.04) * Math.min(c, 1);
-    const ch = [JI.hips, JI["hip" + sd], JI["knee" + sd], JI["ankle" + sd]], i = Math.min(2, Math.floor(c)), f = c - i;
+    const ch = [BI.hips, BI["hip" + sd], BI["knee" + sd], BI["ankle" + sd]], i = Math.min(2, Math.floor(c)), f = c - i;
     W[o + ch[i]] += low * (1 - f); W[o + ch[i + 1]] += low * f;
   };
   for (let g = 0; g < m; g++) {
@@ -280,14 +349,18 @@ export function weights15(F, Y, P = {}) {
     for (const q of ["L", "R"]) { const A = arm[q]; if (!A) continue; const dq = A.DF[g] * s; if (dq <= A.dS + A.bs + A.so && dq < d) { d = dq; sd = q; } }
     if (sd) {
       const A = arm[sd], a = sstep(d, A.dH - A.bh, A.dH + A.bh), b = sstep(d, A.dE - A.be, A.dE + A.be), c = sstep(d, A.dS - A.bs + A.so, A.dS + A.bs + A.so);
-      W[o + JI["hand" + sd]] += 1 - a; W[o + JI["el" + sd]] += a - b; W[o + JI["sh" + sd]] += b - c;
+      W[o + BI["hand" + sd]] += 1 - a; W[o + BI["sh" + sd]] += b - c;
+      if (HB) { const e = (a - b) * sstep((d - A.dH - A.bh) / (A.dE - A.be - A.dH - A.bh), prm.tw0, prm.tw1); W[o + BI["el" + sd]] += e; W[o + BI["twist" + sd]] += a - b - e; }
+      else W[o + BI["el" + sd]] += a - b;
       if (c > 0) body(o, x, y, z, c);
       isArm[g] = 1;
     } else body(o, x, y, z, 1);
     for (let b = 0; b < NB; b++) if (W[o + b] > 0) mask[g] |= 1 << b;
   }
-  // làm mượt (Jacobi): đỉnh thuần một xương, đỉnh chỉ có đầu / thân / hông neo yên
-  const free = new Uint8Array(m), BODY = bit("hips") | bit("torso") | bit("head");
+  // làm mượt (Jacobi): đỉnh thuần một xương, đỉnh chỉ có đầu / thân / hông (+ lưng, cổ, xương đòn: trường liền sẵn) neo yên — xương
+  // đòn không neo thì vùng của nó (không đỉnh nào thuần xương đòn khi dải cổ phủ đỉnh vai) tan dần vào thân, cổ quanh đó (CV_songdao
+  // vai phải 0,48 → 0,001 sau 300 lượt)
+  const free = new Uint8Array(m), BODY = bit("hips") | bit("torso") | bit("head") | (HB ? bit("spine") | bit("neck") | bit("clavL") | bit("clavR") : 0);
   for (let g = 0; g < m; g++) { let mx = 0; for (let b = 0; b < NB; b++) mx = Math.max(mx, W[g * NB + b]); free[g] = mx < 0.999 && (mask[g] & ~BODY) !== 0 ? 1 : 0; }
   let A = W, B = new Float32Array(m * NB);
   const tmp = new Float32Array(NB);
@@ -298,16 +371,16 @@ export function weights15(F, Y, P = {}) {
       tmp.fill(0); let ks = 0;
       for (const [u, L] of nb) { const k = 1 / Math.max(L, 1e-4); ks += k; for (let b = 0; b < NB; b++) tmp[b] += k * A[u * NB + b]; }
       for (let b = 0; b < NB; b++) tmp[b] = (1 - prm.lam) * A[o + b] + (prm.lam * tmp[b]) / ks;
-      if (!toClique(tmp, B, o, mask[g])) for (let b = 0; b < NB; b++) B[o + b] = A[o + b];
+      if (!toClique(tmp, B, o, mask[g], NB, CL)) for (let b = 0; b < NB; b++) B[o + b] = A[o + b];
     }
     [A, B] = [B, A];
   }
-  for (let g = 0; g < m; g++) if (!isArm[g] && Pm[g * 3 + 1] > neckY + prm.headRigid) { const o = g * NB; for (let b = 0; b < NB; b++) A[o + b] = 0; A[o + JI.head] = 1; }
+  for (let g = 0; g < m; g++) if (!isArm[g] && Pm[g * 3 + 1] > neckY + prm.headRigid) { const o = g * NB; for (let b = 0; b < NB; b++) A[o + b] = 0; A[o + BI.head] = 1; }
   const out = new Float32Array(n * NB);
   for (let v = 0; v < n; v++) {
     const o = wid[v] * NB; let S = 0;
     for (let b = 0; b < NB; b++) { const w = A[o + b] >= prm.prune ? A[o + b] : 0; out[v * NB + b] = w; S += w; }
-    if (S > 0) for (let b = 0; b < NB; b++) out[v * NB + b] /= S; else out[v * NB + JI.torso] = 1;
+    if (S > 0) for (let b = 0; b < NB; b++) out[v * NB + b] /= S; else out[v * NB + BI.torso] = 1;
   }
   return out;
 }
