@@ -628,7 +628,8 @@ t("không nhắc vật chỉ để cấm khi câu tả đã đủ: mũ sắt c�
   assert.ok(!/tiles/i.test(P("ENV_nha_bat_chi_huy"))); assert.ok(!/no doors/.test(P("ENV_cong_ham_tu")));
 });
 t("đạo cụ, công trình không phải địa hình: không tả mặt đất, có no ground", () => {
-  const c8 = ["ENV_ho_chong", "ENV_trong_tran", "ENV_xe_luong_vo", "ENV_bia_rom", "ENV_xac_ngua", "ENV_leu_tran", "ENV_khan_dai", "ENV_dai_chi_huy"];
+  const c8 = ["ENV_ho_chong", "ENV_trong_tran", "ENV_xe_luong_vo", "ENV_bia_rom", "ENV_xac_ngua", "ENV_leu_tran", "ENV_khan_dai", "ENV_dai_chi_huy",
+    "ENV_leu_tron", "ENV_leu_vuong_nguyen", "ENV_leu_luong", "ENV_khung_leu_chay", "ENV_trong_dong", "ENV_bia_da"]; // mọi lều, trống, bia (đầu mục K)
   assert.deepEqual(c8.filter((c) => !/no ground/.test(P(c)) || /on the ground|above the ground|reaching the ground|training ground/.test(P(c))), []);
 });
 t("chữ màu, chất liệu lệch thời (mục chưa tạo): không brass, khaki, turban, canvas, sampan, light black; trống đồng 14 cánh như Ngọc Lũ; K8 tên thuyền mui", () => {

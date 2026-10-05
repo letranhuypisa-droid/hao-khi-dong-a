@@ -1497,7 +1497,7 @@ Lầu của mẫu dài hơn thì lính đứng boong (chiến thuyền từ z �
 
 ### K1 · ENV_chien_thuyen_nguyen · Chiến thuyền Nguyên (ba cột buồm)
 
-Dùng ở B20: 16 chiến thuyền của hạm đội, cộng thuyền chỉ huy PT của Phàn Tiếp cũng là thân junk (`battle-b20.js:71`, `battle-b20.js:260`). Thay `BUILD.junk` (`boats.js:362-393`). Boong và tường code giữ (`HULLS.junk`, `boats.js:34-42`): mặt đi x ±2,8, z −6…10 ở cao 2,6; khối lầu lái x ±3,3, z −12,5…−6,2, nóc 5,2; cán cờ chữ ở `flagAt` [−2,3; 11,4; −11,2]. Kích thước: dài 24 m, rộng 7 m, boong 2,6 m trên mớn nước, mạn cao 0,9 m trên boong (`SPECS.junk`, `boats.js:189-194`), mớn 1,4 m. Ba cột (`boats.js:385-390`): cột chính ở z +1 cao 14,5 m trên boong, cột mũi chúi ra trước ở z +7,8 cao 10 m, cột lái nhỏ lệch mạn trên nóc lầu (x 0,9; z −10) cao 6,5 m. Buồm cánh dơi có nẹp tre màu chàm nhạt `#5b77a3`/`#516c97`, khiên tròn chàm treo mạn, mắt thuyền, tời và neo gỗ ở mũi, bánh lái lớn. Kiểu thuyền buồm Nam Tống – Nguyên thế kỷ 13 mà hạm đội Ô Mã Nhi dùng năm 1288; chi tiết là Hư cấu (`boats.js:7-9`). Prompt ảnh ở `design/3d-ref/PROMPTS-MOI-TRUONG.md` ghi hai cột là lệch với game. Lầu lái chiếm khoảng một phần tư thân phía đuôi (z −12,5…−6,2 trên thân 24 m) nên prompt ghi `over the aft quarter` và nóc 5,2 m, kèm chiều cao ba cột. Để đủ chỗ trong 600 ký tự, prompt bỏ cửa và cửa sổ lầu, đuôi phẳng, bánh lái, tời, neo, mắt thuyền; mắt thuyền code vẽ thêm lên LOD0 được nếu cần.
+Dùng ở B20: 16 chiến thuyền của hạm đội, cộng thuyền chỉ huy PT của Phàn Tiếp cũng là thân junk (`battle-b20.js:71`, `battle-b20.js:260`). Thay `BUILD.junk` (`boats.js:362-393`). Boong và tường code giữ (`HULLS.junk`, `boats.js:34-42`): mặt đi x ±2,8, z −6…7 và x ±2,15, z 7…10, cùng cao 2,6; khối lầu lái x ±3,3, z −12,5…−6,2, nóc 5,2; cán cờ chữ ở `flagAt` [−2,3; 11,4; −11,2]. Kích thước: dài 24 m, rộng 7 m, boong 2,6 m trên mớn nước, mạn cao 0,9 m trên boong (`SPECS.junk`, `boats.js:189-194`), mớn 1,4 m. Ba cột (`boats.js:385-390`): cột chính ở z +1 cao 14,5 m trên boong, cột mũi chúi ra trước ở z +7,8 cao 10 m, cột lái nhỏ lệch mạn trên nóc lầu (x 0,9; z −10) cao 6,5 m. Buồm cánh dơi có nẹp tre màu chàm nhạt `#5b77a3`/`#516c97`, khiên tròn chàm treo mạn, mắt thuyền, tời và neo gỗ ở mũi, bánh lái lớn. Kiểu thuyền buồm Nam Tống – Nguyên thế kỷ 13 mà hạm đội Ô Mã Nhi dùng năm 1288; chi tiết là Hư cấu (`boats.js:7-9`). Prompt ảnh ở `design/3d-ref/PROMPTS-MOI-TRUONG.md` ghi hai cột là lệch với game. Lầu lái chiếm khoảng một phần tư thân phía đuôi (z −12,5…−6,2 trên thân 24 m) nên prompt ghi `over the aft quarter` và nóc 5,2 m, kèm chiều cao ba cột. Để đủ chỗ trong 600 ký tự, prompt bỏ cửa và cửa sổ lầu, đuôi phẳng, bánh lái, tời, neo, mắt thuyền; mắt thuyền code vẽ thêm lên LOD0 được nếu cần.
 
 PROMPT (dán thẳng):
 ```text
@@ -1519,7 +1519,7 @@ Yuan flagship junk, 36 m long, 9 m wide, whole hull and keel visible. Weathered 
 
 ### K3 · ENV_thuyen_ho_ve · Thuyền hộ vệ Nguyên
 
-Dùng ở B20: 6 chiếc ở pha 2 và 8 chiếc đợt hai E7–E14 ở pha 4, tới 14 thân (`battle-b20.js:62-66`, `director-b20.js:23`). Thay `BUILD.escort` (`boats.js:462-483`). Boong code giữ (`HULLS.escort`, `boats.js:60-68`): mặt đi x ±1,85, z −4…6,8 ở cao 1,8; lầu lái x ±2,4, z −8,5…−4,2, nóc 3,3. Kích thước 16 × 4,5 m, mớn 0,9 m, mạn khoảng 0,65 m trên boong. Hai cột (`boats.js:477-480`): cột chính 10 m ở z +1, cột mũi chúi 6,5 m ở z +5,6; 3d-ref ghi một cột là lệch. Thuyền hộ vệ là sàn bị lên đánh nhiều nhất B20: Cứ Điểm động chiếm được, mỗi chiếc 12 quân và một đội trưởng (`battle-b20.js:287`, `director-b20.js:521-525`). Vì thế prompt ghi như K1: lầu lái chiếm khoảng một phần tư thân phía đuôi (z −8,5…−4,2 trên thân 16 m, `over the aft quarter`), nóc 3,3 m **tính từ mớn nước** (1,5 m trên boong; cán cờ code đứng trên nóc này, `boats.js:482`), cột chính giữa thân 10 m trên boong, cột mũi 6,5 m gần mũi. Để đủ chỗ, prompt bỏ đuôi phẳng và mắt thuyền. Số đo sau lưới ở đầu mục K; mẫu nằm trong 10 mục thử của lượt 3 và nên giữ texture. Không dùng mẫu này cho thuyền quân Tống ở Kế Sách: màu chàm của Nguyên không hợp quân đồng minh, thuyền Tống là K6.
+Dùng ở B20: 6 chiếc ở pha 2 và 8 chiếc đợt hai E7–E14 ở pha 4, tới 14 thân (`battle-b20.js:62-66`, `director-b20.js:23`). Thay `BUILD.escort` (`boats.js:462-483`). Boong code giữ (`HULLS.escort`, `boats.js:60-68`): mặt đi x ±1,85, z −4…3,5 và x ±1,25, z 3,5…6,8, cùng cao 1,8; lầu lái x ±2,4, z −8,5…−4,2, nóc 3,3. Kích thước 16 × 4,5 m, mớn 0,9 m, mạn khoảng 0,65 m trên boong. Hai cột (`boats.js:477-480`): cột chính 10 m ở z +1, cột mũi chúi 6,5 m ở z +5,6; 3d-ref ghi một cột là lệch. Thuyền hộ vệ là sàn bị lên đánh nhiều nhất B20: Cứ Điểm động chiếm được, mỗi chiếc 12 quân và một đội trưởng (`battle-b20.js:287`, `director-b20.js:521-525`). Vì thế prompt ghi như K1: lầu lái chiếm khoảng một phần tư thân phía đuôi (z −8,5…−4,2 trên thân 16 m, `over the aft quarter`), nóc 3,3 m **tính từ mớn nước** (1,5 m trên boong; cán cờ code đứng trên nóc này, `boats.js:482`), cột chính giữa thân 10 m trên boong, cột mũi 6,5 m gần mũi. Để đủ chỗ, prompt bỏ đuôi phẳng và mắt thuyền. Số đo sau lưới ở đầu mục K; mẫu nằm trong 10 mục thử của lượt 3 và nên giữ texture. Không dùng mẫu này cho thuyền quân Tống ở Kế Sách: màu chàm của Nguyên không hợp quân đồng minh, thuyền Tống là K6.
 
 PROMPT (dán thẳng):
 ```text
@@ -1710,7 +1710,7 @@ Dùng ở B15 và Tự do: 9 lều trong Hàm Tử quan, khu đánh boss pha 4 (
 
 PROMPT (dán thẳng):
 ```text
-Mongol felt tent (ger), 13th century, 4.8 m across and 3.2 m tall: round wall 1.8 m high of pale grey felt tied with three dark rope bands, low conical pale grey felt roof with a round wooden roof ring on top, small wooden door painted dark red. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Mongol felt tent (ger), 13th century, 4.8 m across and 3.2 m tall: round wall 1.8 m high of pale grey felt tied with three dark rope bands, low conical pale grey felt roof with a round wooden roof ring on top, small wooden door painted dark red. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,6–1,2k (code khoảng 54). **Symmetry: tắt** (cửa một bên).
@@ -1721,7 +1721,7 @@ Dùng ở B15 và Tự do: 4 lều trong mỗi doanh trại A2, B2 (`world.js:23
 
 PROMPT (dán thẳng):
 ```text
-Yuan army square wall tent, 13th century: square base 3.2 m, upright walls 1.3 m high under a four-sided sloping roof reaching 2.6 m, coarse grey hemp cloth with pale cloth hem bands, door flap tied open, guy ropes to wooden pegs. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan army square wall tent, 13th century: square base 3.2 m, upright walls 1.3 m high under a four-sided sloping roof reaching 2.6 m, coarse grey hemp cloth with pale cloth hem bands, door flap tied open, guy ropes to wooden pegs. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k (code 20 mỗi lều, 8 lều). Vật đơn lẻ: phần tăng so với code phải bù ở chỗ khác trong B15. **Symmetry: tắt** (cửa một bên).
@@ -1732,7 +1732,7 @@ Dùng ở Tự do, nhiệm vụ "Đánh úp trại": 3 lều lương là mục t
 
 PROMPT (dán thẳng):
 ```text
-Yuan army grain-store tent, 13th century, 5 m long, 4 m wide and 3 m tall: ridge tent of coarse grey hemp cloth on a brown wood frame, side flaps rolled up to show stacked hemp rice sacks and bound bundles of fodder inside. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Yuan army grain-store tent, 13th century, 5 m long, 4 m wide and 3 m tall: ridge tent of coarse grey hemp cloth on a brown wood frame, side flaps rolled up to show stacked hemp rice sacks and bound bundles of fodder inside. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,8–1,5k. **Symmetry: tắt** (vạt cuốn).
@@ -1743,7 +1743,7 @@ Dùng ở B15 và Tự do: lều cháy trơ khung trong trại Nguyên bỏ ngo�
 
 PROMPT (dán thẳng):
 ```text
-Burnt-out tent frame: five charred black wooden poles 2.2 m long leaning in a ring 3.2 m across, scraps of scorched cloth hanging from them, a ring of grey ash and black embers between them. No flame, no smoke. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Burnt-out tent frame: five charred black wooden poles 2.2 m long leaning in a ring 3.2 m across, scraps of scorched cloth hanging from them, a ring of grey ash and black embers between them. No flame, no smoke. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 300–800. **Symmetry: tắt.**
@@ -2066,7 +2066,7 @@ Dùng ở Võ trường: trống đồng trên giá cạnh ghế đài chỉ huy
 
 PROMPT (dán thẳng):
 ```text
-Dong Son bronze drum, about 80 cm across and 60 cm tall, dark green-brown bronze, flat top with a raised fourteen-pointed star in the centre and concentric bands of simple geometric rings, slightly bulging upper body, straight waist, flared foot, four small side handles. Isolated single object, no stand. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Dong Son bronze drum, about 80 cm across and 60 cm tall, dark green-brown bronze, flat top with a raised fourteen-pointed star in the centre and concentric bands of simple geometric rings, slightly bulging upper body, straight waist, flared foot, four small side handles. Isolated single object, no stand, no ground. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 0,5–1k. **Symmetry: bật.**
@@ -2176,7 +2176,7 @@ Dùng ở Võ trường (`scenery.js:992-1006`): thân 1,4 × 2,8 × 0,45 m đ�
 
 PROMPT (dán thẳng):
 ```text
-Upright grey stone stele 3.6 m tall: plain flat slab 1.4 m wide, 2.8 m high and 45 cm thick, set in a rectangular stone base 2.2 m wide, a slightly wider flat stone cap on top. Both faces completely blank, no text, no carving. Isolated single object, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
+Upright grey stone stele 3.6 m tall: plain flat slab 1.4 m wide, 2.8 m high and 45 cm thick, set in a rectangular stone base 2.2 m wide, a slightly wider flat stone cap on top. Both faces completely blank, no text, no carving. Isolated single object, no ground, no people. Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.
 ```
 
 - **Kỹ thuật**: 300–600 (code khoảng 36). **Symmetry: bật.**
