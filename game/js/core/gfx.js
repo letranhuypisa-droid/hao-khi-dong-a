@@ -59,10 +59,12 @@ export function gfxPlan(setting, info = {}, renderScale = 1) {
 // một nấc; hai lần đổi cách nhau ≥ settle (2 s — mỗi lần đổi cấp phát lại bộ đệm khung). Khoảng > gap (100 ms: khựng lẻ, trình duyệt bóp
 // rAF khi pane ở nền; tab ẩn thì trận tự tạm dừng) bỏ qua — máy chậm 11–20 khung/s vẫn được hạ. Màn 60 Hz không bao giờ < 13 ms: đủ khung
 // (≤ down) liền probe (15 s) thì nâng thử một nấc.
-// Nâng nào cũng là thử: lỡ khung lại ngay (hạ ≤ probeFail s sau khi hết settle) là hỏng — lần thử sau chờ gấp backoff (4), hỏng probeTries
-// lần thì thôi hẳn; đã hỏng thì khung nhanh không còn đủ để nâng, chỉ còn thử theo probe (màn 90 Hz vsync lượng tử: GPU 12 ms ở mức đầy ra
-// khung 22,2 ms, mức dưới 11,1 ms "nhanh" — trước đây nâng / hạ mỗi ~2,6 s suốt trận). ≤ 5–6 lần đổi trong 300 s ở 60–144 Hz. Thử mà
-// trụ được (cảnh nhẹ đi) thì xoá số lần hỏng: lại nâng nhanh như đầu trận.
+// Nâng nào cũng là thử: lỡ khung lại trong probeFail (10) s sau khi hết settle là hỏng — lần thử sau chờ gấp backoff (4), tối đa probeMax
+// (240 s: cảnh nặng lâu rồi nhẹ lại vẫn về mức đầy; trước đây hỏng 3 lần là thôi hẳn tới hết trận); đã hỏng thì khung nhanh không còn đủ để
+// nâng, chỉ còn thử theo probe (màn 90 Hz vsync lượng tử: GPU 12 ms ở mức đầy ra khung 22,2 ms, mức dưới 11,1 ms "nhanh" — trước đây nâng /
+// hạ mỗi ~2,6 s suốt trận; tải dồn từng đợt 2 s nặng mỗi 10 s: nâng sau đợt "trụ" qua cửa sổ 6 s cũ nên đổi mỗi ~5 s). Tải đều: ≤ 5–6 lần
+// đổi trong 300 s ở 60–144 Hz; tải dồn từng đợt: ~12 lần trong 900 s. Thử mà trụ được (cảnh nhẹ đi) thì xoá số lần hỏng: lại nâng nhanh
+// như đầu trận.
 // Hạ phải có ích: hết settle mà EMA không nhanh hơn ≥ gain (10%) lúc bắt đầu hạ (và vẫn chậm) thì hạ tiếp một nấc (vsync: 0,875 có khi
 // chưa qua ngưỡng chu kỳ mà 0,75 qua); tới sàn vẫn không nhanh hơn thì trả về mức cũ, khoá hạ tới khi khoảng khung đổi quá ±band (20%) so
 // với lúc khoá hoặc tới lần nâng sau — trình duyệt giới hạn 30 khung/s (tiết kiệm pin), nghẽn CPU: hạ độ phân giải không được gì, trước đây
@@ -72,7 +74,7 @@ export class DynRes {
     this.steps = o.steps || [1, 0.875, 0.75];
     this.down = o.down ?? 18; this.up = o.up ?? 13; this.gap = o.gap ?? 100;
     this.settle = o.settle ?? 2; this.holdDown = o.holdDown ?? 1; this.holdUp = o.holdUp ?? 3;
-    this.probeWait = o.probe ?? 15; this.probeTries = o.probeTries ?? 3; this.probeFail = o.probeFail ?? 4; this.backoff = o.backoff ?? 4;
+    this.probeWait = o.probe ?? 15; this.probeMax = o.probeMax ?? 240; this.probeFail = o.probeFail ?? 10; this.backoff = o.backoff ?? 4;
     this.gain = o.gain ?? 0.1; this.band = o.band ?? 0.2;
     this.level = 0; this.ema = 0; this.slow = 0; this.fast = 0; this.steady = 0;
     this.t = 0; this.last = -Infinity; this.probeAt = -Infinity; this.fails = 0; this.probe0 = this.probeWait; this.probing = false;
@@ -95,7 +97,7 @@ export class DynRes {
       else { const l = this.from; this.from = -1; this.block = this.before; return this.set(l); }
     }
     if (this.slow >= this.holdDown && this.level < this.steps.length - 1 && !this.block) {
-      if (this.probing) { this.probing = false; this.fails++; this.probeWait = this.fails >= this.probeTries ? Infinity : this.probeWait * this.backoff; }
+      if (this.probing) { this.probing = false; this.fails++; this.probeWait = Math.min(this.probeMax, this.probeWait * this.backoff); }
       this.from = this.level; this.before = this.ema;
       return this.set(this.level + 1);
     }

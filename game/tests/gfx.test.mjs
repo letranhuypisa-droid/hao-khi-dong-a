@@ -183,12 +183,31 @@ t("màn 60 Hz: đủ khung 15 s thì nâng thử một nấc; lỡ khung lại t
   assert.deepEqual(run(d, 16.7, 50), []);                // lần thử sau phải chờ 60 s
   assert.deepEqual(run(d, 16.7, 15).map((c) => c[1]), [1]);
 });
-t("máy ở ranh giới (mức đầy 20 ms, mức dưới 16,7 ms): đổi mức có hạn, hết thử sau vài lần — không dao động", () => {
-  const d = new DynRes(); let tt = 0, n = 0, n300 = 0, lastAt = 0;
-  while (tt < 900) { const ms = d.k === 1 ? 20 : 16.7; const k = d.frame(ms); tt += ms / 1000; if (k) { n++; if (tt < 300) n300++; lastAt = tt; } }
-  assert.ok(n <= 7, `${n} lần đổi`); assert.ok(n300 <= 5, `${n300} lần đổi trong 300 s`);
-  assert.ok(lastAt < 400, `lần đổi cuối ở ${lastAt.toFixed(0)} s`);
+t("máy ở ranh giới (mức đầy 20 ms, mức dưới 16,7 ms): đổi mức có hạn, thử nâng thưa dần tới mỗi 240 s — không dao động", () => {
+  const d = new DynRes(); let tt = 0, n = 0, n300 = 0, late = 0;
+  while (tt < 900) { const ms = d.k === 1 ? 20 : 16.7; const k = d.frame(ms); tt += ms / 1000; if (k) { n++; if (tt < 300) n300++; if (tt >= 400) late++; } }
+  assert.ok(n300 <= 5, `${n300} lần đổi trong 300 s`);
+  assert.ok(late <= 4, `${late} lần đổi trong 400–900 s (mỗi lần thử: nâng rồi hạ, ≥ 240 s một lần)`);
+  assert.ok(n <= 11, `${n} lần đổi`);
   assert.equal(d.k, 0.875);
+});
+t("nặng lâu (hỏng thử nhiều lần) rồi nhẹ lại: vẫn về mức đầy — không thôi nâng tới hết trận", () => {
+  // GPU 12 ms × 1,6 trong 400 s (mức đầy lỡ khung, mức dưới đủ khung) rồi × 0,5: trước đây hỏng 3 lần là chờ thử = ∞, kẹt mức dưới
+  for (const hz of [60, 90, 120, 144]) {
+    const d = new DynRes(); sim(d, { gpu: 12 * 1.6, hz }, 400);
+    assert.ok(d.k < 1 && d.fails >= 1, `${hz} Hz: phải đang ở mức dưới, đã thử hỏng (k ${d.k}, hỏng ${d.fails})`);
+    assert.ok(Number.isFinite(d.probeWait) && d.probeWait <= 240, `${hz} Hz: chờ thử ${d.probeWait} s`);
+    sim(d, { gpu: 12 * 0.5, hz }, 300);
+    assert.equal(d.k, 1, `${hz} Hz: 300 s sau khi nhẹ vẫn ở ${d.k}`);
+  }
+});
+t("tải dồn từng đợt (nặng 2 s mỗi 10 s): không đổi độ phân giải mỗi đợt — ≤ 15 lần trong 900 s", () => {
+  // trước đây: hạ giữa đợt nặng, 3 s khung nhanh sau đợt là nâng, nâng "trụ" qua 6 s nên xoá số hỏng — 180 lần / 900 s ở 120–144 Hz
+  for (const [hz, light] of [[60, 8], [90, 6], [120, 8], [144, 6], [144, 8], [144, 10]]) {
+    const d = new DynRes(); let tt = 0, n = 0;
+    while (tt < 900) { const heavy = tt % 10 < 2, ms = frameMs(d, { gpu: light * (heavy ? 2.5 : 1), hz }); if (d.frame(ms)) n++; tt += ms / 1000; }
+    assert.ok(n <= 15, `${hz} Hz, nhẹ ${light} ms: ${n} lần đổi`);
+  }
 });
 t("màn 90 Hz (khung lượng tử 11,1 / 22,2 ms): nâng lên lỡ khung thì thôi nâng theo khung nhanh — ≤ 6 lần đổi trong 300 s, không dao động", () => {
   // GPU 12–19 ms ở mức đầy: mức đầy 22,2 ms, mức dưới 11,1 ms (< 13 ms "nhanh") — trước đây nâng / hạ mỗi ~2,6 s suốt trận (115 lần / 300 s)
@@ -196,8 +215,8 @@ t("màn 90 Hz (khung lượng tử 11,1 / 22,2 ms): nâng lên lỡ khung thì t
     const d = new DynRes(), ch = sim(d, { gpu, hz: 90 }, 300);
     assert.ok(ch.length <= 6, `GPU ${gpu} ms: ${ch.length} lần — ${JSON.stringify(ch)}`);
     assert.ok(d.k < 1, `GPU ${gpu} ms: phải ở mức dưới (mức đầy lỡ khung)`);
-    const late = sim(d, { gpu, hz: 90 }, 600);
-    assert.ok(late.length <= 2, `GPU ${gpu} ms, 300–900 s: ${late.length} lần`);
+    const late = sim(d, { gpu, hz: 90 }, 600);                              // về sau chỉ còn thử ≥ 240 s một lần (nâng rồi hạ)
+    assert.ok(late.length <= 6, `GPU ${gpu} ms, 300–900 s: ${late.length} lần`);
   }
   for (const hz of [60, 120, 144]) for (const gpu of [12, 16, 19, 22]) {
     const ch = sim(new DynRes(), { gpu, hz }, 300);
@@ -206,7 +225,7 @@ t("màn 90 Hz (khung lượng tử 11,1 / 22,2 ms): nâng lên lỡ khung thì t
   const ch12 = sim(new DynRes(), { gpu: 12, hz: 90 }, 300);                  // ca soát nêu: 90 Hz, GPU 12 ms
   assert.ok(ch12.length <= 5, `90 Hz, GPU 12 ms: ${ch12.length} lần — ${JSON.stringify(ch12)}`);
 });
-t("thử nâng mà trụ được ≥ 6 s (cảnh nhẹ đi) thì xoá số lần hỏng: lần chậm sau lại hạ / nâng như đầu trận", () => {
+t("thử nâng mà trụ được ≥ 12 s (cảnh nhẹ đi) thì xoá số lần hỏng: lần chậm sau lại hạ / nâng như đầu trận", () => {
   const d = new DynRes(); sim(d, { gpu: 12, hz: 90 }, 12);
   assert.equal(d.fails, 1); assert.equal(d.k, 0.875);
   sim(d, { gpu: 9, hz: 90 }, 75);                                         // nhẹ đi: lần thử sau 60 s trụ được

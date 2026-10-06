@@ -244,6 +244,8 @@ export const B20 = {
   openGates: () => ({}),
   heroSpawn: { x: SPAWN_X, z: SPAWN_Z, yaw: SANDBOX ? 0 : -Math.PI / 2 },
   camYaw: SANDBOX ? 0 : -Math.PI / 2,                     // trận thật: nhìn ngược dòng — thuyền chỉ huy, đoàn thuyền nhẹ, hạm đội phía sau
+  camDist: 12,                                            // khúc sông rộng: camera dài hơn B15 một chút — đặt từ đầu (trước đây director.frame
+                                                          // đặt ở khung đầu: lượt làm nóng, khung đầu ở 10,5 m rồi khung 2 giật lùi 1,4 m)
   par: { nhanh: PAR, chuan: PAR },
   outroSec: BOSS_OPS.outroSec,                            // cảnh kết: director kéo máy quay lên nhìn cả khúc sông (battle.js giữ màn thắng chờ)
   controlsNote: "trên boong thuyền hộ vệ địch đã hạ trấn thủ giữ 3 s để chiếm, cạnh boong khác 1 s để lên boong, trên bè cỏ 5 s để mở mốc cọc, 0,4 s để gọi đò chuyển (1–4 hoặc chạm để chọn nơi đến, bấm lại Tương tác hoặc Né để đóng)",

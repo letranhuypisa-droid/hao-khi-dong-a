@@ -15,7 +15,8 @@
 //                                          — HUD đọc PHASES/FRONTS/EVENTS; storyEvent đọc STORY_INSERTS
 //   ? camFar                             mặt phẳng xa của camera (m), mặc định 1400 (B20: 2200)
 //   ? openGates()                        → { idCổng: false } trạng thái cổng mở ban đầu (mặc định {})
-//   ? heroSpawn { x, z, yaw }            chỗ tướng xuất hiện (Hero đọc ctx.battle.heroSpawn); camYaw? góc camera đầu trận
+//   ? heroSpawn { x, z, yaw }            chỗ tướng xuất hiện (Hero đọc ctx.battle.heroSpawn); camYaw? góc camera đầu trận;
+//                                          camDist? khoảng cách camera sau tướng (m), mặc định 10,5 (B20: 12)
 //   ? par { nhanh, chuan }               par (giây) cho HUD; mặc định MODES[mode].par
 //   * buildWorld(scene, { shadows, ctx }) → world (giao diện world.js: colliders, bases, gates, sun, update(t),
 //                                          fadeOccluders, setBaseOwner/Progress, setLine, boats, smokes?). Trận có địa

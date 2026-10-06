@@ -129,7 +129,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     if (location.search.includes("debug")) { window.__hk = ctx; watchLateFirstUse(renderer, ctx); }   // chỉ để kiểm thử bằng script
     ctx.hitstopT = 0;
     ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
-    const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
+    const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: def.camDist ?? 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
     let slowT = 0, slowK = 1;
     ctx.cinematic = (text, unit, big) => {
       ctx.hud.cinematic(text);
@@ -187,7 +187,11 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         let recompile = false;
         if (k === "renderScale" || k === "graphics") { recompile = gfx.set(save.settings); resize(); }
         if (k === "shadows") { renderer.shadowMap.enabled = v; recompile = true; }
-        if (recompile) { scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); }); if (warm) warm.pass(renderer, scene, camera, true); else redraw(); }
+        if (recompile) {
+          scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+          // lượt làm nóng lỗi (vật tạm hiện không vẽ được): đã trả lại vật trong finally, vẽ lại cảnh thường quanh bảng — lỗi không thoát ra bảng
+          if (warm) { try { warm.pass(renderer, scene, camera, true); } catch (err) { console.warn("làm nóng", err); redraw(); } } else redraw();
+        }
         else if (k === "renderScale" || k === "graphics") redraw();   // setSize xoá canvas: vẽ lại cảnh quanh bảng tạm dừng (trước đây đen)
         cvNote();
       });
@@ -428,7 +432,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         if (window.__hk === ctx) ctx.warmStats = warm.stats;
       } catch (err) { console.warn("làm nóng", err); }
       if (finished) return;
-      try { ctx.hud.update(0.05, W, H); ctx.hud.frame?.(W, H); } catch (err) { console.warn("HUD", err); }
+      try { ctx.hud.update(0.05, W, H); ctx.hud.frame?.(W, H); ctx.hudB20?.update(ctx.director.hudState(), 0); } catch (err) { console.warn("HUD", err); }   // B20: con nước, bảng
       ctx.warmed = true; onReady?.();
       last = performance.now(); raf = requestAnimationFrame(frame);
     })();

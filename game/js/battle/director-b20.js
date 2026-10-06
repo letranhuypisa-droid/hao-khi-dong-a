@@ -246,8 +246,6 @@ export class DirectorB20 {
   }
   // mỗi khung (BattleDef.frameVisuals): HUD riêng của trận
   frame(dt) {
-    const cam = this.ctx.cam;
-    if (cam && !this.camSet) { this.camSet = true; cam.dist = 12; }         // khúc sông rộng: cần camera dài hơn B15 một chút
     this.pickerFrame();
     // vòng mốc cọc (world.addBase "moc") chỉ có nghĩa tới P3; từ P4 (nước rút, bãi bùn) và lúc cảnh kết thì ẩn — trước đây vòng
     // trắng còn nằm trên bùn trong cảnh kết (review B20)
