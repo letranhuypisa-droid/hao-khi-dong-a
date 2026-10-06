@@ -3,33 +3,52 @@
 // Key KHÔNG nằm trong repo: đặt biến môi trường MESHY_API_KEY (hoặc MESHY_API_KEY_FILE trỏ tới tệp chứa key).
 //
 //   cd design/tools && npm i                                  # gltf-transform, sharp, meshoptimizer (chỉ để nén)
-//   node design/tools/meshy.mjs list    [--set thu|can|tat-ca] [--only H35,WPN_songdao]
+//   node design/tools/meshy.mjs list    [--set ...] [--only H35,WPN_songdao] [--prompt] [--hash]
+//     --set: thu (cặp thử H35 + song đao), can (40 tệp game đang dùng; mặc định), thieu (game còn dựng bằng code: dân làng,
+//     áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú mục O), moi-truong (mã ENV_, trừ mục ghi "tuỳ chọn" ở đầu mục),
+//     lam-lai (mã _v2: làm lại ra tệp mới, không ghi đè tệp cũ), tuong-moi (tướng có tên chưa có GLB: H34, H38, H39, tướng thêm
+//     từ design/3d-ref), tuy-chon (mục không thuộc bộ nào khác, cộng môi trường tuỳ chọn; trừ LINH_r2 còn khối POSE cũ), tat-ca
+//     (run --set tat-ca cũng bỏ LINH_r2: chỉ dựng khi ghi trong --only). --only bỏ mã trùng.
+//     --hash in mã, băm prompt, độ dài bản API, tam giác mục tiêu và so với manifest (≠ là băm đổi ở mã đã trả tiền: lệnh trả mã 1).
+//   node design/tools/meshy.test.mjs                          # kiểm không mạng: đọc tài liệu, bộ chọn, 40 băm cũ không đổi
 //   node design/tools/meshy.mjs balance
 //   node design/tools/meshy.mjs run     [--set ...] [--only ...] [--model latest] [--model-linh meshy-5] [--model-vk meshy-5]
-//                                       [--jobs 3] [--dry] [--stage luoi] [--redo H35,WPN_songdao]
+//                                       [--model-mt meshy-5] [--jobs 3] [--dry] [--stage luoi] [--redo H35,WPN_songdao]
 //     --model cho tướng, sĩ quan, người lính Tự do, cận vệ, ngựa; --model-linh cho lính đám đông và dân làng (nhóm C, D, J:
-//     hàng trăm người ở xa, lưới chỉ 3k); --model-vk cho vũ khí và đạo cụ. Hai tuỳ chọn sau mặc định bằng --model.
+//     hàng trăm người ở xa, lưới chỉ 3k); --model-vk cho vũ khí và đạo cụ; --model-mt cho môi trường (mã ENV_). Hai tuỳ chọn
+//     --model-linh, --model-vk mặc định bằng --model; --model-mt mặc định bằng --model-vk.
 //     Mẫu đã có lưới thì giữ model của lưới đó; muốn đổi thì --redo.
 //     --stage luoi chỉ dựng lưới xám (preview) và tải ảnh lưới; soát xong mới chạy lại không có --stage để tô texture,
-//     nên mẫu hỏng chỉ tốn tiền lưới. --redo bỏ kết quả cũ của các mã đó và dựng lại từ đầu.
+//     nên mẫu hỏng chỉ tốn tiền lưới. --redo bỏ kết quả cũ của các mã đó (mã phải nằm trong danh sách chạy) và dựng lại từ
+//     đầu; tệp gốc, ảnh cũ trong _raw/ đổi tên sang .cu-<giờ> (sau khi đọc được credit), không xoá. Mẫu đã xong, hoặc đã mua
+//     lưới (preview_id), mà băm prompt khác manifest thì run dừng trước khi gọi Meshy, trừ khi mã đó có trong --redo (mua lại
+//     phải là cố ý). Lệnh tạo task (POST, có trả tiền) chỉ gửi lại khi Meshy trả 429; lỗi mạng, 5xx thì dừng mã đó và nhắc xem
+//     task mồ côi trên trang Meshy.
+//   Mọi lệnh kiểm đối số trước: cờ lạ hay gõ sai, --cờ=giá-trị, cờ thiếu giá trị, model lạ đều dừng (mã 2), không gọi Meshy.
 //   node design/tools/meshy.mjs sheet   <ra.png> [--set ...] [--only ...] [--size 256] [--cols 6]   # ghép ảnh Meshy thành một tờ
 //   node design/tools/meshy.mjs post    [--only ...]          # nén lại từ bản gốc đã tải, không tốn credit
 //
 // Mỗi mẫu: preview (lưới) → refine (texture màu phẳng, không PBR, bỏ sáng in sẵn) → tải GLB gốc vào design/glb/_raw/
 // (ngoài git) → nén vào design/glb/<nhóm>/: nhân vật và lính ở nhan-vat/, vũ khí ở vu-khi/, đạo cụ ở dao-cu/,
-// ngựa và voi ở thu-cuoi/. Nén chỉ đổi texture sang WebP (1024; H35, H31 và người lính Tự do 2048), đặt gốc dưới chân,
-// và giảm lưới nếu Meshy trả quá dải tam giác của bảng mục 1. Không lượng tử hoá lưới: game/js/riglab/autorig.js đọc
-// thẳng position.array kiểu Float32.
+// ngựa và voi ở thu-cuoi/, môi trường (thuyền, công trình, đạo cụ cảnh, cây, đá) ở moi-truong/. Nén chỉ đổi texture
+// sang WebP (1024; H35, H31 và người lính Tự do 2048), đặt gốc dưới chân, và giảm lưới nếu Meshy trả quá dải tam giác
+// của bảng mục 1. Không lượng tử hoá lưới: game/js/riglab/autorig.js đọc thẳng position.array kiểu Float32.
 // Trạng thái từng mẫu (mã task, số tam giác, dung lượng) ghi ở design/glb/manifest.json, nên chạy lại chỉ làm phần còn thiếu.
+// Làm lại một mẫu đã có: thêm dòng mã _v2 (H33_v2 → char_H33_tran-nhat-duat_v2.glb: tệp gốc thêm _v2, cùng nhóm, phải có
+// dòng mã gốc) thay vì sửa prompt cũ — sửa prompt cũ là đổi băm: run dừng và nêu mã, chỉ mua lại và ghi đè tệp cũ khi mã đó
+// có trong --redo.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
+// Chạy như lệnh; meshy.test.mjs nhập tệp này để lấy các hàm đọc tài liệu (import.meta.main = false từ Node 24.2) nên không chạy.
+const MAIN = import.meta.main !== false;
+
 // Node chỉ đi qua proxy HTTPS khi bật NODE_USE_ENV_PROXY (Node ≥ 22.21); tự chạy lại với biến này nếu cần.
-if (process.env.HTTPS_PROXY && !process.env.NODE_USE_ENV_PROXY) {
+if (MAIN && process.env.HTTPS_PROXY && !process.env.NODE_USE_ENV_PROXY) {
   const r = spawnSync(process.execPath, process.argv.slice(1), { stdio: "inherit", env: { ...process.env, NODE_USE_ENV_PROXY: "1", NODE_NO_WARNINGS: "1" } });
   process.exit(r.status ?? 1);
 }
@@ -46,19 +65,58 @@ const cmd = args[0] || "list";
 const opt = (k, d) => { const i = args.indexOf("--" + k); return i >= 0 ? args[i + 1] : d; };
 const flag = (k) => args.includes("--" + k);
 
+// Cờ từng lệnh, kiểm trước mọi lệnh. opt() chỉ tìm đúng "--k" rồi lấy chữ kế, nên "--stage=luoi", "--stages luoi" hay
+// "--model-mt" ở cuối dòng bị bỏ qua lặng lẽ: run mua luôn texture cho lưới chưa soát, hoặc dựng bằng latest đắt gấp bốn.
+const CMDS = {
+  list: ["set", "only", "prompt", "hash"],
+  balance: [],
+  run: ["set", "only", "model", "model-linh", "model-vk", "model-mt", "jobs", "dry", "stage", "redo"],
+  sheet: ["set", "only", "size", "cols"],
+  post: ["set", "only"],
+};
+const BOOL = new Set(["prompt", "hash", "dry"]);
+export function checkArgs(argv) {
+  const cmd = argv[0] || "list", seen = new Set();
+  if (!Object.hasOwn(CMDS, cmd)) throw new Error(`lệnh không rõ: ${cmd} (${Object.keys(CMDS).join(" | ")})`);
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith("--")) {
+      if (cmd === "sheet" && i === 1) continue; // tệp ảnh ra
+      throw new Error(`đối số lạ "${a}"${cmd === "sheet" ? " (tệp ảnh ra phải đứng ngay sau sheet)" : ""}`);
+    }
+    const k = a.slice(2);
+    if (k.includes("=")) throw new Error(`${a}: viết cách, không dấu = (--${k.replace("=", " ")})`);
+    if (!CMDS[cmd].includes(k)) throw new Error(`${cmd} không nhận ${a}; chỉ nhận: ${CMDS[cmd].map((x) => "--" + x).join(" ") || "không cờ nào"}`);
+    if (seen.has(k)) throw new Error(`${a} ghi hai lần`);
+    seen.add(k);
+    if (BOOL.has(k)) continue;
+    const v = argv[++i];
+    if (v === undefined || v.startsWith("--")) throw new Error(`${a} thiếu giá trị`);
+    if (k.startsWith("model") && !/^(latest|meshy-\d+)$/.test(v)) throw new Error(`${a} ${v}: model phải là latest hoặc meshy-<số> (meshy-5, meshy-6)`);
+    if (["jobs", "size", "cols"].includes(k) && !/^[1-9]\d*$/.test(v)) throw new Error(`${a} ${v}: phải là số nguyên dương`);
+    if (k === "stage" && v !== "luoi") throw new Error("--stage chỉ nhận luoi");
+  }
+}
+
 // ---------- đọc tài liệu prompt ----------
 
 const NEG_NV = "weapon, sword, spear, bow, shield, holding, cape, cloak, flag, T-pose, pedestal, base, anime, chibi, cartoon, photorealistic, text, logo, samurai armor, kabuto, Qing dynasty clothing, queue braid, European plate armor, Nguyen dynasty court dress, monster, demon, orc, horns, skull, fangs, grotesque, caricature, evil villain, gore, blood, baked lighting, baked shadows";
 const NEG_VK = "hand, person, character, holding, stand, rack, pedestal, base, wall mount, text, letters, runes, glowing, fantasy ornament, anime, chibi, cartoon, katana, European sword, gore, blood, baked lighting, baked shadows";
+// Môi trường: không người, không chữ (cờ, biển chữ do code vẽ); giá, bệ, đế có thể là một phần của vật nên không chặn.
+const NEG_MT = "person, people, character, crowd, text, letters, calligraphy, logo, anime, chibi, cartoon, photorealistic, modern, glowing, fantasy ornament, gore, blood, baked lighting, baked shadows";
 
-const KIND = { char_: "nhan-vat", unit_: "nhan-vat", wpn_: "vu-khi", prop_: "dao-cu", mount_: "thu-cuoi" };
+const KIND = { char_: "nhan-vat", unit_: "nhan-vat", wpn_: "vu-khi", prop_: "dao-cu", mount_: "thu-cuoi", env_: "moi-truong" };
+const V2 = /_v\d+$/; // mã làm lại: H33_v2, tệp …_v2.glb
 
+// "k" chỉ là nghìn khi đứng riêng sau số: "300–600 khối" là 300–600, không phải 300k–600k.
 function parseRange(s) {
-  const m = s.replace(/,/g, ".").match(/([\d.]+)\s*–\s*([\d.]+)\s*(k?)/);
+  const m = s.replace(/,/g, ".").match(/([\d.]+)\s*–\s*([\d.]+)(?:\s*(k)(?![\p{L}\d]))?/u);
   if (!m) return null;
   const k = m[3] ? 1000 : 1;
   return [Math.round(+m[1] * k), Math.round(+m[2] * k)];
 }
+// Mức dưới 300 chỉ còn ở mũi tên, tạo trước quy tắc này (đổi cột thì vẫn cùng băm, nhưng bảng mục 1 mất số trong game).
+const LO_UNDER_300 = ["PROP_mui_ten"];
 
 // Không cần nặng: tướng 10–20k lấy gần mức dưới, cận vệ lấy giữa, lính đám đông và vũ khí (vốn đã nhẹ) lấy mức trên cho rõ.
 function targetTris([lo, hi]) {
@@ -67,42 +125,76 @@ function targetTris([lo, hi]) {
   return hi;
 }
 
-function loadAssets() {
-  const md = readFileSync(DOC, "utf8");
+// Lỗi trong tài liệu thì ném ngay lúc đọc, trước mọi lệnh (kể cả list), để không gửi gì lên Meshy rồi mới hỏng.
+export function loadAssets(md = readFileSync(DOC, "utf8")) {
+  md = md.replace(/\r\n?/g, "\n").normalize("NFC"); // cây làm việc CRLF (Windows, core.autocrlf), chữ Việt tổ hợp
   const rows = new Map();
   for (const line of md.split("\n")) {
     const c = line.split("|").map((s) => s.trim());
     if (c.length < 10 || !/^\d+a?$/.test(c[1])) continue;
-    rows.set(c[2], { no: c[1], code: c[2], file: c[3].replace(/`/g, ""), name: c[4], group: c[5], range: parseRange(c[6]) });
+    const range = parseRange(c[6]);
+    if (!range) throw new Error(`${c[2]}: cột tam giác "${c[6]}" phải là lo–hi, gạch nối dài (ví dụ 1–2k, 300–800)`);
+    // "1,000–2,000" đọc thành 1–2, "500–2k" thành 500k–2k: bắt qua lo > hi, mức dưới 300 (thấp nhất Meshy dựng được) hoặc
+    // mức trên quá 30k (nhiều nhất trong tài liệu là 20k)
+    if (range[0] > range[1] || targetTris(range) < 300 || (range[0] < 300 && !LO_UNDER_300.includes(c[2])) || range[1] > 30000)
+      throw new Error(`${c[2]}: dải tam giác "${c[6]}" sai (300 ≤ lo ≤ hi ≤ 30k, không dấu phân cách nghìn)`);
+    if (rows.has(c[2])) throw new Error(`${c[2]}: trùng mã ở hai dòng bảng (chép dòng làm _v2 thì đổi cả mã)`);
+    rows.set(c[2], { no: c[1], code: c[2], file: c[3].replace(/`/g, ""), name: c[4], group: c[5], range });
   }
-  const secs = new Map();
-  const re = /^### ([A-J]\d+) · (\S+) · (.+)$/gm;
+  const secs = new Map(), seen = new Set();
+  const re = /^### ([A-Z]\d+) · (\S+) · (.+)$/gm; // A–J nhân vật, vũ khí, đạo cụ, thú cưỡi; K–P môi trường, thú, làm lại
   const heads = [...md.matchAll(re)];
   heads.forEach((h, i) => {
+    if (seen.has(h[2])) throw new Error(`${h[2]}: hai mục ### cùng mã (chép mục làm _v2 thì đổi cả mã)`);
+    seen.add(h[2]);
     const end = i + 1 < heads.length ? heads[i + 1].index : md.length;
     let body = md.slice(h.index, end);
     const next = body.indexOf("\n## ", 1); if (next > 0) body = body.slice(0, next);
     const p = body.match(/PROMPT \(dán thẳng\):\s*```text\n([\s\S]*?)\n```/);
     if (!p) return;
-    secs.set(h[2], { sec: h[1], prompt: p[1].trim(), sym: /Symmetry: tắt/.test(body) ? "off" : /Symmetry: bật/.test(body) ? "on" : "auto" });
+    const off = /Symmetry: tắt/.test(body), on = /Symmetry: bật/.test(body);
+    if (off && on) throw new Error(`${h[2]}: ghi cả "Symmetry: bật" và "Symmetry: tắt"; chỉ ghi một (lời khuyên dựng lại thì viết "đối xứng")`);
+    secs.set(h[2], { sec: h[1], prompt: p[1].trim(), sym: off ? "off" : on ? "on" : "auto", tuyChon: /(tuỳ|tùy)\s*chọn/i.test(h[3]) }); // hai cách bỏ dấu
   });
-  // 23a LINH_r2: prompt E2 đổi màu áo (mục E của tài liệu).
+  for (const c of secs.keys()) if (!rows.has(c)) throw new Error(`${c}: có mục PROMPT nhưng không có dòng bảng (dòng thiếu cột?)`);
+  // 23a LINH_r2: prompt E2 đổi màu áo (mục E của tài liệu). Đối xứng bật (áo cân hai bên); mục E2 không ghi, mà thêm dòng
+  // Symmetry vào E2 là đổi băm LINH_r24 đã tạo.
   const e2 = secs.get("LINH_r24");
-  if (e2) secs.set("LINH_r2", { sec: "E2a", sym: e2.sym, prompt: e2.prompt.replace("Dark red robe", "Brick-red robe").replace("four dark red skirt flaps", "four brick-red skirt flaps") });
+  if (e2) secs.set("LINH_r2", { sec: "E2a", sym: "on", tuyChon: true, prompt: e2.prompt.replace("Dark red robe", "Brick-red robe").replace("four dark red skirt flaps", "four brick-red skirt flaps") });
 
-  const out = [];
+  const out = [], files = new Map();
   for (const r of rows.values()) {
     const s = secs.get(r.code);
     if (!s) throw new Error(`thiếu PROMPT cho ${r.code}`);
-    const kind = KIND[r.file.match(/^[a-z]+_/)[0]];
-    let negative = kind === "nhan-vat" || kind === "thu-cuoi" ? NEG_NV : NEG_VK;
-    if (r.code.startsWith("MOUNT_ngua")) negative += ", rider, person";
-    if (r.code === "MOUNT_voi_chien") negative += ", rider, person, howdah, saddle";
-    if (r.code === "NG_KY") negative += ", horse, saddle, sitting, mounted";
+    const kind = KIND[r.file.match(/^[a-z]+_/)?.[0]];
+    if (!kind) throw new Error(`${r.code}: tệp ${r.file} có tiền tố lạ; chỉ nhận ${Object.keys(KIND).join(" ")} (mục 0.5)`);
+    // thiếu .glb thì run ghi ảnh lưới (…-luoi.png) đè lên chỗ tệp gốc, rồi post() đọc ảnh như GLB sau khi đã trả tiền
+    if (!/^[a-z]+_[A-Za-z0-9_-]+\.glb$/.test(r.file)) throw new Error(`${r.code}: tên tệp ${r.file} phải là tiền tố + mã + .glb (mục 0.5)`);
+    if (r.code.startsWith("ENV_") !== (kind === "moi-truong")) throw new Error(`${r.code}: mã ENV_ đi với tệp env_ và ngược lại (${r.file})`);
+    const v = r.code.match(V2)?.[0];
+    if (v && !r.file.endsWith(v + ".glb")) throw new Error(`${r.code}: tệp làm lại phải là …${v}.glb để không ghi đè tệp cũ (${r.file})`);
+    if (v) { // mã _v2 kế thừa quy tắc riêng (texture, đối xứng, negative) và thư mục của mã gốc: phải có mã gốc, đúng tệp, cùng nhóm
+      const b = rows.get(r.code.replace(V2, ""));
+      if (!b) throw new Error(`${r.code}: không có dòng mã gốc ${r.code.replace(V2, "")} (mục 0.5)`);
+      if (r.file !== b.file.replace(/\.glb$/, v + ".glb")) throw new Error(`${r.code}: tệp phải là tệp gốc thêm ${v}: ${b.file.replace(/\.glb$/, v + ".glb")} (đang ghi ${r.file})`);
+      if (r.group !== b.group) throw new Error(`${r.code}: cột nhóm ${r.group} phải giữ nhóm ${b.group} của mã gốc (model, cỡ texture chọn theo nhóm)`);
+    }
+    if (files.has(r.file)) throw new Error(`${r.code}: trùng tệp ${r.file} với ${files.get(r.file)}`);
+    files.set(r.file, r.code);
+    const person = kind === "nhan-vat";
+    if (person && !s.prompt.includes("A-pose,")) throw new Error(`${r.code}: prompt người thiếu "A-pose," (khối POSE hoặc POSE v2, mục 2.2), câu chặn vũ khí sẽ không được chèn`);
+    // Khối tư thế chỉ được rút gọn khi đúng từng chữ; biến thể ("45 °") sẽ gửi nguyên văn, dài hơn và còn "mouth closed".
+    if (person && !s.prompt.includes(POSE) && !s.prompt.includes(POSE2)) throw new Error(`${r.code}: prompt người phải chứa nguyên khối POSE hoặc POSE v2 của mục 2.2, đúng từng chữ`);
+    const base = r.code.replace(V2, ""); // H33_v2 làm lại H33: giữ quy tắc riêng của mã gốc
+    let negative = person || kind === "thu-cuoi" ? NEG_NV : kind === "moi-truong" ? NEG_MT : NEG_VK;
+    if (base === "MOUNT_trau") negative = negative.replace("horns, ", ""); // prompt xin sừng trâu
+    if (base.startsWith("MOUNT_ngua")) negative += ", rider, person";
+    if (base === "MOUNT_voi_chien") negative += ", rider, person, howdah, saddle";
+    if (base === "NG_KY") negative += ", horse, saddle, sitting, mounted";
     // Texture 2048 chỉ cho nhân vật người chơi điều khiển, nhìn gần cả trận (hai tướng chơi được, người lính Tự do); còn lại 1024.
-    const hero = r.code === "H35" || r.code === "H31" || r.group === "E";
-    if (r.code.startsWith("MOUNT_ngua")) s.sym = "on"; // mục 0.2: bật đối xứng cho ngựa
-    out.push({ ...r, ...s, kind, negative, person: kind === "nhan-vat", tris: targetTris(r.range), tex: hero ? 2048 : 1024 });
+    const hero = base === "H35" || base === "H31" || r.group === "E";
+    if (base.startsWith("MOUNT_ngua")) s.sym = "on"; // mục 0.2: bật đối xứng cho ngựa
+    out.push({ ...r, ...s, kind, negative, person, tris: targetTris(r.range), tex: hero ? 2048 : 1024 });
   }
   return out;
 }
@@ -111,12 +203,16 @@ function loadAssets() {
 // (mục 2.3) phải nằm ngay trong prompt: nhân vật không mang vũ khí hay bao đao (vũ khí là tệp riêng), không sừng,
 // không áo choàng; ai không có mũ trong prompt thì ghi rõ không mũ. Khối STYLE và POSE rút gọn để đủ chỗ trong 600 ký tự.
 const STYLE = "Stylized low-poly game asset, realistic proportions, crisp bevelled edges, flat hand-painted lacquer colors, clear silhouette.";
-const POSE = "A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed.";
-function apiPrompt(a) {
+export const POSE = "A-pose, arms 45° down, open empty hands, fingers slightly apart, feet shoulder-width, facing front, mouth closed.";
+// POSE v2 (mục 2.2) chỉ cho mục mới: 40 mẫu đầu ra tay dang gần ngang, khuỷu gập, ngửa bàn tay nên bộ dò khớp rig sai. Mục cũ
+// giữ POSE cũ: đổi chữ là đổi băm. Bản API vẫn mở đầu "A-pose," để câu chặn vũ khí chèn đúng chỗ.
+export const POSE2 = "A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front, mouth closed.";
+export function apiPrompt(a) {
   let p = a.prompt.replace(STYLE, "Stylized low-poly game asset, realistic proportions, flat hand-painted colors, clean silhouette.");
   if (FIX[a.code]) for (const [from, to] of FIX[a.code]) { if (!p.includes(from)) die(`FIX ${a.code}: không thấy "${from}"`); p = p.replace(from, to); }
   if (!a.person) return p;
-  p = p.replace(POSE, "A-pose, arms angled down away from the body, open empty hands, feet shoulder-width, facing front.");
+  p = p.replace(POSE, "A-pose, arms angled down away from the body, open empty hands, feet shoulder-width, facing front.")
+    .replace(POSE2, "A-pose, straight arms 45° down, elbows straight, relaxed open hands, fingers together, feet shoulder-width, facing front.");
   const guard = FIX[a.code] ? "Unarmed, empty belt, no scabbard. No cape." :
     ["Unarmed: no sword, scabbard or weapon on the body.", /helmet|hat\b|cap\b/i.test(a.prompt) ? "" : "No helmet.", "No horns, no cape."].filter(Boolean).join(" ");
   return p.replace(/(A-pose,)/, guard + " $1");
@@ -148,16 +244,37 @@ const ORDER = [
   "H31", "WPN_daikiem", "X20", "X24",
   "LINH_r01", "LINH_r24", "CV_khien", "CV_giao", "CV_cung", "CV_songdao", "CV_daidao", "OFF_tuong",
 ];
-const SETS = { thu: ["H35", "WPN_songdao"], can: ORDER };
+// Bộ chọn. can (mặc định của run) giữ đúng 40 mã đã tạo. Các bộ mới tính từ mã và chữ mục, nên tự gồm mục thêm sau.
+// thieu = thứ game đang vẽ bằng code mà chưa có GLB: dân làng, áo Tống, nón lá, quang gánh, tay nải, ống tên, trâu, thú mục O.
+const THIEU = ["DV_AOTONG", "PROP_non_la", "PROP_quang_ganh", "PROP_tay_nai", "PROP_ong_ten", "MOUNT_trau"];
+const byCode = (all, list) => list.map((c) => { const a = all.find((x) => x.code === c); if (!a) throw new Error(`không có mã ${c}`); return a; });
+const SETS = {
+  thu: (all) => byCode(all, ["H35", "WPN_songdao"]),
+  can: (all) => byCode(all, ORDER),
+  thieu: (all) => all.filter((a) => !V2.test(a.code) && (a.code.startsWith("DAN_") || THIEU.includes(a.code) || a.sec[0] === "O")),
+  "moi-truong": (all) => all.filter((a) => a.code.startsWith("ENV_") && !a.tuyChon),
+  "lam-lai": (all) => all.filter((a) => V2.test(a.code)),
+  "tuong-moi": (all) => all.filter((a) => /^(H\d+|X\d+|TT)$/.test(a.code) && !ORDER.includes(a.code)),
+  // Mục không thuộc bộ nào ở trên (vũ khí, đạo cụ, ngựa tướng, voi tuỳ chọn) và môi trường tuỳ chọn. LINH_r2 dựng từ prompt
+  // LINH_r24 nên còn khối POSE cũ: chỉ chạy bằng --only, hoặc thêm mục riêng viết bằng POSE v2 (mục 2.2 của tài liệu).
+  "tuy-chon": (all) => {
+    const other = new Set(["thieu", "moi-truong", "lam-lai", "tuong-moi"].flatMap((s) => SETS[s](all).map((a) => a.code)));
+    return all.filter((a) => a.code !== "LINH_r2" && !ORDER.includes(a.code) && !other.has(a.code));
+  },
+  "tat-ca": (all) => [...byCode(all, ORDER), ...all.filter((a) => !ORDER.includes(a.code))],
+};
+export const setOf = (all, name) => (Object.hasOwn(SETS, name) ? SETS[name](all) : undefined);
 
-function pick(all) {
-  const only = opt("only");
-  if (only) return only.split(",").map((c) => all.find((a) => a.code === c.trim()) || die(`không có mã ${c}`));
-  const set = opt("set", "can");
-  if (set === "tat-ca") return [...ORDER.map((c) => all.find((a) => a.code === c)), ...all.filter((a) => !ORDER.includes(a.code))];
-  if (!SETS[set]) die(`--set phải là thu | can | tat-ca`);
-  return SETS[set].map((c) => all.find((a) => a.code === c));
+// Danh sách chạy từ --only (bỏ mã trùng: hai worker cùng một mã thì mua hai lưới) hoặc --set. run --set bỏ LINH_r2 (còn
+// khối POSE cũ, mục 2.2): chỉ dựng khi ghi đích danh trong --only. Lỗi thì ném, main() in và thoát mã 2.
+export function pick(all, { only, set = "can", run = false } = {}) {
+  if (only) return [...new Set(only.split(",").map((c) => c.trim()).filter(Boolean))].map((c) => { const a = all.find((x) => x.code === c); if (!a) throw new Error(`không có mã ${c}`); return a; });
+  const list = setOf(all, set);
+  if (!list) throw new Error(`--set phải là ${Object.keys(SETS).join(" | ")}`);
+  if (!list.length) throw new Error(`--set ${set}: tài liệu chưa có mục nào thuộc bộ này`);
+  return run ? list.filter((a) => a.code !== "LINH_r2") : list;
 }
+const choose = (all) => { try { return pick(all, { only: opt("only"), set: opt("set", "can"), run: cmd === "run" }); } catch (e) { die(e.message); } };
 
 function die(m) { console.error(m); process.exit(2); }
 
@@ -170,18 +287,26 @@ function apiKey() {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Gửi lại hay không (status trống = lỗi mạng). POST tạo task lưới hay texture, có trả tiền: lỗi mạng hoặc 5xx có thể là Meshy
+// đã nhận task mà mất phản hồi, gửi lại là mua hai lần và task đầu không vào manifest; chỉ 429 (chưa nhận) mới gửi lại.
+export const shouldRetry = (method, status) => (method === "POST" ? status === 429 : status === undefined || status === 429 || status >= 500);
+const ORPHAN = ". Meshy có thể đã nhận task mà mất phản hồi: xem danh sách task trên trang Meshy (task mồ côi vẫn trừ credit) trước khi chạy lại";
+
 async function call(method, path, body) {
   for (let attempt = 0; ; attempt++) {
     let res;
     try {
       res = await fetch(API + path, { method, headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
     } catch (e) {
-      if (attempt < 4) { await sleep(2000 * 2 ** attempt); continue; }
-      throw new Error(`${method} ${path}: ${e.cause?.message || e.message}`);
+      if (shouldRetry(method) && attempt < 4) { await sleep(2000 * 2 ** attempt); continue; }
+      throw new Error(`${method} ${path}: ${e.cause?.message || e.message}${method === "POST" ? ORPHAN : ""}`);
     }
     const text = await res.text();
-    if (res.status === 429 || res.status >= 500) { if (attempt < 6) { await sleep(5000 * (attempt + 1)); continue; } }
-    if (!res.ok) { const err = new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 400)}`); err.status = res.status; err.body = text; throw err; }
+    if (shouldRetry(method, res.status) && attempt < 6) { await sleep(5000 * (attempt + 1)); continue; }
+    if (!res.ok) {
+      const err = new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 400)}${method === "POST" && res.status >= 500 ? ORPHAN : ""}`);
+      err.status = res.status; err.body = text; throw err;
+    }
     return text ? JSON.parse(text) : {};
   }
 }
@@ -261,7 +386,49 @@ function saveManifest(m) {
   const sorted = Object.fromEntries(Object.entries(m).sort(([a], [b]) => (m[a].no + "").localeCompare(m[b].no + "", undefined, { numeric: true })));
   writeFileSync(MANIFEST, JSON.stringify(sorted, null, 2) + "\n");
 }
-const hash = (a) => createHash("sha1").update(apiPrompt(a) + "|" + a.tris + "|" + a.sym).digest("hex").slice(0, 10);
+export const hash = (a) => createHash("sha1").update(apiPrompt(a) + "|" + a.tris + "|" + a.sym).digest("hex").slice(0, 10);
+
+// Mã đã trả tiền: mẫu xong, hoặc lưới đã mua (preview_id) ở lượt --stage luoi, lỗi giữa chừng, hết credit trước khi tô.
+const paid = (m) => !!m && (m.status === "done" || !!m.preview_id);
+// Chặn trước khi gọi Meshy: --redo chỉ nhận mã trong danh sách chạy (không thì mã đó mất khỏi manifest khi lưu), và mã đã
+// trả tiền mà băm đổi (sửa chữ prompt giữa lượt lưới và lượt tô, hay sửa khối POSE2/STYLE bản API) thì không tự mua lại:
+// renderOne sẽ bỏ lưới cũ, mua lưới mới, hoặc ghi đè GLB đã có. Muốn mua lại thì ghi mã vào --redo. Trả tập mã redo.
+export function guardRun(list, man, redoOpt = "") {
+  const redo = new Set(redoOpt.split(",").map((c) => c.trim()).filter(Boolean));
+  const out = [...redo].filter((c) => !list.some((a) => a.code === c));
+  if (out.length) throw new Error(`--redo ${out.join(",")}: không nằm trong danh sách chạy (thêm vào --only)`);
+  const stale = list.filter((a) => paid(man[a.code]) && man[a.code].hash !== hash(a) && !redo.has(a.code));
+  const kind = (m) => (m.status === "done" ? "done" : m.refine_id ? "tex" : "mesh"); // texture đã gọi (refine_id) là đã trả tiền texture
+  const of = (k) => stale.filter((a) => kind(man[a.code]) === k).map((a) => a.code);
+  const [done, tex, mesh] = ["done", "tex", "mesh"].map(of);
+  if (stale.length) throw new Error([done.length && `băm prompt khác manifest, run sẽ mua lại và ghi đè GLB đã có: ${done.join(", ")}`,
+    tex.length && `đã mua lưới và texture theo prompt cũ (chưa tải, nén xong), run sẽ bỏ cả hai và mua lại: ${tex.join(", ")}`,
+    mesh.length && `lưới đã mua theo prompt cũ (chưa tô texture), run sẽ bỏ lưới đó và mua lưới mới: ${mesh.join(", ")}`].filter(Boolean).join("; ")
+    + ". Sửa lại prompt cho khớp, thêm mục _v2, hoặc dùng --redo <mã> nếu cố ý mua lại");
+  return redo;
+}
+// Dòng của list --hash và số mã đã trả tiền trong manifest (had) / còn giữ băm (same); mục chưa mua lưới tính như chưa tạo.
+export function hashRows(list, man) {
+  let had = 0, same = 0;
+  const lines = list.map((a) => {
+    const h = hash(a), m = man[a.code], len = apiPrompt(a).length;
+    if (paid(m)) { had++; if (m.hash === h) same++; }
+    const st = !paid(m) ? (m ? `chưa tạo (manifest: ${m.status}, chưa mua lưới)` : "chưa tạo") : m.hash === h ? "= manifest"
+      : m.status === "done" ? `≠ manifest ${m.hash}: run sẽ dừng (mua lại thì --redo), ghi đè ${m.path}`
+      : `≠ manifest ${m.hash}: ${m.refine_id ? "lưới và texture" : "lưới"} đã mua theo băm cũ; run dừng, làm lại thì --redo`;
+    return `${a.code.padEnd(22)} ${h}  ${String(len).padStart(3)} ký tự${len > 600 ? " > 600!" : ""}  ${String(a.tris).padStart(6)} tg  ${st}`;
+  });
+  return { lines, had, same };
+}
+// --redo: đổi tên tệp gốc và ảnh cũ cùng băm sang .cu-<giờ> (giữ bản đã trả tiền), để run dựng và tải lại, sheet hiện ảnh mới.
+export function setAsideRaw(dir, base, stamp) {
+  let n = 0;
+  for (const ext of [".glb", "-luoi.png", ".png"]) {
+    const f = join(dir, base + ext);
+    if (existsSync(f)) { renameSync(f, join(dir, base + ext.replace(/(\.\w+)$/, `.cu-${stamp}$1`))); n++; }
+  }
+  return n;
+}
 
 // Theo bảng giá Meshy: lưới 20 credit với model mới nhất (5 với meshy-5 trở về trước), texture 10.
 const PREVIEW = (model) => (model === "latest" || model === "meshy-6" ? 20 : 5), REFINE = 10;
@@ -321,14 +488,24 @@ async function sheet(list, man, out) {
 }
 
 async function main() {
+  try { checkArgs(args); } catch (e) { die(e.message); }
   const all = loadAssets();
   if (cmd === "list") {
-    for (const a of pick(all)) console.log(`${a.no.padStart(3)} ${a.code.padEnd(20)} ${a.kind.padEnd(9)} ${String(a.tris).padStart(6)} tg  tex ${a.tex}  sym ${a.sym.padEnd(4)} ${apiPrompt(a).length} ký tự  → ${a.kind}/${a.file}`);
-    if (flag("prompt")) for (const a of pick(all)) console.log(`\n${a.code}: ${apiPrompt(a)}`);
+    const list = choose(all);
+    if (flag("hash")) {
+      // Băm khác manifest = sửa chữ prompt của mẫu đã có: run sẽ dừng (mua lại phải qua --redo); lệnh trả mã 1 để kịch bản bắt được.
+      const { lines, had, same } = hashRows(list, readManifest());
+      for (const l of lines) console.log(l);
+      console.log(`\n${list.length} mục; ${same}/${had} mã đã có trong manifest giữ nguyên băm`);
+      if (same < had) process.exitCode = 1;
+      return;
+    }
+    for (const a of list) { const n = apiPrompt(a).length; console.log(`${a.no.padStart(3)} ${a.code.padEnd(22)} ${a.kind.padEnd(10)} ${String(a.tris).padStart(6)} tg  tex ${a.tex}  sym ${a.sym.padEnd(4)} ${n} ký tự${n > 600 ? " > 600!" : ""}  → ${a.kind}/${a.file}`); }
+    if (flag("prompt")) for (const a of list) console.log(`\n${a.code}: ${apiPrompt(a)}`);
     return;
   }
   if (cmd === "balance") { console.log(`Credit còn: ${await balance()}`); return; }
-  const list = pick(all);
+  const list = choose(all);
   const man = readManifest();
   if (cmd === "sheet") { await sheet(list, man, resolve(args[1] && !args[1].startsWith("--") ? args[1] : join(RAW, "to-xem.png"))); return; }
   if (cmd === "post") {
@@ -341,19 +518,24 @@ async function main() {
     saveManifest(man); return;
   }
   if (cmd !== "run") die(`lệnh không rõ: ${cmd}`);
-  const model = opt("model", "latest"), modelVk = opt("model-vk", model), modelLinh = opt("model-linh", model);
-  const modelOf = (a) => (a.kind === "vu-khi" || a.kind === "dao-cu" ? modelVk : /^[CDJ]$/.test(a.group) && a.person ? modelLinh : model);
+  const model = opt("model", "latest"), modelVk = opt("model-vk", model), modelLinh = opt("model-linh", model), modelMt = opt("model-mt", modelVk);
+  const modelOf = (a) => (a.kind === "moi-truong" ? modelMt : a.kind === "vu-khi" || a.kind === "dao-cu" ? modelVk : /^[CDJ]$/.test(a.group) && a.person ? modelLinh : model);
   const stage = opt("stage");
   if (stage && stage !== "luoi") die("--stage chỉ nhận luoi");
-  for (const c of (opt("redo") || "").split(",").filter(Boolean)) delete man[c.trim()];
+  let redo;
+  try { redo = guardRun(list, man, opt("redo")); } catch (e) { die(e.message); }
+  for (const c of redo) delete man[c];
   for (const a of list) if (apiPrompt(a).length > 600) die(`${a.code}: prompt ${apiPrompt(a).length} ký tự > 600`);
   const need = list.reduce((n, a) => {
     const m = man[a.code], same = m && m.hash === hash(a);
     if (same && m.status === "done") return n;
     return n + (same && m.preview_id ? 0 : PREVIEW(modelOf(a))) + (stage === "luoi" || (same && m.refine_id) ? 0 : REFINE);
   }, 0);
-  if (flag("dry")) { console.log(`${list.length} mẫu, ước tính ${need} credit (${model} / lính ${modelLinh} / vũ khí ${modelVk})`); return; }
+  if (flag("dry")) { console.log(`${list.length} mẫu, ước tính ${need} credit (${model} / lính ${modelLinh} / vũ khí ${modelVk} / môi trường ${modelMt})`); return; }
   let left = await balance();
+  // Cất tệp cũ của mã --redo sau khi đọc được credit: balance lỗi (thiếu key, mất mạng) thì manifest chưa lưu, tệp phải còn chỗ cũ.
+  const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  for (const a of list) if (redo.has(a.code) && setAsideRaw(RAW, `${hash(a)}-${a.file}`.replace(/\.glb$/, ""), stamp)) console.log(`  ${a.code}: tệp cũ trong _raw/ đổi tên .cu-${stamp}`);
   console.log(`Credit còn: ${left}; ${list.length} mẫu, ước tính ${need} credit`);
   const budget = { take: (n) => { if (left < n) return false; left -= n; return true; } };
   const queue = [...list]; const errors = [];
@@ -371,4 +553,4 @@ async function main() {
   if (errors.length) { console.log(`Lỗi:\n  ${errors.join("\n  ")}`); process.exitCode = 1; }
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+if (MAIN) main().catch((e) => { console.error(e.message); process.exit(1); });
