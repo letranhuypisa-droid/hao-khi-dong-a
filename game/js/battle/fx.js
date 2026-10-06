@@ -1,5 +1,8 @@
 // battle/fx.js — hiệu ứng: tia lửa, vệt chém, sóng xung kích, vòng báo đòn, rung màn, chữ nổi.
 // VFX ưu tiên lưới opaque / alpha thấp để không ăn fill-rate trên điện thoại (mục 15.7, 17).
+// Làm nóng (đợt 19c, battle/gfx.js Warm): ảnh fx tải xong trước khi vào trận (preloadFx trả Promise, main.js chờ ở màn tải) rồi nạp
+// lên GPU; warmSet() dựng sẵn mỗi khoá sprite một vật vào pool và đưa công thức vật liệu của vòng báo đòn, bóng né để biên dịch shader
+// trước khung đầu — lần đầu chém trúng, lần đầu boss báo đòn không còn khựng.
 
 import * as THREE from "three";
 import { heightAt } from "./world.js";
@@ -7,24 +10,34 @@ import { heightAt } from "./world.js";
 const MAXP = 600;
 const BLOOD_A = new THREE.Color(0x8a1d12), BLOOD_B = new THREE.Color(0xb3261a);
 const DUST_A = new THREE.Color(0xc9a86a), DUST_B = new THREE.Color(0xe8d6a8);       // noBlood: vụn gỗ, bụi vàng nhạt
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler(), _v = new THREE.Vector3();
+const upload = (A, n) => { A.clearUpdateRanges(); A.addUpdateRange(0, n * A.itemSize); A.needsUpdate = true; };   // n phần tử đầu (n > 0)
 
-// Ảnh hiệu ứng sinh bằng Higgsfield (assets/SOURCES.md). Nạp một lần, dùng chung mọi trận.
-const TEX = {};
+// Ảnh hiệu ứng sinh bằng Higgsfield (assets/SOURCES.md). Nạp một lần, dùng chung mọi trận. LOADED[tên]: Promise xong khi ảnh tải xong
+// (hoặc lỗi — trận vẫn chạy, sprite trống).
+const TEX = {}, LOADED = {};
 const loader = new THREE.TextureLoader();
 function tex(name) {
-  if (!TEX[name]) { const t = loader.load(`./assets/fx/${name}.webp`); t.colorSpace = THREE.SRGBColorSpace; TEX[name] = t; }
+  if (!TEX[name]) {
+    let done; LOADED[name] = new Promise((r) => { done = r; });
+    const t = loader.load(`./assets/fx/${name}.webp`, done, undefined, done); t.colorSpace = THREE.SRGBColorSpace; TEX[name] = t;
+  }
   return TEX[name];
 }
-export function preloadFx() { for (const n of ["slash", "spark", "smoke", "ring", "redring", "fire", "embers"]) tex(n); }
+// (giữ dạng "for (const n of [...])": tools/build-netlify.mjs đọc danh sách này để kiểm tên tệp fx khi deploy)
+export function preloadFx() { for (const n of ["slash", "spark", "smoke", "ring", "redring", "fire", "embers"]) tex(n); return Promise.all(Object.values(LOADED)); }
+export const fxTextures = () => Object.values(TEX);
 // Rời trận / Võ trường (battle.js releaseGpu): bỏ bản GPU của ảnh dùng chung. Texture đã nạp lên GPU giữ listener
-// "dispose" của renderer cũ → gl → canvas → cả trận cũ ở lại bộ nhớ. Ảnh gốc vẫn trong Texture: trận sau tự nạp lại.
+// "dispose" của renderer cũ → gl → canvas → cả trận cũ ở lại bộ nhớ. Ảnh gốc (đã giải mã) vẫn trong Texture: mỗi trận một ngữ cảnh WebGL
+// mới nên bản GPU không dùng lại được dù có giữ — trận sau nạp lại lúc làm nóng, sau màn tải (battle/gfx.js), không giữa trận.
 export function releaseFxTextures() { for (const k in TEX) TEX[k].dispose(); }
 
 // Hiệu ứng giao chiến (vệt chém, tia lửa, vòng báo đòn) vẽ sau khói lửa của trường (renderOrder cao hơn)
 // để cột khói phía sau không phủ lên vòng đỏ, vệt đao.
 const OVER = new Set(["slash", "spark", "ring", "redring", "seal"]);
 const R_OVER = 5;
+// Mọi khoá sprite trò chơi dùng (ảnh + :flat tấm phẳng + :add cộng sáng): warmSet() dựng sẵn mỗi khoá một vật.
+const SPRITE_KEYS = ["spark", "spark:add", "slash", "slash:add", "smoke", "embers:add", "fire", "ring:flat", "ring:flat:add", "redring:flat"];
 
 // ---- trường billboard instanced: khói cột, lửa, tàn lửa theo pha (atmosphere.js) ---------------------
 // Mỗi ảnh một lượt vẽ cho mọi hạt (sprite thường thì mỗi hạt một lượt). Quay về camera trong vertex shader;
@@ -130,7 +143,7 @@ class Field {
       S[i * 4] = sc; S[i * 4 + 1] = p.rot; S[i * 4 + 2] = al; S[i * 4 + 3] = p.ds;
       C[i * 3] = p.r * k; C[i * 3 + 1] = p.g * k; C[i * 3 + 2] = p.b * k;
     }
-    for (const a of this.attrs) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }
+    if (n > 0) for (const a of this.attrs) { a.clearUpdateRanges(); a.addUpdateRange(0, n * a.itemSize); a.needsUpdate = true; }   // n = 0: range (0, 0) là tải cả buffer
     this.mesh.geometry.instanceCount = n; this.mesh.visible = n > 0;
   }
 }
@@ -214,18 +227,30 @@ export class FX {
   sprite(name, x, y, z, { size = 1, T = 0.3, grow = 1, rise = 0, rot = 0, spin = 0, opacity = 1, flat = false, additive = false, follow = null, flicker = 0, color = 0xffffff } = {}) {
     const key = name + (flat ? ":flat" : "") + (additive ? ":add" : "");
     const list = this.pool[key] || (this.pool[key] = []);
-    let o = list.pop();
-    if (!o) {
-      const blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
-      o = flat
-        ? new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex(name), transparent: true, depthWrite: false, blending, side: THREE.DoubleSide }))
-        : new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(name), transparent: true, depthWrite: false, blending }));
-      o.userData.key = key; if (OVER.has(name)) o.renderOrder = R_OVER; this.scene.add(o);
-    }
+    const o = list.pop() || this.make(name, flat, additive);
     o.visible = true; o.position.set(x, y, z); o.material.color.setHex(color);
     if (flat) o.rotation.set(0, rot, 0); else o.material.rotation = rot;
     this.sprites.push({ o, t: 0, T, size, grow, rise, spin, opacity, flat, follow, flicker, rot });
     return o;
+  }
+
+  make(name, flat, additive) {
+    const blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    const o = flat
+      ? new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex(name), transparent: true, depthWrite: false, blending, side: THREE.DoubleSide }))
+      : new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(name), transparent: true, depthWrite: false, blending }));
+    o.userData.key = name + (flat ? ":flat" : "") + (additive ? ":add" : ""); if (OVER.has(name)) o.renderOrder = R_OVER; this.scene.add(o);
+    return o;
+  }
+  // Làm nóng (battle/gfx.js Warm): pool = mỗi khoá sprite một vật dựng sẵn (trong cảnh, ẩn — dùng thật về sau); extra = vòng báo đòn, bóng
+  // né cùng công thức vật liệu (chỉ để biên dịch, không dùng, không dispose).
+  warmSet() {
+    const pool = SPRITE_KEYS.map((k) => {
+      const [name, ...f] = k.split(":"), o = this.make(name, f.includes("flat"), f.includes("add"));
+      o.visible = false; (this.pool[k] || (this.pool[k] = [])).push(o); return o;
+    });
+    const t = this.teleMeshes(1, true);
+    return { pool, extra: [t.outer, t.fill, this.ghostMesh()] };
   }
 
   spark(x, y, z, heavy = false, color = heavy ? 0xffc36a : 0xfff0c8) {
@@ -309,12 +334,17 @@ export class FX {
   }
 
   // Vòng đỏ dưới chân địch: đòn viền đỏ (nhỏ) hoặc Tuyệt Kỹ boss (lớn).
-  telegraph(unit, r, T, big) {
+  teleMeshes(r, big) {
     const outer = new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex("redring"), transparent: true, depthWrite: false, side: THREE.DoubleSide }));
     const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: 0xd8321e, transparent: true, opacity: big ? 0.26 : 0.2, side: THREE.DoubleSide, depthWrite: false }));
     fill.rotation.x = -Math.PI / 2;
     outer.scale.setScalar(r * 2.25);
-    for (const m of [outer, fill]) { m.renderOrder = R_OVER; this.scene.add(m); }
+    for (const m of [outer, fill]) m.renderOrder = R_OVER;
+    return { outer, fill };
+  }
+  telegraph(unit, r, T, big) {
+    const { outer, fill } = this.teleMeshes(r, big);
+    for (const m of [outer, fill]) this.scene.add(m);
     this.teles.push({ unit, r, T, t: 0, outer, fill, big });
     if (big) this.banner("TUYỆT KỸ · NÉ RA KHỎI VÒNG", "#ff8a6a", 0.9);
   }
@@ -327,9 +357,10 @@ export class FX {
   }
   fire(x, y, z, T = 20, size = 3) { this.sprite("fire", x, y + size * 0.45, z, { size, T, grow: 1, opacity: 0.95, flicker: 1 }); }
 
+  ghostMesh() { const g = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 3, 6), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.45 })); g.renderOrder = R_OVER; return g; }
   afterimage(x, z, cb) {
-    const g = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 3, 6), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.45 }));
-    g.position.set(x, heightAt(x, z) + 0.95, z); g.renderOrder = R_OVER; this.scene.add(g);
+    const g = this.ghostMesh();
+    g.position.set(x, heightAt(x, z) + 0.95, z); this.scene.add(g);
     this.ghosts.push({ g, t: 0, T: 0.5, cb, x, z });
   }
 
@@ -362,7 +393,7 @@ export class FX {
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];
       p.t += dt;
-      if (p.t >= p.T) { this.parts.splice(i, 1); continue; }
+      if (p.t >= p.T) { this.parts[i] = this.parts[this.parts.length - 1]; this.parts.pop(); continue; }   // bỏ không cấp phát (splice trả mảng mới)
       p.vy -= (p.grav ?? 1) * 14 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
     }
     for (const p of this.parts) {
@@ -371,7 +402,10 @@ export class FX {
       _m.compose(_p, _q, _s); this.pm.setMatrixAt(n, _m);
       this.pm.instanceColor.setXYZ(n, p.c.r, p.c.g, p.c.b); n++;
     }
-    this.pm.count = n; this.pm.instanceMatrix.needsUpdate = true; this.pm.instanceColor.needsUpdate = true;
+    // chỉ tải phần đang dùng; không hạt thì không tải (đợt 19c: trước đây 600 ô — 38 + 7 KB — mỗi khung, cả khi không có hạt nào;
+    // addUpdateRange(0, 0) trong WebGL2 là tải cả buffer nên phải bỏ hẳn)
+    this.pm.count = n;
+    if (n > 0) { upload(this.pm.instanceMatrix, n); upload(this.pm.instanceColor, n); }
 
     // sprite và tấm phẳng từ ảnh Higgsfield
     for (let i = this.sprites.length - 1; i >= 0; i--) {
@@ -407,7 +441,7 @@ export class FX {
       if (g.t >= g.T) { this.scene.remove(g.g); g.g.geometry.dispose(); g.g.material.dispose(); g.cb?.(); this.shockwave(g.x, g.z, 3); this.ghosts.splice(i, 1); }   // bóng riêng mỗi lần né: giải phóng GPU
     }
     // chữ nổi
-    const v = new THREE.Vector3();
+    const v = _v;
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i]; t.t += dt;
       if (t.t >= t.T) { t.el.remove(); this.texts.splice(i, 1); continue; }

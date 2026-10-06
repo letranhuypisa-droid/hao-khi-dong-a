@@ -25,6 +25,8 @@ import { makeRng } from "../core/rng.js";
 
 const TAU = Math.PI * 2, HALF_PI = Math.PI / 2;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+// Math.hypot chậm (~50 ns, cấp phát) — cả file dùng hai hàm này (đợt 19c: cò, trâu, quạ trước đây gọi Math.hypot mỗi khung). Chỉ để nhìn.
+const hyp = (x, z) => Math.sqrt(x * x + z * z), hyp3 = (x, y, z) => Math.sqrt(x * x + y * y + z * z);
 const wrapA = (a) => a - TAU * Math.floor((a + Math.PI) / TAU);
 const LANES = Object.values(FRONTS).map((f) => f.laneZ);
 const PZ = ZONES.paddy;
@@ -90,11 +92,11 @@ function pt(M, x, y, z) {
 }
 // khung cho một "chi" treo từ a tới b (lưới chi mọc dọc −y từ gốc). Trả về độ dài.
 function limbTo(M, ax, ay, az, bx, by, bz) {
-  let yx = ax - bx, yy = ay - by, yz = az - bz; const L = Math.hypot(yx, yy, yz) || 1e-6;
+  let yx = ax - bx, yy = ay - by, yz = az - bz; const L = hyp3(yx, yy, yz) || 1e-6;
   yx /= L; yy /= L; yz /= L;
   let xx, xy, xz;
   if (Math.abs(yz) < 0.9) { xx = yy; xy = -yx; xz = 0; } else { xx = 0; xy = yz; xz = -yy; }
-  const n = Math.hypot(xx, xy, xz) || 1; xx /= n; xy /= n; xz /= n;
+  const n = hyp3(xx, xy, xz) || 1; xx /= n; xy /= n; xz /= n;
   M[0] = xx; M[4] = xy; M[8] = xz;
   M[1] = yx; M[5] = yy; M[9] = yz;
   M[2] = xy * yz - xz * yy; M[6] = xz * yx - xx * yz; M[10] = xx * yy - xy * yx;
@@ -112,7 +114,7 @@ function put(im, i, M, sx, sy, sz) {
 function segDist(x, z, ax, az, bx, bz) {
   const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9;
   const t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
-  return Math.hypot(x - ax - dx * t, z - az - dz * t);
+  return hyp(x - ax - dx * t, z - az - dz * t);
 }
 function tint(im, i, c) { const a = im.instanceColor.array, o = i * 3; a[o] = c[0]; a[o + 1] = c[1]; a[o + 2] = c[2]; }
 const MB = new Float64Array(12), MN = new Float64Array(12), MM = new Float64Array(12), MW = new Float64Array(12), MW2 = new Float64Array(12);
@@ -122,7 +124,7 @@ const MX = new Float64Array(12), MH = new Float64Array(12);
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const ico = (r = 1, d = 0) => new THREE.IcosahedronGeometry(r, d);
 function seg(a, b, r0, r1, color, sides = 5) {                  // khúc trụ a → b (bán kính r0 ở a, r1 ở b)
-  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz);
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = hyp3(dx, dy, dz);
   const g = new THREE.CylinderGeometry(r1, r0, L, sides);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / L, dy / L, dz / L)));
   g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
@@ -272,8 +274,8 @@ export class Ambient {
     let best = null, bd = Infinity;
     for (const s of this.spots) {
       if (s.kind !== kind || s.flock) continue;
-      let ok = true; for (const o of this.spots) if (o.flock && Math.hypot(o.x - s.x, o.z - s.z) < minSep) ok = false;
-      const d = Math.hypot(s.x - x, s.z - z);
+      let ok = true; for (const o of this.spots) if (o.flock && hyp(o.x - s.x, o.z - s.z) < minSep) ok = false;
+      const d = hyp(s.x - x, s.z - z);
       if (ok && d < bd) { bd = d; best = s; }
     }
     return best;
@@ -287,10 +289,10 @@ export class Ambient {
     for (let i = 0; i < LANES.length; i++) if (Math.abs(z - LANES[i]) < 31) return false;
     const wd = waterDist(x, z);
     if (wd < 8 || (z < 0 && wd > 58)) return false;
-    return Math.hypot(x - VILLAGE.x, z - VILLAGE.z) > VILLAGE.r + 13;
+    return hyp(x - VILLAGE.x, z - VILLAGE.z) > VILLAGE.r + 13;
   }
   pathOk(x0, z0, x1, z1) {
-    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 4);
+    const n = Math.ceil(hyp(x1 - x0, z1 - z0) / 4);
     for (let k = 1; k <= n; k++) if (!this.bufOk(x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n)) return false;
     return true;
   }
@@ -344,7 +346,7 @@ export class Ambient {
     const rng = this.rng; let x = s.at[0], z = s.at[1];
     if (s.wallow) {
       let best = null, bd = Infinity;
-      for (const sp of this.spots) { const d = Math.hypot(sp.x - x, sp.z - z); if (sp.kind === 0 && !wallowUsed.has(sp) && d < bd) { bd = d; best = sp; } }
+      for (const sp of this.spots) { const d = hyp(sp.x - x, sp.z - z); if (sp.kind === 0 && !wallowUsed.has(sp) && d < bd) { bd = d; best = sp; } }
       if (!best) return null;
       wallowUsed.add(best); x = best.x + rng.range(-3.5, 3.5); z = best.z + rng.range(-2, 2);
     } else {
@@ -392,9 +394,9 @@ export class Ambient {
   }
   // Đòn nặng (rung màn): cò quanh tướng 45 m, trâu và quạ 30 m giật mình.
   bigHit(x, z) {
-    for (const F of this.flocks) if (F.mode === F_GROUND && Math.hypot(F.x - x, F.z - z) < ALARM.bigHit) this.alarmEgrets(F, x, z);
-    for (const F of this.crows) if (F.mode === F_GROUND && Math.hypot(F.x - x, F.z - z) < ALARM.bigHitCrow) this.alarmCrows(F);
-    for (const B of this.herd) if (Math.hypot(B.x - x, B.z - z) < ALARM.bigHitBuf) this.alarmBuffalo(B, x, z);
+    for (const F of this.flocks) if (F.mode === F_GROUND && hyp(F.x - x, F.z - z) < ALARM.bigHit) this.alarmEgrets(F, x, z);
+    for (const F of this.crows) if (F.mode === F_GROUND && hyp(F.x - x, F.z - z) < ALARM.bigHitCrow) this.alarmCrows(F);
+    for (const B of this.herd) if (hyp(B.x - x, B.z - z) < ALARM.bigHitBuf) this.alarmBuffalo(B, x, z);
     this.vill.bigHit(x, z);                                          // dân làng trong 45 m hoảng chạy
   }
   // Mỗi khung kiểm tra vài nhóm (≈ 10 lần/s mỗi nhóm ở 60 khung/s).
@@ -429,9 +431,9 @@ export class Ambient {
     F.dest = D; if (D) D.flock = F;
     F.fleeHd = Math.atan2(F.x - tx, F.z - tz) + rng.range(-0.35, 0.35);
     F.mode = F_CLIMB; F.modeT = 0; F.lx = F.x; F.lz = F.z; F.alt = 1; F.ly = heightAt(F.x, F.z) + 1; F.hd = F.fleeHd; F.sp = 2.5; F.turned = 0;
-    let dMin = Infinity; for (const b of F.birds) dMin = Math.min(dMin, Math.hypot(b.x - tx, b.z - tz));
+    let dMin = Infinity; for (const b of F.birds) dMin = Math.min(dMin, hyp(b.x - tx, b.z - tz));
     for (const b of F.birds) {
-      b.st = B_WAIT; b.delay = clamp((Math.hypot(b.x - tx, b.z - tz) - dMin) * 0.09, 0, 0.9) + rng.range(0, 0.45);
+      b.st = B_WAIT; b.delay = clamp((hyp(b.x - tx, b.z - tz) - dMin) * 0.09, 0, 0.9) + rng.range(0, 0.45);
       b.ox = rng.range(-5, 5); b.oz = rng.range(-6, 3); b.oy = rng.range(-1.5, 1.5);
     }
   }
@@ -440,7 +442,7 @@ export class Ambient {
     let best = null, bs = Infinity, far = null, fd = -1;
     for (const s of this.spots) {
       if ((s.flock && s.flock !== F) || s === F.spot || s === cur) continue;
-      const d = this.scan(s.x, s.z, REFUGE), dist = Math.hypot(s.x - F.x, s.z - F.z);
+      const d = this.scan(s.x, s.z, REFUGE), dist = hyp(s.x - F.x, s.z - F.z);
       if (d === Infinity) { const sc = Math.abs(dist - 140) + this.rng.range(0, 50); if (sc < bs) { bs = sc; best = s; } }
       else if (d > fd) { fd = d; far = s; }
     }
@@ -482,7 +484,7 @@ export class Ambient {
       let best = -1, bd = Infinity; const h0 = this.horses[F.horse];
       for (let i = 0; i < this.horses.length; i++) {
         if (i === F.horse) continue;
-        const h = this.horses[i], d = Math.hypot(h.x - h0.x, h.z - h0.z);
+        const h = this.horses[i], d = hyp(h.x - h0.x, h.z - h0.z);
         if (d < bd && this.scan(h.x, h.z, 22, true) === Infinity) { bd = d; best = i; }
       }
       F.busyT = 0;
@@ -507,7 +509,7 @@ export class Ambient {
     const n = this.n; n.bird = n.neck = n.wing = n.buf = n.head = n.limb = n.boy = 0;
     const C = ctx.camera, cam = C.position;
     C.getWorldDirection(_dir);
-    const fl = Math.hypot(_dir.x, _dir.z) || 1;
+    const fl = hyp(_dir.x, _dir.z) || 1;
     this.camX = cam.x; this.camZ = cam.z; this.camFX = _dir.x / fl; this.camFZ = _dir.z / fl;
     this.camK = Math.tan(C.fov * Math.PI / 360) * C.aspect * 1.2 + 0.08;     // nửa góc nhìn ngang, nới 20%
     for (let i = 0; i < this.flocks.length; i++) this.updateFlock(this.flocks[i], dt, cam);
@@ -526,7 +528,7 @@ export class Ambient {
   updateLeader(F, dt) {
     const egret = F.kind === K_EGRET, D = F.dest;
     let bear = F.hd, dist = 0;
-    if (D) { const dx = D.x - F.lx, dz = D.z - F.lz; dist = Math.hypot(dx, dz); bear = Math.atan2(dx, dz); }
+    if (D) { const dx = D.x - F.lx, dz = D.z - F.lz; dist = hyp(dx, dz); bear = Math.atan2(dx, dz); }
     let spT = 0, altT = 0;
     F.modeT += dt;
     switch (F.mode) {
@@ -591,7 +593,7 @@ export class Ambient {
   skyPass(px, pz, hd) {
     const F = this.sky, rng = this.rng, cam = this.ctx.camera.position, h = this.ctx.hero;
     if (px === undefined) {
-      let fx = h.x - cam.x, fz = h.z - cam.z; const L = Math.hypot(fx, fz) || 1; fx /= L; fz /= L;
+      let fx = h.x - cam.x, fz = h.z - cam.z; const L = hyp(fx, fz) || 1; fx /= L; fz /= L;
       const d = rng.range(110, 190), side = rng.range(-50, 50);
       px = h.x + fx * d - fz * side; pz = h.z + fz * d + fx * side;
       hd = Math.atan2(fx, fz) + (rng.chance(0.5) ? 1 : -1) * rng.range(1.1, 2.0);
@@ -627,7 +629,7 @@ export class Ambient {
       case A_STAND: if (b.actT <= 0) this.egretNext(b, F); break;
       case A_WALK: {
         neckT = 0.32; bodyT = -0.12;
-        const dx = b.tx - b.x, dz = b.tz - b.z, d = Math.hypot(dx, dz);
+        const dx = b.tx - b.x, dz = b.tz - b.z, d = hyp(dx, dz);
         if (d < 0.05 || b.actT <= 0) { b.act = rng.chance(0.65) ? A_STALK : A_STAND; b.actT = rng.range(0.8, 2.8); break; }
         const dy = wrapA(Math.atan2(dx, dz) - b.yaw);
         b.yaw += clamp(dy, -2.5 * dt, 2.5 * dt);
@@ -652,7 +654,7 @@ export class Ambient {
     if (rng.chance(0.55)) {                          // lội vài bước sang chỗ khác trong ô
       for (let k = 0; k < 6; k++) {
         const a = b.yaw + rng.range(-1.7, 1.7), d = rng.range(0.8, 3.5), x = b.x + Math.sin(a) * d, z = b.z + Math.cos(a) * d;
-        if (Math.hypot(x - F.x, z - F.z) < F.spot.r && this.forageOk(x, z, F.spot.kind)) { b.tx = x; b.tz = z; b.gyT = heightAt(x, z); b.act = A_WALK; b.actT = 14; return; }
+        if (hyp(x - F.x, z - F.z) < F.spot.r && this.forageOk(x, z, F.spot.kind)) { b.tx = x; b.tz = z; b.gyT = heightAt(x, z); b.act = A_WALK; b.actT = 14; return; }
       }
     }
     b.act = rng.chance(0.5) ? A_STALK : A_STAND; b.actT = b.act === A_STALK ? rng.range(0.8, 2.5) : rng.range(1, 4);
@@ -697,7 +699,7 @@ export class Ambient {
     const wob = F.mode === F_SKY ? 0.5 * Math.sin(this.t * 0.4 + b.wob) : 0;
     const tx = F.lx + (b.ox + wob) * ch + b.oz * sh, tz = F.lz - (b.ox + wob) * sh + b.oz * ch, ty = F.ly + b.oy;
     let vdx = F.lvx + (tx - b.x) * 0.9, vdy = F.lvy + (ty - b.y) * 1.2, vdz = F.lvz + (tz - b.z) * 0.9;
-    const L = Math.hypot(vdx, vdy, vdz), vmax = egret ? 13 : 10;
+    const L = hyp3(vdx, vdy, vdz), vmax = egret ? 13 : 10;
     if (L > vmax) { vdx *= vmax / L; vdy *= vmax / L; vdz *= vmax / L; }
     const k = Math.min(1, dt * 2.2);
     b.vx += (vdx - b.vx) * k; b.vy += (vdy - b.vy) * k; b.vz += (vdz - b.vz) * k;
@@ -718,7 +720,7 @@ export class Ambient {
   }
   landBird(b, dt) {
     const egret = b.kind === K_EGRET, H = egret ? EGRET_H : CROW_H;
-    const dx = b.sx - b.x, dz = b.sz - b.z, d = Math.hypot(dx, dz);
+    const dx = b.sx - b.x, dz = b.sz - b.z, d = hyp(dx, dz);
     const sp = Math.min(egret ? 7 : 5, d * 0.9 + 0.25), k = Math.min(1, dt * 3);
     b.vx += ((d > 1e-3 ? dx / d * sp : 0) - b.vx) * k; b.vz += ((d > 1e-3 ? dz / d * sp : 0) - b.vz) * k;
     b.vy = clamp((b.sgy + H + Math.min(12, d * 0.42) - b.y) * 2.2, -4.5, 3);
@@ -735,7 +737,7 @@ export class Ambient {
   }
   // hướng thân theo vận tốc: nghiêng cánh khi rẽ, ngóc mũi khi lên
   orient(b, dt) {
-    const hs = Math.hypot(b.vx, b.vz);
+    const hs = hyp(b.vx, b.vz);
     if (hs > 0.4) { const dy = wrapA(Math.atan2(b.vx, b.vz) - b.yaw), turn = clamp(dy, -3 * dt, 3 * dt); b.yaw += turn; b.yawV += (turn / dt - b.yawV) * Math.min(1, dt * 4); }
     b.roll += (clamp(-b.yawV * 0.45, -0.7, 0.7) - b.roll) * Math.min(1, dt * 4);
     if (b.st === B_FLY) b.pitch += (clamp(-Math.atan2(b.vy, Math.max(hs, 1)) * 0.7, -0.6, 0.45) - b.pitch) * Math.min(1, dt * 4);
@@ -769,7 +771,7 @@ export class Ambient {
       for (let s = -1; s <= 1; s += 2) {
         if (air) {
           if (!egret) continue;                                        // quạ co chân khi bay
-          const trail = b.st === B_LAND && Math.hypot(b.sx - b.x, b.sz - b.z) < 3 ? -0.35 : clamp(b.age * 1.2, 0.2, 1.35);
+          const trail = b.st === B_LAND && hyp(b.sx - b.x, b.sz - b.z) < 3 ? -0.35 : clamp(b.age * 1.2, 0.2, 1.35);
           sub(MX, MB, hx * s, hy, -0.03, 0, trail + 0.06 * s, 0); put(L, n.limb, MX, th, 0.5, th);
         } else {
           const sw = b.walkA * 0.34 * Math.sin(b.step * Math.PI) * s, lift = b.walkA * Math.max(0, -Math.cos(b.step * Math.PI) * s) * 0.1;
@@ -800,7 +802,7 @@ export class Ambient {
     B.threatX = tx; B.threatZ = tz; B.calmT = 0;
     // đang chạy thì chỉ đổi hướng khi bị áp sát; tìm chỗ tránh không được thì 2,5 s sau mới tìm lại
     if (B.mode === M_RISE || this.t - B.alarmT < 2.5) return;
-    if (B.mode === M_TROT && Math.hypot(tx - B.x, tz - B.z) > 12) return;
+    if (B.mode === M_TROT && hyp(tx - B.x, tz - B.z) > 12) return;
     B.alarmT = this.t;
     if (!this.pickFlee(B, tx, tz)) { B.look = 3; B.headYT = clamp(wrapA(Math.atan2(tx - B.x, tz - B.z) - B.yaw), -0.7, 0.7); return; }
     B.mode = B.sink > 0.1 ? M_RISE : M_TROT; B.t = 25;
@@ -817,10 +819,10 @@ export class Ambient {
   // chỗ gặm mới quanh nhà (hoặc về nhà khi đã yên lâu)
   pickGraze(B) {
     const rng = this.rng, H = B.home;
-    if (B.calmT > 30 && Math.hypot(H.x - B.x, H.z - B.z) > 6 && this.pathOk(B.x, B.z, H.x, H.z)) { B.tx = H.x; B.tz = H.z; return true; }
+    if (B.calmT > 30 && hyp(H.x - B.x, H.z - B.z) > 6 && this.pathOk(B.x, B.z, H.x, H.z)) { B.tx = H.x; B.tz = H.z; return true; }
     for (let k = 0; k < 10; k++) {
       const a = B.yaw + rng.range(-1.4, 1.4), d = rng.range(4, 12), x = B.x + Math.sin(a) * d, z = B.z + Math.cos(a) * d;
-      if (Math.hypot(x - H.x, z - H.z) > 22 && B.calmT > 30) continue;
+      if (hyp(x - H.x, z - H.z) > 22 && B.calmT > 30) continue;
       if (this.grazeOk(x, z) && this.pathOk(B.x, B.z, x, z)) { B.tx = x; B.tz = z; return true; }
     }
     return false;
@@ -848,9 +850,9 @@ export class Ambient {
       }
       case M_WALK:
         spT = 0.85; headT = 0.4;
-        if (Math.hypot(B.tx - B.x, B.tz - B.z) < 0.4) {
+        if (hyp(B.tx - B.x, B.tz - B.z) < 0.4) {
           const H = B.home;
-          if (H.wallow && Math.hypot(H.x - B.x, H.z - B.z) < 1) { B.mode = M_WALLOW; } else { B.mode = M_GRAZE; B.t = rng.range(20, 45); }
+          if (H.wallow && hyp(H.x - B.x, H.z - B.z) < 1) { B.mode = M_WALLOW; } else { B.mode = M_GRAZE; B.t = rng.range(20, 45); }
         }
         break;
       case M_WALLOW:
@@ -864,11 +866,11 @@ export class Ambient {
         break;
       case M_TROT:
         spT = 2.6; headT = 0.12; turnR = 2.2;
-        if (Math.hypot(B.tx - B.x, B.tz - B.z) < 0.8 || B.t <= 0) { B.mode = M_GRAZE; B.t = rng.range(20, 40); B.look = 2; }
+        if (hyp(B.tx - B.x, B.tz - B.z) < 0.8 || B.t <= 0) { B.mode = M_GRAZE; B.t = rng.range(20, 40); B.look = 2; }
         break;
     }
     // đi tới (tx, tz): quay đầu trước, gần đúng hướng mới bước
-    const dx = B.tx - B.x, dz = B.tz - B.z, d = Math.hypot(dx, dz);
+    const dx = B.tx - B.x, dz = B.tz - B.z, d = hyp(dx, dz);
     let moved = 0;
     if (d > 0.15 && B.mode !== M_WALLOW && B.mode !== M_RISE) {
       const dy = wrapA(Math.atan2(dx, dz) - B.yaw);
@@ -982,12 +984,28 @@ export class Ambient {
 // đất, IK chân, vạt váy lò xo) với heightAt; đòn gánh, thúng, gậy, tay nải là khúc mượn (vạt, "tas") mà ma
 // trận tính lại ở đây. 3 lượt vẽ + 1 lượt bóng tròn; đối tượng dân lấy từ pool, không cấp phát trong vòng khung.
 
-import { skinnedKit, poseFor, soldierFrame, smoothPose, advanceStride, legRate, resetMotion, CH, NCH, BONE_FLOATS, BONE_TEX_W, JOINT_NAMES } from "./soldiers.js";
-import { HAND } from "./soldier-motion.js";
+import { skinnedKit, poseFor, soldierFrame, smoothPose, legRate, resetMotion, CH, NCH, BONE_FLOATS, BONE_TEX_W, JOINT_NAMES } from "./soldiers.js";
+import { HAND, cycleLen } from "./soldier-motion.js";
 import { blobGeometry } from "./models.js";
 
+// Pha bước của dân: bản sao từng phép tính của advanceStride (soldier-motion.js) — hàm riêng (đợt 19c) để chỗ gọi trong soldier-motion chỉ
+// gặp lính (class Agent của crowd.js, một kiểu đối tượng): dùng chung với dân (kiểu khác) thì V8 đọc trường số qua đường đa hình, mỗi lần
+// đọc phải đóng hộp số thực (đo: 302 B mỗi lần gọi so với 24 B; ≈ 2,7 MB rác mỗi giây trận B15). Sửa advanceStride thì sửa cả ở đây.
+function strideV(a, px, pz, dt) {
+  const dx = a.x - px, dz = a.z - pz, moved = Math.sqrt(dx * dx + dz * dz);
+  a.spd += (moved / dt - a.spd) * Math.min(1, dt * 10);
+  const sy = Math.sin(a.yaw), cy = Math.cos(a.yaw), horse = !!a.K.mounted;
+  if (a.mvz === undefined) { a.mvx = 0; a.mvz = 1; }
+  if (moved > 1e-6) {
+    const k = Math.min(1, dt * 8);
+    a.mvx += ((dx * cy - dz * sy) / moved - a.mvx) * k; a.mvz += ((dx * sy + dz * cy) / moved - a.mvz) * k;
+  }
+  const amp = Math.min(1, a.spd / (horse ? 5 : 3.2)), ml = Math.sqrt(a.mvx * a.mvx + a.mvz * a.mvz);
+  const d = moved * TAU / (cycleLen(amp, ml > 0.2 ? a.mvx / ml : 0, horse) * a.scale);
+  a.walk += horse && dx * sy + dz * cy < 0 ? -d : d;
+}
+
 const VJ = (n) => JOINT_NAMES.indexOf(n) * 12;
-const hyp = (x, z) => Math.sqrt(x * x + z * z), hyp3 = (x, y, z) => Math.sqrt(x * x + y * y + z * z);   // Math.hypot chậm
 const J_PEL = VJ("pelvis"), J_TOR = VJ("torso"), J_FAR = VJ("faR"), J_FLF = VJ("flF"), J_FLB = VJ("flB"), J_TAS = VJ("tas");
 const V_KITS = ["DAN_NAM", "DAN_NU", "DAN_TRE"];
 const V_CAP = 20, V_MAX = 40;                      // chỗ mỗi lưới / tổng số dân còn trên bản đồ (kể cả con bế)
@@ -1435,7 +1453,7 @@ class Villagers {
       const sp = hyp(v.vx, v.vz);
       if (sp > 0.2) { const tr = (panic ? 9 : 4.5) * dt; v.yaw += clamp(wrapA(Math.atan2(v.vx, v.vz) - v.yaw), -tr, tr); }
     }
-    advanceStride(v, px, pz, dt);
+    strideV(v, px, pz, dt);
     this.glance(v, dt, panic);
   }
   // ngoái lại: về phía trận (điểm gần nhất trên làn gần nhất) hoặc về phía mối đe doạ khi đang hoảng

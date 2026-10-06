@@ -57,6 +57,7 @@ import { RAFT, zc, hw } from "../data/river-b20.js";
 import { WADE_MAX, TERRAIN_B20, mudAt as mudB20, TIDE } from "../data/terrain-b20.js";
 import { MAP, BOARD } from "../data/battle-b20.js";
 import { makeRng } from "../core/rng.js";
+import { lerpYaw, SNAP_D } from "./pacing.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -109,6 +110,8 @@ export function strandSelect(ids, share, keep = []) {
 
 const _L = { x: 0, z: 0, h: 0, i: -1, d: 0 }, _L2 = { x: 0, z: 0, h: 0, i: -1, d: 0 };
 const _W = { x: 0, y: 0, z: 0 }, _W2 = { x: 0, y: 0, z: 0 }, _F = { h: 0 }, _C = { x0: 0, z0: 0, x1: 0, z1: 0, r: 0 }, _P = { x: 0, z: 0 };
+// collideExtra trả [x, z] dùng lại (đợt 19c): ground.collide đọc r[0], r[1] ngay rồi bỏ — không cấp phát mỗi lính mỗi bước
+const _XZ = [0, 0], xz = (x, z) => { _XZ[0] = x; _XZ[1] = z; return _XZ; };
 const GROUND = null;         // nút "mặt đất" trong đồ thị cửa (route)
 
 // ---- vật dựng phụ: ván bắc, ván dốc, xích (một InstancedMesh hộp đơn vị) ---------------------------------------------------
@@ -291,12 +294,12 @@ export class Naval {
     const D = o ? o.deck : null;
     if (D) {
       _P.x = x; _P.z = z;
-      if (D.contains(x, z, 0.02)) return D.clampInside(_P, r) ? [_P.x, _P.z] : null;
+      if (D.contains(x, z, 0.02)) return D.clampInside(_P, r) ? xz(_P.x, _P.z) : null;
       const h0 = D.heightAt(x, z, 3);
       const E = this.decks.find(x, z, 0, D, _F);
       if (E && Math.abs(_F.h - h0) <= NAV.step && this._mayRide(o, E)) { this._ride(o, E); return null; }
       if (!E && !this.deep(x, z) && Math.abs(this.world.groundY(x, z) - h0) <= NAV.step) { this._unride(o); return null; }
-      D.clampInside(_P, r, true); return [_P.x, _P.z];
+      D.clampInside(_P, r, true); return xz(_P.x, _P.z);
     }
     if (o) {
       const E = this.decks.find(x, z, 0, null, _F);
@@ -310,7 +313,7 @@ export class Naval {
       const px = pushCapsule(x, z, r, _C); if (px) { x = px[0]; z = px[1]; moved = true; }
     }
     if (this.deep(x, z)) { const p = this.shore(x, z); if (p) return p; }
-    return moved ? [x, z] : null;
+    return moved ? xz(x, z) : null;
   }
   // đò chuyển chỉ chở tướng và người theo (naval.ferry đặt lên); người khác không tự bước lên đò
   _mayRide(o, E) { return !E.boat?.isFerry || o === this.ctx.hero; }
@@ -980,11 +983,24 @@ export class Naval {
   }
 
   // ---- vẽ ----------------------------------------------------------------------------------------------------------------
+  // Nội suy khi vẽ (đợt 19c, battle/view.js): capture đầu mỗi bước chụp tư thế thuyền (b.iv), render vẽ thuyền ở tư thế b.rv giữa đó và hiện
+  // tại theo α (thuyền mới, dời quá SNAP_D m: tư thế thật); cờ sóng theo giờ vẽ. b.iv, b.rv chỉ để vẽ.
+  capture(tick) {
+    for (const b of this.boats) { const v = b.iv || (b.iv = new Float64Array(6)); v[0] = b.x; v[1] = b.y; v[2] = b.z; v[3] = b.yaw; v[4] = b.pitch; v[5] = b.roll; b.itk = tick; }
+  }
   // see: điểm máy quay đang nhìn cần thấy (ngực tướng; cảnh bắt sống: người bị bắt) — thân thuyền, buồm, lầu chắn giữa thì mờ chấm
   // (FleetRenderer._seeThrough); null: tắt (cảnh kết nhìn cả khúc sông).
   render(camera, see = null) {
+    const V = this.ctx.view, al = V ? V.alpha : 1;
+    for (const b of this.boats) {
+      const r = b.rv || (b.rv = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 }), v = b.iv;
+      if (al < 1 && v && b.itk === V.tick && (b.x - v[0]) ** 2 + (b.z - v[2]) ** 2 <= SNAP_D * SNAP_D) {
+        r.x = v[0] + (b.x - v[0]) * al; r.y = v[1] + (b.y - v[1]) * al; r.z = v[2] + (b.z - v[2]) * al;
+        r.yaw = lerpYaw(v[3], b.yaw, al); r.pitch = v[4] + (b.pitch - v[4]) * al; r.roll = v[5] + (b.roll - v[5]) * al;
+      } else { r.x = b.x; r.y = b.y; r.z = b.z; r.yaw = b.yaw; r.pitch = b.pitch; r.roll = b.roll; }
+    }
     if (see) this.fleet.setSee(camera.position, see.x, see.y, see.z); else this.fleet.setSee(camera.position, 0, -1e4, 0);
-    this.fleet.sync(this.boats, camera, this.t);
+    this.fleet.sync(this.boats, camera, this.t - (V ? V.lag : 0));
     const B = this.bits; B.begin();
     for (const L of this.links) {
       const P = L.plank, a = P.toWorld(0, -0.3, _W, 0), ax = a.x, ay = a.y, az = a.z, b = P.toWorld(0, L.len + 0.3, _W2, 0);

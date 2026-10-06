@@ -240,6 +240,7 @@ export const B20 = {
   data: { MAP, PHASES, SIDE_MISSIONS, KE_SACH, KS_ORDER, BOSSES, ALLY_GENERALS, FRONTS: FRONTS_B20, EVENTS: {}, STORY_INSERTS, HISTORY_NOTES },
   preset: { level: 25 }, fixedR: 25,
   camFar: 2200,                                           // núi đá vôi xa ở ~1,75 km (world-b20 addSkyKit)
+  rigs: ["H40", "X20", "X24"],                            // Nguyễn Khoái (từ pha 2), Ô Mã Nhi, Phàn Tiếp: làm nóng trước khung đầu (battle/gfx.js)
   openGates: () => ({}),
   heroSpawn: { x: SPAWN_X, z: SPAWN_Z, yaw: SANDBOX ? 0 : -Math.PI / 2 },
   camYaw: SANDBOX ? 0 : -Math.PI / 2,                     // trận thật: nhìn ngược dòng — thuyền chỉ huy, đoàn thuyền nhẹ, hạm đội phía sau

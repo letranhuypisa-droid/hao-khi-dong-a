@@ -845,7 +845,8 @@ export class FleetRenderer {
     return c;
   }
 
-  // Mỗi khung: chọn LOD theo khoảng cách tới camera, ghi ma trận instance. t: giây (sóng cờ).
+  // Mỗi khung: chọn LOD theo khoảng cách tới camera, ghi ma trận instance. t: giây (sóng cờ). b.rv: tư thế vẽ nội suy giữa hai bước mô
+  // phỏng (naval.render, đợt 19c); không có (lab-b20) thì tư thế thật.
   sync(boats, camera, t = performance.now() / 1000) {
     const cp = camera.position, list = this._list, L = FLEET_LOD, h = L.hyst;
     list.length = 0;
@@ -865,9 +866,10 @@ export class FleetRenderer {
       if (lod === 0) n0++;
       if (lod < 2) shown++;
       b._lod = lod;
-      _e.set(b.pitch, b.yaw, b.roll, "YXZ"); _q.setFromEuler(_e);
+      const P = b.rv || b;
+      _e.set(P.pitch, P.yaw, P.roll, "YXZ"); _q.setFromEuler(_e);
       if (lod === 2) _s.set(H.imp[0], H.imp[1], H.imp[2]); else _s.set(1, 1, 1);
-      _m.compose(_v.set(b.x, b.y, b.z), _q, _s);
+      _m.compose(_v.set(P.x, P.y, P.z), _q, _s);
       const i = m.count++;
       m.setMatrixAt(i, _m);
       const k = b.tint * (1 + 0.8 * b.flash);

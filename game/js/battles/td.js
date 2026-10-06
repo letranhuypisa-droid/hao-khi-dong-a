@@ -78,6 +78,7 @@ export function makeTD(sk, career) {
       EVENTS: { leave: { name: "Rời vòng thách đấu" } }, STORY_INSERTS: {}, HISTORY_NOTES: [],
     },
     camFar: 1400,
+    rigs: ["tuong"],                                     // tướng Nguyên của Đấu tướng (sĩ quan luôn làm nóng — battle/gfx.js)
     openGates: () => ({ A3: false, B3: false }),
     heroSpawn: { x: sk.spawn.x, z: sk.spawn.z, yaw: facing },
     camYaw: facing,
@@ -96,7 +97,7 @@ export function makeTD(sk, career) {
     ambient: null,
     bed: (ctx) => ({ dF: ctx.director.bedDist(), fire: ctx.director.burnt ? 0.2 : 0 }),
     music: (d, hk) => (hk.tpc || d.duelOn || d.officerUnits?.some((u) => u.awake && u.alive && !u.dead && !u.retreating) ? "boss" : "battle"),
-    hud: { bounds: boundsOf(sk), drawBase, drawTop, frontsHTML, hkView, pinTip: true },
+    hud: { bounds: boundsOf(sk), drawBase, baseKey: () => "td", drawTop, frontsHTML, hkView, pinTip: true },   // baseKey: lớp nền tĩnh, hud.js vẽ một lần
     par: { nhanh: sk.timeLimit, chuan: sk.timeLimit },
     dispose: (ctx) => ctx.director?.dispose?.(),
   };

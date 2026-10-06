@@ -18,8 +18,7 @@
 .b20-tide .bt-m { position: absolute; top: -1px; width: 0; height: 0; border: 4px solid transparent; border-top-color: #ffc27a; transform: translateX(-4px); }
 .b20-tide .bt-m[hidden] { display: none; }
 .b20-tide.low .bt-f { background-image: repeating-linear-gradient(115deg, rgba(255,255,255,.1) 0 3px, transparent 3px 9px), linear-gradient(90deg, #5a4a30, #7a6a48); }
-.b20-tide.warn { border-color: #ff9a5a; animation: b20warn .7s infinite alternate; } .b20-tide.warn .bt-n { color: #ffc27a; font-weight: 700; }
-@keyframes b20warn { from { box-shadow: 0 0 0 rgba(255,140,80,0); } to { box-shadow: 0 0 12px rgba(255,140,80,.85); } }
+.b20-tide.warn { position: relative; border-color: #ff9a5a; } .b20-tide.warn::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 12px rgba(255,140,80,.85); opacity: 0; animation: glow .7s infinite alternate; pointer-events: none; } .b20-tide.warn .bt-n { color: #ffc27a; font-weight: 700; }
 
 /* ---- cột phải: bản đồ nhỏ thấp hơn B15, bảng dưới sát bản đồ ---- */
 .hud-b20 .hud-map canvas { background: #bca77a; }
@@ -48,8 +47,9 @@
 .b20-sec.lure .gapv { color: var(--vang2); font-size: .86rem; white-space: nowrap; }
 .b20-sec.lure .gs { white-space: nowrap; font-style: normal; margin-left: auto; font-size: .66rem; font-weight: 700; padding: 0 6px; border-radius: 8px; }
 .b20-sec.lure.in .gs { color: #1b2412; background: #9fcf7a; } .b20-sec.lure.far .gs { color: #2a2016; background: #d8c49a; }
-.b20-sec.lure.near { border-color: #ff6a4a; box-shadow: 0 0 calc(14px * var(--pulse, 1)) rgba(255,90,58,.8); }
-.b20-sec.lure.near .gs { color: #fff; background: #c0392b; opacity: var(--pulse, 1); }
+/* nhấp nháy bằng hoạt ảnh opacity (đợt 19c; trước đây hud-b20.js ghi --pulse = sin(t) vào chuỗi HTML, bảng phân tích lại 20 lần/s) */
+.b20-sec.lure.near { position: relative; border-color: #ff6a4a; box-shadow: 0 0 4px rgba(255,90,58,.6); } .b20-sec.lure.near::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 14px rgba(255,90,58,.8); opacity: 0; animation: glow .35s infinite alternate; pointer-events: none; }
+.b20-sec.lure.near .gs { display: inline-block; color: #fff; background: #c0392b; animation: gsblink .35s infinite alternate; } @keyframes gsblink { from { opacity: .3; } to { opacity: 1; } }
 .gapbar { position: relative; height: 12px; margin: 4px 0 11px; border-radius: 3px; background: rgba(90,80,70,.45); border: 1px solid #4a3c30; }
 .gapbar i { position: absolute; top: 0; bottom: 0; } .gapbar .zn { left: 0; background: rgba(192,57,43,.55); } .gapbar .zb { background: rgba(201,161,74,.55); border-left: 1px solid var(--vang2); border-right: 1px solid var(--vang2); }
 .gapbar u { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 4px #000; border-radius: 2px; transition: left .25s; }
@@ -80,7 +80,7 @@
 .b20-sec.escape { border-left-color: #c0392b; } .b20-sec.escape .v { font-family: var(--serif); color: #ffb09a; font-size: .95rem; } .b20-sec.escape .v small { font-size: .62rem; color: var(--muted); }
 .b20-sec .bar.esc { height: 10px; } .b20-sec .bar.esc > div { background: linear-gradient(90deg, #6e1f16, #c0392b 60%, #ff7a5c); }
 .b20-sec.escape .row { justify-content: space-between; margin-top: 4px; } .b20-sec.escape .rate { font-size: .66rem; color: #ffb09a; }
-.b20-sec.escape.hot { box-shadow: 0 0 calc(14px * var(--pulse, 1)) rgba(255,90,58,.8); }
+.b20-sec.escape.hot { position: relative; box-shadow: 0 0 6px rgba(255,90,58,.6); } .b20-sec.escape.hot::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 14px rgba(255,90,58,.8); opacity: 0; animation: glow .45s infinite alternate; pointer-events: none; }
 .b20-sec.escape.full { opacity: .75; } .b20-sec.escape.full .bar.esc > div { background: #5a2a22; }
 .b20-chip.hold.on { border-color: var(--good); color: #dff0c8; background: rgba(60,90,44,.55); }
 
@@ -91,7 +91,7 @@
 .hud-b20 .ks.mini em { font-style: normal; color: var(--muted); font-size: .6rem; }
 .hud-b20 .ks.khoa { border-left-color: #5a4838; opacity: .7; } .hud-b20 .ks.khoa b { color: var(--muted); }
 .hud-b20 .ks.thanhcong b::before { content: "✓ "; color: var(--good); } .hud-b20 .ks.thatbai b::before { content: "✗ "; color: var(--bad); }
-.b20-sec.rally { border-color: var(--vang); background: rgba(155,45,32,.82); animation: pulse .8s infinite alternate; } .b20-sec.rally .sub { color: var(--vang2); font-size: .7rem; }
+.b20-sec.rally { position: relative; border-color: var(--vang); background: rgba(155,45,32,.82); } .b20-sec.rally::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; } .b20-sec.rally .sub { color: var(--vang2); font-size: .7rem; }
 
 /* ---- thanh boss ---- */
 .b20-boss { position: absolute; left: 50%; top: 126px; transform: translateX(-50%); width: 460px; padding: 5px 12px 6px; background: linear-gradient(rgba(34,28,24,.9), rgba(21,18,16,.88));
@@ -109,7 +109,7 @@
 .b20-boss .bhint { margin-top: 3px; font-size: .7rem; color: var(--muted); text-align: center; min-height: 1em; }
 .b20-boss.locked { border-color: var(--vang); box-shadow: 0 0 0 1px var(--vang), 0 0 16px rgba(255,210,122,.45); } .b20-boss.locked .bhp { border-color: var(--vang2); }
 .b20-boss.locked .bhp .bf { background: linear-gradient(#ffd27a, #c9a14a); } .b20-boss.locked .bhint { color: var(--vang2); }
-.b20-boss.broken .bhint { color: #1d1a17; background: linear-gradient(90deg, transparent, #ffd27a 20%, #ffd27a 80%, transparent); font-weight: 900; font-family: var(--serif); letter-spacing: .08em; font-size: .8rem; animation: pulse .5s infinite alternate; }
+.b20-boss.broken .bhint { color: #1d1a17; background: linear-gradient(90deg, transparent, #ffd27a 20%, #ffd27a 80%, transparent); font-weight: 900; font-family: var(--serif); letter-spacing: .08em; font-size: .8rem; position: relative; } .b20-boss.broken .bhint::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .5s infinite alternate; pointer-events: none; }
 .b20-boss.captured { opacity: .9; } .b20-boss.captured .bhp .bf { background: #5a4838; } .b20-boss.captured .bhint { color: var(--good); font-family: var(--serif); font-weight: 900; letter-spacing: .2em; font-size: .9rem; }
 .b20-boss-target .hud-target { display: none; }
 .hud-picker:not([hidden]) ~ .b20-boss { display: none; }           /* bảng Đò chuyển mở: thanh boss nhường chỗ */

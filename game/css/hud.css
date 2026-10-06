@@ -70,7 +70,7 @@
 .hud-sit svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .hud-sit em { position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--son2); color: #fff; font: 700 .64rem/18px var(--sans); text-align: center; }
 .hud-sit em:empty { display: none; }
-.stage.compact .hud-sit.hot { border-color: #ffd27a; animation: pulse .7s infinite alternate; }
+.stage.compact .hud-sit.hot { border-color: #ffd27a; } .stage.compact .hud-sit.hot::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .7s infinite alternate; pointer-events: none; }
 .stage.compact .hud.sit-open .hud-sit { border-color: var(--vang); background: rgba(155,45,32,.85); }
 
 /* Kế Sách + bảng của trận: gập thì chỉ còn đồng hồ sống còn của pha (B20 Nghi binh, Thoát vây, Hào Khí khóa; Kế Sách sẵn sàng) ở dưới
@@ -147,7 +147,7 @@
 .touch .tmenu { position: relative; display: grid; place-items: center; width: calc(var(--u, 48px) * .92); height: calc(var(--u, 48px) * .92); padding: 0; border-radius: 12px;
   background: rgba(21,18,16,.72); border: 2px solid rgba(241,217,138,.5); color: var(--vang2); touch-action: none; }
 .touch .tmenu svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-.touch .tmenu.alert { border-color: #ffd27a; animation: pulse .8s infinite alternate; }
+.touch .tmenu.alert { border-color: #ffd27a; } .touch .tmenu.alert::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; }
 .touch .tsys.open .tmenu { background: rgba(155,45,32,.85); }
 .stage.compact .touch .tfan { display: none; gap: 6px; padding: 4px; border-radius: 14px; background: rgba(21,18,16,.55); }
 .stage.compact .touch .tsys.open .tfan { display: flex; }
