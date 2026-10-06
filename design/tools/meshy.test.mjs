@@ -2,7 +2,7 @@
 // tệp môi trường env_, bộ chọn, POSE v2, mục làm lại _v2, lệnh list --hash; và mọi mã trong design/glb/manifest.json giữ nguyên
 // băm prompt (băm đổi thì `run` mặc định mua lại mẫu đó và ghi đè GLB). Soát cả nội dung mục môi trường K–O của tài liệu thật:
 // độ dài (tài liệu ≤ 630, API ≤ 600), khối STYLE, dải tam giác ≥ 300, kích thước thật, không xin chữ, dẫn chỗ code; nón lá, trâu.
-// Mục P làm lại (14 mã _v2: đúng tệp, nhóm, POSE v2, sửa đúng chỗ lệch), 15 tướng mới từ design/3d-ref (tay không, POSE v2,
+// Mục P làm lại (15 mã _v2: đúng tệp, nhóm, POSE v2, sửa đúng chỗ lệch), 15 tướng mới từ design/3d-ref (tay không, POSE v2,
 // tài liệu ≤ 565, API ≤ 600), mục người chưa tạo đều dùng POSE v2, mục 0.8 "Còn phải tạo" có lệnh và credit từng lượt.
 // Lỗi tài liệu bắt khi đọc (trùng mã dòng bảng hay mục ###, mục không dòng bảng, dải tam giác sai, Symmetry hai chiều, khối POSE
 // biến thể); bộ tuy-chon; chặn run mua lại mẫu đã xong khi băm đổi (guardRun), list --hash trả mã lỗi, --redo cất tệp cũ;
@@ -402,11 +402,11 @@ t("trâu MOUNT_trau ở mục O, đối xứng bật; cò, quạ ở mục O; b�
 
 console.log("Tài liệu thật: làm lại (mục P), tướng mới, mục 0.8 còn phải tạo");
 const P_CODES = ["H33_v2", "X19_v2", "OFF_photuong_v2", "X20_v2", "DV_DAO_v2", "DV_GIAO_v2", "DV_NO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_cung_v2",
-  "CV_songdao_v2", "WPN_giao_dv_v2", "WPN_dadao_v2", "OFF_doitruong_v2"];
+  "CV_songdao_v2", "WPN_giao_dv_v2", "WPN_dadao_v2", "OFF_doitruong_v2", "OFF_tuong_v2"];
 const NEW_GEN = ["H27", "H28", "H29", "H30", "H32", "H36", "H37", "TT", "X16", "X17", "X18", "X21", "X22", "X23", "X25"];
 const get = (c) => all.find((x) => x.code === c) || { code: c, prompt: "", missing: true };
 const missing = (list) => list.filter((c) => get(c).missing);
-t("mục P: đủ 14 mã làm lại; tệp _v2 cạnh tệp gốc, cùng nhóm, dải tam giác, thư mục với mã gốc đã tạo; bộ lam-lai đúng 14 mã", () => {
+t("mục P: đủ 15 mã làm lại; tệp _v2 cạnh tệp gốc, cùng nhóm, dải tam giác, thư mục với mã gốc đã tạo; bộ lam-lai đúng 15 mã", () => {
   assert.deepEqual(missing(P_CODES), []);
   for (const c of P_CODES) {
     const a = get(c), b = get(c.replace(/_v2$/, ""));
@@ -441,12 +441,15 @@ t("mục P sửa đúng chỗ lệch: mũ không sừng, mũ lông trống, đ�
   want("WPN_giao_dv_v2", /\bone flat leaf-shaped\b/i.test(p("WPN_giao_dv_v2")) && !/four-sided/i.test(p("WPN_giao_dv_v2")), "một lưỡi lá dẹt");
   want("WPN_dadao_v2", /one straight line/i.test(p("WPN_dadao_v2")), "lưỡi và cán thẳng hàng");
   want("OFF_doitruong_v2", /onion-shaped/i.test(p("OFF_doitruong_v2")) && /scale cuirass/i.test(p("OFF_doitruong_v2")), "giữ mũ và giáp vảy của FIX đã dựng đúng");
+  // bản cũ: tay buông dính vạt áo, ống tay rộng — rig không tách được tay (game giữ bản nướng 35beed2)
+  want("OFF_tuong_v2", /close-fitting sleeves/i.test(p("OFF_tuong_v2")) && /hanging straight/i.test(p("OFF_tuong_v2")) && /one short gold cone on the top centre/.test(p("OFF_tuong_v2"))
+    && !/spike|drum/i.test(p("OFF_tuong_v2")), "ống tay bó, vạt áo buông thẳng, một chóp vàng ngắn");
   assert.deepEqual(bad, []);
 });
 t("mục P: đồ lệch một bên giữ Symmetry tắt (DV_NO_v2, CV_cung_v2, WPN_dadao_v2); áo cân hai bên bật", () => {
   assert.deepEqual(missing(P_CODES), []);
   assert.deepEqual(["DV_NO_v2", "CV_cung_v2", "WPN_dadao_v2"].filter((c) => get(c).sym !== "off"), []);
-  assert.deepEqual(["H33_v2", "X19_v2", "OFF_photuong_v2", "X20_v2", "DV_DAO_v2", "DV_GIAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_songdao_v2", "OFF_doitruong_v2"]
+  assert.deepEqual(["H33_v2", "X19_v2", "OFF_photuong_v2", "X20_v2", "DV_DAO_v2", "DV_GIAO_v2", "LINH_r01_v2", "CV_giao_v2", "CV_songdao_v2", "OFF_doitruong_v2", "OFF_tuong_v2"]
     .filter((c) => get(c).sym !== "on"), []);
 });
 t("15 tướng mới (design/3d-ref/PROMPTS-TUONG.md): mục A/B, tệp char_<mã>_<tên>.glb, 10–20k, POSE v2, tài liệu ≤ 565, API ≤ 600, chưa có trong manifest", () => {

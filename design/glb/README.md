@@ -58,7 +58,7 @@ cd design/tools && npm i && cd ../..
 node design/tools/glb-bake.mjs all                 # hoặc char | kit | wpn, thêm --only H35,DV_GIAO
 ```
 
-Bảng chọn cỡ lưới, texture, chỗ cầm và chiều vũ khí, hộp cắt phần thừa, khớp ghi tay, độ cao vai đã xem, số trọng số riêng mẫu: `design/tools/bake/catalog.mjs`. Mẫu mà lỗi của GLB không sửa được lúc nướng thì `keep: "35beed2"` giữ bản nướng cũ: `glb-bake.mjs` bỏ qua, `models.test.mjs` ghi TODO «GLB cần làm lại» (đang có OFF_tuong: tách tam giác cầu thì hở 0,25–0,68 m; lính DV_NO: nếp khuỷu LOD0) — tệp cũ 15 khớp vẫn chạy.
+Bảng chọn cỡ lưới, texture, chỗ cầm và chiều vũ khí, hộp cắt phần thừa, khớp ghi tay, độ cao vai đã xem, số trọng số riêng mẫu: `design/tools/bake/catalog.mjs`. Mẫu mà lỗi của GLB không sửa được lúc nướng thì `keep: "35beed2"` giữ bản nướng cũ: `glb-bake.mjs` bỏ qua, `models.test.mjs` ghi TODO «GLB cần làm lại» (đang có OFF_tuong: tách tam giác cầu thì hở 0,25–0,68 m; lính DV_NO: nếp khuỷu LOD0) — tệp cũ 15 khớp vẫn chạy. Prompt làm lại: OFF_tuong_v2 (mục P15), DV_NO_v2 (P7) của `design/glb-prompts.md`; có tệp `_v2` thì bỏ `keep`, chuyển bước nướng sang tệp mới.
 
 | Loại | Gắn vào | Cách làm (tệp trong `design/tools/bake/`) |
 | --- | --- | --- |
