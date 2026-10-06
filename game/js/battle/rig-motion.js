@@ -20,7 +20,7 @@
 import * as THREE from "three";
 import * as IK from "./ik.js";
 import { LEG } from "./models.js";
-import { fitGeo, fitArms, refitArms } from "./anim-wc01.js";
+import { FIT, fitGeo, fitArms, refitArms } from "./anim-wc01.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
@@ -127,8 +127,8 @@ export class RigMotion {
     const eL = P.elL.position, hL = P.handL.position;
     this.arm = { L1: Math.hypot(eL.x, eL.y, eL.z), L2: Math.hypot(hL.y, hL.z), off: Math.atan2(hL.z, -hL.y) };
     // tay phải đại kiếm theo số đo tay của rig (anim-wc01.js fitGeo / fitArms; null = rig khối, tư thế dùng thẳng); fq: tư thế đã
-    // giải lại (dùng lại mỗi lượt)
-    this.fit = this.grip ? fitGeo(P, d.blade, d.head || null) : null; this.fq = {};
+    // giải lại (dùng lại mỗi lượt, giữ lời giải khung trước), fr: tư thế sau refitArms, gp: mặt đất trong khung thân (fitPlane)
+    this.fit = this.grip ? fitGeo(P, d.blade, d.head || null) : null; this.fq = {}; this.fr = {}; this.gp = [0, 1, 0, 0]; this.kb = 0;
     // đế giày (khung cổ chân): rig khối LEG; thân GLB theo lưới (models.js rig.foot từ meta.foot)
     this.foot = rig.foot || LEG;
     this.legs = [
@@ -169,18 +169,23 @@ export class RigMotion {
 
     // ---- 1. chân bám đất ----
     this.legIK(dt, pose, ground, snap, !(o && o.ik === false));
-    // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q; dt (0 ở khung đầu, nhảy
-    // chỗ): chiều lật chắn tay, chiều lưỡi sắc theo khung trước (this.fq giữ qua các khung) — bàn tay không lật qua lại
+    // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q; giải tiếp theo lời giải khung
+    // trước (this.fq giữ qua các khung; dt = 0 khi hit-stop: đứng yên), khung đầu / nhảy chỗ (snap) giải toàn cục; mặt đất theo fitPlane
     let q = pose;
-    if (this.fit) q = this.setArmR(fitArms(pose, this.fit, this.fq, snap ? 0 : dt));
+    if (this.fit) { this.fitPlane(ground); q = this.setArmR(fitArms(pose, this.fit, this.fq, dt, this.gp, snap)); }
     // ---- 2. ma trận phần trên (hông đã hạ) để lấy điểm neo; lưỡi vũ khí không cắm đất ----
     for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
     if (this.blades.length) this.fixBlades(q, ground);
-    // cổ tay phải vừa gập cho lưỡi khỏi cắm đất: giữ hướng lưỡi đó, đưa cổ tay lại vào tầm với (điểm nắm đổi chỗ theo lưỡi)
-    if (this.fit && P.handR.rotation.x !== q.handRx) {
-      q = this.setArmR(refitArms(q, this.fit, P.handR.rotation.x, this.fq));
+    // cổ tay phải vừa gập cho lưỡi khỏi cắm đất: giữ hướng lưỡi đó, đưa cổ tay lại vào tầm với (điểm nắm đổi chỗ theo lưỡi); lưỡi gập mà
+    // vào mặt, cổ (refitArms null) thì không gập — đất đã tính trong fitArms theo mặt phẳng dốc. Góc gập giữ (kb) đổi dần, ≤ FIT.bk mỗi
+    // khung: gập bật / tắt 30–40° giữa hai khung khi lộn né làm lưỡi giật 38–62° (soát lần 3).
+    if (this.fit) {
+      let want = P.handR.rotation.x - q.handRx;
+      if (want && !refitArms(q, this.fit, q.handRx + want, this.fr)) want = 0;
+      const lim = FIT.bk * Math.max(1, Math.min(3, dt * 60)), bend = snap ? want : this.kb + Math.max(-lim, Math.min(lim, want - this.kb));
+      this.kb = bend;
+      if (Math.abs(bend) > 1e-6) q = this.setArmR(refitArms(q, this.fit, q.handRx + bend, this.fr, true)); else this.setArmR(q);
       for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
-      this.fixBlades(q, ground);
     }
     if (this.grip) this.gripIK(q);             // sau fixBlades: cổ tay phải gập thì chuôi đổi chỗ
     // ---- 3. vạt áo, áo choàng, cờ, dây ----
@@ -328,6 +333,19 @@ export class RigMotion {
       j.rotation.x = a0 + clamp(dl, lo, hi);
       j.updateWorldMatrix(false, false);
     }
+  }
+
+  // Mặt đất trong khung thân của rig (đơn vị rig) cho fitArms: mặt phẳng qua đất dưới hông theo dốc đo ±0,5 m — độ cao trên đất (vuông
+  // góc mặt dốc) của điểm khung thân x là gp[0..2]·x + gp[3]. Lộn né (đầu sát đất): lưỡi tránh đầu và đất cùng lúc thay vì fixBlades gập
+  // lưỡi lên vào đầu (soát 19a lần 3: 1,5–1,8 cm).
+  fitPlane(ground) {
+    const P = this.rig.p, s = this.s, gp = this.gp;
+    P.hips.updateWorldMatrix(false, false); P.torso.updateWorldMatrix(false, false);
+    const h = P.hips.matrixWorld.elements, e = P.torso.matrixWorld.elements, hx = h[12], hz = h[14], r = 0.5 * s;
+    const g0 = ground(hx, hz), sx = (ground(hx + r, hz) - ground(hx - r, hz)) / (2 * r), sz = (ground(hx, hz + r) - ground(hx, hz - r)) / (2 * r);
+    const k = 1 / (s * Math.sqrt(1 + sx * sx + sz * sz));
+    gp[0] = (e[1] - sx * e[0] - sz * e[2]) * k; gp[1] = (e[5] - sx * e[4] - sz * e[6]) * k; gp[2] = (e[9] - sx * e[8] - sz * e[10]) * k;
+    gp[3] = (e[13] - sx * (e[12] - hx) - sz * (e[14] - hz) - g0) * k;
   }
 
   // tay phải theo tư thế q (fitArms / refitArms) → khớp; trả q

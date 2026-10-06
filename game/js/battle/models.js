@@ -6,7 +6,7 @@
 
 import * as THREE from "three";
 import { model, applyRest, bodyMesh, weaponMesh } from "./glb.js";
-import { headShape, guardPts, handPts } from "./anim-wc01.js";
+import { headShape, bodyShape, guardPts, handPts } from "./anim-wc01.js";
 
 export const PAL = {
   son: 0x9b2d20, sonDam: 0x6e1d15, then: 0x1d1a17, vang: 0xc9a14a, trung: 0xe6dcc3,
@@ -166,8 +166,9 @@ const I4 = new THREE.Matrix4();
 // vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo (vạt áo nằm trong lưới, đi theo hông và
 // chân); đế giày theo lưới (rig.foot từ meta.foot, rig-motion.js). Áo choàng, cờ lưng, tua giáo (GLB: neo ở chân mũi, meta.head),
 // dải khăn vẫn dựng bằng code như cũ.
-// Lưới mặt (anim-wc01.js headShape: đỉnh theo đầu cùng cổ, râu, cổ áo, khung khớp đầu; trung vị khoảng cách tâm sọ) và ngón tay phải
-// (handPts, khung bàn tay: .hand) của thân GLB M: khớp đầu, bàn tay ở khung gắn (meta.inv), lưới thân; tính một lần mỗi mô hình (M.head).
+// Lưới mặt (anim-wc01.js headShape: đỉnh theo đầu cùng cổ, râu, cổ áo, khung khớp đầu; trung vị khoảng cách tâm sọ), ngón tay phải
+// (handPts, khung bàn tay: .hand) và thân (bodyShape: râu, cổ, cổ áo theo thân; lát ngang ngực, bụng, hông: .body) của thân GLB M: khớp
+// đầu, bàn tay ở khung gắn (meta.inv), lưới thân; tính một lần mỗi mô hình (M.head).
 export function headOf(M) {
   if (M.head === undefined) {
     const g = M.geos.body, h = M.meta.bones.indexOf("head"), A = g.attributes;
@@ -175,6 +176,7 @@ export function headOf(M) {
     M.head = hp ? headShape(A.position.array, A.skinIndex.array, A.skinWeight.array, h, hp.toArray(), M.meta.bones.indexOf("neck")) : null;
     const r = M.meta.bones.indexOf("handR");
     if (M.head && r >= 0) M.head.hand = handPts(A.position.array, A.skinIndex.array, A.skinWeight.array, r, M.meta.inv.slice(r * 16, r * 16 + 16));
+    if (M.head) M.head.body = bodyShape(A.position.array, A.skinIndex.array, A.skinWeight.array, M.meta.bones, M.meta.inv);
   }
   return M.head;
 }

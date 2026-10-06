@@ -22,6 +22,7 @@ const A = await import("../js/battle/anim.js");
 const W1 = await import("../js/battle/anim-wc01.js");
 const { HERO_ANIM } = await import("../js/battle/hero-anim.js");
 const { driveQuat } = await import("../js/battle/rig-helpers.js");
+const { MOVES_WC01 } = await import("../js/data/moves-wc01.js");
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -31,11 +32,11 @@ function t(name, fn) {
 const flat = () => 0;
 const wpos = (o) => new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
 
-// Một khung: đặt tư thế, chạy chuyển động phụ (lượt đầu: dựng tức thời), cập nhật ma trận.
-function step(rig, motion, pose) {
+// Một khung: đặt tư thế, chạy chuyển động phụ (lượt đầu: dựng tức thời; o.snap: dựng lại như khung đầu), cập nhật ma trận.
+function step(rig, motion, pose, o = undefined) {
   A.applyPose(rig, pose);
   rig.root.updateMatrixWorld(true);
-  motion.update(1 / 60, pose, flat);
+  motion.update(1 / 60, pose, flat, o);
   rig.root.updateMatrixWorld(true);
 }
 // Sai số tay trái → điểm nắm chuôi (dyn.grip), đơn vị rig; kèm tỉ lệ khoảng cách vai trái → điểm nắm / dài tay.
@@ -95,6 +96,29 @@ t("headShape có xương cổ: thêm đỉnh mà đầu + cổ nặng ≥ nửa 
   assert.ok(Math.abs(r.shell - Math.hypot(0 - c[0], 1.75 - c[1], 0.1 - c[2])) < 1e-6, `vỏ ${r.shell}`);
   assert.equal(W1.headShape(Float32Array.from(pos), Uint8Array.from(si), Uint8Array.from(sw), 2, hp).pts.length, 3);
 });
+// Bảng khoảng cách của lưới mặt (anim-wc01.js distGrid, soát 19a lần 3: lan "điểm gần nhất" qua 26 ô kề thay cho rải mỗi đỉnh vào mọi ô
+// trong bán kính FIT.gm — dựng mỗi rig WC01 65–104 ms): mọi nút bảng so với duyệt hết các đỉnh (cắt ở FIT.gm) — sai ≤ 1,5 mm ở nút cách
+// đỉnh < 10 cm (khe lớn nhất fitArms dùng: 9 cm), ≤ 2,5 mm mọi nút. Gieo mỗi đỉnh vào 8 ô quanh nó (bản đầu) thì sai 5,7–6,7 mm.
+t("headShape grid (distGrid): khoảng cách tới đỉnh gần nhất ở mọi nút bảng như duyệt hết (cắt ở FIT.gm), sai ≤ 1,5 mm trong 10 cm, ≤ 2,5 mm mọi nút", () => {
+  const hp = [0, 1.6, 0], pos = [], si = [], sw = [];
+  let s = 7;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 800; i++) {
+    const a = rnd() * Math.PI * 2, b = Math.acos(2 * rnd() - 1), r = 0.09 + 0.03 * rnd();
+    pos.push(hp[0] + r * Math.sin(b) * Math.cos(a), hp[1] + 0.12 + 1.2 * r * Math.cos(b), hp[2] + r * Math.sin(b) * Math.sin(a));
+    si.push(2, 0, 0, 0); sw.push(255, 0, 0, 0);
+  }
+  const r = W1.headShape(Float32Array.from(pos), Uint8Array.from(si), Uint8Array.from(sw), 2, hp), G = r.grid, Q = r.pts, c = W1.FIT.gc;
+  let worst = 0, near = 0;
+  for (let a = 0; a < G.n[0]; a++) for (let b = 0; b < G.n[1]; b++) for (let e = 0; e < G.n[2]; e++) {
+    const x = G.o[0] + a * c, y = G.o[1] + b * c, z = G.o[2] + e * c;
+    let d = W1.FIT.gm;
+    for (let i = 0; i < Q.length; i += 3) d = Math.min(d, Math.hypot(x - Q[i], y - Q[i + 1], z - Q[i + 2]));
+    const er = Math.abs(d - G.d[(a * G.n[1] + b) * G.n[2] + e]);
+    worst = Math.max(worst, er); if (d < 0.1) near = Math.max(near, er);
+  }
+  assert.ok(near <= 0.0015 && worst <= 0.0025, `sai lớn nhất ${(near * 1000).toFixed(2)} mm trong 10 cm, ${(worst * 1000).toFixed(2)} mm mọi nút (${G.n.join(" × ")} nút, ${Q.length / 3} đỉnh)`);
+});
 t("handPts: đỉnh theo bàn tay phải trong khung bàn tay (ma trận gắn nghịch đảo), ngoài lõi nắm tay quanh cán (> 0,03), mỗi ô FIT.hc một đỉnh", () => {
   const inv = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.3, -1.0, -0.1, 1], pos = [], si = [], sw = [];
   const put = (p, b) => { pos.push(...p); si.push(b, 0, 0, 0); sw.push(255, 0, 0, 0); };
@@ -125,13 +149,16 @@ const hkm = (rel) => { const b = readFileSync(new URL(rel, MD)); return parseHKM
 const DKM = hkm("wpn/daikiem.hkm"), DK = DKM.meta;
 // như models.js lane(): chắn tay, mũi, núm chuôi, mút chắn tay
 const BLADE = { guard: DK.guard ?? 0.07, tip: DK.hi[2], butt: DK.lo[2], gp: W1.guardPts(DKM.geos.body.attributes.position.array) };
-// Như makeRig với thân GLB: khớp theo meta.rest, gươm GLB, lưới đầu từ lưới thân (models.js headOf).
-function glbRig(id) {
+// Như makeRig với thân GLB: khớp theo meta.rest, gươm GLB (lưỡi, điểm fixBlades: mũi, hai mép 0,2 dưới mũi, núm — models.js), lưới đầu
+// từ lưới thân (models.js headOf). M: mô hình (lưới da cho kiểm thử va chạm).
+function glbRig(id, withModel = false) {
   const b = readFileSync(new URL(`char/${id}.hkm`, MD)), M = parseHKM(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
   const r = M.meta.rest, rig = makeRig({ weapon: "daikiem" });
   for (const k of ["shL", "elL", "handL", "shR", "elR", "handR", "head"]) rig.p[k].position.set(r[k][0], r[k][1], r[k][2]);
   rig.dyn.blade = BLADE; rig.dyn.head = headOf(M);
-  return rig;
+  const z = BLADE.tip;
+  rig.dyn.blades = [{ j: rig.p.handR, key: "handRx", pts: new Float32Array([0, 0, z, 0, 0.065, z - 0.2, 0, -0.065, z - 0.2, 0, 0, BLADE.butt]) }];
+  return withModel ? { rig, M } : rig;
 }
 // Lưới mặt (headShape: đỉnh theo đầu cùng cổ, râu, cổ áo; cứng theo khung đầu) → trục gươm: khoảng cách nhỏ nhất tới đoạn chuôi (núm …
 // chắn tay: hai bàn tay) và tới cả thanh (núm … mũi), đơn vị rig.
@@ -149,23 +176,33 @@ function headGap(rig) {
 // Lưới mặt (mũ, mặt, cổ, râu) cách trục cả thanh gươm ≥ 0,055 (nửa bản lưỡi 0,047 + khe: lưỡi không xuyên mũ), cách đoạn chuôi (hai bàn
 // tay) ≥ 0,055; khung mà cổ tay gập thêm cho mũi khỏi cắm đất (rig-motion.js fixBlades, lộn né: góc cổ tay khác lời giải fitArms) chỉ cần
 // ≥ 0,047 — đất trước, lưỡi vẫn không cắt vào lưới. Soát lần 2: lính Tự do LINH_r01 hai tay cách mặt 0,5–0,6 cm, chuôi 1,8 cm (chuôi trong
-// miệng); vành mũ LINH_r24, cánh mũ H31 sượt lưỡi 0,4–0,8 cm — trước đó chỉ đo lưỡi với quả cầu quanh tâm sọ.
-t("thân GLB thật (H31, lính Tự do LINH_r01 / LINH_r24): mọi đòn WC01, u = 0…0,95 — tay trái tới điểm nắm (≤ 1 cm) khi grip = 1 (khung chuyển ≤ rig khối + 1 cm), lưới mặt cách cả thanh gươm và hai bàn tay ≥ 0,055", () => {
-  const bad = [], ref = makeRig({ weapon: "daikiem" }), mr = new RigMotion(ref), P = W1.POSES_WC01;
-  const ALL = { ...W1.HERO_ANIM_WC01, idle: (u) => P.idle(u * 3), run: (u) => P.run(u * 2 * Math.PI, 1, 0.95), block: () => P.block,
-    hit: (u) => P.hitReact(u), dodge: (u) => P.dodgeRoll(u), down: (u) => P.knockdown(u) };
+// miệng); vành mũ LINH_r24, cánh mũ H31 sượt lưỡi 0,4–0,8 cm — trước đó chỉ đo lưỡi với quả cầu quanh tâm sọ. Soát lần 3: fitArms giải
+// tiếp theo khung trước (gọi rời từng mẫu chỉ còn ở khung đầu) — mỗi đòn phát như trong trận: 18 khung thế thủ trộn 0,15 rồi đòn trộn
+// 0,8 mỗi khung 1/60 s (chạy 0,35, đỡ, ngã 0,4, trúng đòn 0,5, lộn né 0,6), đo ở các mẫu u = 0,05…1. Lộn né riêng (hai tay ôm chuôi khi
+// cuộn người, đầu chạm đất, tư thế đặt hai bàn tay trước mặt — lời giải toàn cục cũng thiếu khe 2–9 cm; soát lần 3 chưa đạt): tay trái hụt
+// ≤ 4 cm, lưới mặt ≥ 0,04 (đo: LINH_r24 hụt 3,3 cm khi gượng dậy, lưỡi cách 0,046 lúc đầu sát đất).
+t("thân GLB thật (H31, lính Tự do LINH_r01 / LINH_r24): mọi đòn WC01 và đứng, chạy, đỡ, trúng đòn, lộn né, ngã phát 60 khung / giây, u = 0,05…1 — tay trái tới điểm nắm (≤ 1 cm) khi grip = 1 (khung chuyển ≤ rig khối + 1 cm), lưới mặt cách cả thanh gươm và hai bàn tay ≥ 0,055", () => {
+  const bad = [], P = W1.POSES_WC01, DT = 1 / 60, DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };
+  const ALL = Object.fromEntries(Object.entries(W1.HERO_ANIM_WC01).map(([k, f]) => [k, [f, MOVES_WC01[k]?.dur ?? DUR[k], 0.8]]));
+  Object.assign(ALL, { idle: [(u) => P.idle(u * 3), 3, 0.15], run: [(u) => P.run(u * 1.5 * 11, 1, 0.95), 1.5, 0.35], block: [() => P.block, 0.6, 0.4],
+    hit: [(u) => P.hitReact(u), 0.3, 0.5], dodge: [(u) => P.dodgeRoll(u), 0.32, 0.6], down: [(u) => P.knockdown(u * 1.6), 1.6, 0.4] });
   for (const id of ["H31", "LINH_r01", "LINH_r24"]) {
-    const rig = glbRig(id), m = new RigMotion(rig);
-    for (const [k, f] of Object.entries(ALL)) for (let i = 0; i < 20; i++) {
-      const u = i * 0.05, pose = f(u);
-      step(rig, m, pose);
-      if (pose.grip >= 0.5) {
-        const e = gripErr(rig).err;
-        let lim = 0.01; if (pose.grip < 0.999) { step(ref, mr, pose); lim += gripErr(ref).err; }
-        if (e > lim) bad.push(`${id} ${k}@${u.toFixed(2)} tay trái hụt ${e.toFixed(3)} (grip ${pose.grip.toFixed(2)})`);
+    const rig = glbRig(id), m = new RigMotion(rig), ref = makeRig({ weapon: "daikiem" }), mr = new RigMotion(ref);
+    for (const [k, [f, dur, kb]] of Object.entries(ALL)) {
+      let pose = P.idle(0);
+      for (let i = 0; i < 18; i++) { pose = A.blendPose(pose, P.idle(i * DT), 0.15); step(rig, m, pose); step(ref, mr, pose); }
+      const N = Math.ceil(dur / DT);
+      for (let i = 1; i <= N; i++) {
+        pose = A.blendPose(pose, f(i / N), kb); step(rig, m, pose); step(ref, mr, pose);
+        const u = i / N;
+        if (Math.floor(u * 20 + 1e-9) === Math.floor(((i - 1) / N) * 20 + 1e-9)) continue;
+        if (pose.grip >= 0.5) {
+          const e = gripErr(rig).err, lim = (k === "dodge" ? 0.04 : 0.01) + (pose.grip < 0.999 ? gripErr(ref).err : 0);
+          if (e > lim) bad.push(`${id} ${k}@${u.toFixed(2)} tay trái hụt ${e.toFixed(3)} (grip ${pose.grip.toFixed(2)})`);
+        }
+        const hg = headGap(rig), bent = Math.abs(m.fq.handRx - rig.p.handR.rotation.x) > 1e-3;
+        if (hg.sword < (k === "dodge" ? 0.04 : bent ? 0.047 : 0.055)) bad.push(`${id} ${k}@${u.toFixed(2)} gươm cách lưới mặt ${hg.sword.toFixed(3)} (chuôi ${hg.hand.toFixed(3)}${bent ? ", cổ tay gập theo đất" : ""})`);
       }
-      const hg = headGap(rig), bent = Math.abs(W1.fitArms(pose, m.fit, {}).handRx - rig.p.handR.rotation.x) > 1e-3;
-      if (hg.sword < (bent ? 0.047 : 0.055)) bad.push(`${id} ${k}@${u.toFixed(2)} gươm cách lưới mặt ${hg.sword.toFixed(3)} (chuôi ${hg.hand.toFixed(3)}${bent ? ", cổ tay gập theo đất" : ""})`);
     }
   }
   assert.ok(!bad.length, `${bad.length} khung: ${bad.slice(0, 14).join("; ")}`);
@@ -173,9 +210,11 @@ t("thân GLB thật (H31, lính Tự do LINH_r01 / LINH_r24): mọi đòn WC01, 
 // Gọi liên tục như rig-motion.js (cùng đối tượng ra, dt > 0), bước u 0,01 qua mọi đòn WC01: khuỷu phải không nhảy > 0,22 m giữa hai bước
 // khi khuỷu tư thế đi < 0,05 m, lưỡi sắc (trục y bàn tay) không quay hơn tư thế quá 100° — bàn tay không lật. Đo đợt soát 19a lần 2 với
 // bản 18ce9b8: khuỷu lính Tự do nhảy 0,25–0,36 m (N1, DN, CT: phía khuỷu cổ tay gập 150–190°), bàn tay lật 180° (31 khung / 60 khung một
-// giây; gọi rời từng khung nay 82).
-t("fitArms gọi liên tục (thân GLB thật): khuỷu không nhảy, bàn tay không lật giữa hai bước u 0,01", () => {
-  const bad = [], ref = makeRig({ weapon: "daikiem" });
+// giây; gọi rời từng khung nay 82). Soát lần 3: fitArms giải tiếp theo khung trước (giới hạn mỗi khung theo thời gian) — bước theo khung
+// 1/60 s thật của đòn (u += 1/60 / thời lượng); bước u 0,01 với dt 1/60 (Tuyệt Kỹ: 2,6 khung tư thế trong một khung giải) thì lời giải
+// tụt lại rồi đổi phía khuỷu.
+t("fitArms gọi liên tục (thân GLB thật): khuỷu không nhảy, bàn tay không lật giữa hai khung 1/60 s", () => {
+  const bad = [], ref = makeRig({ weapon: "daikiem" }), DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };
   const frame = (rig, q) => {
     rig.p.shR.rotation.set(q.shRx, q.shRy, q.shRz); rig.p.elR.rotation.set(q.elRx, 0, 0); rig.p.handR.rotation.set(q.handRx, 0, q.handRz);
     rig.root.updateMatrixWorld(true);
@@ -186,18 +225,118 @@ t("fitArms gọi liên tục (thân GLB thật): khuỷu không nhảy, bàn tay
     const rig = glbRig(id), g = W1.fitGeo(rig.p, BLADE, rig.dyn.head), o = {};
     for (const [k, f] of Object.entries(W1.HERO_ANIM_WC01)) {
       let prev = null;
-      for (let i = 0; i <= 100; i++) {
-        const p = f(i / 100), F = frame(rig, W1.fitArms(p, g, o, i ? 1 / 60 : 0)), Z = frame(ref, p);
+      const N = Math.ceil((MOVES_WC01[k]?.dur ?? DUR[k]) * 60);
+      for (let i = 0; i <= N; i++) {
+        const p = f(i / N), F = frame(rig, W1.fitArms(p, g, o, i ? 1 / 60 : 0)), Z = frame(ref, p);
         if (prev) {
           const de = F.el.distanceTo(prev.F.el), de0 = Z.el.distanceTo(prev.Z.el), dr = (F.E.angleTo(prev.F.E) - Z.E.angleTo(prev.Z.E)) * 180 / Math.PI;
-          if (de > 0.22 && de0 < 0.05) bad.push(`${id} ${k}@${(i / 100).toFixed(2)} khuỷu nhảy ${de.toFixed(2)} m`);
-          if (dr > 100) bad.push(`${id} ${k}@${(i / 100).toFixed(2)} bàn tay lật ${dr.toFixed(0)}°`);
+          if (de > 0.22 && de0 < 0.05) bad.push(`${id} ${k}@${(i / N).toFixed(3)} khuỷu nhảy ${de.toFixed(2)} m`);
+          if (dr > 100) bad.push(`${id} ${k}@${(i / N).toFixed(3)} bàn tay lật ${dr.toFixed(0)}°`);
         }
         prev = { F, Z };
       }
     }
   }
   assert.ok(!bad.length, `${bad.length} bước: ${bad.slice(0, 12).join("; ")}`);
+});
+const PAR15 = { hips: null, torso: "hips", head: "torso", shL: "torso", elL: "shL", handL: "elL", shR: "torso", elR: "shR", handR: "elR",
+  hipL: "hips", kneeL: "hipL", ankleL: "kneeL", hipR: "hips", kneeR: "hipR", ankleR: "kneeR" };
+// Phát như trong trận (soát 19a lần 3): mọi đòn WC01 rồi lộn né nối nhau, 60 khung / giây, tư thế trộn như hero.js (đòn 0,8 mỗi khung,
+// 18 khung thế thủ trộn 0,15 trước mỗi đòn; lộn né 0,32 s trộn 0,6), cùng một RigMotion (fitArms → fixBlades → refitArms → gripIK), song
+// song rig khối cùng tư thế (đổi của chính tư thế). Mỗi khung đo trong khung thân: hướng lưỡi (trục z bàn tay phải) không quay hơn lưỡi
+// rig khối quá 20°, lưỡi sắc không lật (quay > 120° mà lưỡi quay < 60°), khuỷu không đi hơn khuỷu rig khối quá 0,05 m (cho ≤ 1 / 200
+// khung tới 0,1 m: khuỷu dời dần sang phía kia khi cổ tay gập quá tầm, xem armPlane); lưới da (CPU) đỉnh theo đầu và đỉnh cổ, râu, cổ
+// áo (không theo đầu, tay; trên đường vai − 0,02, |x| < 0,13 quanh đầu) không vào khối gươm (từng lát 5 mm theo lưới gươm) quá 5 mm, cách
+// đỉnh hai bàn tay ≥ 5 mm; lưỡi không lệch lưỡi rig khối > 90° quá 6 khung liền, không bao giờ > 120° (kẹt: tay dưới cằm, lưỡi xuyên
+// ngực khi tư thế giơ gươm qua đầu). Bản 9374f70: lưỡi bật tới 89° (gồng C6, Tuyệt Kỹ, lộn né), bàn tay lật 180°, râu, cổ áo lọt chắn
+// tay 3 cm, gươm vào đầu khi lộn né. Lộn né riêng (hai tay ôm chuôi khi cuộn người, đầu chạm đất — lời giải toàn cục cũng thiếu khe; soát
+// lần 3 chưa đạt): gươm vào mặt, cổ ≤ 2,5 cm, bàn tay cách ≥ 3 mm (đo: LINH_r01 2,3 cm, LINH_r24 3,9 mm ở chuỗi này; chuỗi soát của
+// trình duyệt: 0).
+const wslab = (() => {
+  const P = DKM.geos.body.attributes.position.array, I = DKM.geos.body.index.array;
+  let zlo = Infinity, zhi = -Infinity; for (let i = 2; i < P.length; i += 3) { zlo = Math.min(zlo, P[i]); zhi = Math.max(zhi, P[i]); }
+  const BZ = 0.005, NB = Math.ceil((zhi - zlo) / BZ) + 1, MX = new Float32Array(NB).fill(-1), MY = new Float32Array(NB).fill(-1);
+  for (let t3 = 0; t3 < I.length; t3 += 3) for (const [a, b] of [[I[t3], I[t3 + 1]], [I[t3 + 1], I[t3 + 2]], [I[t3 + 2], I[t3]]]) {
+    const L = Math.hypot(P[b * 3] - P[a * 3], P[b * 3 + 1] - P[a * 3 + 1], P[b * 3 + 2] - P[a * 3 + 2]), k = Math.max(1, Math.ceil(L / 0.004));
+    for (let s = 0; s <= k; s++) {
+      const f = s / k, x = P[a * 3] + (P[b * 3] - P[a * 3]) * f, y = P[a * 3 + 1] + (P[b * 3 + 1] - P[a * 3 + 1]) * f, z = P[a * 3 + 2] + (P[b * 3 + 2] - P[a * 3 + 2]) * f;
+      const bi = Math.min(NB - 1, Math.max(0, Math.floor((z - zlo) / BZ))); MX[bi] = Math.max(MX[bi], Math.abs(x)); MY[bi] = Math.max(MY[bi], Math.abs(y));
+    }
+  }
+  for (let bi = 1; bi < NB; bi++) if (MX[bi] < 0) { MX[bi] = MX[bi - 1]; MY[bi] = MY[bi - 1]; }
+  return (x, y, z) => {
+    let dz = 0, bi;
+    if (z < zlo) { dz = zlo - z; bi = 0; } else if (z > zhi) { dz = z - zhi; bi = NB - 1; } else bi = Math.min(NB - 1, Math.floor((z - zlo) / BZ));
+    const dx = Math.abs(x) - MX[bi], dy = Math.abs(y) - MY[bi];
+    return dz === 0 && dx <= 0 && dy <= 0 ? Math.max(dx, dy) : Math.hypot(Math.max(dx, 0), Math.max(dy, 0), dz);
+  };
+})();
+t("WC01 nối đòn 60 khung / giây (thân GLB thật, mọi đòn + lộn né): lưỡi không bật quá tư thế 20°, bàn tay không lật, khuỷu không nhảy, gươm và hai bàn tay không vào mặt, râu, cổ, cổ áo", () => {
+  const DT = 1 / 60, DUR = { hich: 3, binhThu: 0.9, ult: 4.4 }, seq = [];
+  for (const k of Object.keys(W1.HERO_ANIM_WC01)) {
+    for (let i = 0; i < 18; i++) seq.push([null, 0, () => W1.POSES_WC01.idle(i * DT), 0.15]);
+    const f = W1.HERO_ANIM_WC01[k], N = Math.ceil((MOVES_WC01[k]?.dur ?? DUR[k]) / DT);
+    for (let i = 1; i <= N; i++) seq.push([k, i / N, () => f(i / N), 0.8]);
+  }
+  for (let i = 0; i < 18; i++) seq.push([null, 0, () => W1.POSES_WC01.idle(i * DT), 0.15]);
+  for (let i = 1; i <= 20; i++) seq.push(["dodge", i / 20, () => W1.POSES_WC01.dodgeRoll(Math.min(1, (i * DT) / 0.32)), 0.6]);
+  const ARMB = new Set(["shL", "elL", "handL", "shR", "elR", "handR", "twistL", "twistR", "clavL", "clavR"]), bad = [];
+  let frames = 0, elbOver = 0;
+  for (const id of ["H31", "LINH_r01", "LINH_r24"]) {
+    const { rig, M } = glbRig(id, true), ref = makeRig({ weapon: "daikiem" }), m = new RigMotion(rig), mr = new RigMotion(ref), meta = M.meta;
+    const B3 = M.geos.body.attributes, P = B3.position.array, SI = B3.skinIndex.array, SW = B3.skinWeight.array, SWD = SW instanceof Uint8Array ? 255 : 1;
+    const bind = (n) => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(meta.inv, meta.bones.indexOf(n) * 16).invert());
+    const hb = bind("head"), shY = (bind("shL").y + bind("shR").y) / 2, face = [], fist = [];
+    for (let i = 0; i < P.length / 3; i++) {
+      let q = 0; for (let k = 1; k < 4; k++) if (SW[i * 4 + k] > SW[i * 4 + q]) q = k;
+      const d = meta.bones[SI[i * 4 + q]];
+      if (d === "head" || (!ARMB.has(d) && P[i * 3 + 1] > shY - 0.02 && Math.abs(P[i * 3] - hb.x) < 0.13)) face.push(i);
+      if (d === "handR" || d === "handL") fist.push(i);
+    }
+    const skin = (Ms, i) => {
+      let x = 0, y = 0, z = 0; const px = P[i * 3], py = P[i * 3 + 1], pz = P[i * 3 + 2];
+      for (let k = 0; k < 4; k++) { const w = SW[i * 4 + k] / SWD; if (!w) continue; const e = Ms[SI[i * 4 + k]].elements; x += w * (e[0] * px + e[4] * py + e[8] * pz + e[12]); y += w * (e[1] * px + e[5] * py + e[9] * pz + e[13]); z += w * (e[2] * px + e[6] * py + e[10] * pz + e[14]); }
+      return [x, y, z];
+    };
+    const ax = (r) => {
+      const T = r.p.torso.matrixWorld.clone().invert();
+      return { z: new THREE.Vector3(0, 0, 1).transformDirection(r.p.handR.matrixWorld).transformDirection(T), y: new THREE.Vector3(0, 1, 0).transformDirection(r.p.handR.matrixWorld).transformDirection(T),
+        eR: wpos(r.p.elR).applyMatrix4(T), eL: wpos(r.p.elL).applyMatrix4(T) };
+    };
+    let pg = W1.POSES_WC01.idle(0), prev = null, dvRun = 0;
+    for (const [k, u, f, kb] of seq) {
+      pg = A.blendPose(pg, f(), kb);
+      step(rig, m, pg); step(ref, mr, pg);
+      const a = ax(rig), b = ax(ref);
+      if (prev && k) {
+        frames++;
+        const at = (`${id} ${k}@${u.toFixed(3)}`), deg = (p, q) => (p.angleTo(q) * 180) / Math.PI;
+        const tz = deg(a.z, prev.a.z) - deg(b.z, prev.b.z), ty = deg(a.y, prev.a.y), el = Math.max(a.eR.distanceTo(prev.a.eR) - b.eR.distanceTo(prev.b.eR), a.eL.distanceTo(prev.a.eL) - b.eL.distanceTo(prev.b.eL));
+        if (tz > 20) bad.push(`${at} lưỡi quay hơn tư thế ${tz.toFixed(0)}°`);
+        const dv = deg(a.z, b.z); dvRun = dv > 90 ? dvRun + 1 : 0;
+        if (dv > 120 || dvRun > 6) bad.push(`${at} lưỡi lệch tư thế ${dv.toFixed(0)}° (${dvRun} khung liền > 90°)`);
+        if (ty > 120 && deg(a.z, prev.a.z) < 60) bad.push(`${at} bàn tay lật ${ty.toFixed(0)}°`);
+        if (el > 0.05) elbOver++;
+        if (el > 0.1) bad.push(`${at} khuỷu nhảy ${el.toFixed(2)} m hơn tư thế`);
+        // va chạm: chỉ khi gươm / bàn tay gần đầu
+        const hd = wpos(rig.p.head), hw = wpos(rig.p.handR), m4 = rig.p.handR.matrixWorld, tip = new THREE.Vector3(0, 0, BLADE.tip).applyMatrix4(m4), butt = new THREE.Vector3(0, 0, BLADE.butt).applyMatrix4(m4);
+        const seg = tip.clone().sub(butt), tt = Math.max(0, Math.min(1, hd.clone().sub(butt).dot(seg) / seg.lengthSq()));
+        if (butt.clone().addScaledVector(seg, tt).distanceTo(hd) < 0.75 || hw.distanceTo(hd) < 0.6 || wpos(rig.p.handL).distanceTo(hd) < 0.6) {
+          const Ms = boneWorld(rig, meta), inv = m4.clone().invert().elements, F = face.map((i) => skin(Ms, i));
+          let worst = 9;
+          for (const [x, y, z] of F) worst = Math.min(worst, wslab(inv[0] * x + inv[4] * y + inv[8] * z + inv[12], inv[1] * x + inv[5] * y + inv[9] * z + inv[13], inv[2] * x + inv[6] * y + inv[10] * z + inv[14]));
+          if (worst < (k === "dodge" ? -0.025 : -0.005)) bad.push(`${at} gươm vào mặt / cổ ${(-worst * 100).toFixed(1)} cm`);
+          let fd = 9;
+          for (const i of fist) { const p = skin(Ms, i); for (const q of F) { const d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (d < fd) fd = d; } }
+          if (fd < (k === "dodge" ? 0.003 : 0.005)) bad.push(`${at} bàn tay sát mặt / cổ ${(fd * 1000).toFixed(1)} mm`);
+        }
+      }
+      prev = { a, b };
+    }
+  }
+  if (elbOver > frames / 200) bad.unshift(`khuỷu nhảy > 0,05 m hơn tư thế ở ${elbOver} / ${frames} khung`);
+  const kinds = ["lưỡi quay", "lưỡi lệch", "bàn tay lật", "khuỷu nhảy", "gươm vào", "bàn tay sát"].map((k) => `${k} ${bad.filter((s) => s.includes(k)).length}`);
+  assert.ok(!bad.length, `${kinds.join(", ")} — ${bad.slice(0, 12).join("; ")}`);
 });
 t("rig khối (tay đúng số tư thế 0,34 + 0,36, vai ±0,3): không giải lại tay phải — góc khớp đúng tư thế", () => {
   const rig = makeRig({ weapon: "daikiem" }), m = new RigMotion(rig);
@@ -217,8 +356,6 @@ console.log("Đường tách tam giác cầu (đỉnh song sinh)");
 const SIGN = [["idle", 0, (u) => A.idle(0)], ["roar", 0.5, (u) => A.roar(u)], ["ult", 0.3, (u) => A.heavyChop(u / 0.45 * 0.5, 0.9)],
   ["ult", 0.7, (u) => A.spin((u - 0.45) / 0.55, 2)], ["heavy", 0.45, (u) => A.heavyChop(u, 0.4, false)], ["sweep", 0.4, (u) => A.sweep(u)],
   ["C1", 0.4, (u) => HERO_ANIM.C1(u)], ["run", 0.25, (u) => A.run(u * 2 * Math.PI, 1, 0.95)], ["dodge", 0.5, (u) => A.dodgeRoll(u)]];
-const PAR15 = { hips: null, torso: "hips", head: "torso", shL: "torso", elL: "shL", handL: "elL", shR: "torso", elR: "shR", handR: "elR",
-  hipL: "hips", kneeL: "hipL", ankleL: "kneeL", hipR: "hips", kneeR: "hipR", ankleR: "kneeR" };
 // Ma trận thế giới mỗi xương của meta.bones (khớp: rig.p; xương phụ: cha × (gốc meta.rest, bộ dẫn của góc cục bộ khớp nguồn))
 function boneWorld(rig, meta) {
   const W = {}, o = [0, 0, 0, 0], q = new THREE.Quaternion(), pp = new THREE.Vector3(), sc = new THREE.Vector3();
