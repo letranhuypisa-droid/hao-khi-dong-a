@@ -457,6 +457,7 @@ function dying(a, horse) {
 // ---- pha bước, làm mượt tư thế ---------------------------------------------------------------------
 // Tốc độ thật, hướng đi (khung thân, làm mượt) và pha bước chân lấy từ quãng đã đi: không bước khi bị
 // đẩy, khi đứng; chu kỳ khớp dáng đi (cycleLen) nên chân chống không trượt. Ngựa lùi thì chân chạy ngược.
+// Dân (ambient.js strideV) dùng bản sao riêng của hàm này (giữ chỗ gọi này chỉ gặp lính — đợt 19c): sửa ở đây thì sửa cả ở đó.
 export function advanceStride(a, px, pz, dt) {
   const dx = a.x - px, dz = a.z - pz, moved = Math.sqrt(dx * dx + dz * dz);
   a.spd += (moved / dt - a.spd) * Math.min(1, dt * 10);

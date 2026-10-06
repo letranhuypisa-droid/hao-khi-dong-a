@@ -9,7 +9,7 @@ import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
 import { BigUnit } from "./units.js";
 import { FX, preloadFx } from "./fx.js";
-import { createRenderer, Warm } from "./gfx.js";
+import { createRenderer, Warm, watchLateFirstUse } from "./gfx.js";
 import { Pacer, STEP } from "./pacing.js";
 import { View } from "./view.js";
 import { Audio } from "./audio.js";
@@ -253,13 +253,17 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       const a = ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "spectator", x: s.x, z: s.z, yaw: s.yaw });
       a.y = s.y;
     }
-    ctx.hero = new Hero(ctx, stats); ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI;
+    // Hero dựng ở chỗ xuất hiện của B15 (72, −32) rồi mới đặt vào sân. Khung đầu chưa có bước (pacing.js) vẽ rig ở gốc rig, camera nhắm
+    // tướng (view.pos) — trước đây giữa rừng ngoài rào sân: dời gốc rig, độ cao theo sân. Chỉ gốc, không place(): chuyển động phụ của rig
+    // (chân, vạt, dải khăn) vẫn "dịch chuyển" ở bước đầu như trước đợt 19c; y bước đầu tính lại trước khi ai đọc.
+    ctx.hero = new Hero(ctx, stats); ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI; ctx.hero.y = heightAt(0, 8);
+    ctx.hero.rig.root.position.set(0, ctx.hero.y, 8); ctx.hero.rig.root.rotation.y = Math.PI;
     for (const tr of ctx.hero.trails) ctx.view.follow(tr.mesh, ctx.hero.rig.root);   // vệt lưỡi dời theo tướng lúc vẽ
     const input = new Input(canvas);
     new ArenaHUD(hudRoot, ctx);
     if (opts.mode === "huanluyen") new TutorialDirector(ctx, opts); else new ArenaDirector(ctx, opts);
     ctx.input = input;
-    if (location.search.includes("debug")) window.__hk = ctx;
+    if (location.search.includes("debug")) { window.__hk = ctx; watchLateFirstUse(renderer, ctx); }
     ctx.hitstopT = 0; ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
     const cam = ctx.cam = { yaw: Math.PI, pitch: 0.42, dist: 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
     let slowT = 0, slowK = 1;
@@ -272,7 +276,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       gfx.resize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix();
       syncCompact(container);
     };
-    window.addEventListener("resize", resize); resize();
+    resize();                                                                    // đổi cỡ cửa sổ: onResize (dưới, vẽ lại khi đang tạm dừng)
     const syncTouch = setupTouch(container, touchRoot, input, ctx, settings);   // "Tự nhận" theo cách bạn bấm vào sân, rồi theo thiết bị vừa dùng (xem battle.js)
     syncCompact(container);                                                      // HUD gọn khi cảm ứng / khung hẹp (đợt 13)
 
@@ -294,13 +298,16 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       } else { ctx.audio.unlock(); music?.resume(); last = performance.now(); pacer.reset(); }
       if (!on && ctx.director.over && endShown) showEnd(ctx.director.result);
     };
+    // tạm dừng mà đổi cỡ cửa sổ: setSize xoá canvas — vẽ lại đúng khung vừa rồi quanh bảng (như battle.js)
+    const onResize = () => { resize(); if (paused && !finished && ctx.warmed) { view.begin(); try { renderer.render(scene, camera); } finally { view.end(); } } };
+    window.addEventListener("resize", onResize);
     const onLock = () => { if (!document.pointerLockElement && !paused && !finished && !ctx.touch && !ctx.director.over) pause(true); };
     document.addEventListener("pointerlockchange", onLock);
     const onVis = () => { if (document.hidden && !paused && !finished && !ctx.director.over) pause(true); };
     document.addEventListener("visibilitychange", onVis);
     const finish = (res) => {
       finished = true; cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize); document.removeEventListener("pointerlockchange", onLock); document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("resize", onResize); document.removeEventListener("pointerlockchange", onLock); document.removeEventListener("visibilitychange", onVis);
       input.dispose(); ctx.audio.close(); warm?.attach(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
       resolve(res);
     };
@@ -312,6 +319,28 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       overlay.querySelector("[data-a=leave]").onclick = () => finish(res);
     };
 
+    // camera, mặt trời theo tướng (như battle.js aim): trước làm nóng gọi aim(0, NOIN) — time = 0 nên camera đặt thẳng vào chỗ mở màn
+    const NOIN = { camDX: 0, camDY: 0, touch: false };
+    const aim = (dt, inp) => {
+      const h = ctx.hero;
+      if (Math.abs(inp.camDX) + Math.abs(inp.camDY) > 0.01) cam.idle = 0; else cam.idle += dt;
+      cam.yaw -= inp.camDX * (inp.touch ? 0.006 : 0.0026);
+      cam.pitch = Math.max(0.12, Math.min(0.95, cam.pitch + inp.camDY * 0.002));
+      if (h.lock?.alive && !h.lock.dead) cam.yaw = lerpAngle(cam.yaw, Math.atan2(h.lock.x - h.x, h.lock.z - h.z), Math.min(1, dt * 3));
+      else if (cam.idle > 1.2 && h.state === "free" && h.inputMag > 0.3) cam.yaw = lerpAngle(cam.yaw, h.yaw, Math.min(1, dt * 0.8 * h.inputMag));
+      cam.pull = Math.max(0, cam.pull - dt * 0.6);
+      const dist = cam.dist + cam.pull * 5, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
+      view.pos(h, hp);
+      const tx = hp.x, ty = hp.y + 1.6, tz = hp.z;      // nhắm vào chỗ vẽ của tướng (nội suy giữa hai bước)
+      const cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = Math.max(ty + dist * Math.sin(cam.pitch), heightAt(cx, cz) + 1.2);
+      const k = time < 0.2 ? 1 : Math.min(1, dt * 10);
+      cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
+      const fxk = ctx.fx;            // rung + giật camera theo hướng chém, thu FOV (như battle.js)
+      camera.position.set(cam.x + fxk.shakeX + fxk.kickX, cam.y + fxk.shakeY + fxk.kickY, cam.z + fxk.kickZ); camera.lookAt(tx + fxk.kickX * 0.5, ty, tz + fxk.kickZ * 0.5);
+      const fov = 55 - fxk.fovPunch; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+      ctx.world.fadeOccluders(camera.position, tx, tz, dt);
+      ctx.world.sun.position.set(tx - 40, 80, tz + 30); ctx.world.sun.target.position.set(tx, 0, tz);
+    };
     const step = (dt, inp, draw, live = false) => {     // live: khung rAF thật (pacing.js); advance: false
       time += dt; ctx.touch = inp.touch; syncTouch();
       const d = ctx.director;
@@ -333,25 +362,8 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
         pacer.end();
         for (let i = ctx.units.length - 1; i >= 0; i--) if (!ctx.units[i].alive) ctx.units.splice(i, 1);
       } else d.update(dt);
-      view.frame(pacer.alpha, ctx.clock);
-      const h = ctx.hero;
-      if (Math.abs(inp.camDX) + Math.abs(inp.camDY) > 0.01) cam.idle = 0; else cam.idle += dt;
-      cam.yaw -= inp.camDX * (inp.touch ? 0.006 : 0.0026);
-      cam.pitch = Math.max(0.12, Math.min(0.95, cam.pitch + inp.camDY * 0.002));
-      if (h.lock?.alive && !h.lock.dead) cam.yaw = lerpAngle(cam.yaw, Math.atan2(h.lock.x - h.x, h.lock.z - h.z), Math.min(1, dt * 3));
-      else if (cam.idle > 1.2 && h.state === "free" && h.inputMag > 0.3) cam.yaw = lerpAngle(cam.yaw, h.yaw, Math.min(1, dt * 0.8 * h.inputMag));
-      cam.pull = Math.max(0, cam.pull - dt * 0.6);
-      const dist = cam.dist + cam.pull * 5, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
-      view.pos(h, hp);
-      const tx = hp.x, ty = hp.y + 1.6, tz = hp.z;      // nhắm vào chỗ vẽ của tướng (nội suy giữa hai bước)
-      const cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = Math.max(ty + dist * Math.sin(cam.pitch), heightAt(cx, cz) + 1.2);
-      const k = time < 0.2 ? 1 : Math.min(1, dt * 10);
-      cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.z += (cz - cam.z) * k;
-      const fxk = ctx.fx;            // rung + giật camera theo hướng chém, thu FOV (như battle.js)
-      camera.position.set(cam.x + fxk.shakeX + fxk.kickX, cam.y + fxk.shakeY + fxk.kickY, cam.z + fxk.kickZ); camera.lookAt(tx + fxk.kickX * 0.5, ty, tz + fxk.kickZ * 0.5);
-      const fov = 55 - fxk.fovPunch; if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
-      ctx.world.fadeOccluders(camera.position, tx, tz, dt);
-      ctx.world.sun.position.set(tx - 40, 80, tz + 30); ctx.world.sun.target.position.set(tx, 0, tz);
+      view.frame(pacer.live ? pacer.alpha : 1, ctx.clock);   // tua bằng advance: α = 1 (như battle.js)
+      aim(dt, inp);
       ctx.world.update(time); ctx.crowd.render(); ctx.fx.update(dt, W, H); ctx.hud.update();
       view.begin();
       try { if (draw) renderer.render(scene, camera); } finally { view.end(); }
@@ -361,12 +373,17 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     if (window.__hk === ctx) ctx.advance = (sec, bot, draw = false) => { for (let t = 0; t < sec && !finished; t += 1 / 30) { bot?.(ctx); step(1 / 30, input.poll(), draw); if (paused) break; } };
     // dt không âm (dấu giờ rAF có thể sớm hơn last — như battle.js); cầm dọc: chờ xoay ngang (battle.js)
     const frame = (now) => { raf = requestAnimationFrame(frame); const ms = now - last, dt = Math.max(0, Math.min(0.1, ms / 1000)); last = now; if (paused || finished || rotateBlocked(container)) return; if (gfx.frame(ms)) resize(); step(dt, input.poll(), true, true); };
-    // làm nóng như battle.js: sĩ quan, tướng Nguyên của các đợt / luyện tập ra giữa chừng
+    // làm nóng như battle.js: sĩ quan, tướng Nguyên của các đợt / luyện tập ra giữa chừng; trước đó camera vào chỗ mở màn, lính có chỗ vẽ;
+    // sau đó HUD một lượt
     ctx.warmed = false;
     (async () => {
-      try { warm = new Warm(scene, ctx, ["doitruong", "photuong", "tuong"]); await warm.run(renderer, scene, camera, preloadFx()); }
-      catch (err) { console.warn("làm nóng", err); }
+      try {
+        aim(0, NOIN); ctx.crowd.render();
+        warm = new Warm(scene, ctx, ["doitruong", "photuong", "tuong"]); await warm.run(renderer, scene, camera, preloadFx());
+        if (window.__hk === ctx) ctx.warmStats = warm.stats;
+      } catch (err) { console.warn("làm nóng", err); }
       if (finished) return;
+      try { ctx.hud.update(); } catch (err) { console.warn("HUD", err); }
       ctx.warmed = true; onReady?.();
       last = performance.now(); raf = requestAnimationFrame(frame);
     })();

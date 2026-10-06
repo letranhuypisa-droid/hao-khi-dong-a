@@ -26,7 +26,7 @@ import { RANKS as CAREER_RANKS, rankOf, nextRank, RANK_PERKS, PICKS, GEAR, gearC
 import { newCareer, soldierStats, soldierDef, recordBattle, buyGear, retire, WEAPONS, careerGuards, recruitGuard, editGuard, dismissGuard } from "./meta/career.js";
 import { GUARD_CLASSES, GUARD_NAME_MAX, guardSlots, guardStats } from "./data/guards.js";
 import { MISSIONS, SITES, missionBoard } from "./data/skirmish.js";
-import { GFX_LEVELS, GFX_NAME } from "./core/gfx.js";
+import { GFX_LEVELS, isGfx } from "./core/gfx.js";
 
 // ?debug (bot, kịch bản kiểm thử) bỏ comic, Hiến kế và khung chèn giữa trận; thêm &story để vẫn phát
 const DEBUG = /[?&]debug\b/.test(location.search);
@@ -137,7 +137,7 @@ function openSettings() {
   const d = document.createElement("div"); d.className = "sheet-wrap";
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Cài đặt">
     <div class="sheet-head"><h3>Cài đặt</h3><button data-close aria-label="Đóng">✕</button></div>
-    <label class="field">Đồ hoạ <select data-set="graphics">${GFX_LEVELS.map((l) => opt(l.id, s.graphics in GFX_NAME ? s.graphics : "auto", l.name)).join("")}</select></label>
+    <label class="field">Đồ hoạ <select data-set="graphics">${GFX_LEVELS.map((l) => opt(l.id, isGfx(s.graphics) ? s.graphics : "auto", l.name)).join("")}</select></label>
     <label class="field">Số lính hiển thị <select data-set="troops">${TROOP_LEVELS.map((t) => opt(t.id, s.troops, `${t.name} · ${t.N}`)).join("")}</select></label>
     <label class="field">Điều khiển cảm ứng <select data-set="touch">${[["auto", "Tự nhận"], ["on", "Bật"], ["off", "Tắt"]].map(([v, l]) => opt(v, s.touch, l)).join("")}</select></label>
     <label class="field">Bóng <input type="checkbox" data-set="shadows" ${s.shadows ? "checked" : ""}></label>

@@ -930,16 +930,18 @@ export function addSky(scene, world, rng, ridges, clouds = { x0: -500, span: 160
   const cl = [];
   for (let k = 0; k < clouds.n; k++) cl.push({ x: rng.range(clouds.x0, clouds.x0 + clouds.span), y: rng.range(150, 230), z: rng.range(-clouds.z, clouds.z), s: rng.range(0.8, 1.8), v: rng.range(1.5, 3.5) });
   scene.add(cm);
-  // mây trôi hết dải thì quay về đầu dải: co dần về 0 trong 8% cuối, lớn dần trong 8% đầu (không vụt tắt, vụt hiện)
+  // mây trôi hết dải thì quay về đầu dải: co dần về 0 trong 8% cuối, lớn dần trong 8% đầu (không vụt tắt, vụt hiện). Đặt ngay lúc dựng
+  // (t = 0): chưa có world.update đầu thì cả 14 cụm mây nằm ở gốc toạ độ — lượt vẽ làm nóng trước khung đầu (đợt 19c) thấy khối trắng giữa sân
   const edge = clouds.span * 0.08;
-  world.animated.push((t) => {
+  const drift = (t) => {
     for (let i = 0; i < cl.length; i++) {
       const c = cl[i], x = clouds.x0 + ((c.x - clouds.x0 + t * c.v) % clouds.span);
       const s = c.s * Math.min(1, Math.min(x - clouds.x0, clouds.x0 + clouds.span - x) / edge);
       _m.compose(_v.set(x, c.y, c.z), _q.identity(), _s.set(s, s, s)); cm.setMatrixAt(i, _m);
     }
     cm.instanceMatrix.needsUpdate = true;
-  });
+  };
+  drift(0); world.animated.push(drift);
 }
 
 // ---- Võ trường: doanh trại luyện quân nhà Trần quanh sân đất nện (Hư cấu) ------------------------------

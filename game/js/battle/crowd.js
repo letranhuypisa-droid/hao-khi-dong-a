@@ -46,11 +46,12 @@ const _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, "YXZ"), _p = ne
 const _c = new THREE.Color();
 const _pose = new Float32Array(NCH);
 // Mức chi tiết theo khoảng cách tới camera (mọi kiểu lính): LOD0 < 18 m — tư thế mượt + IK chân, lò xo vạt, dây tua; LOD1 < 40 m — tư thế
-// mượt, không IK / vạt / tua; LOD2 xa hơn — tính lại tư thế mỗi 3 khung (khung khác dời ma trận cũ theo chỗ vẽ). Lính GLB (glb.js, soldiers.js
-// glbKit) còn đổi lưới theo mức (design/systems.md §13.3: LOD0 ≤ 600 tam giác điện thoại, LOD1 ≤ 250, LOD2 ≤ 100). Trễ ±LOD_HYST m: đang ở
-// mức thấp phải ra quá ngưỡng + 2 m mới lên mức xa, đang xa phải vào trong ngưỡng − 2 m mới về — trước đây 33–44 lần đổi lưới mỗi giây
-// (lính đứng quanh 18 m nhảy qua lại mỗi khung).
-const LOD_D = [18, 40], LOD_HYST = 2;
+// mượt, không IK / vạt / tua; LOD2 xa hơn. Lính GLB (glb.js, soldiers.js glbKit) còn đổi lưới theo mức (design/systems.md §13.3: LOD0 ≤ 600
+// tam giác điện thoại, LOD1 ≤ 250, LOD2 ≤ 100). Trễ ±LOD_HYST m: đang ở mức thấp phải ra quá ngưỡng + 2 m mới lên mức xa, đang xa phải vào
+// trong ngưỡng − 2 m mới về — trước đây 33–44 lần đổi lưới mỗi giây (lính đứng quanh 18 m nhảy qua lại mỗi khung).
+// Tư thế 20 Hz (tính lại mỗi 3 khung, khung khác dời ma trận cũ theo chỗ vẽ) vẫn theo khoảng cách tới TƯỚNG > 40 m (FAR2) như trước đợt 19c —
+// theo camera (đứng sau tướng ~9,6 m) thì lính trước mặt tướng 31–40 m cũng thành 20 Hz.
+const LOD_D = [18, 40], LOD_HYST = 2, FAR2 = 40 * 40;
 const LOD_UP2 = LOD_D.map((d) => (d + LOD_HYST) ** 2), LOD_DN2 = LOD_D.map((d) => (d - LOD_HYST) ** 2), LOD_D2 = LOD_D.map((d) => d * d);
 export function lodLevel(prev, d2) {
   let l = 0;
@@ -763,7 +764,7 @@ export class Crowd {
       counts[k] = 0;
       if (this.meshes[k].glb) { (lodN[k] ||= [0, 0, 0]).fill(0); (lodC[k] ||= [0, 0, 0]).fill(0); }
     }
-    const camera = this.ctx.camera, cam = camera?.position;
+    const camera = this.ctx.camera, cam = camera?.position, hero = this.ctx.hero;
     if (camera) viewPlanes(camera);
     for (const a of this.agents) {
       let x = a.x, z = a.z, y = a.y, yaw = a.yaw;
@@ -800,9 +801,10 @@ export class Crowd {
       const gy = a.gy;
       const sink = a.state === "dead" && a.dieT > 1.8 ? (a.dieT - 1.8) * 1.0 : 0;
       const lv = a.lv, y = gy + a.ry - sink, mc = a.mc;
-      if (lv < 2 || !a.poseInit || (frame + a.id) % 3 === 0) {
+      const far = hero ? (x - hero.x) ** 2 + (z - hero.z) ** 2 > FAR2 : lv === 2;      // tư thế 20 Hz
+      if (!far || !a.poseInit || (frame + a.id) % 3 === 0) {
         const P = a.pose;
-        if (!a.poseInit || lv === 2) { poseFor(a, a.kit, a.K, clk, _pose); P.set(_pose); a.poseInit = true; a.tc1 = NaN; }
+        if (!a.poseInit || far) { poseFor(a, a.kit, a.K, clk, _pose); P.set(_pose); a.poseInit = true; a.tc1 = NaN; }
         else {
           this.target(a, clk, rc, _pose);
           const k = a.atkT < 0.14 || a.state === "hit" ? kSnap : kSoft;
@@ -812,7 +814,7 @@ export class Crowd {
         soldierFrame(a, M.skel, x, y, z, gy, P, dtA, heightAt, lv === 0, mc, a.ryaw);
         a.mx = x; a.my = y; a.mz = z;
       } else if (a.mx !== x || a.my !== y || a.mz !== z) {
-        // LOD2 giữa hai lần tính tư thế: dời cả bộ ma trận theo chỗ vẽ mới (tư thế 20 Hz, vị trí mỗi khung — không giật bước 3 khung)
+        // xa tướng, giữa hai lần tính tư thế: dời cả bộ ma trận theo chỗ vẽ mới (tư thế 20 Hz, vị trí mỗi khung — không giật bước 3 khung)
         const dx = x - a.mx, dy = y - a.my, dz = z - a.mz;
         for (let o = 0; o < BONE_FLOATS; o += 12) { mc[o + 3] += dx; mc[o + 7] += dy; mc[o + 11] += dz; }
         a.mx = x; a.my = y; a.mz = z;

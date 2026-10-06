@@ -984,9 +984,26 @@ export class Ambient {
 // đất, IK chân, vạt váy lò xo) với heightAt; đòn gánh, thúng, gậy, tay nải là khúc mượn (vạt, "tas") mà ma
 // trận tính lại ở đây. 3 lượt vẽ + 1 lượt bóng tròn; đối tượng dân lấy từ pool, không cấp phát trong vòng khung.
 
-import { skinnedKit, poseFor, soldierFrame, smoothPose, advanceStride, legRate, resetMotion, CH, NCH, BONE_FLOATS, BONE_TEX_W, JOINT_NAMES } from "./soldiers.js";
-import { HAND } from "./soldier-motion.js";
+import { skinnedKit, poseFor, soldierFrame, smoothPose, legRate, resetMotion, CH, NCH, BONE_FLOATS, BONE_TEX_W, JOINT_NAMES } from "./soldiers.js";
+import { HAND, cycleLen } from "./soldier-motion.js";
 import { blobGeometry } from "./models.js";
+
+// Pha bước của dân: bản sao từng phép tính của advanceStride (soldier-motion.js) — hàm riêng (đợt 19c) để chỗ gọi trong soldier-motion chỉ
+// gặp lính (class Agent của crowd.js, một kiểu đối tượng): dùng chung với dân (kiểu khác) thì V8 đọc trường số qua đường đa hình, mỗi lần
+// đọc phải đóng hộp số thực (đo: 302 B mỗi lần gọi so với 24 B; ≈ 2,7 MB rác mỗi giây trận B15). Sửa advanceStride thì sửa cả ở đây.
+function strideV(a, px, pz, dt) {
+  const dx = a.x - px, dz = a.z - pz, moved = Math.sqrt(dx * dx + dz * dz);
+  a.spd += (moved / dt - a.spd) * Math.min(1, dt * 10);
+  const sy = Math.sin(a.yaw), cy = Math.cos(a.yaw), horse = !!a.K.mounted;
+  if (a.mvz === undefined) { a.mvx = 0; a.mvz = 1; }
+  if (moved > 1e-6) {
+    const k = Math.min(1, dt * 8);
+    a.mvx += ((dx * cy - dz * sy) / moved - a.mvx) * k; a.mvz += ((dx * sy + dz * cy) / moved - a.mvz) * k;
+  }
+  const amp = Math.min(1, a.spd / (horse ? 5 : 3.2)), ml = Math.sqrt(a.mvx * a.mvx + a.mvz * a.mvz);
+  const d = moved * TAU / (cycleLen(amp, ml > 0.2 ? a.mvx / ml : 0, horse) * a.scale);
+  a.walk += horse && dx * sy + dz * cy < 0 ? -d : d;
+}
 
 const VJ = (n) => JOINT_NAMES.indexOf(n) * 12;
 const J_PEL = VJ("pelvis"), J_TOR = VJ("torso"), J_FAR = VJ("faR"), J_FLF = VJ("flF"), J_FLB = VJ("flB"), J_TAS = VJ("tas");
@@ -1436,7 +1453,7 @@ class Villagers {
       const sp = hyp(v.vx, v.vz);
       if (sp > 0.2) { const tr = (panic ? 9 : 4.5) * dt; v.yaw += clamp(wrapA(Math.atan2(v.vx, v.vz) - v.yaw), -tr, tr); }
     }
-    advanceStride(v, px, pz, dt);
+    strideV(v, px, pz, dt);
     this.glance(v, dt, panic);
   }
   // ngoái lại: về phía trận (điểm gần nhất trên làn gần nhất) hoặc về phía mối đe doạ khi đang hoảng

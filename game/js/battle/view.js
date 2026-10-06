@@ -15,6 +15,8 @@
 
 import { RigSnap, STEP } from "./pacing.js";
 
+const _o = { x: 0, y: 0, z: 0 };
+
 export class View {
   constructor() {
     this.tick = 0; this.alpha = 1; this.lag = 0; this.clock = 0;
@@ -41,12 +43,18 @@ export class View {
   cut() { this.tick += 2; this.live.length = 0; }
   // sau vòng bước của khung: hệ số nội suy, giờ vẽ
   frame(alpha, clock) { this.alpha = alpha; this.lag = (1 - alpha) * STEP; this.clock = clock - this.lag; }
-  // vị trí vẽ của gốc rig vật o (tướng, đơn vị lớn) vào out { x, y, z }
+  // chỗ vẽ của vật o (tướng) vào out { x, y, z }: vị trí mô phỏng (o.x, o.y, o.z) lùi (1 − α) đoạn gốc rig đã đi trong bước cuối. Chưa có
+  // ảnh chụp của bước này (khung đầu chạy 0 bước, sau cut()) hay α = 1 (tua bằng advance, hit-stop) thì đúng vị trí mô phỏng như trước đợt
+  // 19c — không lấy gốc rig: gốc chỉ dời theo place() trong bước, tướng đặt chỗ khác sau khi dựng (Võ trường) / director dời tướng sau bước
+  // (cảnh bắt sống B20) thì gốc còn ở chỗ cũ.
   pos(o, out) {
     const r = o.rig?.root, s = r && this.snaps.get(r);
-    if (s && s.tick === this.tick && this.alpha < 1) return s.rootAt(this.alpha, out);
-    const p = r ? r.position : o;
-    out.x = p.x; out.y = p.y; out.z = p.z;
+    out.x = o.x; out.y = o.y; out.z = o.z;
+    if (s && s.tick === this.tick && this.alpha < 1) {
+      const p = r.position, x = p.x, y = p.y, z = p.z;
+      s.rootAt(this.alpha, _o);
+      out.x += _o.x - x; out.y += _o.y - y; out.z += _o.z - z;
+    }
     return out;
   }
   begin() {

@@ -121,7 +121,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .hk-bar.ready { box-shadow: 0 0 14px rgba(255,210,122,.8); } .hk-bar.ready::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 6px 1px rgba(255,236,170,.95); opacity: 0; animation: glow 1s infinite alternate; pointer-events: none; } .hk-bar.tpc .hk-fill { background: linear-gradient(90deg, #e0a24a, #ffe7a0); }
 /* Nhấp nháy sáng (đợt 19c): quầng sáng vẽ sẵn ở lớp ::after / ::before, hoạt ảnh chỉ đổi opacity — trình duyệt chạy nó trên compositor,
    không vẽ lại phần tử mỗi khung. Trước đây @keyframes pulse đổi box-shadow (nhắc khóa chuột, nhãn chỉ đường hiện gần như suốt trận: vẽ lại
-   mỗi khung). Phần tử có overflow: hidden (.hk-bar, .sk) dùng quầng bên trong (inset). */
+   mỗi khung). Phần tử có overflow: hidden (.hk-bar, .sk) dùng quầng bên trong (inset); ô kỹ năng: vòng mảnh sát viền, nằm trên icon nhưng
+   dưới chữ (z-index 1, trước chữ trong cây) — quầng dày 14 px đè lên giữa icon và nhãn "Tổng Phản Công" như phủ màn be. */
 @keyframes glow { from { opacity: 0; } to { opacity: 1; } }
 .hk-state { font-size: .75rem; color: var(--vang2); min-height: 1em; }
 .hud-time { background: rgba(21,18,16,.72); border: 1px solid #5a4838; border-radius: 8px; padding: 6px 12px; text-align: center; }
@@ -192,7 +193,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .sk { width: 76px; height: 70px; background: rgba(21,18,16,.78); border: 1px solid #5a4838; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .66rem; text-align: center; position: relative; }
 .sk b { font-size: .9rem; color: var(--vang2); } .sk i { font-style: normal; font-size: .7rem; color: var(--muted); }
 .sk.ready { border-color: var(--vang); box-shadow: 0 0 12px rgba(241,217,138,.45); } .sk.tpc.ready { background: rgba(155,45,32,.85); }
-.sk.tpc.ready::before, .sk.hot::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 14px 2px rgba(255,210,122,.95); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; z-index: 2; }
+.sk.tpc.ready::before, .sk.hot::before { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px rgba(255,210,122,.85), inset 0 0 9px 1px rgba(255,210,122,.5); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; z-index: 1; }
 .ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.9); opacity: 0; transition: .15s; background: rgba(21,18,16,.9); border: 2px solid var(--vang); border-radius: 14px; padding: 12px 16px; width: 440px; pointer-events: none; }
 .ring.on { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
 .ring-title { font-family: var(--serif); color: var(--vang2); text-align: center; margin-bottom: 8px; } .ring-title span { text-decoration: underline; cursor: pointer; } .ring-title small { color: var(--muted); font-family: var(--sans); font-size: .7rem; }

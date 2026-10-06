@@ -1,10 +1,12 @@
 // tests/pacing.test.mjs — nhịp bước cố định và nội suy khi vẽ (đợt 19c, battle/pacing.js). Dãy dấu giờ rAF giả (lưới vsync, lệch ±0,3 ms, làm
 // tròn 0,1 ms như Chrome, khung giật): màn 60 Hz đúng một bước mỗi khung (cả sau khung chạm trần 4 bước, lưới lệch pha, màn 59,94 Hz), 30 Hz
 // hai bước, 90/120/144 Hz không khung hai bước, giờ trận bám giờ thật; chế độ tua (advance) giữ y hệt bộ tích lũy cũ từng bit (tất định);
-// giờ vẽ tăng đều; nội suy góc; chụp / nội suy / trả TRS của rig (trả đúng từng bit, không đụng Euler, dịch chuyển thì không trượt).
+// giờ vẽ tăng đều; nội suy góc; chụp / nội suy / trả TRS của rig (trả đúng từng bit, không đụng Euler, dịch chuyển thì không trượt);
+// chỗ camera nhắm (View.pos): vị trí mô phỏng khi chưa có bước / α = 1, lùi theo đoạn gốc rig đã đi khi α < 1.
 //   node game/tests/pacing.test.mjs
 import assert from "node:assert/strict";
 import { STEP, MAX_STEPS, PHASE, SNAP_D, Pacer, lerpYaw, RigSnap } from "../js/battle/pacing.js";
+import { View } from "../js/battle/view.js";
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -241,6 +243,33 @@ t("chụp nông (deep = false): chỉ gốc; rootAt cho vị trí gốc nội su
   S.apply(0.5); assert.equal(a.position.x, 1.5); assert.ok(Math.abs(root.position.x - 2.2) < 1e-12);
   S.restore(); assert.equal(root.position.x, 2.4);
   root.position.x = 2 + SNAP_D * 2; S.rootAt(0.5, o); assert.equal(o.x, 2 + SNAP_D * 2);   // dịch chuyển: không nội suy
+});
+
+// View.pos: chỗ camera, mặt trời nhắm (battle.js, arena.js) — vị trí mô phỏng của tướng lùi theo đoạn gốc rig đã đi trong bước cuối
+const hero = (x, z, rx = x, rz = z) => ({ x, y: 0.25, z, rig: { root: node(rx, []) } });
+const place = (h) => { h.rig.root.position.x = h.x; h.rig.root.position.y = h.y; h.rig.root.position.z = h.z; };
+t("View.pos khi chưa có bước nào (khung đầu chạy 0 bước): vị trí mô phỏng, không phải gốc rig còn ở chỗ dựng", () => {
+  const h = hero(0, 8); h.rig.root.position.x = 72; h.rig.root.position.z = -32;    // Võ trường: tướng dựng ở chỗ B15 rồi mới đặt vào sân
+  const V = new View(), o = {};
+  V.frame(0.5, 0); V.pos(h, o);
+  assert.deepEqual([o.x, o.y, o.z], [0, 0.25, 8]);
+});
+t("View.pos α = 1 (tua bằng advance, hit-stop): đúng vị trí mô phỏng từng bit như trước đợt 19c", () => {
+  const h = hero(1 / 3, -0.1), V = new View(), ctx = { hero: h, units: [] }, o = {};
+  V.capture(ctx); h.x += 0.123456789; h.z -= 1e-9; place(h);
+  V.frame(1, 1); V.pos(h, o);
+  assert.ok(Object.is(o.x, h.x) && Object.is(o.y, h.y) && Object.is(o.z, h.z), JSON.stringify(o));
+});
+t("View.pos α < 1: lùi (1 − α) đoạn gốc đã đi trong bước; gốc chưa đặt lại (director dời tướng sau bước) vẫn lấy vị trí mô phỏng", () => {
+  const h = hero(2, 0), V = new View(), ctx = { hero: h, units: [] }, o = {};
+  V.capture(ctx); h.x = 2.4; place(h);
+  V.frame(0.25, 1); V.pos(h, o);
+  assert.ok(Math.abs(o.x - 2.1) < 1e-12 && o.z === 0, JSON.stringify(o));
+  h.x = 5; h.z = 1;                                                     // dời thẳng (captureShot B20), rig chưa place
+  V.pos(h, o);
+  assert.ok(Math.abs(o.x - 4.7) < 1e-12 && o.z === 1, JSON.stringify(o));
+  V.capture(ctx); h.x = 30; place(h); V.frame(0.5, 2); V.pos(h, o);   // gốc dời quá SNAP_D trong một bước: vẽ ngay chỗ mới
+  assert.equal(o.x, 30);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);
