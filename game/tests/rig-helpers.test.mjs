@@ -1,7 +1,9 @@
 // tests/rig-helpers.test.mjs — đợt 19a A4: xương phụ của thân GLB (battle/rig-helpers.js, thuần): bảng xương phụ (lưng, cổ, xương đòn,
 // xoắn cẳng tay — cha, khớp nguồn, cách quay, phần góc) và bộ dẫn driveQuat: quay một phần góc của quaternion cục bộ khớp nguồn (slerp
-// từ đơn vị) cho lưng, cổ; phần xoắn quanh trục xương y cho xoắn cẳng tay; phần tay giơ quá ngang vai (quanh trục của vung) cho xương
-// đòn. Bake (human.mjs: khung gắn) và glb.js (lúc chạy) dùng chung nên khung gắn của xương phụ khớp đúng lúc chạy.
+// từ đơn vị) cho lưng, cổ; phần xoắn quanh trục xương y cho xoắn cẳng tay; phần tay giơ quá ngang vai cho xương đòn — quanh trục z
+// (trước ↔ sau) của thân, nhấc đầu ngoài lên dù giơ ngang hay ra trước (đợt 19a soát: trước đây quanh trục của vung — giơ ra trước thì
+// trục song song xương đòn, đầu vai không nhấc). Bake (human.mjs: khung gắn) và glb.js (lúc chạy) dùng chung nên khung gắn của xương
+// phụ khớp đúng lúc chạy.
 //   node game/tests/rig-helpers.test.mjs
 import assert from "node:assert/strict";
 
@@ -41,14 +43,14 @@ t("đủ 6 xương: lưng, cổ, xương đòn hai bên, xoắn cẳng tay hai b
   assert.deepEqual(Object.keys(HELPERS), HELPER_NAMES);
   for (const [n, h] of Object.entries(HELPERS)) {
     assert.ok(J15.includes(h.parent) && J15.includes(h.src), n);
-    assert.ok(["all", "twist", "lift"].includes(h.kind), n);
+    assert.ok(["all", "twist", "liftL", "liftR"].includes(h.kind), n);
     assert.ok(h.share > 0 && h.share < 1, n);
   }
   assert.equal(HELPERS.spine.src, "torso"); assert.equal(HELPERS.spine.parent, "hips"); assert.equal(HELPERS.spine.kind, "all");
   assert.equal(HELPERS.neck.src, "head"); assert.equal(HELPERS.neck.parent, "torso"); assert.equal(HELPERS.neck.kind, "all");
   for (const s of ["L", "R"]) {
-    assert.equal(HELPERS["clav" + s].src, "sh" + s); assert.equal(HELPERS["clav" + s].parent, "torso"); assert.equal(HELPERS["clav" + s].kind, "lift");
-    assert.ok(HELPERS["clav" + s].share >= 0.25 && HELPERS["clav" + s].share <= 0.35);
+    assert.equal(HELPERS["clav" + s].src, "sh" + s); assert.equal(HELPERS["clav" + s].parent, "torso"); assert.equal(HELPERS["clav" + s].kind, "lift" + s);
+    assert.ok(HELPERS["clav" + s].share >= 0.1 && HELPERS["clav" + s].share <= 0.35);
     assert.equal(HELPERS["twist" + s].src, "hand" + s); assert.equal(HELPERS["twist" + s].parent, "el" + s); assert.equal(HELPERS["twist" + s].kind, "twist");
   }
   for (const n of ["spine", "neck", "twistL", "twistR"]) assert.ok(Math.abs(HELPERS[n].share - 0.5) < 0.11, n);
@@ -92,31 +94,36 @@ t("twist: q bất kỳ = vung · xoắn — vung không có thành phần y, xo�
   }
 });
 
-console.log("driveQuat — tay giơ quá ngang vai (lift: xương đòn)");
+console.log("driveQuat — tay giơ quá ngang vai (liftL / liftR: xương đòn trái / phải)");
 t("lift: tay dưới ngang vai (buông, đưa ra trước, giơ ngang 80°, xoắn cánh tay) → đơn vị — đứng, chạy, chém ngang xương đòn yên", () => {
-  for (const q of [I, axisAngle(Z, 1.2), axisAngle(X, -1.4), axisAngle(Y, 2.0), shoulder(-0.8, 2.0, 0), shoulder(-1.15, -0.35, 0.1), axisAngle(Z, LIFT0 - 1e-6)]) same(drive("lift", 0.25, q), I, 1e-9);
+  for (const k of ["liftL", "liftR"]) for (const q of [I, axisAngle(Z, 1.2), axisAngle(X, -1.4), axisAngle(Y, 2.0), shoulder(-0.8, 2.0, 0), shoulder(-1.15, -0.35, 0.1), axisAngle(Z, LIFT0 - 1e-6)]) same(drive(k, 0.25, q), I, 1e-9, k);
 });
-t("lift: giơ ngang (z) hay ra trước (x) quá ngang vai θ → quay cùng chiều tay quanh cùng trục, góc phần × (θ − π/2)", () => {
-  same(drive("lift", 0.25, axisAngle(Z, 2.5)), axisAngle(Z, 0.25 * (2.5 - Math.PI / 2)));
-  same(drive("lift", 0.25, axisAngle(Z, -2.2)), axisAngle(Z, -0.25 * (2.2 - Math.PI / 2)));
-  same(drive("lift", 0.3, axisAngle(X, -2.6)), axisAngle(X, -0.3 * (2.6 - Math.PI / 2)));
+t("lift: quá ngang vai θ — giơ ngang hay ra trước đều quay quanh z của thân một góc phần × (θ − π/2), đầu ngoài xương đòn (±x) nhấc lên", () => {
+  same(drive("liftR", 0.25, axisAngle(Z, 2.5)), axisAngle(Z, 0.25 * (2.5 - Math.PI / 2)), 1e-9, "phải giơ ngang");
+  same(drive("liftL", 0.25, axisAngle(Z, -2.2)), axisAngle(Z, -0.25 * (2.2 - Math.PI / 2)), 1e-9, "trái giơ ngang");
+  same(drive("liftR", 0.3, axisAngle(X, -2.6)), axisAngle(Z, 0.3 * (2.6 - Math.PI / 2)), 1e-9, "phải giơ ra trước");
+  same(drive("liftL", 0.3, axisAngle(X, -2.6)), axisAngle(Z, -0.3 * (2.6 - Math.PI / 2)), 1e-9, "trái giơ ra trước");
+  assert.ok(rot(drive("liftR", 0.25, axisAngle(X, -2.6)), X)[1] > 0.05, "giơ ra trước: đầu ngoài xương đòn phải không nhấc");
+  assert.ok(rot(drive("liftL", 0.25, axisAngle(X, -2.6)), [-1, 0, 0])[1] > 0.05, "giơ ra trước: đầu ngoài xương đòn trái không nhấc");
 });
-t("lift: vai Euler YXZ như đòn bổ C1 (shRx −2,85, shRy 0,45, shRz 0,15) — trục nằm ngang, góc = phần × (góc tay so với buông − π/2), kéo (0, −1, 0) về phía tay; xoắn cánh tay thêm không đổi kết quả", () => {
+t("lift: vai Euler YXZ như đòn bổ C1 (shRx −2,85, shRy 0,45, shRz 0,15) — quay thuần quanh z, góc = phần × (góc tay so với buông − π/2); xoắn cánh tay thêm không đổi kết quả", () => {
   for (const [rx, ry, rz] of [[-2.85, 0.45, 0.15], [-2.55, 0.7, 0.25], [-1.9, -1.0, 0.3], [0.2, 0.3, 2.4]]) {
-    const q = shoulder(rx, ry, rz), d = rot(q, DOWN), e = Math.acos(-d[1]), c = drive("lift", 0.25, q);
+    const q = shoulder(rx, ry, rz), d = rot(q, DOWN), e = Math.acos(-d[1]);
     assert.ok(e > Math.PI / 2, `tư thế thử phải quá ngang vai (${e})`);
-    assert.ok(Math.abs(c[1]) < 1e-12, "trục có thành phần y");
-    assert.ok(Math.abs(angleOf(c) - 0.25 * (e - Math.PI / 2)) < 1e-9, `góc ${angleOf(c)} ≠ ${0.25 * (e - Math.PI / 2)}`);
-    assert.ok(dot(rot(c, DOWN), d) > dot(DOWN, d), "không kéo về phía tay");
-    same(drive("lift", 0.25, mul(q, axisAngle(Y, 1.3))), c, 1e-9, "xoắn cánh tay");
+    for (const [k, sg] of [["liftR", 1], ["liftL", -1]]) {
+      const c = drive(k, 0.25, q);
+      assert.ok(Math.abs(c[0]) < 1e-12 && Math.abs(c[1]) < 1e-12, `${k}: trục không phải z`);
+      same(c, axisAngle(Z, sg * 0.25 * (e - Math.PI / 2)), 1e-9, k);
+      same(drive(k, 0.25, mul(q, axisAngle(Y, 1.3))), c, 1e-9, `${k} xoắn cánh tay`);
+    }
   }
 });
 t("lift: liền ở ngang vai, tay thẳng lên trời (y = w = 0) không ra NaN — góc phần × π/2", () => {
-  const a = drive("lift", 0.25, axisAngle(Z, LIFT0 + 1e-7));
+  const a = drive("liftR", 0.25, axisAngle(Z, LIFT0 + 1e-7));
   assert.ok(angleOf(a) < 1e-7);
-  const up = drive("lift", 0.25, axisAngle(X, Math.PI));
+  const up = drive("liftR", 0.25, axisAngle(X, Math.PI));
   assert.ok(up.every(Number.isFinite));
-  same(up, axisAngle(X, 0.25 * Math.PI / 2));
+  same(up, axisAngle(Z, 0.25 * Math.PI / 2));
   for (const k of ["twist", "all"]) assert.ok(drive(k, 0.5, axisAngle(X, Math.PI)).every(Number.isFinite), k);
   same(drive("twist", 0.5, axisAngle(X, Math.PI)), I);
 });

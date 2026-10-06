@@ -10,7 +10,8 @@
 //     đùi, cẳng chân;
 //   · cờ sau lưng tướng: vải xoay quanh cán (lò xo theo tốc độ, gió), nằm ngang khi ngã;
 //   · tay trái nắm chuôi vũ khí hai tay (đại kiếm WC01, rig có dyn.grip): IK tay hai khúc tới điểm nắm trên chuôi, theo độ dài
-//     tay của rig (thân GLB: khung gắn của mô hình).
+//     tay của rig (thân GLB: khung gắn của mô hình); tay phải của tư thế WC01 (giải cho tay 0,34 + 0,36) giải lại theo số đo tay
+//     của rig trước đó (anim-wc01.js fitArms — thân GLB tay ngắn: tay trái với tới chuôi, lưỡi tránh vỏ đầu dyn.shell; rig khối giữ nguyên).
 // Mỗi rig một thể hiện. Gọi update(dt, pose, ground) SAU khi đã đặt root (vị trí, yaw) và tư thế (applyPose):
 // dt là bước mô phỏng của Hero.update / BigUnit.update (1/60 s; hit-stop không có bước nào nên vải cũng đứng
 // yên), dt = 0 chỉ dựng lại hình, không chạy động lực. pose là tư thế đang trộn (anim.js): chân và hông dựng lại
@@ -19,6 +20,7 @@
 import * as THREE from "three";
 import * as IK from "./ik.js";
 import { LEG } from "./models.js";
+import { fitGeo, fitArms, refitArms } from "./anim-wc01.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
@@ -124,6 +126,9 @@ export class RigMotion {
     // khối 0,34 và (0, −0,36, 0,02); thân GLB theo khung gắn của mô hình (khớp lúc chạy = khung gắn, models.js applyRest)
     const eL = P.elL.position, hL = P.handL.position;
     this.arm = { L1: Math.hypot(eL.x, eL.y, eL.z), L2: Math.hypot(hL.y, hL.z), off: Math.atan2(hL.z, -hL.y) };
+    // tay phải đại kiếm theo số đo tay của rig (anim-wc01.js fitGeo / fitArms; null = rig khối, tư thế dùng thẳng); fq: tư thế đã
+    // giải lại (dùng lại mỗi lượt)
+    this.fit = this.grip ? fitGeo(P, d.blade, d.shell || 0) : null; this.fq = {};
     // đế giày (khung cổ chân): rig khối LEG; thân GLB theo lưới (models.js rig.foot từ meta.foot)
     this.foot = rig.foot || LEG;
     this.legs = [
@@ -164,10 +169,19 @@ export class RigMotion {
 
     // ---- 1. chân bám đất ----
     this.legIK(dt, pose, ground, snap, !(o && o.ik === false));
+    // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q
+    let q = pose;
+    if (this.fit) q = this.setArmR(fitArms(pose, this.fit, this.fq));
     // ---- 2. ma trận phần trên (hông đã hạ) để lấy điểm neo; lưỡi vũ khí không cắm đất ----
     for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
-    if (this.blades.length) this.fixBlades(pose, ground);
-    if (this.grip) this.gripIK(pose);          // sau fixBlades: cổ tay phải gập thì chuôi đổi chỗ
+    if (this.blades.length) this.fixBlades(q, ground);
+    // cổ tay phải vừa gập cho lưỡi khỏi cắm đất: giữ hướng lưỡi đó, đưa cổ tay lại vào tầm với (điểm nắm đổi chỗ theo lưỡi)
+    if (this.fit && P.handR.rotation.x !== q.handRx) {
+      q = this.setArmR(refitArms(q, this.fit, P.handR.rotation.x, this.fq));
+      for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
+      this.fixBlades(q, ground);
+    }
+    if (this.grip) this.gripIK(q);             // sau fixBlades: cổ tay phải gập thì chuôi đổi chỗ
     // ---- 3. vạt áo, áo choàng, cờ, dây ----
     this.updateFlaps(dt, first, fresh);
     if (this.cape) this.updateCape(dt, first, fresh);
@@ -313,6 +327,13 @@ export class RigMotion {
       j.rotation.x = a0 + clamp(dl, lo, hi);
       j.updateWorldMatrix(false, false);
     }
+  }
+
+  // tay phải theo tư thế q (fitArms / refitArms) → khớp; trả q
+  setArmR(q) {
+    const P = this.rig.p;
+    P.shR.rotation.set(q.shRx, q.shRy, q.shRz); P.elR.rotation.x = q.elRx; P.handR.rotation.set(q.handRx, 0, q.handRz);
+    return q;
   }
 
   // ---- tay trái nắm chuôi (vũ khí hai tay) ------------------------------------------------------------

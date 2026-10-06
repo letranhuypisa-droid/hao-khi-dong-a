@@ -69,10 +69,13 @@ export class Hero {
     this.rig = makeRig(rigCfg);
     this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, dải khăn, cờ (rig-motion.js)
     ctx.scene.add(this.rig.root);
-    // vệt lưỡi: một vệt mỗi lưỡi trong rig.dyn.blades (song đao: tay phải rồi tay trái như cũ), tâm cung là vai cùng bên
-    const TR = TRAILS[rigCfg.weapon], p = this.rig.p;
+    // vệt lưỡi: một vệt mỗi lưỡi trong rig.dyn.blades (song đao: tay phải rồi tay trái như cũ), tâm cung là vai cùng bên. Thân GLB
+    // (rig.dyn.blade: chắn tay → mũi lưỡi GLB, models.js): cùng đoạn dọc lưỡi như số rig khối (lưỡi khối từ 0,16) — trước đây dùng
+    // thẳng số rig khối: vệt, tia lửa tụ lực vượt mũi lưỡi GLB (song đao 0,80, đại kiếm 1,14) 0,16–0,26 m
+    const TR = TRAILS[rigCfg.weapon], p = this.rig.p, G = this.rig.glb && this.rig.dyn.blade;
+    const onBlade = (z) => (G ? G.guard + ((z - 0.16) / (TR.tip - 0.16)) * (G.tip - G.guard) : z);
     this.trailSrc = this.rig.dyn.blades.map((b) => {
-      const tip = TR ? TR.tip : b.pts[2], base = TR ? TR.base : 0.15;
+      const tip = TR ? onBlade(TR.tip) : b.pts[2], base = TR ? onBlade(TR.base) : 0.15;
       return { j: b.j, pivot: b.j === p.handL ? p.shL : p.shR, base: new THREE.Vector3(0, TR ? 0.02 * (rigCfg.weapon === "songdao") : b.pts[1], base),
         tip: new THREE.Vector3(0, TR ? 0.02 * (rigCfg.weapon === "songdao") : b.pts[1], tip) };
     });

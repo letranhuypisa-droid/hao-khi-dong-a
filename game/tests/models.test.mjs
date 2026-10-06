@@ -1,10 +1,11 @@
 // tests/models.test.mjs — đợt 19a: mô hình nướng sẵn (game/assets/models/** + index.json, design/tools/glb-bake.mjs) đúng hình người
 // và đúng chiều vũ khí: (a) 17 nhân vật rig — độ dài cánh tay, cẳng tay, hai bên lệch nhau, khớp lúc chạy trùng khung gắn, vai, cổ;
-// trục bản lề khuỷu theo mặt gập khuỷu của mô hình, đế giày (meta.foot), phần thừa đã cắt (sừng, bao đao); (b) trọng số da — mỗi xương
-// có phần, ≤ 4 xương, tổng 1, không trộn xương không kề, bàn chân không theo hông, da mượt, eo liền; (c) vũ khí — kiếm, đao chuôi ở
-// phía tay và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z, chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua);
-// (d) lính đám đông — không trộn khúc không kề, tay theo khúc tay, ngân sách tam giác mỗi mức, mức chi tiết nào cũng còn vũ khí, neo
-// tua giáo; (e) xương phụ (A4: lưng, cổ, xương đòn, xoắn cẳng tay — game/js/battle/rig-helpers.js) — đủ xương, đúng cha / bộ dẫn,
+// trục bản lề khuỷu theo mặt gập khuỷu của mô hình, đế giày (meta.foot), phần thừa đã cắt (sừng, bao đao — không tam giác, không đỉnh
+// nào trong hộp cắt); (b) trọng số da — mỗi xương có phần, ≤ 4 xương, tổng 1, không trộn xương không kề (từng đỉnh) và không tam giác
+// cầu (hai đỉnh của một tam giác có xương nặng nhất cách nhau ≥ 3 đốt — màng, gai khi tay cử động; đợt 19a soát), bàn chân không theo
+// hông, da mượt, eo liền; (c) vũ khí — kiếm, đao chuôi ở phía tay và lưỡi theo +Z, đại đao nắm ở cán dưới lưỡi, giáo / chùy đầu ở +Z,
+// chân mũi giáo / chân lưỡi đại đao (meta.head, neo tua); (d) lính đám đông — không trộn khúc không kề (từng đỉnh, từng tam giác), tay
+// theo khúc tay, ngân sách tam giác mỗi mức, mức chi tiết nào cũng còn vũ khí, neo tua giáo; (e) xương phụ (A4: lưng, cổ, xương đòn, xoắn cẳng tay — game/js/battle/rig-helpers.js) — đủ xương, đúng cha / bộ dẫn,
 // có trọng số, khung gắn = bộ dẫn áp vào khung gắn khớp nguồn (lúc chạy tư thế gắn → da đơn vị), bàn tay xoắn / thân xoắn ở tư thế
 // gắn không thắt cổ tay, eo (da tính bằng ma trận gắn + bộ dẫn như glb.js);
 // (f) bộ dò khớp tay — phần thuần của design/tools/bake/landmarks.mjs trên trục tay tổng hợp (khuỷu, "hand", tỉ lệ chung, kiểm dải).
@@ -142,8 +143,10 @@ t("index", "mọi mục index.json có .hkm + .webp, đúng loại, đúng số 
 
 console.log("(a) Nhân vật rig: độ dài xương, vai, cổ (khung gắn = nghịch đảo meta.inv; lúc chạy = meta.rest)");
 // cánh tay ≥ 0,18 (A1 đặt 0,22): CV_daidao đo trên lưới chỉ 0,19 (vai trong giáp vai, khuỷu 1,275 khung thô — design/tools/bake/catalog.mjs FIX_CV_DAIDAO)
-t("tay-dai", "cánh tay trên 0,18–0,40 m, cẳng tay 0,18–0,34 m, hai bên (rig WC01: cẳng tới 0,37 — tư thế WC01 giải IK cho tay 0,34 + 0,36)", () => forChars((c) => {
-  const bad = [], fMax = c.meta.wc01 ? 0.37 : 0.34;
+// cẳng tay ≤ 0,34 với mọi rig, cả đại kiếm WC01 (tư thế WC01 giải lại theo tay của rig — anim-wc01.js fitArms; trước đây rig WC01 được
+// tới 0,37 để giữ tay 0,34 + 0,36 của tư thế)
+t("tay-dai", "cánh tay trên 0,18–0,40 m, cẳng tay 0,18–0,34 m, hai bên", () => forChars((c) => {
+  const bad = [], fMax = 0.34;
   for (const s of ["L", "R"]) {
     if (!(c.arm["U" + s] >= 0.18 && c.arm["U" + s] <= 0.4)) bad.push(`trên ${s} ${f3(c.arm["U" + s])}`);
     if (!(c.arm["F" + s] >= 0.18 && c.arm["F" + s] <= fMax)) bad.push(`cẳng ${s} ${f3(c.arm["F" + s])}`);
@@ -206,8 +209,10 @@ t("de", "đế giày lưới (meta.foot): sole 0,03–0,08 dưới cổ chân g�
   }
   return bad.join(", ");
 }));
-// hộp cắt (khung chuẩn hoá thô) → khung nướng: x' = (x − ox)·s, y' = y·s, z' = (z − oz)·s (meta.norm = [s, ox, oz]); thu mỗi bên 1 cm
-t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao DV_DAO): meta.cut > 0, nhân vật không còn tam giác nào trong hộp cắt", () => {
+// hộp cắt (khung chuẩn hoá thô) → khung nướng: x' = (x − ox)·s, y' = y·s, z' = (z − oz)·s (meta.norm = [s, ox, oz]); thu mỗi bên 1 cm —
+// không tam giác nào có trọng tâm trong đó, không đỉnh nào lọt vào (trước đây chỉ xét trọng tâm: H33 còn 7 đỉnh sâu tới 1,9 cm, X19 4
+// đỉnh tới 4 cm — mảnh sừng vụn, cạnh 8–12 cm)
+t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao DV_DAO): meta.cut > 0, nhân vật không còn tam giác nào, đỉnh nào trong hộp cắt (thu 1 cm)", () => {
   const out = [];
   for (const [kind, cat, M] of [["char", CHARS, CH], ["kit", KIT_LIST, KT]]) for (const [id, e] of Object.entries(cat)) {
     if (!e.cut) continue;
@@ -217,12 +222,11 @@ t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao D
     const [sc, ox, oz] = m.meta.norm || [], g = m.meshes.body, P = g.position, I = g.index;
     if (sc === undefined) { out.push({ id, msg: "thiếu meta.norm" }); continue; }
     const box = e.cut.map((b) => ({ lo: [(b.lo[0] - ox) * sc + 0.01, b.lo[1] * sc + 0.01, (b.lo[2] - oz) * sc + 0.01], hi: [(b.hi[0] - ox) * sc - 0.01, b.hi[1] * sc - 0.01, (b.hi[2] - oz) * sc - 0.01] }));
-    let n = 0;
-    for (let q = 0; q < I.length; q += 3) {
-      const ct = [0, 1, 2].map((k) => (P[I[q] * 3 + k] + P[I[q + 1] * 3 + k] + P[I[q + 2] * 3 + k]) / 3);
-      if (box.some((b) => ct.every((x, k) => x >= b.lo[k] && x <= b.hi[k]))) n++;
-    }
-    if (n) out.push({ id, msg: `${n} tam giác còn trong hộp cắt` });
+    let n = 0, nv = 0;
+    const inBox = (p) => box.some((b) => p.every((x, k) => x >= b.lo[k] && x <= b.hi[k]));
+    for (let q = 0; q < I.length; q += 3) if (inBox([0, 1, 2].map((k) => (P[I[q] * 3 + k] + P[I[q + 1] * 3 + k] + P[I[q + 2] * 3 + k]) / 3))) n++;
+    for (let v = 0; v < g.count; v++) if (inBox([P[v * 3], P[v * 3 + 1], P[v * 3 + 2]])) nv++;
+    if (n || nv) out.push({ id, msg: `${n} tam giác, ${nv} đỉnh còn trong hộp cắt` });
   }
   return out;
 });
@@ -234,7 +238,7 @@ const MIN_SHARE = { hips: 1.5, torso: 15, head: 3, sh: 2, el: 0.9, hand: 0.5, hi
 // xương phụ nhận trọng số thay khớp (A4): lưng (bụng, ngực dưới), xương đòn (đỉnh vai) tính vào thân, xoắn (nửa cẳng tay phía cổ tay)
 // tính vào khuỷu — thân riêng còn 7,9–14,8%, khuỷu X19 0,2–0,4%
 const SHARE_OF = { spine: "torso", clavL: "torso", clavR: "torso", twistL: "elL", twistR: "elR" };
-t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 1%, vai ≥ 2%, cổ ≥ 3%…; xương phụ tính vào khớp nó thay)", () => forChars((c) => {
+t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 0,9% (cộng xoắn), vai ≥ 2%, cổ ≥ 3%…; xương phụ tính vào khớp nó thay)", () => forChars((c) => {
   const S = Object.fromEntries(c.B.map((b) => [b, 0]));
   for (const [, ws] of skinOf(c)) for (const [b, w] of ws) S[SHARE_OF[b] || b] += w;
   const bad = [];
@@ -261,6 +265,20 @@ t("khong-ke", "không đỉnh nào trộn hai xương không kề (cổ chân + 
     if (hit) n++;
   }
   return n ? `${n} đỉnh (${pc(n / c.g.count)}): ${Object.entries(pairs).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, m]) => k + " " + m).join(", ")}` : "";
+}));
+// Tam giác cầu (đợt 19a soát): hai đỉnh của một tam giác có xương nặng nhất cách nhau ≥ 3 đốt (cả xương phụ, cha theo meta.parent) — lưới
+// Meshy dính hai phần (cổ tay áo giáp CV_daidao vào thân, bàn tay OFF_tuong vào vạt áo, ống tay áo X19 vào vạt áo): tam giác căng thành
+// màng, gai tới 2,3 m khi tay cử động. Kiểm theo tam giác (khong-ke chỉ kiểm từng đỉnh nên không bắt được).
+t("cau", "không tam giác nào nối hai xương nặng nhất cách nhau ≥ 3 đốt (cả xương phụ) — màng / gai khi hai phần rời nhau", () => forChars((c) => {
+  const { g, B } = c, n = g.count, dom = new Array(n), I = g.index;
+  for (let v = 0; v < n; v++) { let q = 0; for (let k = 1; k < 4; k++) if (g.skinWeight[v * 4 + k] > g.skinWeight[v * 4 + q]) q = k; dom[v] = B[g.skinIndex[v * 4 + q]]; }
+  let cnt = 0; const pairs = {};
+  for (let t3 = 0; t3 < I.length; t3 += 3) {
+    let hit = "";
+    for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) { const x = dom[I[t3 + a]], y = dom[I[t3 + b]]; if (treeDist(x, y, c.P) >= 3) hit = [x, y].sort().join("+"); }
+    if (hit) { cnt++; pairs[hit] = (pairs[hit] || 0) + 1; }
+  }
+  return cnt ? `${cnt} tam giác: ${Object.entries(pairs).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, m]) => k + " " + m).join(", ")}` : "";
 }));
 t("ban-chan", "đỉnh bàn chân (cổ chân hoặc xương con của nó nặng nhất) không có trọng số hông", () => forChars((c) => {
   let n = 0, bad = 0;
@@ -376,6 +394,20 @@ t("kit-ke", "không đỉnh nào trộn hai khúc không kề (bàn chân + ch�
     let n = 0; const pairs = {};
     for (let v = 0; v < g.count; v++) { const s = segOf(g.aSkin, v); if (s.a !== s.b && s.w >= 0.01 && s.w <= 0.99 && forbidden(s.a, s.b, k.P, k.roots)) { n++; const q = [s.a, s.b].sort().join("+"); pairs[q] = (pairs[q] || 0) + 1; } }
     if (n) out.push(`${ln} ${n} đỉnh (${Object.entries(pairs).map(([q, m]) => q + " " + m).join(", ")})`);
+  }
+  return out.length ? [{ id, msg: out.join("; ") }] : [];
+}));
+t("kit-cau", "không tam giác nào nối hai khúc cấm trộn (theo khúc nặng nhất mỗi đỉnh: như kit-ke), mọi mức chi tiết — DV_NO cẳng tay + thân thành gai dọc nỏ", () => Object.entries(K).flatMap(([id, k]) => {
+  const out = [];
+  for (const [ln, g] of Object.entries(k.meshes)) {
+    const n = g.count, dom = new Array(n), I = g.index; let cnt = 0; const pairs = {};
+    for (let v = 0; v < n; v++) dom[v] = segOf(g.aSkin, v).dom;
+    for (let t3 = 0; t3 < I.length; t3 += 3) {
+      let hit = "";
+      for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) { const x = dom[I[t3 + a]], y = dom[I[t3 + b]]; if (forbidden(x, y, k.P, k.roots)) hit = [x, y].sort().join("+"); }
+      if (hit) { cnt++; pairs[hit] = (pairs[hit] || 0) + 1; }
+    }
+    if (cnt) out.push(`${ln} ${cnt} (${Object.entries(pairs).map(([q, m]) => q + " " + m).join(", ")})`);
   }
   return out.length ? [{ id, msg: out.join("; ") }] : [];
 }));

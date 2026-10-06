@@ -33,7 +33,7 @@ if (what === "char" || what === "all") {
     writeHKM(hkm, { ...r.meta, tex: code + ".webp" }, { body: r.mesh });
     await writeRaw(tex, r.image, c.tex);
     index["char/" + code] = { kind: "char", file: `char/${code}.hkm`, tex: `char/${code}.webp`, tris: r.tris, bytes: size(hkm) + size(tex) };
-    console.log(`✓ ${code.padEnd(14)} ${r.tris} tg (gốc ${r.trisBefore}) · ${((size(hkm) + size(tex)) / 1024).toFixed(0)} KB · vai ×${r.meta.scale} · tay ${r.how.L} / ${r.how.R}${r.cut ? ` · cắt ${r.cut} tg` : ""} · ${Date.now() - t0} ms${r.warnings.length ? " · " + r.warnings.join("; ") : ""}`);
+    console.log(`✓ ${code.padEnd(14)} ${r.tris} tg (gốc ${r.trisBefore}) · ${((size(hkm) + size(tex)) / 1024).toFixed(0)} KB · vai ×${r.meta.scale} · tay ${r.how.L} / ${r.how.R}${r.cut ? ` · cắt ${r.cut} tg` : ""}${r.split?.cut ? ` · tách cầu ${r.split.cut} tg` : ""} · ${Date.now() - t0} ms${r.warnings.length ? " · " + r.warnings.join("; ") : ""}`);
   }
 }
 if (what === "wpn" || what === "all") {
@@ -63,7 +63,7 @@ if (what === "kit" || what === "all") {
     await writeRaw(tex, r.image, c.horse ? 1024 : 512);
     const tris = r.lods.map((m) => m.index.a.length / 3);
     index["kit/" + code] = { kind: "kit", file: `kit/${code}.hkm`, tex: `kit/${code}.webp`, tris: tris[0], lods: tris, bytes: size(hkm) + size(tex) };
-    console.log(`✓ ${code.padEnd(8)} LOD ${tris.join(" / ")} tg · ${((size(hkm) + size(tex)) / 1024).toFixed(0)} KB · ${Date.now() - t0} ms${r.info ? " · ngựa " + JSON.stringify(r.info, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v)) : ""}${r.warnings.length ? " · " + r.warnings.join("; ") : ""}`);
+    console.log(`✓ ${code.padEnd(8)} LOD ${tris.join(" / ")} tg · ${((size(hkm) + size(tex)) / 1024).toFixed(0)} KB${r.split ? ` · tách cầu ${r.split} tg trước khi buông tay` : ""} · ${Date.now() - t0} ms${r.info ? " · ngựa " + JSON.stringify(r.info, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v)) : ""}${r.warnings.length ? " · " + r.warnings.join("; ") : ""}`);
   }
 }
 writeFileSync(INDEX, JSON.stringify(Object.fromEntries(Object.entries(index).sort()), null, 1) + "\n");

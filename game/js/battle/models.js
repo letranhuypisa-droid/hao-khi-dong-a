@@ -6,6 +6,7 @@
 
 import * as THREE from "three";
 import { model, applyRest, bodyMesh, weaponMesh } from "./glb.js";
+import { headShell } from "./anim-wc01.js";
 
 export const PAL = {
   son: 0x9b2d20, sonDam: 0x6e1d15, then: 0x1d1a17, vang: 0xc9a14a, trung: 0xe6dcc3,
@@ -160,10 +161,20 @@ const I4 = new THREE.Matrix4();
 // Toa Đô 22 (41), nay 2 lưới + lá cờ (tướng): 4–6 lượt vẽ mỗi rig. Hộp bao: cầu cố định đủ rộng cho mọi tư thế (vũ
 // khí dài, lộn né, nằm) nên vẫn bị loại khi ngoài khung nhìn, ngoài hộp bóng (áo choàng trước đây tắt loại bỏ).
 // Mô hình GLB (cfg.model, glb.js): có trong đệm thì thân là một lưới da GLB gắn vào chính các khớp này (vị trí vai, khuỷu, cổ tay,
-// cổ, bề ngang chân đặt theo mô hình — đúng khung gắn, kể cả rig đại kiếm WC01; tay trái nắm chuôi giải IK theo độ dài tay đó),
+// cổ, bề ngang chân đặt theo mô hình — đúng khung gắn, kể cả rig đại kiếm WC01: tay phải tư thế WC01 giải lại, tay trái nắm chuôi
+// giải IK theo độ dài tay đó, lưỡi tránh vỏ đầu dyn.shell — rig-motion.js, anim-wc01.js fitArms),
 // vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo (vạt áo nằm trong lưới, đi theo hông và
 // chân); đế giày theo lưới (rig.foot từ meta.foot, rig-motion.js). Áo choàng, cờ lưng, tua giáo (GLB: neo ở chân mũi, meta.head),
 // dải khăn vẫn dựng bằng code như cũ.
+// Vỏ đầu (anim-wc01.js headShell) của thân GLB M: khớp đầu ở khung gắn (meta.inv), lưới thân; tính một lần mỗi mô hình (M.shell).
+export function shellOf(M) {
+  if (M.shell === undefined) {
+    const g = M.geos.body, h = M.meta.bones.indexOf("head"), A = g.attributes;
+    const hp = h < 0 ? null : new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(M.meta.inv, h * 16).invert());
+    M.shell = hp ? headShell(A.position.array, A.skinIndex.array, A.skinWeight.array, h, hp.toArray()) : 0;
+  }
+  return M.shell;
+}
 export function makeRig(cfg = {}) {
   const { scale = 1, cloth = PAL.son, armor = PAL.then, trim = PAL.vang, skin = PAL.da,
     hat = "tocbui", weapon = "songdao", cape = null, flag = null, shield = false,
@@ -300,11 +311,13 @@ export function makeRig(cfg = {}) {
   }
 
   let reach = 1.2;                                        // tầm vũ khí tính từ bàn tay (cầu bao)
-  // vũ khí GLB (khung chuẩn bake/wpn.mjs: gốc chỗ nắm, cán +Z) thay khối hình khi có; điểm mũi / đuôi (edge) theo dài thật
+  // vũ khí GLB (khung chuẩn bake/wpn.mjs: gốc chỗ nắm, cán +Z) thay khối hình khi có; điểm mũi / đuôi (edge) theo dài thật;
+  // kiếm, đao GLB: dyn.blade = { guard, tip } — lưỡi từ chắn tay (meta.guard) tới mũi: vệt chém (hero.js), né sọ (anim-wc01.js)
   const tipZ = (m) => m.meta.hi[2], buttZ = (m) => m.meta.lo[2];
+  const lane = (m) => { dyn.blade = { guard: m.meta.guard ?? 0.07, tip: tipZ(m) }; };
   if (weapon === "songdao") {
     const m = WM("songdao");
-    if (m) { wpn(p.handR, m); wpn(p.handL, m, { mirror: true }); }
+    if (m) { wpn(p.handR, m); wpn(p.handL, m, { mirror: true }); lane(m); }
     else { add(p.handR, () => blade(0.9, 0.08, PAL.sat)); add(p.handL, () => blade(0.9, 0.08, PAL.sat)); }
     const z = m ? tipZ(m) : 1.06;
     edge(p.handR, "handRx", 0, 0.02, z); edge(p.handL, "handLx", 0, 0.02, z);
@@ -328,12 +341,12 @@ export function makeRig(cfg = {}) {
     edge(p.handR, "handRx", 0, -0.04, z, 0, 0.24, z, 0, 0, m ? buttZ(m) : -0.7); reach = z + 0.1;
   } else if (weapon === "dao") {
     const m = WM("dao");
-    if (m) wpn(p.handR, m); else add(p.handR, () => blade(1.0, 0.1, PAL.sat));
+    if (m) { wpn(p.handR, m); lane(m); } else add(p.handR, () => blade(1.0, 0.1, PAL.sat));
     edge(p.handR, "handRx", 0, 0.02, m ? tipZ(m) : 1.16);
   } else if (weapon === "daikiem" && WM("daikiem")) {
     // Gươm Tiết chế GLB: gốc ngay dưới chắn tay như rig, tay trái nắm dưới 0,2 (dyn.grip)
     const m = WM("daikiem");
-    wpn(p.handR, m);
+    wpn(p.handR, m); lane(m);
     const z = tipZ(m);
     edge(p.handR, "handRx", 0, 0, z, 0, 0.065, z - 0.2, 0, -0.065, z - 0.2, 0, 0, buttZ(m)); reach = z + 0.05;
     dyn.grip = { j: p.handR, local: new THREE.Vector3(0, 0, -0.2) };
@@ -403,6 +416,7 @@ export function makeRig(cfg = {}) {
   const mats = [], meshes = [];
   if (M) {
     const body = bodyMesh(p, M);
+    if (dyn.grip) dyn.shell = shellOf(M);
     body.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.92, 0), R);
     root.add(body); mats.push(body.material); meshes.push(body);
   }
@@ -426,13 +440,14 @@ export function makeRig(cfg = {}) {
   return { root, p, scale, dyn, skeleton, mats, meshes, weapons, glb: !!M, foot };
 }
 
-// Giải phóng phần riêng của một thể hiện rig: gỡ khỏi cảnh, texture xương của khung xương, vật liệu. Hình học dùng
-// chung (đệm theo cấu hình) giữ lại. Gọi lại nhiều lần không sao.
+// Giải phóng phần riêng của một thể hiện rig: gỡ khỏi cảnh, texture xương của khung xương (khung khối và khung riêng của thân
+// GLB — glb.js bodyMesh, 21 xương), vật liệu. Hình học dùng chung (đệm theo cấu hình) giữ lại. Gọi lại nhiều lần không sao.
 export function disposeRig(rig) {
   rig.root.parent?.remove(rig.root);
   if (rig.disposed) return;
   rig.disposed = true;
   rig.skeleton?.dispose();
+  for (const m of rig.meshes || []) if (m.skeleton && m.skeleton !== rig.skeleton) m.skeleton.dispose();
   for (const m of rig.mats || []) m.dispose();
 }
 

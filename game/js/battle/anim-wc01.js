@@ -13,9 +13,12 @@
 // Nhịp đòn nặng: gồng lâu và rộng (hông xoay trước, vai theo sau, trọng tâm dồn về chân sau) → chém rất nhanh ("snap") với
 // bước chân trước dẫn hông → theo đà dài (lưỡi đi quá đích, người xoắn hết cỡ, gối khuỵu) → hồi thế chậm. ĐỀ XUẤT BẢN THỬ:
 // mọi góc, mốc u (chỉnh bằng mắt trong lab.html?view=hero&hero=H31&m=…).
+//
+// Tư thế giải cho tay 0,34 + 0,36, vai ±0,3 (rig khối). Thân GLB giữ tay của mô hình (đợt 19a): fitArms (cuối file) giải lại tay
+// phải mỗi khung theo số đo đó (rig-motion.js) — rig khối không đổi gì.
 
 import * as A from "./anim.js";
-import { armIK } from "./ik.js";
+import { armIK, armFK } from "./ik.js";
 
 const { P, keys, blendPose, EASE, seg, clamp01 } = A;
 
@@ -327,3 +330,119 @@ export const HERO_ANIM_WC01 = {
 export const POSES_WC01 = { guard: GUARD, block: BLOCK, idle, run, hitReact, dodgeRoll, knockdown,
   charge: (key) => HERO_ANIM_WC01[key]?.(MOVE_CHARGE_U[key] ?? 0.3) };
 const MOVE_CHARGE_U = { C1: 0.3, C4: 0.42, C6: 0.3 };
+
+// ---- tay phải theo số đo của rig (thân GLB, đợt 19a) ---------------------------------------------------------------------
+// Tư thế trên giải cho tay 0,34 + 0,36, vai ±0,3 (ARM, SH). Thân GLB giữ tay của mô hình (H31 0,23–0,25 + 0,21–0,22, vai ±0,225;
+// lính Tự do LINH_r01 / r24 tay 0,48–0,52, vai ±0,31): đặt thẳng góc khớp của tư thế thì cổ tay phải gần vai hơn đích — tay trái
+// không với tới chuôi (đo đợt soát 19a: 12 / 16 đòn hụt tới 0,1), lưỡi giơ qua đầu sượt tâm sọ 2 cm. fitArms giải lại tay phải
+// mỗi khung (rig-motion.js, sau tư thế, trước fixBlades / gripIK): hướng lưỡi, lưỡi sắc lấy từ tư thế; cổ tay về điểm gần đích nhất
+// trong tầm với (FIT.k tay duỗi: khuỷu còn gập ~28°) — đang nắm hai tay (grip ≥ 0,5) thì điểm nắm (GRIP dưới cổ tay dọc lưỡi) cũng
+// trong tầm tay trái; cổ tay sát tâm sọ (< wr = max(FIT.wr, vỏ đầu)) thì đẩy ra; lưỡi gần tâm sọ hơn sr = max(FIT.sr, vỏ đầu +
+// FIT.hm) thì nghiêng lưỡi khỏi đầu; mặt phẳng tay chứa lưỡi (cổ tay chỉ gập một trục), phía khuỷu gần khuỷu của tư thế.
+// skull: tâm sọ trong khung đầu. Vỏ đầu (headShell, models.js dyn.shell): thân GLB đội mũ to hơn đầu khối — H31 0,157, LINH_r24
+// 0,148, LINH_r01 0,119. Giữ sr 0,12 thì lưỡi xuyên mũ H31 ở C1, C4, C6, DQ, ult, N3 (đỉnh mũ cách trục lưỡi 1–6 mm); với vỏ + 0,05
+// thì cách 2,5–7,5 cm, đổi lại tay ngắn mũ to không giơ gươm qua vai được: thế C1, C6, DQ, ult thành gươm dựng trước mặt (hướng lưỡi
+// lệch tư thế tới 67° ở H31, 81° ở LINH_r01; sr 0,12 đã lệch 23° / 48° vì tay ngắn).
+export const FIT = { k: 0.97, wr: 0.14, sr: 0.12, hm: 0.05, skull: [0, 0.13, 0.03] };
+// Vỏ đầu của thân GLB: trung vị khoảng cách tâm sọ (khớp đầu hp ở khung gắn + FIT.skull) → đỉnh có xương nặng nhất là đầu (head:
+// chỉ số xương); pos (n × 3, khung gắn), si / sw (n × 4: chỉ số, trọng số xương). Trung vị: mũ, tóc quanh sọ — sừng, mào, chóp mũ
+// (H31 tới 0,37) chỉ là phần nhỏ. Không đỉnh nào theo đầu: 0.
+export function headShell(pos, si, sw, head, hp) {
+  const c = add(hp, FIT.skull), d = [];
+  for (let v = 0; v < pos.length / 3; v++) {
+    let q = 0; for (let k = 1; k < 4; k++) if (sw[v * 4 + k] > sw[v * 4 + q]) q = k;
+    if (si[v * 4 + q] === head) d.push(Math.hypot(pos[v * 3] - c[0], pos[v * 3 + 1] - c[1], pos[v * 3 + 2] - c[2]));
+  }
+  d.sort((a, b) => a - b);
+  return d.length ? d[d.length >> 1] : 0;
+}
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const scl = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const lin = (a, ka, b, kb) => [a[0] * ka + b[0] * kb, a[1] * ka + b[1] * kb, a[2] * ka + b[2] * kb];
+// quay v quanh trục đơn vị k một góc th (Rodrigues)
+const rotAx = (v, k, th) => { const c = Math.cos(th), s = Math.sin(th); return add(lin(v, c, cross(k, v), s), scl(k, dot(k, v) * (1 - c))); };
+const inBall = (p, c, r) => { const d = sub(p, c), L = len(d); return L <= r ? p : add(c, scl(d, r / L)); };
+// Điểm gần p nhất trong giao hai quả cầu (c1, r1), (c2, r2); không giao thì điểm giữa hai mặt cầu trên đường nối tâm.
+function nearest2(p, c1, r1, c2, r2) {
+  const in1 = (q) => len(sub(q, c1)) <= r1 + 1e-9, in2 = (q) => len(sub(q, c2)) <= r2 + 1e-9;
+  if (in1(p) && in2(p)) return p;
+  const q1 = inBall(p, c1, r1), q2 = inBall(p, c2, r2), ok1 = in2(q1), ok2 = in1(q2);
+  if (ok1 || ok2) return ok1 && (!ok2 || len(sub(q1, p)) <= len(sub(q2, p))) ? q1 : q2;
+  const u = sub(c2, c1), d = len(u), n = scl(u, 1 / d);
+  if (d >= r1 + r2) return add(c1, scl(n, (r1 + d - r2) / 2));
+  const a = (d * d + r1 * r1 - r2 * r2) / (2 * d), h = Math.sqrt(Math.max(0, r1 * r1 - a * a)), cc = add(c1, scl(n, a));
+  let w = sub(p, cc); w = sub(w, scl(n, dot(w, n)));
+  if (len(w) < 1e-9) w = cross(Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1], n);
+  return add(cc, scl(norm(w), h));
+}
+// khoảng cách từ c tới đoạn a + z·d, z0 ≤ z ≤ z1
+const segGap = (c, a, d, z0, z1) => { const z = Math.max(z0, Math.min(z1, dot(sub(c, a), d))); return len(sub(c, add(a, scl(d, z)))); };
+
+// Số đo tay của rig (P = rig.p: khớp lúc chạy, khung cha), blade = { guard, tip } của lưỡi (models.js dyn.blade), shell: vỏ đầu
+// (models.js dyn.shell, headShell) → số đo cho fitArms; null khi tay trùng số tư thế (rig khối: tư thế giữ nguyên từng số).
+export function fitGeo(P, blade = null, shell = 0) {
+  const v = (o) => [o.position.x, o.position.y, o.position.z];
+  const arm = (s) => { const e = P["el" + s].position, h = P["hand" + s].position; return { L1: Math.hypot(e.x, e.y, e.z), L2: Math.hypot(h.y, h.z), off: Math.atan2(h.z, -h.y) }; };
+  const g = { shR: v(P.shR), shL: v(P.shL), R: arm("R"), L: arm("L"), head: v(P.head), blade: blade ? [blade.guard, blade.tip] : [0.16, 1.22],
+    sr: Math.max(FIT.sr, shell + FIT.hm), wr: Math.max(FIT.wr, shell) };
+  let d = 0;
+  for (let k = 0; k < 3; k++) d = Math.max(d, Math.abs(g.shR[k] - SH.R[k]), Math.abs(g.shL[k] - SH.L[k]));
+  for (const s of ["R", "L"]) d = Math.max(d, Math.abs(g[s].L1 - ARM.L1), Math.abs(g[s].L2 - ARM.L2), Math.abs(g[s].off - ARM.off));
+  return d < 1e-6 ? null : g;
+}
+const _fk = [0, 0, 0, 0, 0, 0], _ik2 = [0, 0, 0, 0];
+// cổ tay W vào tầm tay phải (rR); nắm hai tay (gw: 0 buông … 1 nắm) thì điểm nắm W − GRIP·D cũng trong tầm tay trái
+function reach(W, D, g, gw) {
+  const rR = FIT.k * (g.R.L1 + g.R.L2), a = inBall(W, g.shR, rR);
+  return gw > 0 ? lin(a, 1 - gw, nearest2(W, g.shR, rR, add(g.shL, scl(D, GRIP)), FIT.k * (g.L.L1 + g.L.L2)), gw) : a;
+}
+// Tư thế p (đã trộn) → o = p với tay phải (shR*, elRx, handRx, handRz) giải theo số đo g (fitGeo). Không cấp phát o.
+export function fitArms(p, g, o = {}) {
+  Object.assign(o, p);
+  // tư thế ở số đo tư thế: cổ tay W, lưỡi D (trục z bàn tay), lưỡi sắc E (trục y), khuỷu (so với vai) — khung thân trên
+  const f = elFrame(p.shRx, p.shRy, p.shRz, p.elRx);
+  armFK(p.shRx, p.shRy, p.shRz, p.elRx - ARM.off, ARM.L1, ARM.L2, _fk);
+  const elP = [_fk[0], _fk[1], _fk[2]], cx = Math.cos(p.handRx), sx = Math.sin(p.handRx), cz = Math.cos(p.handRz), sz = Math.sin(p.handRz);
+  let W = add(SH.R, [_fk[3], _fk[4], _fk[5]]), D = lin(f.y, -sx, f.z, cx), E = lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz);
+  const gw = Math.min(1, Math.max(0, 2 * (p.grip || 0)));
+  const ch = Math.cos(p.headX || 0), shd = Math.sin(p.headX || 0), K = FIT.skull;
+  const C = add(g.head, [K[0], ch * K[1] - shd * K[2], shd * K[1] + ch * K[2]]);
+  for (let it = 0; it < 8; it++) {
+    W = reach(W, D, g, gw);
+    const r = sub(C, W), R = len(r);
+    if (R < g.wr) { W = R > 1e-9 ? sub(C, scl(r, g.wr / R)) : add(C, [0, 0, g.wr]); continue; }
+    if (segGap(C, W, D, g.blade[0], g.blade[1]) >= g.sr - 1e-4) break;
+    const need = Math.asin(Math.min(1, g.sr / R)) - Math.acos(Math.max(-1, Math.min(1, dot(r, D) / R)));
+    const ax = cross(r, D), al = len(ax);
+    if (need <= 0 || al < 1e-9) break;
+    D = rotAx(D, scl(ax, 1 / al), need + 1e-3); E = rotAx(E, scl(ax, 1 / al), need + 1e-3);
+  }
+  return armTo(o, g, reach(W, D, g, gw), D, E, elP, p.handRz);
+}
+// Sau rig-motion.js fixBlades (cổ tay phải gập thêm cho mũi lưỡi khỏi cắm đất, góc mới hx): giữ lưỡi theo hướng mới, đưa lại cổ tay
+// vào tầm với (điểm nắm đổi chỗ theo lưỡi — lính Tự do vai rộng hụt chuôi 1,5–3 cm ở thế bổ đất). q: tư thế đã fitArms.
+export function refitArms(q, g, hx, o = {}) {
+  Object.assign(o, q);
+  const f = elFrame(q.shRx, q.shRy, q.shRz, q.elRx);
+  armFK(q.shRx, q.shRy, q.shRz, q.elRx - g.R.off, g.R.L1, g.R.L2, _fk);
+  const cx = Math.cos(hx), sx = Math.sin(hx), cz = Math.cos(q.handRz), sz = Math.sin(q.handRz);
+  const D = lin(f.y, -sx, f.z, cx), E = lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz);
+  return armTo(o, g, reach(add(g.shR, [_fk[3], _fk[4], _fk[5]]), D, g, Math.min(1, Math.max(0, 2 * (q.grip || 0)))), D, E, [_fk[0], _fk[1], _fk[2]], q.handRz);
+}
+// IK tay phải tới cổ tay W, lưỡi D, lưỡi sắc E → o. Mặt phẳng tay chứa lưỡi (cổ tay chỉ gập quanh x, lật quanh z): khuỷu ở một trong
+// hai phía của (vai → cổ tay) trong mặt phẳng đó, lấy phía gần khuỷu elP (so với vai); góc lật gần hz0.
+function armTo(o, g, W, D, E, elP, hz0) {
+  const v = sub(W, g.shR), n = cross(v, D), side = len(n) > 1e-6 * len(v) ? norm(cross(n, v)) : null;
+  let best = -Infinity, a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+  for (const pl of side ? [side, scl(side, -1)] : [elP]) {
+    armIK(v[0], v[1], v[2], pl[0], pl[1], pl[2], g.R.L1, g.R.L2, _ik2);
+    armFK(_ik2[0], _ik2[1], _ik2[2], _ik2[3], g.R.L1, g.R.L2, _fk);
+    const s = dot(norm([_fk[0], _fk[1], _fk[2]]), norm(elP));
+    if (s > best) { best = s; a0 = _ik2[0]; a1 = _ik2[1]; a2 = _ik2[2]; a3 = _ik2[3]; }
+  }
+  const ex = a3 + g.R.off, fr = elFrame(a0, a1, a2, ex), hx = Math.atan2(-dot(D, fr.y), dot(D, fr.z));
+  let hz = Math.atan2(-dot(E, fr.x), dot(E, lin(fr.y, Math.cos(hx), fr.z, Math.sin(hx))));
+  if (hz - hz0 > Math.PI / 2) hz -= Math.PI; else if (hz - hz0 < -Math.PI / 2) hz += Math.PI;   // lưỡi hai mặt sắc: lật ít nhất
+  o.shRx = a0; o.shRy = a1; o.shRz = a2; o.elRx = ex; o.handRx = hx; o.handRz = hz;
+  return o;
+}

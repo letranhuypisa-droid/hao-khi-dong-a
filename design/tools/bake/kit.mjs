@@ -5,14 +5,15 @@
 // Mỗi đỉnh ≤ 2 khúc: aSkin = (khúc 0, khúc 1, trọng số khúc 0 × 255, 0). Shader (glb.js) lấy ma trận thế giới hai khúc từ texture
 // khớp như skinnedKit, trừ vị trí nghỉ của khúc (piv) rồi nhân: p = Σ w·M_k·(v − piv_k) — tư thế nghỉ các khúc chỉ có tịnh tiến.
 // Chuyển dáng gốc (tay đưa ra trước) về tư thế nghỉ: skinning tuyến tính 15 khớp (human.mjs) từ khung gắn của mô hình sang khung nghỉ
-// của bộ khúc, rồi gộp 15 khớp về 15 khúc (đầu theo thân, bàn tay theo cẳng tay).
+// của bộ khúc (kitBody: tách tam giác cầu trên lưới gốc trước — cẳng tay áp sườn không kéo thành gai), rồi gộp 15 khớp về 15 khúc
+// (đầu theo thân, bàn tay theo cẳng tay).
 // Mức chi tiết: hàn đỉnh trùng vị trí (bỏ đường may UV của Meshy) rồi giảm lưới tự do (meshopt) tới đúng ngân sách. LOD0 trải UV
 // lại và nướng texture riêng từ lưới gốc (rebake.mjs); LOD1–2 tô màu đỉnh lấy từ texture gốc, không dùng texture.
 // meta.tas: neo tua giáo (khung cẳng tay cầm giáo) ở chân mũi giáo Meshy — soldiers.js glbKit đặt vào soldier-motion.js TAS.
 
 import * as THREE from "three";
-import { readGLB, smoothNormals, rawImage } from "./io.mjs";
-import { JOINTS, fitHuman, cutBoxes, bindSkeleton, weights15 } from "./human.mjs";
+import { readGLB, smoothNormals, rawImage, quantWeights } from "./io.mjs";
+import { JOINTS, fitHuman, cutBoxes, bindSkeleton, weights15, topK, splitBridges, boneDist } from "./human.mjs";
 import { rebake, weldSimplify } from "./rebake.mjs";
 import { SKELETONS, JOINT_NAMES, HAND } from "../../../game/js/battle/soldier-motion.js";
 
@@ -76,10 +77,57 @@ function skin2(W, n, map, skel = "human") {
   return out;
 }
 
+// ---- cây khúc: cặp khúc không được chung tam giác ----------------------------------------------------------------------------------
+// Như game/tests/models.test.mjs kit-ke (theo đỉnh) và cau (theo tam giác): cách ≥ 3 khúc, hai chi khác nhau, thân + khúc chi không phải
+// gốc chi (thân + cẳng tay). kitTree(skel) → { par (cha mỗi khúc), cau(a, b) }.
+const KIT_ROOTS = { human: ["uaL", "uaR", "thL", "thR"], horse: ["uaL", "uaR", "thL", "thR", "shL", "shR"] };
+export function kitTree(skel) {
+  const par = Object.fromEntries(SKELETONS[skel].map((j) => [j[0], j[1]])), roots = KIT_ROOTS[skel];
+  const up = (b) => { const a = [b]; while (par[a[a.length - 1]]) a.push(par[a[a.length - 1]]); return a; };
+  const limb = (b) => up(b).find((x) => roots.includes(x)) || "core";
+  const cau = (a, b) => {
+    if (a === b) return false;
+    if (boneDist(a, b, par) >= 3) return true;
+    const la = limb(a), lb = limb(b);
+    if (la !== "core" && lb !== "core") return la !== lb;
+    if (la === "core" && lb === "core") return false;
+    return !roots.includes(la === "core" ? b : a);
+  };
+  return { par, cau };
+}
+const TREE = { human: kitTree("human"), horse: kitTree("horse") };
+
+// Thân lính bộ (mẫu đã dò khớp F, lưới gốc idx, uv) → tư thế nghỉ bộ khúc: tay buông thẳng ở vai bộ khúc, chân ở hông bộ khúc, đầu giữ
+// chỗ của mô hình (theo thân). Tách tam giác cầu trên lưới gốc trước khi đặt tay (splitBridges, cặp khớp cấm theo cây khúc qua MAP):
+// đặt tay buông là một tư thế, tam giác nối cẳng tay với thân kéo giãn ngay trong lưới nghỉ — DV_NO (cẳng tay áp sườn, chĩa ra trước)
+// trước đây có 84 tam giác giãn 4–36 lần, dài tới 0,55 m: gai đỏ dọc ống tay ở mọi tư thế, phép đo tư thế (so với lưới nghỉ) không
+// thấy. Trả { V (nghỉ), S (gốc sau tách), W (15 khớp mỗi đỉnh), idx, uv, cut (số tam giác tách) }.
+export const KIT_SH = HP.uaL[1];
+export function kitBody(F, idx, uv) {
+  const NB = JOINTS.length, W0 = weights15(F, YH, KIT_W), bind = bindSkeleton(F, YH), t = topK(W0, NB, 4);
+  const s = splitBridges({ pos: F.V, idx, si: t.idx, sw: quantWeights(t.w) }, JOINTS, undefined, (a, b) => TREE.human.cau(MAP[a], MAP[b]));
+  const n = s.src.length, W = new Float32Array(n * NB), uv2 = new Float32Array(n * 2);
+  for (let v = 0; v < n; v++) {
+    W.set(W0.subarray(s.own[v] * NB, (s.own[v] + 1) * NB), v * NB);
+    uv2[v * 2] = uv[s.src[v] * 2]; uv2[v * 2 + 1] = uv[s.src[v] * 2 + 1];
+  }
+  const place = {
+    hips: HP.pelvis, torso: HP.torso, head: [0, F.neckY, 0],
+    shL: HP.uaL, elL: HP.faL, handL: [HP.faL[0], HP.faL[1] + HAND, HP.faL[2]],
+    shR: HP.uaR, elR: HP.faR, handR: [HP.faR[0], HP.faR[1] + HAND, HP.faR[2]],
+    hipL: HP.thL, kneeL: HP.shL, ankleL: HP.ftL, hipR: HP.thR, kneeR: HP.shR, ankleR: HP.ftR,
+  };
+  return { V: restPose({ ...F, V: s.pos }, W, bind, place), S: s.pos, W, idx: s.idx, uv: uv2, cut: s.cut };
+}
+
 // ---- hàn + giảm lưới; màu đỉnh cho mức xa ----------------------------------------------------------------------------------------
 // sampleColors: màu texture tại UV mỗi đỉnh (song tuyến). img: { data, w, h, ch } (sharp raw).
 // weldLOD: hàn đỉnh trùng vị trí (đường may UV biến mất, màu trung bình nếu có col), giảm lưới tự do còn ~tris tam giác. Trả phần
-// lưới { pos, nor, col, skin, idx, uv (0) }.
+// lưới { pos, nor, col, skin, idx, uv (0) }. skel ("human" | "horse", phần có trọng số khúc): tách tam giác cầu (human.mjs splitBridges
+// theo kitTree — nỏ binh DV_NO cẳng tay áp sườn: tam giác cẳng tay + thân kéo thành gai trắng dọc nỏ khi tay vung; đáy chậu, gấu áo +
+// cẳng chân, ngực ngựa giữa hai chân trước). simp (catalog, tuỳ kiểu lính): { w } giảm lưới giữ cả trọng số cẳng tay hai bên (rebake.mjs
+// weldSimplify attr, nặng w) — NG_TANK LOD1: gộp cạnh qua dải khuỷu để lại tam giác 0,26 m từ khúc vai xuống cẳng tay, co 17,7 lần khi
+// khuỷu gập; giữ trọng số mọi khúc thì LOD xa các kiểu khác xấu hơn (6,3 → 5,6% thay vì 3,4%), nên chỉ cẳng tay, chỉ kiểu cần.
 export function sampleColors(uv, img) {
   const n = uv.length / 2, out = new Float32Array(n * 3);
   const px = (x, y, c) => img.data[(Math.min(img.h - 1, Math.max(0, y)) * img.w + Math.min(img.w - 1, Math.max(0, x))) * img.ch + c] / 255;
@@ -89,15 +137,28 @@ export function sampleColors(uv, img) {
   }
   return out;
 }
-export async function weldLOD(part, tris, col = null) {
-  const { pos, idx, src, id } = await weldSimplify(part.pos, part.idx, tris), m = src.length;
+export async function weldLOD(part, tris, col = null, skel = null, simp = null) {
+  let attr = null;
+  if (skel && simp && simp.w > 0) {
+    const n = part.pos.length / 3, S = ["faL", "faR"].map((s) => JOINT_NAMES.indexOf(s)), d = new Float32Array(n * 2);
+    for (let v = 0; v < n; v++) { const w = part.skin[v * 4 + 2] / 255, a = S.indexOf(part.skin[v * 4]), b = S.indexOf(part.skin[v * 4 + 1]); if (a >= 0) d[v * 2 + a] += w; if (b >= 0) d[v * 2 + b] += 1 - w; }
+    attr = { data: d, k: 2, w: simp.w };
+  }
+  const { pos: P0, idx: I0, src, id } = await weldSimplify(part.pos, part.idx, tris, attr), m = src.length;
   const C = new Float32Array(m * 3), cnt = new Float32Array(m), skin = new Uint8Array(m * 4);
   for (let g = 0; g < m; g++) for (let k = 0; k < 4; k++) skin[g * 4 + k] = part.skin[src[g] * 4 + k];
   if (col) {
     for (let v = 0; v < id.length; v++) { const g = id[v]; cnt[g]++; for (let c = 0; c < 3; c++) C[g * 3 + c] += col[v * 3 + c]; }
     for (let g = 0; g < m; g++) for (let c = 0; c < 3; c++) C[g * 3 + c] /= cnt[g];
   }
-  return { pos, nor: smoothNormals(pos, idx), col: C, skin, idx, uv: new Float32Array(m * 2) };
+  if (!skel) return { pos: P0, nor: smoothNormals(P0, I0), col: C, skin, idx: I0, uv: new Float32Array(m * 2) };
+  // tách tam giác cầu: khúc (s0, s1, w0) ↔ (si, sw) 4 thành phần
+  const si = new Uint8Array(m * 4), sw = new Uint8Array(m * 4);
+  for (let g = 0; g < m; g++) { si[g * 4] = skin[g * 4]; si[g * 4 + 1] = skin[g * 4 + 1]; sw[g * 4] = skin[g * 4 + 2]; sw[g * 4 + 1] = 255 - skin[g * 4 + 2]; }
+  const s = splitBridges({ pos: P0, idx: I0, si, sw }, JOINT_NAMES, TREE[skel].par, TREE[skel].cau), n2 = s.src.length;
+  const skin2 = new Uint8Array(n2 * 4), col2 = new Float32Array(n2 * 3);
+  for (let g = 0; g < n2; g++) { skin2[g * 4] = s.si[g * 4]; skin2[g * 4 + 1] = s.si[g * 4 + 1]; skin2[g * 4 + 2] = s.sw[g * 4]; for (let c = 0; c < 3; c++) col2[g * 3 + c] = C[s.src[g] * 3 + c]; }
+  return { pos: s.pos, nor: smoothNormals(s.pos, s.idx), col: col2, skin: skin2, idx: s.idx, uv: new Float32Array(n2 * 2) };
 }
 
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -174,10 +235,11 @@ function concat(parts) {
   }
   return { pos, nor, skin, idx };
 }
-// LOD0: hàn + giảm từng phần (tris[k]), nối, trải UV, nướng texture từ các phần gốc (mỗi phần có img).
-async function nearLOD(parts, tris, res) {
+// LOD0: hàn + giảm từng phần (tris[k]), nối, trải UV, nướng texture từ các phần gốc (mỗi phần có img). skels[k]: bộ khúc của phần có
+// trọng số (thân lính, ngựa, người cưỡi — weldLOD tách tam giác cầu); simp: cách giảm thân lính (phần đầu, weldLOD).
+async function nearLOD(parts, tris, res, skels = [], simp = null) {
   const low = [];
-  for (let k = 0; k < parts.length; k++) low.push(await weldLOD(parts[k], tris[k]));
+  for (let k = 0; k < parts.length; k++) low.push(await weldLOD(parts[k], tris[k], null, skels[k] || null, k ? null : simp));
   const r = await rebake(concat(low), parts, res);
   return { mesh: assemble([r.part]), image: r.image };
 }
@@ -186,27 +248,16 @@ async function nearLOD(parts, tris, res) {
 // c: { lods: [tris…], weapons: [{ raw: [raw lod0, lod1, lod2], bone, p, r, s }], tassel: "son" | "long" | null, tasZ }
 export async function bakeKit(file, c) {
   const cg = cutBoxes(await readGLB(file, Infinity), c.cut), g = cg.g;
-  const F = fitHuman(g.pos, g.idx, { shY: HP.uaL[1], fix: c.fix, box: cg.bounds, name: c.name, kit: true });
-  const bind = bindSkeleton(F, YH);
-  const W = weights15(F, YH, KIT_W);
-  // khung nghỉ: vai, khuỷu, cổ tay bộ khúc (tay buông), chân ở hông bộ khúc, đầu giữ chỗ mô hình
-  const place = {
-    hips: HP.pelvis, torso: HP.torso, head: [0, F.neckY, 0],
-    shL: HP.uaL, elL: HP.faL, handL: [HP.faL[0], HP.faL[1] + HAND, HP.faL[2]],
-    shR: HP.uaR, elR: HP.faR, handR: [HP.faR[0], HP.faR[1] + HAND, HP.faR[2]],
-    hipL: HP.thL, kneeL: HP.shL, ankleL: HP.ftL, hipR: HP.thR, kneeR: HP.shR, ankleR: HP.ftR,
-  };
-  const V = restPose(F, W, bind, place);
-  const nor = smoothNormals(V, g.idx), n = V.length / 3;
-  const skin = skin2(W, n, MAP);
-  const body = { pos: V, nor, uv: g.uv, skin, idx: g.idx, img: await rawImage(g.image) };
-  const bodyCol = sampleColors(g.uv, body.img);
+  const F = fitHuman(g.pos, g.idx, { shY: KIT_SH, fix: c.fix, box: cg.bounds, name: c.name, kit: true, shoulder: c.shoulder, fallback: c.fallback });
+  const R = kitBody(F, g.idx, g.uv), n = R.V.length / 3;
+  const body = { pos: R.V, nor: smoothNormals(R.V, R.idx), uv: R.uv, skin: skin2(R.W, n, MAP), idx: R.idx, img: await rawImage(g.image) };
+  const bodyCol = sampleColors(R.uv, body.img);
   const wps = c.weapons.map((w) => ({ ...placeWeapon(w.full, w.bone, HP[w.bone], w), img: w.img }));
   const lods = [];
-  const near = await nearLOD([body, ...wps, ...(c.tassel ? [tasselSrc(c.tassel)] : [])], [c.lods[0], ...c.weapons.map((w) => w.wl[0]), Infinity], c.res ?? 512);
+  const near = await nearLOD([body, ...wps, ...(c.tassel ? [tasselSrc(c.tassel)] : [])], [c.lods[0], ...c.weapons.map((w) => w.wl[0]), Infinity], c.res ?? 512, ["human"], c.simp);
   lods.push(near.mesh);
   for (let L = 1; L < c.lods.length; L++) {
-    const parts = [await weldLOD(body, c.lods[L], bodyCol)];
+    const parts = [await weldLOD(body, c.lods[L], bodyCol, "human", c.simp)];
     for (let k = 0; k < c.weapons.length; k++) parts.push(await weldLOD(wps[k], c.weapons[k].wl[L], c.weapons[k].col));
     if (c.tassel) parts.push(tasselColor(c.tassel, L));
     lods.push(assemble(parts, true));
@@ -214,7 +265,7 @@ export async function bakeKit(file, c) {
   // neo tua giáo (khung cẳng tay cầm giáo): chân mũi giáo đo lúc nướng (wpn.mjs meta.head) — soldier-motion.js TAS dùng thay neo
   // "dài giáo − 0,79" của giáo dựng bằng code (mũi giáo Meshy dài hơn: neo cũ rơi giữa lưỡi)
   const tw = c.tassel ? c.weapons.find((w) => w.head != null) : null;
-  return { lods, image: near.image, warnings: F.lm.warnings, how: F.how, cut: cg.cut, meta: { kind: "kit", skel: "human", piv: JOINT_NAMES.map((j) => (j === "tas" ? [0, 0, 0] : HP[j])),
+  return { lods, image: near.image, warnings: F.lm.warnings, how: F.how, cut: cg.cut, split: R.cut, meta: { kind: "kit", skel: "human", piv: JOINT_NAMES.map((j) => (j === "tas" ? [0, 0, 0] : HP[j])),
     ...(tw ? { tas: [tw.p[0], tw.p[1], +(tw.p[2] + tw.head * (tw.s ?? 1)).toFixed(4)] } : {}), arms: F.how, ...(cg.cut ? { cut: cg.cut } : {}) } };
 }
 export { pivots as kitPivots, placeWeapon, assemble, skin2, restPose, tassel, MAP as KIT_MAP, YH as KIT_Y };
@@ -296,7 +347,7 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
 
   // ---- người cưỡi ----
   const cr = cutBoxes(await readGLB(riderFile, Infinity), c.cut), r = cr.g;
-  const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix, box: cr.bounds, name: c.name, kit: true });
+  const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix, box: cr.bounds, name: c.name, kit: true, shoulder: c.shoulder, fallback: c.fallback });
   const bind = bindSkeleton(F, YH);
   const W = weights15(F, YH, KIT_W);
   const seat = [0, XP.torso[1] - 0.08, XP.torso[2]];
@@ -317,11 +368,11 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
 
   const hCol = sampleColors(h.uv, horse.img), rCol = sampleColors(r.uv, rider.img);
   const wps = c.weapons.map((w) => ({ ...placeWeapon(w.full, w.bone, XP[w.bone], w), img: w.img }));
-  const near = await nearLOD([horse, rider, ...wps], [...c.lods[0], ...c.weapons.map((w) => w.wl[0])], c.res ?? 1024);
+  const near = await nearLOD([horse, rider, ...wps], [...c.lods[0], ...c.weapons.map((w) => w.wl[0])], c.res ?? 1024, ["horse", "horse"]);
   const lods = [near.mesh];
   for (let L = 1; L < c.lods.length; L++) {
     const [th, tr] = c.lods[L];
-    const parts = [await weldLOD(horse, th, hCol), await weldLOD(rider, tr, rCol)];
+    const parts = [await weldLOD(horse, th, hCol, "horse"), await weldLOD(rider, tr, rCol, "horse")];
     for (let k = 0; k < c.weapons.length; k++) parts.push(await weldLOD(wps[k], c.weapons[k].wl[L], c.weapons[k].col));
     lods.push(assemble(parts, true));
   }

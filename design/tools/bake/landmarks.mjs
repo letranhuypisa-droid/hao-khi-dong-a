@@ -103,17 +103,18 @@ export function moveElbow(rr, A, f) {
 
 // ---- kiểm tay (mét, sau chuẩn hoá vai) và tay thay thế (thuần) ----------------------------------------------------------------
 // Dải hợp lệ (nhân vật rig): cánh tay 0,18–0,40 (cận vệ đại đao CV_daidao đo trên lưới chỉ 0,19: vai trong giáp vai 1,45, khuỷu
-// 1,275 khung thô), cẳng tay 0,18–0,34 (rig WC01: tới 0,37 — tư thế WC01 giải IK cho tay 0,34 + 0,36), vai |x| 0,12–0,35 đúng phía,
-// hai tay lệch ≤ 25%; game/tests/models.test.mjs kiểm đúng các dải này trên tệp nướng. Lính đám đông (ARM_KIT) rộng hơn: tay lính về
-// khúc 0,29 + 0,29 ở tư thế nghỉ (kit.mjs), độ dài chỉ để bắt khớp dò hỏng.
-export const ARM_OK = { up: [0.18, 0.4], fore: [0.18, 0.34], foreWC01: 0.37, shX: [0.12, 0.35], lr: 0.25 };
+// 1,275 khung thô), cẳng tay 0,18–0,34 (mọi rig, cả đại kiếm WC01: tư thế WC01 giải lại theo tay của rig — anim-wc01.js fitArms;
+// trước đây rig WC01 được tới 0,37 để giữ tay 0,34 + 0,36), vai |x| 0,12–0,35 đúng phía, hai tay lệch ≤ 25%;
+// game/tests/models.test.mjs kiểm đúng các dải này trên tệp nướng. Lính đám đông (ARM_KIT) rộng hơn: tay lính về khúc 0,29 + 0,29
+// ở tư thế nghỉ (kit.mjs), độ dài chỉ để bắt khớp dò hỏng.
+export const ARM_OK = { up: [0.18, 0.4], fore: [0.18, 0.34], shX: [0.12, 0.35], lr: 0.25 };
 export const ARM_KIT = { up: [0.15, 0.42], fore: [0.15, 0.42], shX: [0.12, 0.35], lr: 0.25 };
 // a: { sh, el, hand } (khung thô, x tính từ trục cổ ox); s: tỉ lệ ra mét. Trả danh sách lỗi (rỗng = hợp lệ).
-export function armProblems(a, side, s, { ox = 0, foreMax = ARM_OK.fore[1], ok = ARM_OK } = {}) {
+export function armProblems(a, side, s, { ox = 0, ok = ARM_OK } = {}) {
   const sg = side === "L" ? -1 : 1, up = len(sub(a.sh, a.el)) * s, fo = len(sub(a.el, a.hand)) * s, x = (a.sh[0] - ox) * s;
   const out = [];
   if (!(up >= ok.up[0] && up <= ok.up[1])) out.push(`cánh tay ${up.toFixed(3)} m`);
-  if (!(fo >= ok.fore[0] && fo <= foreMax)) out.push(`cẳng tay ${fo.toFixed(3)} m`);
+  if (!(fo >= ok.fore[0] && fo <= ok.fore[1])) out.push(`cẳng tay ${fo.toFixed(3)} m`);
   if (!(x * sg >= ok.shX[0] && x * sg <= ok.shX[1])) out.push(`vai x ${x.toFixed(3)} m`);
   return out;
 }
@@ -281,8 +282,8 @@ export function landmarks(pos, index, H = 1.9) {
     info.rings[side] = rings.map((r) => r ? [+(r.d / H).toFixed(2), +(r.r / H).toFixed(3), +(r.c[0] / H).toFixed(3), +(r.c[1] / H).toFixed(3), +(r.c[2] / H).toFixed(3), r.n] : null);
     ends["hand" + side] = tipP;
     if (!A) { warnings.push(`tay ${side}: trục tay hỏng (vai ${pitHow})`); info.arm[side] = { ok: false, why: `trục tay hỏng (vai ${pitHow})`, tip: tipP, axis: rr.map((r) => r.c) }; continue; }
-    // vai hợp lý: |x| 0,06–0,19 H, cao 0,6–0,85 H; đầu ngón cách vai ≥ 0,2 H
-    const shOk = Math.abs(A.sh[0]) >= 0.06 * H && Math.abs(A.sh[0]) <= 0.19 * H && A.sh[0] * sg > 0 && A.sh[1] >= 0.6 * H && A.sh[1] <= 0.85 * H;
+    // vai hợp lý: |x| 0,06–0,19 H, cao 0,62–0,8 H (mẫu hiện có 0,654–0,763 H; trước đây 0,6–0,85); đầu ngón cách vai ≥ 0,2 H
+    const shOk = Math.abs(A.sh[0]) >= 0.06 * H && Math.abs(A.sh[0]) <= 0.19 * H && A.sh[0] * sg > 0 && A.sh[1] >= 0.62 * H && A.sh[1] <= 0.8 * H;
     const tipOk = len(sub(tipP, A.sh)) >= 0.2 * H;
     axes.push(arm.map((r) => r.c));
     info.geo[side] = { DF };

@@ -1,6 +1,10 @@
 // design/tools/bake/catalog.mjs — tệp nào nướng thế nào: ngân sách tam giác (design/systems.md §13.3: tướng người chơi ≤ 10 nghìn,
 // tướng khác ≤ 6 nghìn, boss ≤ 8 nghìn), cỡ texture (người chơi 1024², còn lại 512²), khớp ghi tay khi bộ dò sai, hộp cắt phần thừa,
 // chiều và chỗ cầm vũ khí.
+// shoulder: độ cao vai (khung chuẩn hoá thô cao 1,9, trung bình hai bên) đã xem bằng mắt trong lab — mẫu không có khớp ghi tay phải
+// có; bộ dò lệch quá 0,03 thì dừng nướng (human.mjs fitHuman: chuỗi tay tự khớp mà sai — vai rơi ở khuỷu — qua được mọi dải độ dài).
+// Mẫu mới / mẫu làm lại: nướng một lần, đọc số trong lỗi, xem tay trong lab rồi ghi. fallback: true cho phép tay thay thế (đối xứng,
+// tỉ lệ người) khi tay dò hỏng — chỉ ghi sau khi xem tay đó.
 
 // Khớp ghi tay (toạ độ chuẩn hoá thô cao 1,9, đọc từ ảnh lưới; human.mjs fitHuman — trọng số tay theo chuỗi xương ghi tay) cho mẫu
 // bộ dò không dựng được. Tướng Nguyên chung: hai tay buông dính vạt áo (đường đo dọc mặt lưới đi tắt qua áo).
@@ -28,23 +32,27 @@ const CUT_H33 = [{ lo: [-0.16, 1.81, -0.2], hi: [0.16, 2, 0.2] }, { lo: [-0.16, 
   { lo: [-0.16, 1.715, -0.2], hi: [-0.085, 1.765, 0.2] }, { lo: [0.085, 1.715, -0.2], hi: [0.16, 1.765, 0.2] }];
 const CUT_X19 = [{ lo: [-0.14, 1.765, -0.2], hi: [-0.055, 2, 0.2] }, { lo: [0.055, 1.765, -0.2], hi: [0.14, 2, 0.2] }];
 const CUT_DV_DAO = [{ lo: [0.255, 0.55, -0.36], hi: [0.36, 0.85, 0.1] }];
+// w: thay số trọng số mặc định (human.mjs WEIGHT_PRM) riêng mẫu — so: dời dải vai về phía tay, xc: bề ngang dải giữa hai chân theo hông,
+// ky: dải đó xuống dưới gối, seam: thả đường giáp hai vùng thuần — chọn theo lưới đo đợt 19a soát (17 rig × 26 kiểu đòn × 5 nhịp so bản
+// gốc 35beed2): ít ô có tam giác xấu / giãn > 10 lần nhiều hơn bản gốc nhất (H35 4 → 1 ô / 45 → 19, giãn > 10 lần 385 → 188; H40 7 → 4,
+// X24 14 → 2, OFF_tuong 12 → 0, CV_giao giãn > 10 lần 84 → 54, …).
 export const CHARS = {
-  H35: { tris: 9000, tex: 1024 },
-  H31: { tris: 9000, tex: 1024, wc01: true },
-  LINH_r01: { tris: 9000, tex: 1024 },
-  LINH_r24: { tris: 9000, tex: 1024 },
-  H33: { tris: 6000, tex: 512, cut: CUT_H33 },
-  H40: { tris: 6000, tex: 512 },
-  X19: { tris: 7500, tex: 512, cut: CUT_X19 },
-  X20: { tris: 7500, tex: 512 },
-  X24: { tris: 7500, tex: 512 },
-  OFF_tuong: { tris: 6000, tex: 512, fix: FIX_OFF_TUONG },
-  OFF_photuong: { tris: 6000, tex: 512 },
-  OFF_doitruong: { tris: 5000, tex: 512 },
-  CV_khien: { tris: 5000, tex: 512 },
-  CV_giao: { tris: 5000, tex: 512 },
-  CV_cung: { tris: 5000, tex: 512 },
-  CV_songdao: { tris: 5000, tex: 512 },
+  H35: { tris: 9000, tex: 1024, shoulder: 1.441, w: { so: -0.09, ky: 0.12 } },
+  H31: { tris: 9000, tex: 1024, shoulder: 1.303, w: { seam: 1 } },
+  LINH_r01: { tris: 9000, tex: 1024, shoulder: 1.379 },
+  LINH_r24: { tris: 9000, tex: 1024, shoulder: 1.357 },
+  H33: { tris: 6000, tex: 512, cut: CUT_H33, shoulder: 1.261, w: { seam: 1, so: -0.09, xc: 0.6 } },
+  H40: { tris: 6000, tex: 512, shoulder: 1.334, w: { seam: 1, so: -0.09 } },
+  X19: { tris: 7500, tex: 512, cut: CUT_X19, shoulder: 1.324 },
+  X20: { tris: 7500, tex: 512, shoulder: 1.29 },
+  X24: { tris: 7500, tex: 512, shoulder: 1.356, w: { seam: 1, so: -0.09 } },
+  OFF_tuong: { tris: 6000, tex: 512, fix: FIX_OFF_TUONG, w: { seam: 1 } },
+  OFF_photuong: { tris: 6000, tex: 512, shoulder: 1.288 },
+  OFF_doitruong: { tris: 5000, tex: 512, shoulder: 1.245, w: { seam: 1, so: -0.09, xc: 0.6 } },
+  CV_khien: { tris: 5000, tex: 512, shoulder: 1.39 },
+  CV_giao: { tris: 5000, tex: 512, shoulder: 1.435, w: { ky: 0.08 } },
+  CV_cung: { tris: 5000, tex: 512, shoulder: 1.4, w: { so: -0.09, xc: 0.6 } },
+  CV_songdao: { tris: 5000, tex: 512, shoulder: 1.337 },
   CV_daidao: { tris: 5000, tex: 512, fix: FIX_CV_DAIDAO },
 };
 
@@ -77,16 +85,16 @@ export const WEAPONS = {
 // TAS; trước đây giáo chỉ dời +z mong chân mũi trùng neo "dài giáo − 0,79" của giáo dựng bằng code, nhưng mũi Meshy dài hơn nên tua
 // treo giữa lưỡi). res: cạnh texture nướng của LOD0 (mặc định 512; kỵ binh 1024). LOD2 của vũ khí dài: giảm lưới gộp cán / lưỡi mảnh
 // thành đường thẳng trước (sai số chỉ bằng bề dày) — giáo Đại Việt 12 tam giác còn 4 (mất cán, tua treo giữa trời), đao lính 12 chỉ
-// còn chắn tay + chuôi: giáo 24, đao 20 (đo phủ trục dài: 87%, 99%).
+// còn chắn tay + chuôi: giáo 24, đao 20 (đo phủ trục dài: 87%, 99%). simp: { w } giảm lưới thân giữ trọng số cẳng tay (kit.mjs weldLOD).
 const HAND = -0.29;
 export const KIT_LIST = {
-  NG_DAO: { lods: [470, 220, 90], weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.14], wl: [70, 28, 10] }] },
-  NG_GIAO: { lods: [470, 220, 90], tassel: "long", weapons: [{ id: "giao_ng", bone: "faR", p: [0, HAND, 0.09], wl: [70, 30, 12] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.12], s: 0.72, wl: [70, 28, 10] }] },
-  NG_CUNG: { lods: [470, 220, 90], weapons: [{ id: "cung_ng", bone: "faL", p: [0, HAND, 0], wl: [80, 30, 12] }] },
-  NG_TANK: { lods: [500, 240, 100], weapons: [{ id: "chuy", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 14] }] },
-  DV_GIAO: { lods: [470, 220, 90], tassel: "son", weapons: [{ id: "giao_dv", bone: "faR", p: [0, HAND, 0.11], wl: [70, 30, 24] }] },
-  DV_DAO: { lods: [470, 220, 90], cut: CUT_DV_DAO, weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_nhat", bone: "faL", p: [0, -0.14, 0.14], wl: [70, 28, 10] }] },
+  NG_DAO: { lods: [470, 220, 90], shoulder: 1.382, weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.14], wl: [70, 28, 10] }] },
+  NG_GIAO: { lods: [470, 220, 90], shoulder: 1.305, tassel: "long", weapons: [{ id: "giao_ng", bone: "faR", p: [0, HAND, 0.09], wl: [70, 30, 12] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.12], s: 0.72, wl: [70, 28, 10] }] },
+  NG_CUNG: { lods: [470, 220, 90], shoulder: 1.242, weapons: [{ id: "cung_ng", bone: "faL", p: [0, HAND, 0], wl: [80, 30, 12] }] },
+  NG_TANK: { lods: [500, 240, 100], shoulder: 1.291, simp: { w: 1 }, weapons: [{ id: "chuy", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 14] }] },
+  DV_GIAO: { lods: [470, 220, 90], shoulder: 1.318, tassel: "son", weapons: [{ id: "giao_dv", bone: "faR", p: [0, HAND, 0.11], wl: [70, 30, 24] }] },
+  DV_DAO: { lods: [470, 220, 90], shoulder: 1.295, cut: CUT_DV_DAO, weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_nhat", bone: "faL", p: [0, -0.14, 0.14], wl: [70, 28, 10] }] },
   DV_NO: { lods: [470, 220, 90], fix: FIX_DV_NO, weapons: [{ id: "no", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 14] }] },
   // kỵ binh: [tam giác ngựa, tam giác người cưỡi] mỗi mức; cung ở cẳng tay trái như BUILD.NG_KY (HAND + 0,02 của khung ngựa: −0,27)
-  NG_KY: { horse: "MOUNT_ngua_nguyen", lods: [[440, 360], [170, 140], [70, 60]], weapons: [{ id: "cung_ng", bone: "faL", p: [0, -0.27, 0], wl: [80, 30, 12] }] },
+  NG_KY: { horse: "MOUNT_ngua_nguyen", shoulder: 1.354, lods: [[440, 360], [170, 140], [70, 60]], weapons: [{ id: "cung_ng", bone: "faL", p: [0, -0.27, 0], wl: [80, 30, 12] }] },
 };

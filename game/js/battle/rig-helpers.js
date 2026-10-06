@@ -3,8 +3,11 @@
 //   · spine (lưng): con của hông, cùng gốc với khớp thân, nửa góc thân — bụng, ngực dưới xoắn, gập dần (hông – lưng – thân mỗi cặp
 //     chỉ lệch nửa góc) thay vì trộn thẳng hông + thân;
 //   · neck (cổ): con của thân, cùng gốc với khớp cổ (đầu), nửa góc đầu;
-//   · clavL / clavR (xương đòn): con của thân, gốc ở đầu xương ức (ngang vai), 25% phần tay giơ quá ngang vai (giơ ngang hay ra trước
-//     đều tính) — bắp vai, cơ thang nhấc lên theo tay giơ cao thay vì gập nếp; tay dưới ngang vai (đứng, chạy, chém ngang) đứng yên;
+//   · clavL / clavR (xương đòn): con của thân, gốc ở đầu xương ức (ngang vai), 15% phần tay giơ quá ngang vai (giơ ngang hay ra trước
+//     đều tính), quay quanh trục z (trước ↔ sau) của thân cho đầu ngoài nhấc lên — bắp vai, cơ thang nhấc lên theo tay giơ cao thay vì
+//     gập nếp; tay dưới ngang vai (đứng, chạy, chém ngang) đứng yên. Đợt 19a soát: trước đây quay quanh trục của vung — giơ ra trước
+//     thì trục đó song song xương đòn, đầu vai không nhấc chút nào (vai gập ở đòn bổ C1, C2, nằm ngã); phần 0,25 → 0,15: lưới đo 17 rig
+//     × 26 kiểu × 5 nhịp, 12 / 17 rig ít ô xấu hơn bản gốc hơn;
 //   · twistL / twistR (xoắn cẳng tay): con của khuỷu, giữa cẳng tay, nửa phần xoắn của bàn tay quanh trục cẳng tay — cổ tay không
 //     thắt như giấy gói kẹo.
 // Thuần (không three): bake (design/tools/bake/human.mjs: khung gắn của xương phụ = bộ dẫn áp vào khung gắn của khớp nguồn) và glb.js
@@ -19,8 +22,8 @@
 export const HELPERS = {
   spine:  { parent: "hips",  src: "torso", kind: "all",   share: 0.5 },
   neck:   { parent: "torso", src: "head",  kind: "all",   share: 0.5 },
-  clavL:  { parent: "torso", src: "shL",   kind: "lift",  share: 0.25 },
-  clavR:  { parent: "torso", src: "shR",   kind: "lift",  share: 0.25 },
+  clavL:  { parent: "torso", src: "shL",   kind: "liftL", share: 0.15 },
+  clavR:  { parent: "torso", src: "shR",   kind: "liftR", share: 0.15 },
   twistL: { parent: "elL",   src: "handL", kind: "twist", share: 0.5 },
   twistR: { parent: "elR",   src: "handR", kind: "twist", share: 0.5 },
 };
@@ -29,9 +32,9 @@ export const LIFT0 = Math.PI / 2;             // "lift": góc tay (so với buô
 
 // Bộ dẫn: quaternion cục bộ của khớp nguồn (x, y, z, w — quy ước three) → góc cục bộ của xương phụ, ghi out[0…3]. q = vung · xoắn
 // (xoắn quanh trục xương y, làm trước; vung là phép quay ngắn nhất từ (0, −1, 0) tới hướng xương, trục nằm ngang trong khung cha).
-// kind "all": slerp(đơn vị, q, share); "twist": slerp(đơn vị, xoắn, share); "lift": quay quanh trục của vung một góc
-// share × max(0, góc vung − LIFT0). q, −q như nhau (lấy nửa cầu w ≥ 0: đường ngắn). Vung 180° (y = w = 0, xoắn không xác định):
-// xoắn = đơn vị, vung = q.
+// kind "all": slerp(đơn vị, q, share); "twist": slerp(đơn vị, xoắn, share); "liftL" / "liftR": quay quanh trục z của khung cha một góc
+// ∓ / ± share × max(0, góc vung − LIFT0) (đầu ngoài xương đòn trái −x / phải +x nhấc lên). q, −q như nhau (lấy nửa cầu w ≥ 0: đường
+// ngắn). Vung 180° (y = w = 0, xoắn không xác định): xoắn = đơn vị, vung = q.
 export function driveQuat(kind, share, x, y, z, w, out) {
   if (w < 0) { x = -x; y = -y; z = -z; w = -w; }
   if (kind !== "all") {
@@ -39,12 +42,10 @@ export function driveQuat(kind, share, x, y, z, w, out) {
     if (kind === "twist") {
       if (n < 1e-9) { x = 0; y = 0; z = 0; w = 1; } else { x = 0; y /= n; z = 0; w /= n; }
     } else {
-      let ax = x, az = z, e = Math.PI;
-      if (n >= 1e-9) { ax = (w * x + y * z) / n; az = (w * z - x * y) / n; e = 2 * Math.atan2(Math.sqrt(ax * ax + az * az), n); }
-      const a = share * Math.max(0, e - LIFT0), l = Math.sqrt(ax * ax + az * az);
-      if (a <= 0 || l < 1e-12) { out[0] = 0; out[1] = 0; out[2] = 0; out[3] = 1; return out; }
-      const k = Math.sin(a / 2) / l;
-      out[0] = ax * k; out[1] = 0; out[2] = az * k; out[3] = Math.cos(a / 2);
+      let e = Math.PI;
+      if (n >= 1e-9) { const ax = (w * x + y * z) / n, az = (w * z - x * y) / n; e = 2 * Math.atan2(Math.sqrt(ax * ax + az * az), n); }
+      const a = share * Math.max(0, e - LIFT0) * (kind === "liftL" ? -1 : 1);
+      out[0] = 0; out[1] = 0; out[2] = Math.sin(a / 2); out[3] = Math.cos(a / 2);
       return out;
     }
   }

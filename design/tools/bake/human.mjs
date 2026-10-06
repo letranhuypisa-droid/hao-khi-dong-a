@@ -1,7 +1,8 @@
 // design/tools/bake/human.mjs — phần dùng chung của nhân vật rig (char.mjs) và lính đám đông (kit.mjs): cắt phần thừa (catalog cut),
-// chuẩn hoá mô hình người Meshy theo độ cao vai, dò khớp (landmarks.mjs) rồi kiểm tay (độ dài, hai bên lệch, vai): tay sai thay bằng
-// tay kia đối xứng nếu khớp lưới, rồi tỉ lệ người trên trục dò được, không được thì dừng nướng báo lỗi kèm tên mẫu (thêm khớp ghi
-// tay vào catalog.mjs). Khung gắn 15 khớp theo dáng tay của mô hình, trọng số da.
+// chuẩn hoá mô hình người Meshy theo độ cao vai, dò khớp (landmarks.mjs) rồi kiểm tay (độ dài, hai bên lệch, vai, độ cao vai đã xem
+// bằng mắt — catalog shoulder): tay sai thay bằng tay kia đối xứng nếu khớp lưới, rồi tỉ lệ người trên trục dò được — chỉ khi catalog
+// cho phép (fallback) — không được thì dừng nướng báo lỗi kèm tên mẫu (thêm khớp ghi tay vào catalog.mjs). Khung gắn 15 khớp theo dáng
+// tay của mô hình, trọng số da, tách tam giác cầu (lưới dính hai phần xa nhau trên cây xương).
 //
 // 15 khớp theo rig tướng (models.js): hips, torso, head, shL/elL/handL, shR/elR/handR, hipL/kneeL/ankleL, hipR/kneeR/ankleR.
 // Khung gắn: thân, chân thẳng đứng (góc 0); vai, khuỷu xoay cho xương trùng hướng tay mô hình (tay đưa ra trước hoặc chữ A), trục x
@@ -32,15 +33,20 @@ export function bounds(pos) {
 const normPt = (b, H) => { const k0 = H / (b[3] - b[2]); return (x, y, z) => [(x - (b[0] + b[1]) / 2) * k0, (y - b[2]) * k0, (z - (b[4] + b[5]) / 2) * k0]; };
 
 // Cắt bỏ phần thừa của mẫu Meshy trước khi dò khớp, tính trọng số (catalog cut: sừng mũ, bao đao): xoá tam giác có trọng tâm
-// trong một hộp { lo: [x, y, z], hi: [x, y, z] } (khung chuẩn hoá thô cao 1,9 của lưới chưa cắt), bỏ đỉnh không còn dùng.
-// g: { pos, uv, idx, … } của readGLB. Trả { g (mới), bounds (hộp bao lưới chưa cắt — giữ khung chuẩn hoá), cut (số tam giác) }.
+// trong một hộp { lo: [x, y, z], hi: [x, y, z] } (khung chuẩn hoá thô cao 1,9 của lưới chưa cắt) hoặc có đỉnh lọt vào hộp quá CUT_IN
+// (đợt 19a soát: chỉ xét trọng tâm thì còn mảnh sừng vụn — H33 7 đỉnh sâu tới 1,9 cm, X19 4 đỉnh tới 4 cm, cạnh 8–12 cm), bỏ đỉnh
+// không còn dùng. g: { pos, uv, idx, … } của readGLB. Trả { g (mới), bounds (hộp bao lưới chưa cắt — giữ khung chuẩn hoá), cut (số
+// tam giác) }.
+const CUT_IN = 0.008;
 export function cutBoxes(g, boxes) {
   const b = bounds(g.pos);
   if (!boxes || !boxes.length) return { g, bounds: b, cut: 0 };
   const N = normPt(b, 1.9), P = g.pos, keep = [];
+  const inside = (p, d) => boxes.some((x) => p.every((cv, k) => cv >= x.lo[k] + d && cv <= x.hi[k] - d));
   for (let t = 0; t < g.idx.length; t += 3) {
-    const c = [0, 0, 0]; for (let q = 0; q < 3; q++) { const v = g.idx[t + q], p = N(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]); for (let k = 0; k < 3; k++) c[k] += p[k] / 3; }
-    if (!boxes.some((x) => c.every((cv, k) => cv >= x.lo[k] && cv <= x.hi[k]))) keep.push(g.idx[t], g.idx[t + 1], g.idx[t + 2]);
+    const c = [0, 0, 0], vs = [];
+    for (let q = 0; q < 3; q++) { const v = g.idx[t + q], p = N(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]); vs.push(p); for (let k = 0; k < 3; k++) c[k] += p[k] / 3; }
+    if (!inside(c, 0) && !vs.some((p) => inside(p, CUT_IN))) keep.push(g.idx[t], g.idx[t + 1], g.idx[t + 2]);
   }
   const map = new Int32Array(P.length / 3).fill(-1), pos = [], uv = [], idx = [];
   for (const v of keep) { if (map[v] < 0) { map[v] = pos.length / 3; pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]); uv.push(g.uv[v * 2], g.uv[v * 2 + 1]); } idx.push(map[v]); }
@@ -48,16 +54,21 @@ export function cutBoxes(g, boxes) {
 }
 
 // pos: toạ độ gốc Meshy. shY: độ cao vai mong muốn (rig tướng 1,48; lính đám đông 1,43). fix: khớp tay ghi tay (toạ độ chuẩn hoá
-// thô, cao 1,9) khi bộ dò sai; box: hộp bao lưới chưa cắt (cutBoxes); name: mã mẫu (báo lỗi); wc01: rig đại kiếm (cẳng tay tới
-// 0,37); kit: lính đám đông (dải độ dài rộng hơn, ARM_KIT). Tay: dò (landmarks), kiểm dải (armProblems, hai tay lệch ≤ 25%); tay
-// sai thay bằng tay kia đối xứng nếu khớp lưới, rồi tỉ lệ người trên trục dò được, không được thì dừng nướng báo lỗi tên mẫu.
+// thô, cao 1,9) khi bộ dò sai; box: hộp bao lưới chưa cắt (cutBoxes); name: mã mẫu (báo lỗi); kit: lính đám đông (dải độ dài rộng
+// hơn, ARM_KIT); shoulder: độ cao vai đã xem bằng mắt (khung thô, catalog.mjs — mẫu không có fix bắt buộc); fallback: cho phép tay
+// thay thế (catalog.mjs, sau khi xem bằng mắt). Tay: dò (landmarks), kiểm dải (armProblems, hai tay lệch ≤ 25%); tay sai thay bằng tay
+// kia đối xứng nếu khớp lưới, rồi tỉ lệ người trên trục dò được — chỉ khi có cờ fallback (không có thì dừng nướng, báo cách thay dựng
+// được); không được thì dừng nướng báo lỗi tên mẫu. Vai dò được (trung bình hai bên) lệch shoulder quá 0,03 thì dừng nướng: bộ dò có
+// thể ra một chuỗi tay tự khớp mà sai — DV_NO bỏ khớp ghi tay: vai rơi ở khuỷu (1,237 thay vì 1,37), qua mọi dải độ dài, mô hình phóng
+// +10,7%; không dấu hình học nào tách được (đợt 19a soát lại: cột lưới trên vai, đỉnh vùng vai, bề ngang thân trên vai — mẫu đúng có
+// giáp vai, cổ áo, mũ rộng trùm cả khoảng của mẫu sai).
 // Trả { V (đã chuẩn hoá), J (khớp, cùng hệ toạ độ), s (tỉ lệ so với chuẩn hoá thô cao 1,9), ox, oz (trục cổ ở khung thô:
 // x' = (x − ox)·s), lm, geo (trường khoảng cách tay cho trọng số, mỗi bên), how (cách dựng mỗi tay), neckY, legX: { L, R } }.
-export function fitHuman(pos, idx, { shY, fix = null, box = null, name = "?", wc01 = false, kit = false }) {
+export function fitHuman(pos, idx, { shY, fix = null, box = null, name = "?", kit = false, shoulder = null, fallback = false }) {
   const H = 1.9, b = box || bounds(pos), N = normPt(b, H), P = new Float32Array(pos.length);
   for (let i = 0; i < pos.length; i += 3) P.set(N(pos[i], pos[i + 1], pos[i + 2]), i);
   const lm = landmarks(P, idx, H), j = lm.j, info = lm.info, G = info.weld, ox = j.head[0];
-  const ok = kit ? ARM_KIT : ARM_OK, foreMax = wc01 ? ARM_OK.foreWC01 : ok.fore[1], RAD = [0.05, 0.04, 0.045], RAD_OUT = [0.07, 0.07, 0.065];
+  const ok = kit ? ARM_KIT : ARM_OK, RAD = [0.05, 0.04, 0.045], RAD_OUT = [0.07, 0.07, 0.065];
   const arms = {}, geo = {};
   for (const sd of ["L", "R"]) {
     const a = info.arm[sd];
@@ -71,7 +82,7 @@ export function fitHuman(pos, idx, { shY, fix = null, box = null, name = "?", wc
   };
   const check = (s) => {
     const pr = {};
-    for (const sd of ["L", "R"]) pr[sd] = !arms[sd] ? [`không có trục tay (${info.arm[sd]?.why || "không thấy đầu ngón"})`] : [...(arms[sd].bad ? [arms[sd].bad] : []), ...armProblems(arms[sd], sd, s, { ox, foreMax, ok })];
+    for (const sd of ["L", "R"]) pr[sd] = !arms[sd] ? [`không có trục tay (${info.arm[sd]?.why || "không thấy đầu ngón"})`] : [...(arms[sd].bad ? [arms[sd].bad] : []), ...armProblems(arms[sd], sd, s, { ox, ok })];
     if (!pr.L.length && !pr.R.length && armAsym(arms.L, arms.R) > ok.lr) {
       const bend = (sd) => (arms[sd].how === "ghi tay" ? Infinity : info.arm[sd]?.A?.bend ?? 0);
       pr[bend("L") < bend("R") ? "L" : "R"].push(`hai tay lệch ${(armAsym(arms.L, arms.R) * 100).toFixed(0)}%`);
@@ -88,8 +99,8 @@ export function fitHuman(pos, idx, { shY, fix = null, box = null, name = "?", wc
       const m = mirrorArm({ sh: arms[o].sh, el: arms[o].el, hand: arms[o].hand }, ox);
       const near = (p) => { let d = Infinity; for (let v = 0; v < G.n; v++) d = Math.min(d, Math.hypot(G.P[v * 3] - p[0], G.P[v * 3 + 1] - p[1], G.P[v * 3 + 2] - p[2])); return d; };
       const why = near(m.el) > 0.05 * H ? "khuỷu ngoài lưới" : near(m.hand) > 0.05 * H ? "bàn tay ngoài lưới" : a && a.tip && v3(m.hand).distanceTo(v3(a.tip)) > 0.1 * H ? "xa đầu ngón dò được" : "";
-      if (!why) { arms[sd] = { ...m, how: "đối xứng" }; delete geo[sd]; continue; }
-      tried.push("đối xứng: " + why);
+      if (!why && fallback) { arms[sd] = { ...m, how: "đối xứng" }; delete geo[sd]; continue; }
+      tried.push("đối xứng: " + (why || "dựng được, cần cờ fallback trong catalog.mjs (xem tay trong lab trước)"));
     }
     // (2) tỉ lệ người trên trục dò được (khuỷu ở tỉ lệ ratio0); vai sai thì lấy vai tay kia đối xứng, cắt trục ở điểm gần vai đó
     if (a && a.rings && a.rings.length >= 5 && a.tip) {
@@ -100,14 +111,20 @@ export function fitHuman(pos, idx, { shY, fix = null, box = null, name = "?", wc
         rr = [...rr.slice(0, k), { d: rr[k].d, c: shM }];
       }
       const A = armJoints(rr, a.tip, H, { ...ARM_RULE, bendMin: Infinity });
-      const p2 = A ? armProblems(A, sd, s, { ox, foreMax, ok }) : ["trục quá ngắn"];
-      if (!p2.length) { arms[sd] = { sh: A.sh, el: A.el, hand: A.hand, how: "tỉ lệ người" }; geo[sd] = { DF: info.geo[sd].DF, dHand: A.dHand, dEl: A.dEl, dSh: A.dSh }; continue; }
-      tried.push("tỉ lệ người: " + p2.join(", "));
+      const p2 = A ? armProblems(A, sd, s, { ox, ok }) : ["trục quá ngắn"];
+      if (!p2.length && fallback) { arms[sd] = { sh: A.sh, el: A.el, hand: A.hand, how: "tỉ lệ người" }; geo[sd] = { DF: info.geo[sd].DF, dHand: A.dHand, dEl: A.dEl, dSh: A.dSh }; continue; }
+      tried.push("tỉ lệ người: " + (p2.join(", ") || "dựng được, cần cờ fallback trong catalog.mjs (xem tay trong lab trước)"));
     }
     throw new Error(`${name}: tay ${sd} không dựng được (${pr[sd].join(", ")}${tried.length ? "; " + tried.join("; ") : ""}) — thêm khớp ghi tay vào catalog.mjs`);
   }
   s = scaleOf(); pr = check(s);
   for (const sd of ["L", "R"]) if (pr[sd].length) throw new Error(`${name}: tay ${sd} sau khi thay vẫn sai (${pr[sd].join(", ")})`);
+  // vai dò (không có khớp ghi tay) phải trùng độ cao vai đã xem bằng mắt (catalog shoulder, khung thô) ±0,03
+  if (!fix) {
+    const y = (arms.L.sh[1] + arms.R.sh[1]) / 2;
+    if (shoulder == null) throw new Error(`${name}: chưa ghi độ cao vai (dò được ${y.toFixed(3)} khung thô) — xem tay trong lab rồi ghi shoulder: ${y.toFixed(3)} vào catalog.mjs`);
+    if (Math.abs(y - shoulder) > 0.03) throw new Error(`${name}: vai dò ở ${y.toFixed(3)} ≠ ${shoulder} ghi trong catalog.mjs (khung thô) — tay dò sai (vai rơi ở khuỷu?) hoặc mẫu đã đổi: xem lại tay rồi sửa số / thêm khớp ghi tay`);
+  }
   for (const sd of ["L", "R"]) {
     const A = arms[sd];
     j["sh" + sd] = A.sh; j["el" + sd] = A.el; j["hand" + sd] = A.hand;
@@ -247,7 +264,7 @@ const CLIQUES_H = [["hips", "spine", "torso"], ["torso", "neck", "head"],
 // giác xấu). Vùng xương đòn chọn theo tam giác xấu ở đợt 19a A4 (rộng hơn / hẹp hơn đều xấu hơn chút ít).
 export const WEIGHT_PRM = { bh: 0.05, be: 0.1, bs: 0.08, so: -0.05, bn: 0.1, w0: -0.02, w1: 0.42, top: 0.22, kb: 0.05, a0: -0.01, a1: 0.07,
   rin: 0.075, rw: 0.12, cR: 0.7, mid: 0.1, toeZ: 0.2, heelZ: -0.08, iters: 300, lam: 0.5, headRigid: 0.06, prune: 0.02,
-  cU0: 0, cU1: 0.6, cY0: -0.12, cY1: -0.04, cZ0: 0.06, cZ1: 0.14, tw0: 0.35, tw1: 0.85 };
+  cU0: 0, cU1: 0.6, cY0: -0.12, cY1: -0.04, cZ0: 0.06, cZ1: 0.14, tw0: 0.35, tw1: 0.85, islands: 1, xc: 0.4, ky: 0, seam: 0 };
 const sstep = (x, a, b) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const segDist = (p, a, b) => {
   const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
@@ -262,6 +279,83 @@ function toClique(w, out, oo, mask, NB, CL) {
   for (let b = 0; b < NB; b++) out[oo + b] = 0;
   for (const b of CL[best]) if (mask & (1 << b)) out[oo + b] = w[b] / bm;
   return true;
+}
+
+// ---- cầu: tam giác nối hai phần cách ≥ 3 đốt trên cây xương (đợt 19a soát) --------------------------------------------------------
+// Số đốt giữa hai xương trên cây 15 khớp + xương phụ (cha theo rig-helpers.js HELPERS); game/tests/models.test.mjs cau kiểm đúng luật này.
+export const PAR_ALL = { ...PARENT, ...Object.fromEntries(HELPER_NAMES.map((n) => [n, HELPERS[n].parent])) };
+const upOf = (b, par) => { const c = []; for (let x = b; x; x = par[x]) c.push(x); return c; };
+export function boneDist(a, b, par = PAR_ALL) { const A = upOf(a, par), B = upOf(b, par); for (let i = 0; i < A.length; i++) { const j = B.indexOf(A[i]); if (j >= 0) return i + j; } return 99; }
+// khúc của xương: thân (hông, lưng, thân, cổ, đầu, xương đòn), cánh tay, cẳng tay (khuỷu, xoắn, bàn tay), đùi, cẳng chân (gối, cổ chân)
+const SEG = (b) => (/^sh/.test(b) ? b : /^(el|twist|hand)/.test(b) ? "fa" + b.slice(-1) : /^hip[LR]/.test(b) ? b : /^(knee|ankle)/.test(b) ? "sn" + b.slice(-1) : "body");
+// Đảo trọng số trên lưới hàn G: mảnh liền của một khúc (theo xương nặng nhất) tách khỏi mảnh lớn nhất của khúc đó, mà quá nửa cạnh mép
+// nối hai xương cách ≥ 3 đốt (CV_daidao: 3 + 7 đỉnh cổ tay áo giáp theo thân — ngoài ống quanh chuỗi khớp ghi tay; OFF_tuong: 38–46
+// đỉnh vạt tay áo theo lưng / hông bao quanh cẳng tay) — tam giác mép căng thành gai khi tay cử động: mỗi đỉnh đảo lấy trọng số đỉnh
+// ngoài (khúc bao quanh nhiều nhất) gần nhất theo đường đi dọc cạnh trong đảo. A: m × NB (sửa tại chỗ), names: tên xương theo cột.
+// Trả số đỉnh đã đổi.
+function mergeIslands(A, G, NB, names) {
+  const m = G.n, dom = new Int32Array(m);
+  for (let g = 0; g < m; g++) { let b = 0; for (let k = 1; k < NB; k++) if (A[g * NB + k] > A[g * NB + b]) b = k; dom[g] = b; }
+  const seg = Array.from(dom, (b) => SEG(names[b])), comp = new Int32Array(m).fill(-1), comps = [];
+  for (let s = 0; s < m; s++) {
+    if (comp[s] >= 0) continue;
+    const id = comps.length, vs = [s]; comp[s] = id;
+    for (let i = 0; i < vs.length; i++) for (const [w] of G.adj[vs[i]]) if (comp[w] < 0 && seg[w] === seg[s]) { comp[w] = id; vs.push(w); }
+    comps.push(vs);
+  }
+  const main = {}; comps.forEach((vs, id) => { const s = seg[vs[0]]; if (main[s] === undefined || vs.length > comps[main[s]].length) main[s] = id; });
+  let changed = 0;
+  comps.forEach((vs, id) => {
+    if (main[seg[vs[0]]] === id) return;
+    let edges = 0, far = 0; const nb = {};
+    for (const v of vs) for (const [w] of G.adj[v]) if (comp[w] !== id) { edges++; if (boneDist(names[dom[v]], names[dom[w]]) >= 3) far++; nb[seg[w]] = (nb[seg[w]] || 0) + 1; }
+    if (!edges || far * 2 < edges) return;
+    const to = Object.entries(nb).sort((a, b) => b[1] - a[1])[0][0], inC = new Set(vs), dist = new Map(), from = new Map(), done = new Set();
+    for (const v of vs) for (const [w, L] of G.adj[v]) if (!inC.has(w) && seg[w] === to && L < (dist.get(v) ?? Infinity)) { dist.set(v, L); from.set(v, w); }
+    for (;;) {
+      let v = -1, d = Infinity; for (const [x, dx] of dist) if (!done.has(x) && dx < d) { d = dx; v = x; }
+      if (v < 0) break;
+      done.add(v);
+      for (const [w, L] of G.adj[v]) if (inC.has(w) && !done.has(w) && d + L < (dist.get(w) ?? Infinity)) { dist.set(w, d + L); from.set(w, from.get(v)); }
+    }
+    for (const v of vs) { const w = from.get(v); if (w === undefined) continue; for (let k = 0; k < NB; k++) A[v * NB + k] = A[w * NB + k]; changed++; }
+  });
+  return changed;
+}
+// Tam giác cầu trên lưới cuối (sau giảm lưới): hai đỉnh có xương nặng nhất cách nhau ≥ 3 đốt — lưới Meshy dính hai phần (bàn tay OFF_tuong
+// vào vạt áo, ống tay áo rộng X19 vào vạt áo, đáy chậu X20, cẳng tay nỏ binh DV_NO vào sườn): trộn trọng số kiểu nào cũng căng thành
+// màng khi hai phần rời nhau. Tách: tam giác thuộc cặp đỉnh hợp nhau (cách < 3 đốt; hai cặp thì cặp xương gần nhau hơn; không cặp nào
+// thì đỉnh có xương gần gốc nhất); đỉnh còn lại thay bằng bản sao cùng vị trí mang trọng số đỉnh chủ gần nhất (một bản sao mỗi đỉnh ×
+// xương chủ, tam giác cầu liền nhau dùng chung) — tư thế gắn y nguyên, hai phần rời nhau thì hở khe thay vì kéo màng.
+// m: { pos, idx, si, sw (u8, 4 mỗi đỉnh) }, names: tên xương theo chỉ số, par: cha mỗi xương (mặc định 15 khớp + xương phụ; lính đám
+// đông: cây khúc soldier-motion.js), cau(a, b): hai xương không được chung tam giác (mặc định cách ≥ 3 đốt). Trả { pos, idx, si, sw,
+// src (đỉnh mới → đỉnh cũ: vị trí, UV), own (đỉnh mới → đỉnh mang trọng số), cut (số tam giác tách), dups (số đỉnh thêm) }.
+export function splitBridges(m, names, par = PAR_ALL, cau = (a, b) => boneDist(a, b, par) >= 3) {
+  const n = m.pos.length / 3, dom = new Int32Array(n), depth = (b) => upOf(b, par).length;
+  for (let v = 0; v < n; v++) { let q = 0; for (let k = 1; k < 4; k++) if (m.sw[v * 4 + k] > m.sw[v * 4 + q]) q = k; dom[v] = m.si[v * 4 + q]; }
+  const D = (a, b) => { const x = names[dom[a]], y = names[dom[b]]; return cau(x, y) ? 3 : Math.min(2, boneDist(x, y, par)); };
+  const pos = Array.from(m.pos), si = Array.from(m.si), sw = Array.from(m.sw), src = Array.from({ length: n }, (_, i) => i), wo = src.slice(), idx = Uint32Array.from(m.idx), dup = new Map();
+  const d2 = (a, b) => (pos[a * 3] - pos[b * 3]) ** 2 + (pos[a * 3 + 1] - pos[b * 3 + 1]) ** 2 + (pos[a * 3 + 2] - pos[b * 3 + 2]) ** 2;
+  let cut = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const v = [idx[t], idx[t + 1], idx[t + 2]], ok = [[0, 1], [1, 2], [2, 0]].filter(([a, b]) => D(v[a], v[b]) < 3);
+    if (ok.length === 3) continue;
+    cut++;
+    ok.sort((p, q) => D(v[p[0]], v[p[1]]) - D(v[q[0]], v[q[1]]));
+    const own = ok.length ? ok[0] : [[0, 1, 2].sort((a, b) => depth(names[dom[v[a]]]) - depth(names[dom[v[b]]]))[0]];
+    for (let k = 0; k < 3; k++) {
+      if (own.includes(k)) continue;
+      const a = own.reduce((x, y) => (d2(v[k], v[x]) <= d2(v[k], v[y]) ? x : y)), key = v[k] * 64 + dom[v[a]];
+      let nv = dup.get(key);
+      if (nv === undefined) {
+        nv = pos.length / 3; dup.set(key, nv);
+        pos.push(pos[v[k] * 3], pos[v[k] * 3 + 1], pos[v[k] * 3 + 2]); src.push(src[v[k]]); wo.push(v[a]);
+        for (let q = 0; q < 4; q++) { si.push(si[v[a] * 4 + q]); sw.push(sw[v[a] * 4 + q]); }
+      }
+      idx[t + k] = nv;
+    }
+  }
+  return { pos: Float32Array.from(pos), idx, si: Uint8Array.from(si), sw: Uint8Array.from(sw), src: Int32Array.from(src), own: Int32Array.from(wo), cut, dups: dup.size };
 }
 
 // Trọng số 15 khớp mỗi đỉnh (Float32Array n × 15, tổng 1, ≤ 4 xương, chỉ xương kề nhau). Y: { hips, hipOff, knee, ankle } độ cao khung
@@ -290,7 +384,7 @@ export function weights15(F, Y, P = {}, HB = null) {
   const G = lm.info.weld, wid = lm.info.weldId, geo = F.geo || lm.info.geo, m = G.n;
   const Pm = new Float32Array(m * 3);
   for (let v = 0; v < n; v++) { const g = wid[v]; Pm[g * 3] = V[v * 3]; Pm[g * 3 + 1] = V[v * 3 + 1]; Pm[g * 3 + 2] = V[v * 3 + 2]; }
-  const W = new Float32Array(m * NB), isArm = new Uint8Array(m), mask = new Int32Array(m);
+  const W = new Float32Array(m * NB), isArm = new Uint8Array(m), mask = new Int32Array(m), mid = new Uint8Array(m);
   const hY = Y.hips, yTop = Y.hips - Y.hipOff, kY = Y.knee, aY = Y.ankle, yC = Y.hips - 0.14;
   // trục chân (khung gắn: thẳng đứng ở legX, z theo tâm ống chân thấp) + bàn chân ra trước, gót ra sau
   const LG = {};
@@ -340,6 +434,12 @@ export function weights15(F, Y, P = {}, HB = null) {
     const rin = prm.rin + 0.03 * sstep(y, 0.3, 0.8), rho = sstep(r, rin, rin + prm.rw);
     c = c * (1 - rho) + Math.min(c, prm.cR * sstep(Math.abs(x), 0, prm.mid)) * rho;
     c -= (1 - sstep(Math.abs(x), 0, 0.05)) * sstep(y, yC - 0.06, yC + 0.04) * Math.min(c, 1);
+    // giữa hai chân trên gối (|x| < xc · bề ngang chân): dần theo hông tới đường giữa, neo khi làm mượt — vạt áo, váy lót giữa hai chân
+    // không chia đôi theo hai đùi (trước đây làm mượt kéo hai nửa về hai đùi thuần, giáp nhau ở x = 0: H35 chạy, hai chân dang thì dải
+    // giữa váy lót sau giãn 15–18 lần). ky: dải bắt đầu dưới gối chừng ấy (váy lót dài quá gối — H35 gấu sau giữa hai chân ở 0,48 m,
+    // ngay trên gối, vẫn chia đôi hipL | hipR: chạy giãn 13–16 lần)
+    const hc = (1 - sstep(Math.abs(x), 0, prm.xc * Math.abs(legX[sd]))) * sstep(y, kY - prm.ky, kY + 0.1);
+    if (hc > 0) { c *= 1 - hc; if (hc > 0.5) mid[o / NB] = 1; }
     const ch = [BI.hips, BI["hip" + sd], BI["knee" + sd], BI["ankle" + sd]], i = Math.min(2, Math.floor(c)), f = c - i;
     W[o + ch[i]] += low * (1 - f); W[o + ch[i + 1]] += low * f;
   };
@@ -361,7 +461,17 @@ export function weights15(F, Y, P = {}, HB = null) {
   // đòn không neo thì vùng của nó (không đỉnh nào thuần xương đòn khi dải cổ phủ đỉnh vai) tan dần vào thân, cổ quanh đó (CV_songdao
   // vai phải 0,48 → 0,001 sau 300 lượt)
   const free = new Uint8Array(m), BODY = bit("hips") | bit("torso") | bit("head") | (HB ? bit("spine") | bit("neck") | bit("clavL") | bit("clavR") : 0);
-  for (let g = 0; g < m; g++) { let mx = 0; for (let b = 0; b < NB; b++) mx = Math.max(mx, W[g * NB + b]); free[g] = mx < 0.999 && (mask[g] & ~BODY) !== 0 ? 1 : 0; }
+  for (let g = 0; g < m; g++) { let mx = 0; for (let b = 0; b < NB; b++) mx = Math.max(mx, W[g * NB + b]); free[g] = mx < 0.999 && (mask[g] & ~BODY) !== 0 && !mid[g] ? 1 : 0; }
+  // đường giáp hai vùng thuần khác xương (cùng một nhóm kề nhau: nách thân | vai, thân | đùi): đỉnh hai bên thả ra, được trộn xương bên kia
+  // — không thì cả độ lệch dồn vào một hàng cạnh (nách CV_daidao: cạnh 2 cm giãn 10 lần khi giơ tay qua đầu)
+  if (prm.seam) {
+    const pure = (g) => { for (let b = 0; b < NB; b++) if (W[g * NB + b] >= 0.999) return b; return -1; }, add = [];
+    for (let g = 0; g < m; g++) {
+      const b1 = pure(g); if (b1 < 0) continue;
+      for (const [u] of G.adj[g]) { const b2 = pure(u); if (b2 >= 0 && b2 !== b1 && CL.some((c) => c.includes(b1) && c.includes(b2))) add.push(g, b2); }
+    }
+    for (let i = 0; i < add.length; i += 2) { mask[add[i]] |= 1 << add[i + 1]; free[add[i]] = 1; }
+  }
   let A = W, B = new Float32Array(m * NB);
   const tmp = new Float32Array(NB);
   for (let it = 0; it < prm.iters; it++) {
@@ -375,6 +485,7 @@ export function weights15(F, Y, P = {}, HB = null) {
     }
     [A, B] = [B, A];
   }
+  if (prm.islands) mergeIslands(A, G, NB, HB ? NAMES_H : JOINTS);
   for (let g = 0; g < m; g++) if (!isArm[g] && Pm[g * 3 + 1] > neckY + prm.headRigid) { const o = g * NB; for (let b = 0; b < NB; b++) A[o + b] = 0; A[o + BI.head] = 1; }
   const out = new Float32Array(n * NB);
   for (let v = 0; v < n; v++) {
