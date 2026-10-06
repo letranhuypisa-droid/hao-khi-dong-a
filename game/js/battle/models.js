@@ -6,7 +6,7 @@
 
 import * as THREE from "three";
 import { model, applyRest, bodyMesh, weaponMesh } from "./glb.js";
-import { headShell } from "./anim-wc01.js";
+import { headShape, guardPts, handPts } from "./anim-wc01.js";
 
 export const PAL = {
   son: 0x9b2d20, sonDam: 0x6e1d15, then: 0x1d1a17, vang: 0xc9a14a, trung: 0xe6dcc3,
@@ -162,18 +162,21 @@ const I4 = new THREE.Matrix4();
 // khí dài, lộn né, nằm) nên vẫn bị loại khi ngoài khung nhìn, ngoài hộp bóng (áo choàng trước đây tắt loại bỏ).
 // Mô hình GLB (cfg.model, glb.js): có trong đệm thì thân là một lưới da GLB gắn vào chính các khớp này (vị trí vai, khuỷu, cổ tay,
 // cổ, bề ngang chân đặt theo mô hình — đúng khung gắn, kể cả rig đại kiếm WC01: tay phải tư thế WC01 giải lại, tay trái nắm chuôi
-// giải IK theo độ dài tay đó, lưỡi tránh vỏ đầu dyn.shell — rig-motion.js, anim-wc01.js fitArms),
+// giải IK theo độ dài tay đó, cả thanh gươm tránh lưới mặt dyn.head — rig-motion.js, anim-wc01.js fitArms),
 // vũ khí, khiên là lưới GLB con của khớp tay; không dựng khối hình thân, không vạt áo lò xo (vạt áo nằm trong lưới, đi theo hông và
 // chân); đế giày theo lưới (rig.foot từ meta.foot, rig-motion.js). Áo choàng, cờ lưng, tua giáo (GLB: neo ở chân mũi, meta.head),
 // dải khăn vẫn dựng bằng code như cũ.
-// Vỏ đầu (anim-wc01.js headShell) của thân GLB M: khớp đầu ở khung gắn (meta.inv), lưới thân; tính một lần mỗi mô hình (M.shell).
-export function shellOf(M) {
-  if (M.shell === undefined) {
+// Lưới mặt (anim-wc01.js headShape: đỉnh theo đầu cùng cổ, râu, cổ áo, khung khớp đầu; trung vị khoảng cách tâm sọ) và ngón tay phải
+// (handPts, khung bàn tay: .hand) của thân GLB M: khớp đầu, bàn tay ở khung gắn (meta.inv), lưới thân; tính một lần mỗi mô hình (M.head).
+export function headOf(M) {
+  if (M.head === undefined) {
     const g = M.geos.body, h = M.meta.bones.indexOf("head"), A = g.attributes;
     const hp = h < 0 ? null : new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(M.meta.inv, h * 16).invert());
-    M.shell = hp ? headShell(A.position.array, A.skinIndex.array, A.skinWeight.array, h, hp.toArray()) : 0;
+    M.head = hp ? headShape(A.position.array, A.skinIndex.array, A.skinWeight.array, h, hp.toArray(), M.meta.bones.indexOf("neck")) : null;
+    const r = M.meta.bones.indexOf("handR");
+    if (M.head && r >= 0) M.head.hand = handPts(A.position.array, A.skinIndex.array, A.skinWeight.array, r, M.meta.inv.slice(r * 16, r * 16 + 16));
   }
-  return M.shell;
+  return M.head;
 }
 export function makeRig(cfg = {}) {
   const { scale = 1, cloth = PAL.son, armor = PAL.then, trim = PAL.vang, skin = PAL.da,
@@ -312,9 +315,10 @@ export function makeRig(cfg = {}) {
 
   let reach = 1.2;                                        // tầm vũ khí tính từ bàn tay (cầu bao)
   // vũ khí GLB (khung chuẩn bake/wpn.mjs: gốc chỗ nắm, cán +Z) thay khối hình khi có; điểm mũi / đuôi (edge) theo dài thật;
-  // kiếm, đao GLB: dyn.blade = { guard, tip } — lưỡi từ chắn tay (meta.guard) tới mũi: vệt chém (hero.js), né sọ (anim-wc01.js)
+  // kiếm, đao GLB: dyn.blade = { guard, tip, butt, gp } — lưỡi từ chắn tay (meta.guard) tới mũi, núm chuôi, mút chắn tay (anim-wc01.js
+  // guardPts, một lần mỗi mô hình): vệt chém (hero.js), gươm tránh đầu (anim-wc01.js)
   const tipZ = (m) => m.meta.hi[2], buttZ = (m) => m.meta.lo[2];
-  const lane = (m) => { dyn.blade = { guard: m.meta.guard ?? 0.07, tip: tipZ(m) }; };
+  const lane = (m) => { dyn.blade = { guard: m.meta.guard ?? 0.07, tip: tipZ(m), butt: buttZ(m), gp: (m.gp ||= guardPts(m.geos.body.attributes.position.array)) }; };
   if (weapon === "songdao") {
     const m = WM("songdao");
     if (m) { wpn(p.handR, m); wpn(p.handL, m, { mirror: true }); lane(m); }
@@ -416,7 +420,7 @@ export function makeRig(cfg = {}) {
   const mats = [], meshes = [];
   if (M) {
     const body = bodyMesh(p, M);
-    if (dyn.grip) dyn.shell = shellOf(M);
+    if (dyn.grip) dyn.head = headOf(M);
     body.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.92, 0), R);
     root.add(body); mats.push(body.material); meshes.push(body);
   }

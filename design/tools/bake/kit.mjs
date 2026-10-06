@@ -33,6 +33,9 @@ const YH = { hips: HP.pelvis[1], torso: HP.torso[1], hipOff: 0.02, thigh: 0.44, 
 // trọng số (human.mjs weights15) cho lưới lính thô (cạnh ~6 cm): dải vai giữ giữa khớp vai — dời 5 cm về phía tay như nhân vật rig
 // thì cả vòng đỉnh bắp tay sang thân / cẳng tay, khúc cánh tay còn 1,7% đỉnh (NG_CUNG; trước 4,2%)
 const KIT_W = { so: 0 };
+// người cưỡi (riderBody): vạt áo không kéo đế giày theo đùi (human.mjs boot); dải giữa hai chân hẹp (xc) — ngồi ngựa đùi ra trước 90°, dải
+// theo hông rộng (0,4) kéo đáy quần, mông 4–5 lần trên yên
+const RIDER_W = { boot: 1, xc: 0.2 };
 
 // Dáng gốc → tư thế nghỉ bộ khúc: v' = Σ w_j · R_j · B_j⁻¹ · v. R_j: khung nghỉ của khớp j (thế giới): place[j] là vị trí (khung chỉ
 // tịnh tiến) hoặc { p, q } (vị trí + quaternion: chân người cưỡi gập). Tay buông thẳng ở vai bộ khúc, chân ở hông bộ khúc; đầu giữ
@@ -270,6 +273,25 @@ export async function bakeKit(file, c) {
 }
 export { pivots as kitPivots, placeWeapon, assemble, skin2, restPose, tassel, MAP as KIT_MAP, YH as KIT_Y };
 
+// Người cưỡi (mẫu đã dò khớp F) → tư thế ngồi trên ngựa (khung HORSE): đùi ra trước, gối gập quanh bụng ngựa, tay buông. Trọng số như lính
+// bộ, thêm RIDER_W. P: thay số trọng số (thử). Trả { V (ngồi), S (gốc), W (15 khớp mỗi đỉnh) }.
+export function riderBody(F, P = {}) {
+  const bind = bindSkeleton(F, YH), W = weights15(F, YH, { ...KIT_W, ...RIDER_W, ...P });
+  const seat = [0, XP.torso[1] - 0.08, XP.torso[2]];
+  const DOWNV = new THREE.Vector3(0, -1, 0);
+  const legFrame = (from, to) => ({ p: from, q: new THREE.Quaternion().setFromUnitVectors(DOWNV, new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize()) });
+  const place = {
+    hips: seat, torso: XP.torso, head: [0, XP.torso[1] + (F.neckY - YH.torso), XP.torso[2]],
+    shL: XP.uaL, elL: XP.faL, handL: [XP.faL[0], XP.faL[1] - 0.27, XP.faL[2]],
+    shR: XP.uaR, elR: XP.faR, handR: [XP.faR[0], XP.faR[1] - 0.27, XP.faR[2]],
+  };
+  for (const [sd, sg] of [["L", -1], ["R", 1]]) {
+    const hip = [sg * 0.12, seat[1] - 0.02, seat[2]], knee = [sg * 0.3, seat[1] - 0.2, seat[2] + 0.36], ankle = [sg * 0.31, seat[1] - 0.52, seat[2] + 0.2];
+    place["hip" + sd] = legFrame(hip, knee); place["knee" + sd] = legFrame(knee, ankle); place["ankle" + sd] = { p: ankle, q: legFrame(knee, ankle).q };
+  }
+  return { V: restPose(F, W, bind, place), S: F.V, W };
+}
+
 // ---- kỵ binh (bộ khúc HORSE): ngựa + người cưỡi ngồi --------------------------------------------------------------------------
 // Ngựa: thân (cả cổ, đầu, yên) theo "pelvis"; bốn chân thL (trước trái), shL (sau trái), thR (trước phải), shR (sau phải), mỗi
 // chân một khúc cứng xoay ở hông; đuôi theo "tas" (dây treo, neo ở mông). Người cưỡi: thân, đầu theo "torso", tay theo ua / fa,
@@ -347,22 +369,8 @@ export async function bakeHorseKit(horseFile, riderFile, c) {
 
   // ---- người cưỡi ----
   const cr = cutBoxes(await readGLB(riderFile, Infinity), c.cut), r = cr.g;
-  const F = fitHuman(r.pos, r.idx, { shY: HP.uaL[1], fix: c.fix, box: cr.bounds, name: c.name, kit: true, shoulder: c.shoulder, fallback: c.fallback });
-  const bind = bindSkeleton(F, YH);
-  const W = weights15(F, YH, KIT_W);
-  const seat = [0, XP.torso[1] - 0.08, XP.torso[2]];
-  const DOWNV = new THREE.Vector3(0, -1, 0);
-  const legFrame = (from, to) => ({ p: from, q: new THREE.Quaternion().setFromUnitVectors(DOWNV, new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize()) });
-  const place = {
-    hips: seat, torso: XP.torso, head: [0, XP.torso[1] + (F.neckY - YH.torso), XP.torso[2]],
-    shL: XP.uaL, elL: XP.faL, handL: [XP.faL[0], XP.faL[1] - 0.27, XP.faL[2]],
-    shR: XP.uaR, elR: XP.faR, handR: [XP.faR[0], XP.faR[1] - 0.27, XP.faR[2]],
-  };
-  for (const [sd, sg] of [["L", -1], ["R", 1]]) {
-    const hip = [sg * 0.12, seat[1] - 0.02, seat[2]], knee = [sg * 0.3, seat[1] - 0.2, seat[2] + 0.36], ankle = [sg * 0.31, seat[1] - 0.52, seat[2] + 0.2];
-    place["hip" + sd] = legFrame(hip, knee); place["knee" + sd] = legFrame(knee, ankle); place["ankle" + sd] = { p: ankle, q: legFrame(knee, ankle).q };
-  }
-  const RV = restPose(F, W, bind, place);
+  const F = fitHuman(r.pos, r.idx, { shY: KIT_SH, fix: c.fix, box: cr.bounds, name: c.name, kit: true, shoulder: c.shoulder, fallback: c.fallback });
+  const { V: RV, W } = riderBody(F);
   const rskin = skin2(W, RV.length / 3, RIDER_MAP2, "horse");
   const rider = { pos: RV, nor: smoothNormals(RV, r.idx), uv: r.uv, skin: rskin, idx: r.idx, img: await rawImage(r.image) };
 

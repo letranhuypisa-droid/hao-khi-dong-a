@@ -11,7 +11,7 @@
 //   · cờ sau lưng tướng: vải xoay quanh cán (lò xo theo tốc độ, gió), nằm ngang khi ngã;
 //   · tay trái nắm chuôi vũ khí hai tay (đại kiếm WC01, rig có dyn.grip): IK tay hai khúc tới điểm nắm trên chuôi, theo độ dài
 //     tay của rig (thân GLB: khung gắn của mô hình); tay phải của tư thế WC01 (giải cho tay 0,34 + 0,36) giải lại theo số đo tay
-//     của rig trước đó (anim-wc01.js fitArms — thân GLB tay ngắn: tay trái với tới chuôi, lưỡi tránh vỏ đầu dyn.shell; rig khối giữ nguyên).
+//     của rig trước đó (anim-wc01.js fitArms — thân GLB tay ngắn: tay trái với tới chuôi, cả thanh gươm tránh lưới mặt dyn.head; rig khối giữ nguyên).
 // Mỗi rig một thể hiện. Gọi update(dt, pose, ground) SAU khi đã đặt root (vị trí, yaw) và tư thế (applyPose):
 // dt là bước mô phỏng của Hero.update / BigUnit.update (1/60 s; hit-stop không có bước nào nên vải cũng đứng
 // yên), dt = 0 chỉ dựng lại hình, không chạy động lực. pose là tư thế đang trộn (anim.js): chân và hông dựng lại
@@ -128,7 +128,7 @@ export class RigMotion {
     this.arm = { L1: Math.hypot(eL.x, eL.y, eL.z), L2: Math.hypot(hL.y, hL.z), off: Math.atan2(hL.z, -hL.y) };
     // tay phải đại kiếm theo số đo tay của rig (anim-wc01.js fitGeo / fitArms; null = rig khối, tư thế dùng thẳng); fq: tư thế đã
     // giải lại (dùng lại mỗi lượt)
-    this.fit = this.grip ? fitGeo(P, d.blade, d.shell || 0) : null; this.fq = {};
+    this.fit = this.grip ? fitGeo(P, d.blade, d.head || null) : null; this.fq = {};
     // đế giày (khung cổ chân): rig khối LEG; thân GLB theo lưới (models.js rig.foot từ meta.foot)
     this.foot = rig.foot || LEG;
     this.legs = [
@@ -169,9 +169,10 @@ export class RigMotion {
 
     // ---- 1. chân bám đất ----
     this.legIK(dt, pose, ground, snap, !(o && o.ik === false));
-    // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q
+    // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q; dt (0 ở khung đầu, nhảy
+    // chỗ): chiều lật chắn tay, chiều lưỡi sắc theo khung trước (this.fq giữ qua các khung) — bàn tay không lật qua lại
     let q = pose;
-    if (this.fit) q = this.setArmR(fitArms(pose, this.fit, this.fq));
+    if (this.fit) q = this.setArmR(fitArms(pose, this.fit, this.fq, snap ? 0 : dt));
     // ---- 2. ma trận phần trên (hông đã hạ) để lấy điểm neo; lưỡi vũ khí không cắm đất ----
     for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
     if (this.blades.length) this.fixBlades(q, ground);

@@ -30,7 +30,7 @@ export function bounds(pos) {
   for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { b[k * 2] = Math.min(b[k * 2], pos[i + k]); b[k * 2 + 1] = Math.max(b[k * 2 + 1], pos[i + k]); }
   return b;
 }
-const normPt = (b, H) => { const k0 = H / (b[3] - b[2]); return (x, y, z) => [(x - (b[0] + b[1]) / 2) * k0, (y - b[2]) * k0, (z - (b[4] + b[5]) / 2) * k0]; };
+export const normPt = (b, H) => { const k0 = H / (b[3] - b[2]); return (x, y, z) => [(x - (b[0] + b[1]) / 2) * k0, (y - b[2]) * k0, (z - (b[4] + b[5]) / 2) * k0]; };
 
 // Cắt bỏ phần thừa của mẫu Meshy trước khi dò khớp, tính trọng số (catalog cut: sừng mũ, bao đao): xoá tam giác có trọng tâm
 // trong một hộp { lo: [x, y, z], hi: [x, y, z] } (khung chuẩn hoá thô cao 1,9 của lưới chưa cắt) hoặc có đỉnh lọt vào hộp quá CUT_IN
@@ -264,7 +264,7 @@ const CLIQUES_H = [["hips", "spine", "torso"], ["torso", "neck", "head"],
 // giác xấu). Vùng xương đòn chọn theo tam giác xấu ở đợt 19a A4 (rộng hơn / hẹp hơn đều xấu hơn chút ít).
 export const WEIGHT_PRM = { bh: 0.05, be: 0.1, bs: 0.08, so: -0.05, bn: 0.1, w0: -0.02, w1: 0.42, top: 0.22, kb: 0.05, a0: -0.01, a1: 0.07,
   rin: 0.075, rw: 0.12, cR: 0.7, mid: 0.1, toeZ: 0.2, heelZ: -0.08, iters: 300, lam: 0.5, headRigid: 0.06, prune: 0.02,
-  cU0: 0, cU1: 0.6, cY0: -0.12, cY1: -0.04, cZ0: 0.06, cZ1: 0.14, tw0: 0.35, tw1: 0.85, islands: 1, xc: 0.4, ky: 0, seam: 0 };
+  cU0: 0, cU1: 0.6, cY0: -0.12, cY1: -0.04, cZ0: 0.06, cZ1: 0.14, tw0: 0.35, tw1: 0.85, islands: 1, xc: 0.4, ky: 0, seam: 0, mirror: 0, boot: 0 };
 const sstep = (x, a, b) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const segDist = (p, a, b) => {
   const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
@@ -403,9 +403,39 @@ export function weights15(F, Y, P = {}, HB = null) {
     const k = Math.min(1, (0.7 * up) / (prm.be + prm.bs - prm.so), (0.7 * fo) / (prm.bh + prm.be));
     arm[sd] = { DF: g.DF, dH, dE, dS, bh: prm.bh * k, be: prm.be * k, bs: prm.bs * k, so: prm.so * k };
   }
+  // tay soi gương (catalog w.mirror, mẫu gần đối xứng): trường mỗi tay lấy thêm trường tay kia ở đỉnh đối xứng (x → −x, đỉnh hàn gần
+  // nhất ≤ 2,5 cm), đổi theo chuỗi (đầu ngón … bàn tay … khuỷu … vai: cùng phần mỗi đoạn) — chỉ khi ngắn hơn (thêm tay, không bớt).
+  // X19: ống tay áo phải rộng rủ tới khuỷu, đường đo dọc mặt lưới vòng qua lưng — nửa dưới ống tay (82 / 143 đỉnh) theo thân, giơ tay
+  // thành tấm màng tối; tay trái cùng hình đo đúng (101 / 122 đỉnh theo vai)
+  if (prm.mirror && arm.L && arm.R) {
+    const cell = 0.025, key = (x, y, z) => `${Math.floor(x / cell)},${Math.floor(y / cell)},${Math.floor(z / cell)}`, grid = new Map();
+    for (let g = 0; g < m; g++) { const k = key(Pm[g * 3], Pm[g * 3 + 1], Pm[g * 3 + 2]); (grid.get(k) || grid.set(k, []).get(k)).push(g); }
+    const near = (x, y, z) => {
+      let best = -1, bd = cell * cell;
+      const i0 = Math.floor(x / cell), j0 = Math.floor(y / cell), k0 = Math.floor(z / cell);
+      for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (let k = k0 - 1; k <= k0 + 1; k++)
+        for (const g of grid.get(`${i},${j},${k}`) || []) { const d = (Pm[g * 3] - x) ** 2 + (Pm[g * 3 + 1] - y) ** 2 + (Pm[g * 3 + 2] - z) ** 2; if (d < bd) { bd = d; best = g; } }
+      return best;
+    };
+    // d (một tay) → toạ độ chuỗi t: 0 đầu ngón, 1 bàn tay, 2 khuỷu, 3 vai, > 3 tiếp theo đoạn vai; và ngược lại
+    const toT = (A, d) => (d <= A.dH ? d / A.dH : d <= A.dE ? 1 + (d - A.dH) / (A.dE - A.dH) : 2 + (d - A.dE) / (A.dS - A.dE));
+    const fromT = (A, t) => (t <= 1 ? t * A.dH : t <= 2 ? A.dH + (t - 1) * (A.dE - A.dH) : A.dE + (t - 2) * (A.dS - A.dE));
+    for (const [sd, od] of [["L", "R"], ["R", "L"]]) {
+      const A = arm[sd], B = arm[od], DF = Float64Array.from(A.DF);
+      for (let g = 0; g < m; g++) {
+        const x = Pm[g * 3]; if ((sd === "L") !== (x < 0)) continue;
+        const h = near(-x, Pm[g * 3 + 1], Pm[g * 3 + 2]); if (h < 0) continue;
+        const d = fromT(A, toT(B, B.DF[h] * s)) / s;
+        if (d < DF[g]) DF[g] = d;
+      }
+      A.DF2 = DF;
+    }
+    for (const sd of ["L", "R"]) { arm[sd].DF = arm[sd].DF2; delete arm[sd].DF2; }
+  }
   const bit = (name) => 1 << BI[name];
   // xương phụ: phần góc lưng, cổ (meta.drive); xương đòn: đầu xương ức (gốc, khung gắn) → khớp vai
   const sS = HB && HB.drive.spine[2], sN = HB && HB.drive.neck[2];
+  if (HB && !(sS > 0 && sS < 1 && sN > 0 && sN < 1)) throw new Error(`weights15: phần góc lưng / cổ phải trong (0, 1) (lưng ${sS}, cổ ${sN}; rig-helpers.js HELPERS) — 0 hay 1 chia cho 0`);
   const CV = HB && { L: [HB.piv.clavL, F.J.shL], R: [HB.piv.clavR, F.J.shR] };
   const clavW = (x, y, z) => {
     const [c, sh] = CV[x < 0 ? "L" : "R"], u = (Math.abs(x) - Math.abs(c[0])) / (Math.abs(sh[0]) - Math.abs(c[0]));
@@ -431,7 +461,9 @@ export function weights15(F, Y, P = {}, HB = null) {
     const sd = x < 0 ? "L" : "R", L = LG[sd], p = [x, y, z];
     let c = sstep(y, yTop, yTop - prm.top) + sstep(y, kY + prm.kb, kY - prm.kb) + sstep(y, aY + prm.a1, aY + prm.a0);
     const r = Math.min(segDist(p, L[0], L[1]), segDist(p, L[1], L[2]), segDist(p, L[2], L[3]), segDist(p, L[2], L[4]));
-    const rin = prm.rin + 0.03 * sstep(y, 0.3, 0.8), rho = sstep(r, rin, rin + prm.rw);
+    // vạt áo (rho: xa trục chân) kéo c về phía hông; boot (người cưỡi): không dưới cổ giày (đế giày rộng nằm ngoài ống quanh trục bàn
+    // chân — NG_KY đế giày theo đùi 0,67–0,75: ngồi lên ngựa thì đế kéo thành vây 0,3–0,49 m)
+    const rin = prm.rin + 0.03 * sstep(y, 0.3, 0.8), rho = sstep(r, rin, rin + prm.rw) * (prm.boot ? sstep(y, aY + 0.08, aY + 0.18) : 1);
     c = c * (1 - rho) + Math.min(c, prm.cR * sstep(Math.abs(x), 0, prm.mid)) * rho;
     c -= (1 - sstep(Math.abs(x), 0, 0.05)) * sstep(y, yC - 0.06, yC + 0.04) * Math.min(c, 1);
     // giữa hai chân trên gối (|x| < xc · bề ngang chân): dần theo hông tới đường giữa, neo khi làm mượt — vạt áo, váy lót giữa hai chân

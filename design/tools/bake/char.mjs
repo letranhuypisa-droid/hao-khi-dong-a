@@ -43,14 +43,14 @@ function footOf(V, W, NB, legX, ankleY) {
 // Lưới cuối trước khi nướng texture (bakeChar; số đo của đợt soát chạy trên chính lưới này): dò khớp, khung gắn + xương phụ, trọng số
 // (đỉnh lưới Meshy giảm sơ), hàn + giảm tới ngân sách, trọng số u8 mỗi đỉnh, tách tam giác cầu (human.mjs splitBridges). Trả { F, g, cut,
 // bind, HB, bones, W, pos, idx, si, sw (u8, lưới cuối), split: { cut: tam giác tách, dups: đỉnh thêm } }. w: thay WEIGHT_PRM.
-export async function charMesh(file, { tris, fix = null, cut = null, name = "?", shoulder = null, fallback = false, w = {} } = {}) {
+export async function charMesh(file, { tris, fix = null, cut = null, name = "?", shoulder = null, fallback = false, w = {}, split = true } = {}) {
   const c = cutBoxes(await readGLB(file, tris), cut), g = c.g;
   const F = fitHuman(g.pos, g.idx, { shY: 1.48, fix, box: c.bounds, name, shoulder, fallback });
   const bind = bindSkeleton(F, Y), HB = bindHelpers(bind), bones = [...JOINTS, ...HB.names], NB = bones.length;
   const W = weights15(F, Y, w, HB), { idx: si, w: sw } = topK(W, NB, 4);
   const low = await weldSimplify(F.V, g.idx, tris), nl = low.src.length, lsi = new Uint8Array(nl * 4), lsw = new Float32Array(nl * 4);
   for (let i = 0; i < nl; i++) { const v = low.src[i]; for (let k = 0; k < 4; k++) { lsi[i * 4 + k] = si[v * 4 + k]; lsw[i * 4 + k] = sw[v * 4 + k]; } }
-  const s = splitBridges({ pos: low.pos, idx: low.idx, si: lsi, sw: quantWeights(lsw) }, bones);
+  const q = { pos: low.pos, idx: low.idx, si: lsi, sw: quantWeights(lsw) }, s = split ? splitBridges(q, bones) : { ...q, cut: 0, dups: 0 };
   return { F, g, cut: c.cut, bind, HB, bones, W, pos: s.pos, idx: s.idx, si: s.si, sw: s.sw, split: { cut: s.cut, dups: s.dups } };
 }
 

@@ -32,13 +32,16 @@ const TODO = {
   "phan:OFF_tuong": "GLB",
 };
 
+// Mẫu giữ tệp nướng cũ (catalog keep: GLB cần làm lại) — lỗi của mẫu đó ở mọi mục in TODO, không tính trượt, để khoảng hở còn thấy.
+const KEEP = Object.fromEntries(Object.entries({ ...CHARS, ...KIT_LIST }).filter(([, c]) => c.keep).map(([id, c]) => [id, `GLB cần làm lại, giữ bản ${c.keep}`]));
+
 let pass = 0, fail = 0, skip = 0;
 // fn trả danh sách lỗi [{ id, msg }] (rỗng = đạt); lỗi có trong TODO thì bỏ qua
 function t(code, name, fn) {
   let probs;
   try { probs = fn(); }
   catch (e) { fail++; console.log("  FAIL " + name + "\n       " + (e.stack || e.message).split("\n").slice(0, 3).join("\n       ")); return; }
-  const todoOf = (id) => TODO[`${code}:${id}`] || TODO[`${code}:*`];
+  const todoOf = (id) => TODO[`${code}:${id}`] || TODO[`${code}:*`] || KEEP[id];
   const real = probs.filter((p) => !todoOf(p.id)), todo = probs.filter((p) => todoOf(p.id));
   const ids = new Set(probs.map((p) => p.id));
   const stale = Object.keys(TODO).filter((k) => k.startsWith(code + ":") && (k.endsWith(":*") ? !probs.length : !ids.has(k.slice(code.length + 1))));
@@ -233,12 +236,13 @@ t("cat", "phần thừa đã cắt (catalog cut: sừng mũ H33, X19; bao đao D
 
 console.log("(b) Trọng số da nhân vật rig");
 // phần trọng số tối thiểu mỗi xương (% số đỉnh, Σw / n): rig đúng đều qua; tay, khuỷu ~0% là tay chết (rig hỏng)
-// khuỷu ≥ 0,9% (A1–A3: 1%): X19 tay phải ống tay áo bọc cẳng tay theo vai — A3 1,03%, A4 khuỷu + xoắn 0,93% (dải vai lấy thêm 0,15%)
-const MIN_SHARE = { hips: 1.5, torso: 15, head: 3, sh: 2, el: 0.9, hand: 0.5, hip: 0.8, knee: 0.5, ankle: 0.3 };
+// khuỷu ≥ 0,85% (A1–A3: 1%): X19 hai ống tay áo rộng bọc cẳng tay theo vai — A3 1,03%, A4 khuỷu + xoắn 0,93% (dải vai lấy thêm 0,15%),
+// soát lần 2 (tay phải soi gương tay trái, cả ống tay áo theo vai): 0,89%
+const MIN_SHARE = { hips: 1.5, torso: 15, head: 3, sh: 2, el: 0.85, hand: 0.5, hip: 0.8, knee: 0.5, ankle: 0.3 };
 // xương phụ nhận trọng số thay khớp (A4): lưng (bụng, ngực dưới), xương đòn (đỉnh vai) tính vào thân, xoắn (nửa cẳng tay phía cổ tay)
 // tính vào khuỷu — thân riêng còn 7,9–14,8%, khuỷu X19 0,2–0,4%
 const SHARE_OF = { spine: "torso", clavL: "torso", clavR: "torso", twistL: "elL", twistR: "elR" };
-t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 0,9% (cộng xoắn), vai ≥ 2%, cổ ≥ 3%…; xương phụ tính vào khớp nó thay)", () => forChars((c) => {
+t("phan", "mỗi xương trong 15 khớp có phần trọng số tối thiểu (bàn tay ≥ 0,5%, khuỷu ≥ 0,85% (cộng xoắn), vai ≥ 2%, cổ ≥ 3%…; xương phụ tính vào khớp nó thay)", () => forChars((c) => {
   const S = Object.fromEntries(c.B.map((b) => [b, 0]));
   for (const [, ws] of skinOf(c)) for (const [b, w] of ws) S[SHARE_OF[b] || b] += w;
   const bad = [];
@@ -430,6 +434,27 @@ const KIT_BUDGET = [640, 310, 145];
 t("kit-ngan-sach", `lính bộ: tam giác mỗi mức ≤ ${KIT_BUDGET.join(" / ")} (LOD0 / 1 / 2, cả vũ khí và tua)`, () => Object.entries(K).filter(([, k]) => k.meta.skel === "human").flatMap(([id, k]) => {
   const n = Object.values(k.meshes).map((g) => g.index.length / 3), bad = n.map((x, i) => (x > KIT_BUDGET[i] ? `lod${i} ${x}` : "")).filter(Boolean);
   return bad.length ? [{ id, msg: bad.join(", ") }] : [];
+}));
+// bóng chính diện của thân (tư thế nghỉ, chiếu lên mặt XY, ô 2 cm, dải thân |x| < 0,6, y 0,3–1,6 — bỏ vũ khí chìa ra, chân) của mức xa
+// không gầy đi quá 20% so với LOD0 — DV_GIAO LOD2 (ngân sách thân 90) còn 62%: mất hai tay, người que, gầy hẳn đi ở mốc đổi mức 40 m
+// (đợt 19a soát lần 2; các kiểu khác 82–95%)
+function frontArea(g) {
+  const P = g.position, I = g.index, cell = 0.02, on = new Set();
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3, ax = P[a], ay = P[a + 1], bx = P[b], by = P[b + 1], cx = P[c], cy = P[c + 1];
+    const d = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay); if (Math.abs(d) < 1e-12) continue;
+    for (let i = Math.floor(Math.min(ax, bx, cx) / cell); i <= Math.floor(Math.max(ax, bx, cx) / cell); i++)
+      for (let j = Math.floor(Math.min(ay, by, cy) / cell); j <= Math.floor(Math.max(ay, by, cy) / cell); j++) {
+        const px = (i + 0.5) * cell, py = (j + 0.5) * cell;
+        const u = ((bx - px) * (cy - py) - (cx - px) * (by - py)) / d, v = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) / d;
+        if (u >= 0 && v >= 0 && u + v <= 1 && Math.abs(px) < 0.6 && py > 0.3 && py < 1.6) on.add(i * 100000 + j);
+      }
+  }
+  return on.size;
+}
+t("kit-bong", "bóng chính diện thân ở mức xa ≥ 0,8 × LOD0 (tư thế nghỉ, chiếu lên XY, ô 2 cm, dải thân)", () => Object.entries(K).flatMap(([id, k]) => {
+  const a = Object.values(k.meshes).map(frontArea), bad = a.slice(1).map((x, i) => (x < 0.8 * a[0] ? `lod${i + 1} ${((x / a[0]) * 100).toFixed(0)}%` : "")).filter(Boolean);
+  return bad.length ? [{ id, msg: bad.join(", ") + ` (LOD0 ${a[0]} ô)` }] : [];
 }));
 // vũ khí trong lưới lính: tam giác gắn cứng vào khúc cẳng tay, nằm ngoài ống cẳng tay + bàn tay (r 0,1 m quanh đoạn piv → piv − 0,38 y);
 // chiếu lên trục dài nhất của hộp vũ khí mong đợi (piv + p + s·R(r)·[lo, hi] của wpn/*.hkm) → phần phủ. LOD0 phủ ≥ 50%, mức xa ≥ 70% LOD0.

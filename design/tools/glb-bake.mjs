@@ -27,6 +27,7 @@ const size = (f) => statSync(f).size;
 if (what === "char" || what === "all") {
   for (const [code, c] of Object.entries(CHARS)) {
     if (only && !only.includes(code)) continue;
+    if (c.keep) { console.log(`· ${code.padEnd(14)} giữ bản nướng ${c.keep} (catalog keep: GLB cần làm lại)`); continue; }
     const src = join(ROOT, man[code].path), t0 = Date.now();
     const r = await bakeChar(src, { ...c, name: code });
     const hkm = join(OUT, "char", code + ".hkm"), tex = join(OUT, "char", code + ".webp");
@@ -50,6 +51,7 @@ if (what === "wpn" || what === "all") {
 if (what === "kit" || what === "all") {
   for (const [code, c] of Object.entries(KIT_LIST)) {
     if (only && !only.includes(code)) continue;
+    if (c.keep) { console.log(`· ${code.padEnd(8)} giữ bản nướng ${c.keep} (catalog keep: GLB cần làm lại)`); continue; }
     const t0 = Date.now();
     const weapons = [];
     for (const w of c.weapons) {

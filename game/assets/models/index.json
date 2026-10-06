@@ -94,22 +94,22 @@
   "kind": "char",
   "file": "char/OFF_tuong.hkm",
   "tex": "char/OFF_tuong.webp",
-  "tris": 5989,
-  "bytes": 282774
+  "tris": 5985,
+  "bytes": 279932
  },
  "char/X19": {
   "kind": "char",
   "file": "char/X19.hkm",
   "tex": "char/X19.webp",
   "tris": 7458,
-  "bytes": 334416
+  "bytes": 333768
  },
  "char/X20": {
   "kind": "char",
   "file": "char/X20.hkm",
   "tex": "char/X20.webp",
   "tris": 7500,
-  "bytes": 295038
+  "bytes": 294982
  },
  "char/X24": {
   "kind": "char",
@@ -138,9 +138,9 @@
   "lods": [
    575,
    264,
-   116
+   134
   ],
-  "bytes": 67068
+  "bytes": 67356
  },
  "kit/DV_NO": {
   "kind": "kit",
@@ -149,10 +149,10 @@
   "tris": 546,
   "lods": [
    546,
-   259,
-   101
+   260,
+   102
   ],
-  "bytes": 59360
+  "bytes": 63420
  },
  "kit/NG_CUNG": {
   "kind": "kit",
@@ -200,7 +200,7 @@
    338,
    140
   ],
-  "bytes": 133668
+  "bytes": 132370
  },
  "kit/NG_TANK": {
   "kind": "kit",
