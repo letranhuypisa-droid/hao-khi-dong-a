@@ -13,9 +13,13 @@
 // Nhịp đòn nặng: gồng lâu và rộng (hông xoay trước, vai theo sau, trọng tâm dồn về chân sau) → chém rất nhanh ("snap") với
 // bước chân trước dẫn hông → theo đà dài (lưỡi đi quá đích, người xoắn hết cỡ, gối khuỵu) → hồi thế chậm. ĐỀ XUẤT BẢN THỬ:
 // mọi góc, mốc u (chỉnh bằng mắt trong lab.html?view=hero&hero=H31&m=…).
+//
+// Tư thế giải cho tay 0,34 + 0,36, vai ±0,3 (rig khối). Thân GLB giữ tay của mô hình (đợt 19a): fitArms (cuối file) giải lại tay
+// phải mỗi khung theo số đo đó (rig-motion.js) — rig khối không đổi gì.
 
 import * as A from "./anim.js";
-import { armIK } from "./ik.js";
+import { armIK, armFK } from "./ik.js";
+import { MOVES_WC01 } from "../data/moves-wc01.js";
 
 const { P, keys, blendPose, EASE, seg, clamp01 } = A;
 
@@ -143,16 +147,24 @@ function carryArms(p) {
   return p;
 }
 
-export function idle(t) { return A.idle(t, true, GUARD); }
-export function run(phase, speed01 = 1, stride = 0.95 * speed01) { return A.run(phase, speed01, stride, carryArms); }
-export function block() { return BLOCK; }
+// Thẻ bảng lời giải (fitArms, thân GLB): tư thế của đòn / thế có bảng mang fk (khoá bảng) và fu (mốc trong bảng); anim.js
+// blendPose chép thẻ của tư thế đích. Chỉ thêm hai trường, không đổi kênh nào (rig khối không đọc).
+const tagP = (p, k, u) => { p.fk = k; p.fu = u; return p; };
+const DOWN_U = 1 / 2.2;                  // anim.js knockdown: nằm yên từ u = 1 / 2,2
+export function idle(t) { return tagP(A.idle(t, true, GUARD), "guard", 0); }
+export function run(phase, speed01 = 1, stride = 0.95 * speed01) { return tagP(A.run(phase, speed01, stride, carryArms), "carry", 0); }
+const BLOCK_T = Object.freeze({ ...BLOCK, fk: "block", fu: 0 });
+export function block() { return BLOCK_T; }
 // Trúng đòn: giật ngửa, gươm bị đánh bật lên (vẫn hai tay nắm).
 const HIT = pose({ torsoX: -0.45, torsoY: 0.3, headX: -0.35, hipsY: -0.14, hipLx: 0.25, kneeLx: 0.35, hipRx: -0.15, kneeRx: 0.5, rootX: -0.08,
   h: [0.2, 1.3, 0.25], d: [0.25, 0.9, 0.3] });
-export function hitReact(u) { return A.hitReact(u, GUARD, HIT); }
+const hitRaw = (u) => A.hitReact(u, GUARD, HIT);
+export function hitReact(u) { return tagP(hitRaw(u), "hit", u); }
 // Lộn né: như song đao nhưng hai tay vẫn nắm chuôi (IK tay trái theo grip).
-export function dodgeRoll(u) { const p = A.dodgeRoll(u); p.grip = 1; return p; }
-export function knockdown(u) { const p = A.knockdown(u); p.grip = 0; return p; }
+const dodgeRaw = (u) => { const p = A.dodgeRoll(u); p.grip = 1; return p; };
+export function dodgeRoll(u) { return tagP(dodgeRaw(u), "dodge", u); }
+const downRaw = (u) => { const p = A.knockdown(u); p.grip = 0; return p; };
+export function knockdown(u) { return tagP(downRaw(u), "down", Math.min(u, DOWN_U)); }
 
 // ---- chuỗi N -----------------------------------------------------------------------------------------------------------
 // N1 chém xéo từ trên vai phải xuống trái dưới: gồng — hông xoay phải, gươm vắt qua vai phải mũi chúc ra sau; chém — chân
@@ -317,13 +329,1271 @@ function ult(u) {
 }
 
 // ---- bảng đòn (hero-anim.js: ANIMS.WC01) --------------------------------------------------------------------------------
-export const HERO_ANIM_WC01 = {
+const MOVE_RAW = {
   N1: (u) => keys(u, N1_K), N2: (u) => keys(u, N2_K), N3: (u) => keys(u, N3_K), N4: (u) => keys(u, N4_K), N5: (u) => keys(u, N5_K), N6,
   C1: (u) => keys(u, C1_K), C2: (u) => keys(u, C2_K), C3, C4, C5: (u) => keys(u, C5_K), C6,
   DN: (u) => keys(u, DN_K), DC: (u) => keys(u, DC_K), DQ: (u) => keys(u, DQ_K), CT: (u) => keys(u, CT_K),
   hich, binhThu: (u) => keys(u, BT_K), ult,
 };
+export const HERO_ANIM_WC01 = Object.fromEntries(Object.entries(MOVE_RAW).map(([k, f]) => [k, (u) => tagP(f(u), k, u)]));
 // Tư thế ngoài đòn (hero.js sẽ chọn theo lớp): thế thủ, đỡ, chạy, trúng đòn, né, ngã; charge = khung giữ khi tụ lực C.
-export const POSES_WC01 = { guard: GUARD, block: BLOCK, idle, run, hitReact, dodgeRoll, knockdown,
+export const POSES_WC01 = { guard: GUARD, block: BLOCK_T, idle, run, hitReact, dodgeRoll, knockdown,
   charge: (key) => HERO_ANIM_WC01[key]?.(MOVE_CHARGE_U[key] ?? 0.3) };
 const MOVE_CHARGE_U = { C1: 0.3, C4: 0.42, C6: 0.3 };
+
+// ---- tay phải theo số đo của rig (thân GLB, đợt 19a) ---------------------------------------------------------------------
+// Tư thế trên giải cho tay 0,34 + 0,36, vai ±0,3 (ARM, SH). Thân GLB giữ tay của mô hình (H31 0,23–0,25 + 0,21–0,22, vai ±0,225;
+// lính Tự do LINH_r01 / r24 tay 0,48–0,52, vai ±0,31): đặt thẳng góc khớp của tư thế thì cổ tay phải gần vai hơn đích — tay trái
+// không với tới chuôi (đo đợt soát 19a: 12 / 16 đòn hụt tới 0,1), lưỡi giơ qua đầu sượt tâm sọ 2 cm. fitArms giải lại tay phải
+// mỗi khung (rig-motion.js, sau tư thế, trước fixBlades / gripIK): hướng lưỡi, lưỡi sắc lấy từ tư thế; cổ tay về điểm gần đích nhất
+// trong tầm với (FIT.k tay duỗi: khuỷu còn gập ~28°) — đang nắm hai tay (grip ≥ 0,5) thì điểm nắm (GRIP dưới cổ tay dọc lưỡi) cũng
+// trong tầm tay trái. Vật cản (khung thân trên): lưới mặt (headShape, khung đầu quay headX: mũ, mặt, cổ, râu theo đầu), lưới cổ
+// (bodyShape up: râu theo thân, cổ, cổ áo trên đường vai), thân (bodyShape sl: lát ngang ngực, bụng, hông dưới đường vai − FIT.bc — lát
+// mức lưng, hông quay theo phần góc thân) và mặt đất (mặt phẳng rig-motion.js fitPlane tính theo dốc dưới hông). Hai nắm tay (điểm nắm
+// tay trái − FIT.fz … chắn tay) cách mặt ≥ FIT.hh, cách cổ ≥ FIT.uh; gốc lưỡi, lưỡi cách mặt, cổ ≥ FIT.hb (nửa bản lưỡi 0,047 + khe),
+// ngoài thân ≥ FIT.bb; đuôi chuôi cách mặt ≥ FIT.hb, cổ ≥ FIT.ub; mút chắn tay ≥ FIT.hg, giữa thanh chắn tay ≥ FIT.hgm, ngón tay phải
+// ≥ FIT.hf; lưỡi (cả hai mép gần mũi), đuôi chuôi trên đất ≥ FIT.gr.
+// Khung đầu (gọi rời, nhảy chỗ): giải toàn cục như soát lần 2 — nghiêng lưỡi (dựng mũi lên trước, rồi quay ra xa tâm sọ), dời hai nắm
+// tay ra (pháp tuyến, rồi dò rìa tầm với), còn sát nhiều thì dựng mũi thêm, lật chắn tay. Gọi liên tục (đợt soát 19a lần 3): lời giải
+// trước theo chuyển động của tư thế (hướng lưỡi quay đúng góc mà lưỡi tư thế quay, khung bàn tay theo khung tay tư thế, cổ tay giữ độ
+// lệch so với đích), kéo dần về đích (tư thế; chạm thì lời giải toàn cục của khung) FIT.rd, rr, rw mỗi khung 1/60 s rồi đẩy ra khỏi
+// vật cản tại chỗ — cổ tay theo pháp tuyến, lưỡi nghiêng quanh trục mômen của các điểm thiếu khe (góc nhỏ nhất, FIT.pd), lật chắn tay
+// góc nhỏ nhất — không đổi họ lời giải giữa hai khung; kẹt xa đích thì đi thẳng tới đích, cho thiếu khe tới FIT.tr. Mỗi khung lưỡi,
+// lưỡi sắc, cổ tay không đổi hơn tư thế quá FIT.cd, ce, cw, lưỡi thật của bàn tay quá FIT.ca, khuỷu quá lim + FIT.eg (fitArms); khuỷu
+// giữ phía của khung trước, đổi phía thì dời dần (armPlane); góc gập theo đất của rig-motion.js đổi ≤ FIT.bk mỗi khung.
+// Soát lần 1: chỉ đo lưỡi với quả cầu quanh tâm sọ — lính Tự do LINH_r01 thế C1, C4, DQ, ult hai tay cách mặt 0,5–0,6 cm, chuôi
+// 1,8 cm (chuôi trong miệng). Soát lần 2: mút chắn tay chĩa vào miệng 1–2 cm, đuôi chuôi trong râu, C6 lưỡi gập xuống sau vai, khuỷu
+// nhảy 0,25–0,36 m, bàn tay lật 180°. Soát lần 3 (phát 60 khung / giây nối đòn): giải rời từng khung đổi họ nghiệm — lưỡi bật 60–89°
+// một khung (gồng C1, C6, Đòn Quyết, Tuyệt Kỹ, cuối lộn né), lật bàn tay 180° khi nối đòn; râu, cổ áo theo thân lọt chắn tay, chuôi
+// 2,6–3 cm; chuôi, chắn tay lún ngực, bụng 400–540 khung; lộn né gập lưỡi theo đất vào đầu 1,5–1,8 cm. Soát lần 4 (máy đích, trận B20):
+// giải mỗi khung tốn 0,33 ms trung bình, 33 ms khung tệ nhất; đổi mốc u 1e-5 làm lưỡi lệch 41–100° (lời giải theo lịch sử, đổi nhánh);
+// C6 LINH_r24, Tuyệt Kỹ H31 nhát 3: tay kẹt dưới cằm, nhát bổ trễ tư thế 45–102° suốt 20–36 khung, lưỡi không xuống tới đất. Nay đòn, thế
+// có thẻ tra bảng dựng sẵn mỗi mô hình (fitTables — cuối file): lượt dựng kéo lưỡi về đích nhanh ít nhất FIT.rx lần lưỡi tư thế; mẫu kẹt
+// nhánh (lệch > FIT.tdv mà giải rời lệch ít hơn FIT.txg) thì thêm lượt ngược (FIT.tm mẫu trước); bước nhảy rải ra (FIT.jw, jt); lúc chạy,
+// lời giải trộn còn chạm quá FIT.tq thì đuổi theo bảng hay đẩy ra, giữ liền mạch FIT.ct, cj; giữa hai mẫu tra theo phần tay tư thế đã đi
+// (FIT.lx); góc gập theo đất theo tư thế đang trộn, đổi ≤ FIT.bt mỗi khung; mọi khung so với khung trước lưỡi quay quá tư thế ≤ FIT.cr,
+// hai trục bàn tay ≤ FIT.cy, khuỷu phải ≤ FIT.cj, khuỷu tay trái ≤ FIT.cel (mặt, cổ, đất trước); chạy tra bảng tĩnh khi tay tư thế đã vào
+// thế mang (FIT.cq). Tư thế không thẻ giải mỗi khung, trần FIT.wk lần đo khe; thân nghiêng quá (trục y thân · pháp tuyến đất < FIT.uq:
+// lộn né, ngã) thì "dựng mũi lên" theo phía trời chứ không theo trục y thân.
+export const FIT = { k: 0.97, wr: 0.14, sr: 0.12, hm: 0.05, skull: [0, 0.13, 0.03], hh: 0.09, hg: 0.07, hb: 0.07, gz: 0.08, it: 4, cell: 0.006,
+  gc: 0.02, gm: 0.16, gs: 0.02, fz: 0.07, nx: 0.15, ts: Math.PI / 12, fd: 0.04, hf: 0.06, hc: 0.02,
+  ux: 0.14, uh: 0.09, ub: 0.05, hgm: 0.045, gr: 0.035, fc: 0.02, bc: 0.1, bb: 0.005,
+  rd: 0.1, rr: 0.14, rw: 0.015, pd: 0.6, cd: 0.3, ce: 0.4, cw: 0.04, tr: 0.01, ew: 0.04, ed: 0.35, ws: 1.0, ws2: 0.1, bdr: 0.4, rf: 0.01, bk: 0.1,
+  eg: 0.01, ca: 0.28, gf: 3, rx: 1.2, uq: 0.5, wk: 8000, tq: 0.004, tdv: Math.PI / 4, txg: 0.35, tm: [3, 12], jw: 0.05, jt: 0.35, ct: 0.35, cj: 0.05,
+  cr: 0.34, cy: 0.6, cel: 0.03, lx: 0.05, bt: 0.15, cq: 0.05 };
+// Lưới mặt của thân GLB (head, neck: chỉ số xương đầu, cổ — −1 nếu không có; pos n × 3 khung gắn, si / sw n × 4; hp khớp đầu ở khung
+// gắn, chỉ tịnh tiến): đỉnh có xương nặng nhất là đầu, cộng đỉnh mà đầu + cổ nặng ≥ nửa trong |x| ≤ FIT.nx quanh khớp đầu (cổ, râu, cổ áo
+// — râu LINH_r01 theo thân, đuôi chuôi lọt vào râu mà lưới đầu không thấy), trừ khớp đầu — pts (Float32Array, một đỉnh mỗi ô FIT.cell);
+// grid: bảng khoảng cách tới đỉnh gần nhất (distGrid: ô FIT.gc, phủ hộp đỉnh ± FIT.gm, ≤ FIT.gm — fitArms tra thay vì duyệt từng đỉnh);
+// shell: trung vị khoảng cách tâm sọ (hp + FIT.skull) → các đỉnh theo đầu (dùng khi không có pts). Không đỉnh nào: { shell: 0, pts: null,
+// grid: null }.
+export function headShape(pos, si, sw, head, hp, neck = -1) {
+  const c = add(hp, FIT.skull), d = [], pts = [], seen = new Set();
+  for (let v = 0; v < pos.length / 3; v++) {
+    let q = 0, wh = 0, wt = 0;
+    for (let k = 0; k < 4; k++) { const w = sw[v * 4 + k], b = si[v * 4 + k]; wt += w; if (b === head || b === neck) wh += w; if (w > sw[v * 4 + q]) q = k; }
+    const own = si[v * 4 + q] === head, x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
+    if (!own && !(neck >= 0 && 2 * wh >= wt && Math.abs(x - hp[0]) <= FIT.nx)) continue;
+    const key = `${Math.round(x / FIT.cell)},${Math.round(y / FIT.cell)},${Math.round(z / FIT.cell)}`;
+    if (own) d.push(Math.hypot(x - c[0], y - c[1], z - c[2]));
+    if (seen.has(key)) continue;
+    seen.add(key); pts.push(x - hp[0], y - hp[1], z - hp[2]);
+  }
+  d.sort((a, b) => a - b);
+  const P = pts.length ? Float32Array.from(pts) : null;
+  return { shell: d.length ? d[d.length >> 1] : 0, pts: P, grid: P ? distGrid(P, FIT.gm) : null };
+}
+// Thân GLB ngoài đầu (đợt soát 19a lần 3): names tên xương theo chỉ số, inv ma trận gắn nghịch đảo (n × 16, theo cột). Toạ độ khung
+// thân: trừ khớp thân lúc gắn (thân, lưng, hông gắn không quay).
+//  · up: bảng khoảng cách tới đỉnh trên đường vai − 0,02, |x − x khớp đầu| < FIT.ux, xương nặng nhất không phải đầu, tay, xương đòn —
+//    râu theo thân, cổ, cổ áo (lưới mặt chỉ có đỉnh theo đầu, đầu + cổ ≥ nửa: LINH_r01 93 đỉnh râu lọt chắn tay 2,6 cm);
+//  · sl: thân (đỉnh theo thân, lưng, hông, xương đòn từ khớp thân − 0,12 tới đường vai − FIT.bc) cắt thành lát ngang (slices) — bodyAt:
+//    lưỡi không xuyên ngực, bụng (C6, Tuyệt Kỹ bật nhảy: tay kẹt dưới cằm, lưỡi theo tư thế quay ra sau xuyên ngực, 46 khung lệch tư thế
+//    > 90°). Không lấy đỉnh vai: lát sao lấp chỗ lõm giữa cổ và vai, lưỡi gác vai bị coi là trong thân — kẹt (lệch > 90° 86 khung).
+// Thiếu xương thân, đầu, vai: null.
+export function bodyShape(pos, si, sw, names, inv) {
+  const bp = (nm) => {
+    const i = names.indexOf(nm); if (i < 0) return null;
+    const b = i * 16, t = [inv[b + 12], inv[b + 13], inv[b + 14]];
+    return [0, 1, 2].map((r) => -(inv[b + r * 4] * t[0] + inv[b + r * 4 + 1] * t[1] + inv[b + r * 4 + 2] * t[2]));
+  };
+  const T0 = bp("torso"), H0 = bp("head"), sL = bp("shL"), sR = bp("shR");
+  if (!T0 || !H0 || !sL || !sR) return null;
+  const shY = (sL[1] + sR[1]) / 2, head = names.indexOf("head"), PH = { torso: 0, clavL: 0, clavR: 0, spine: 0.5, hips: 1 };
+  const arms = new Set(["shL", "elL", "handL", "shR", "elR", "handR", "twistL", "twistR", "clavL", "clavR"].map((n) => names.indexOf(n)));
+  const up = [], seen = new Set(), body = [];
+  for (let v = 0; v < pos.length / 3; v++) {
+    let q = 0; for (let k = 1; k < 4; k++) if (sw[v * 4 + k] > sw[v * 4 + q]) q = k;
+    const b = si[v * 4 + q], X = pos[v * 3], Y = pos[v * 3 + 1], x = X - T0[0], y = Y - T0[1], z = pos[v * 3 + 2] - T0[2];
+    if (b !== head && !arms.has(b) && Y > shY - 0.02 && Math.abs(X - H0[0]) < FIT.ux) {
+      const key = `${Math.round(x / FIT.cell)},${Math.round(y / FIT.cell)},${Math.round(z / FIT.cell)}`;
+      if (!seen.has(key)) { seen.add(key); up.push(x, y, z); }
+    }
+    if (PH[names[b]] === undefined || y < -0.12 || Y > shY - FIT.bc) continue;
+    let wp = 0, ws = 0;
+    for (let k = 0; k < 4; k++) { const f = PH[names[si[v * 4 + k]]]; if (f !== undefined) { wp += sw[v * 4 + k] * f; ws += sw[v * 4 + k]; } }
+    body.push(x, y, z, wp / ws);
+  }
+  return { up: up.length ? distGrid(Float32Array.from(up), FIT.gm) : null, sl: body.length ? slices(body) : null };
+}
+// Bảng khoảng cách (ô FIT.gc, phủ hộp P ± m, cắt ở m) tới điểm gần nhất trong P (n × 3): mỗi điểm gieo đúng khoảng cách vào 6 × 6 × 6 ô
+// quanh nó, rồi lan "điểm gần nhất" sang 26 ô kề, một lượt quét xuôi một lượt ngược (so với duyệt hết: sai ≤ 1,5 mm trong 10 cm, ≤ 2,5 mm
+// tới m — rig-glb.test.mjs; gieo 8 ô thì sai 5–7 mm). Trước đây rải mỗi điểm vào mọi ô trong bán kính m: 65–104 ms lần đầu dựng mỗi rig
+// WC01 (soát 19a lần 3).
+function distGrid(P, m) {
+  const s = FIT.gc, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < P.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], P[i + k]); hi[k] = Math.max(hi[k], P[i + k]); }
+  const o = lo.map((x) => x - m), n = lo.map((x, k) => Math.ceil((hi[k] - x + 2 * m) / s) + 1), N = n[0] * n[1] * n[2];
+  const d = new Float32Array(N).fill(Infinity), id = new Int32Array(N).fill(-1);
+  const put = (j, a, b, e, i) => {
+    const x = o[0] + a * s - P[i], y = o[1] + b * s - P[i + 1], z = o[2] + e * s - P[i + 2], t = Math.sqrt(x * x + y * y + z * z);
+    if (t < d[j]) { d[j] = t; id[j] = i; }
+  };
+  for (let i = 0; i < P.length; i += 3) {
+    const a0 = Math.floor((P[i] - o[0]) / s), b0 = Math.floor((P[i + 1] - o[1]) / s), e0 = Math.floor((P[i + 2] - o[2]) / s);
+    for (let a = Math.max(0, a0 - 2); a <= Math.min(n[0] - 1, a0 + 3); a++) for (let b = Math.max(0, b0 - 2); b <= Math.min(n[1] - 1, b0 + 3); b++)
+      for (let e = Math.max(0, e0 - 2); e <= Math.min(n[2] - 1, e0 + 3); e++) put((a * n[1] + b) * n[2] + e, a, b, e, i);
+  }
+  const ka = [], kb = [], ke = [];
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let e = -1; e <= 1; e++) if (a < 0 || (a === 0 && (b < 0 || (b === 0 && e < 0)))) { ka.push(a); kb.push(b); ke.push(e); }
+  for (const sg of [1, -1]) {
+    for (let a = sg > 0 ? 0 : n[0] - 1; a >= 0 && a < n[0]; a += sg) for (let b = sg > 0 ? 0 : n[1] - 1; b >= 0 && b < n[1]; b += sg)
+      for (let e = sg > 0 ? 0 : n[2] - 1; e >= 0 && e < n[2]; e += sg) {
+        const j = (a * n[1] + b) * n[2] + e;
+        for (let q = 0; q < 13; q++) {
+          const A2 = a + sg * ka[q], B2 = b + sg * kb[q], E2 = e + sg * ke[q];
+          if (A2 < 0 || B2 < 0 || E2 < 0 || A2 >= n[0] || B2 >= n[1] || E2 >= n[2]) continue;
+          const i = id[(A2 * n[1] + B2) * n[2] + E2];
+          if (i >= 0 && i !== id[j]) put(j, a, b, e, i);
+        }
+      }
+  }
+  for (let j = 0; j < N; j++) if (d[j] > m) d[j] = m;
+  return { o, n, d };
+}
+// Lát ngang của thân (B: n × 4 — x, y, z khung thân, phần góc thân φ: thân, xương đòn 0, lưng 0,5 — khung lưng quay nửa góc thân —, hông
+// 1, theo trọng số da): lát i phủ y0 + i·FIT.fc … + FIT.fc; tâm = giữa hộp (x, z) các đỉnh của lát; r[i·SECT + j] = khoảng cách xa nhất
+// tới tâm của các đỉnh theo hướng j (hướng trống: trung bình hai hướng kề có số) — lát hình sao; lv = φ trung bình làm tròn về LV mức.
+// (Mỗi xương một mặt trước / sau thì thủng: mặt trước ngực có chỗ theo đòn, chỗ theo lưng.) Đo trên lưới da: 90% đỉnh thân cách mặt lát
+// trong −5,5 … +1,5 cm.
+const SECT = 32, LV = 5;
+function slices(B) {
+  const c = FIT.fc;
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 1; i < B.length; i += 4) { y0 = Math.min(y0, B[i]); y1 = Math.max(y1, B[i]); }
+  const n = Math.max(1, Math.ceil((y1 - y0) / c + 1e-6)), at = (y) => Math.min(n - 1, Math.floor((y - y0) / c));
+  const lo = new Float32Array(2 * n).fill(Infinity), hi = new Float32Array(2 * n).fill(-Infinity), ph = new Float32Array(n), cnt = new Int32Array(n);
+  for (let i = 0; i < B.length; i += 4) {
+    const s = at(B[i + 1]);
+    lo[2 * s] = Math.min(lo[2 * s], B[i]); hi[2 * s] = Math.max(hi[2 * s], B[i]); lo[2 * s + 1] = Math.min(lo[2 * s + 1], B[i + 2]); hi[2 * s + 1] = Math.max(hi[2 * s + 1], B[i + 2]);
+    ph[s] += B[i + 3]; cnt[s]++;
+  }
+  const cx = new Float32Array(n), cz = new Float32Array(n), r = new Float32Array(n * SECT), lv = new Int8Array(n).fill(-1);
+  for (let s = 0; s < n; s++) if (cnt[s]) { cx[s] = (lo[2 * s] + hi[2 * s]) / 2; cz[s] = (lo[2 * s + 1] + hi[2 * s + 1]) / 2; lv[s] = Math.round((ph[s] / cnt[s]) * (LV - 1)); }
+  for (let i = 0; i < B.length; i += 4) {
+    const s = at(B[i + 1]), dx = B[i] - cx[s], dz = B[i + 2] - cz[s], j = Math.floor(((Math.atan2(dz, dx) / TAU) * SECT + SECT) % SECT) % SECT;
+    r[s * SECT + j] = Math.max(r[s * SECT + j], Math.hypot(dx, dz));
+  }
+  for (let s = 0; s < n; s++) for (let pass = 0; pass < SECT && cnt[s]; pass++) {
+    let empty = 0;
+    for (let j = 0; j < SECT; j++) {
+      if (r[s * SECT + j] > 0) continue;
+      const a = r[s * SECT + ((j + SECT - 1) % SECT)], b = r[s * SECT + ((j + 1) % SECT)];
+      if (a > 0 || b > 0) r[s * SECT + j] = a > 0 && b > 0 ? (a + b) / 2 : Math.max(a, b); else empty++;
+    }
+    if (!empty) break;
+  }
+  return { y0, n, cx, cz, r, lv };
+}
+// khoảng cách (nội suy ba chiều) từ điểm (x, y, z) tới bảng distGrid; ngoài bảng: FIT.gm
+function gridAt(G, x, y, z) {
+  const s = FIT.gc, fx = (x - G.o[0]) / s, fy = (y - G.o[1]) / s, fz = (z - G.o[2]) / s, n = G.n;
+  if (!(fx >= 0 && fy >= 0 && fz >= 0 && fx < n[0] - 1 && fy < n[1] - 1 && fz < n[2] - 1)) return FIT.gm;
+  const a = fx | 0, b = fy | 0, e = fz | 0, u = fx - a, v = fy - b, w = fz - e, d = G.d, j = (a * n[1] + b) * n[2] + e, J = n[1] * n[2];
+  const c00 = d[j] * (1 - w) + d[j + 1] * w, c01 = d[j + n[2]] * (1 - w) + d[j + n[2] + 1] * w;
+  const c10 = d[j + J] * (1 - w) + d[j + J + 1] * w, c11 = d[j + J + n[2]] * (1 - w) + d[j + J + n[2] + 1] * w;
+  return (c00 * (1 - v) + c01 * v) * (1 - u) + (c10 * (1 - v) + c11 * v) * u;
+}
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const scl = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const lin = (a, ka, b, kb) => [a[0] * ka + b[0] * kb, a[1] * ka + b[1] * kb, a[2] * ka + b[2] * kb];
+// quay v quanh trục đơn vị k một góc th (Rodrigues)
+const rotAx = (v, k, th) => { const c = Math.cos(th), s = Math.sin(th); return add(lin(v, c, cross(k, v), s), scl(k, dot(k, v) * (1 - c))); };
+const angOf = (a, b) => Math.atan2(len(cross(a, b)), dot(a, b));
+// v vuông góc với đơn vị d, chuẩn hoá (suy biến: giữ v)
+const perpN = (v, d) => { const w = sub(v, scl(d, dot(v, d))), l = len(w); return l > 1e-9 ? scl(w, 1 / l) : v; };
+// quay v theo phép quay ngắn nhất đưa đơn vị a tới đơn vị b
+const swing = (v, a, b) => { const k = cross(a, b), s = len(k); return s > 1e-9 ? rotAx(v, scl(k, 1 / s), Math.atan2(s, dot(a, b))) : v; };
+// quay v theo phép quay đưa khung trực chuẩn (a0, b0) tới (a1, b1)
+const xfer = (v, a0, b0, a1, b1) => { const c0 = cross(a0, b0), c1 = cross(a1, b1), x = dot(v, a0), y = dot(v, b0), z = dot(v, c0); return add(lin(a1, x, b1, y), scl(c1, z)); };
+const inBall = (p, c, r) => { const d = sub(p, c), L = len(d); return L <= r ? p : add(c, scl(d, r / L)); };
+// Điểm gần p nhất trong giao hai quả cầu (c1, r1), (c2, r2); không giao thì điểm giữa hai mặt cầu trên đường nối tâm.
+function nearest2(p, c1, r1, c2, r2) {
+  const in1 = (q) => len(sub(q, c1)) <= r1 + 1e-9, in2 = (q) => len(sub(q, c2)) <= r2 + 1e-9;
+  if (in1(p) && in2(p)) return p;
+  const q1 = inBall(p, c1, r1), q2 = inBall(p, c2, r2), ok1 = in2(q1), ok2 = in1(q2);
+  if (ok1 || ok2) return ok1 && (!ok2 || len(sub(q1, p)) <= len(sub(q2, p))) ? q1 : q2;
+  const u = sub(c2, c1), d = len(u), n = scl(u, 1 / d);
+  if (d >= r1 + r2) return add(c1, scl(n, (r1 + d - r2) / 2));
+  const a = (d * d + r1 * r1 - r2 * r2) / (2 * d), h = Math.sqrt(Math.max(0, r1 * r1 - a * a)), cc = add(c1, scl(n, a));
+  let w = sub(p, cc); w = sub(w, scl(n, dot(w, n)));
+  if (len(w) < 1e-9) w = cross(Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1], n);
+  return add(cc, scl(norm(w), h));
+}
+// khoảng cách từ c tới đoạn a + z·d, z0 ≤ z ≤ z1
+const segGap = (c, a, d, z0, z1) => { const z = Math.max(z0, Math.min(z1, dot(sub(c, a), d))); return len(sub(c, add(a, scl(d, z)))); };
+
+// Số đo tay của rig (P = rig.p: khớp lúc chạy, khung cha), blade = { guard, tip, butt } của gươm (models.js dyn.blade: chắn tay, mũi,
+// núm chuôi, mút chắn tay), head = { shell, pts, grid, hand, body } lưới mặt (models.js dyn.head: headShape), ngón tay phải (handPts),
+// thân (bodyShape) → số đo cho fitArms; null khi tay trùng số tư thế (rig khối: tư thế giữ nguyên từng số).
+export function fitGeo(P, blade = null, head = null) {
+  const shell = head ? head.shell : 0;
+  const v = (o) => [o.position.x, o.position.y, o.position.z];
+  const arm = (s) => { const e = P["el" + s].position, h = P["hand" + s].position; return { L1: Math.hypot(e.x, e.y, e.z), L2: Math.hypot(h.y, h.z), off: Math.atan2(h.z, -h.y) }; };
+  const g = { shR: v(P.shR), shL: v(P.shL), R: arm("R"), L: arm("L"), head: v(P.head), tp: v(P.torso), blade: blade ? [blade.guard, blade.tip] : [0.16, 1.22],
+    butt: blade?.butt ?? -0.32, gp: blade?.gp || null, pts: head?.pts || null, grid: head?.grid || null, hp: head?.hand || null,
+    up: head?.body?.up || null, sl: head?.body?.sl || null, sr: Math.max(FIT.sr, shell + FIT.hm), wr: Math.max(FIT.wr, shell) };
+  let d = 0;
+  for (let k = 0; k < 3; k++) d = Math.max(d, Math.abs(g.shR[k] - SH.R[k]), Math.abs(g.shL[k] - SH.L[k]));
+  for (const s of ["R", "L"]) d = Math.max(d, Math.abs(g[s].L1 - ARM.L1), Math.abs(g[s].L2 - ARM.L2), Math.abs(g[s].off - ARM.off));
+  return d < 1e-6 ? null : g;
+}
+const _fk = [0, 0, 0, 0, 0, 0], _ik2 = [0, 0, 0, 0];
+const TILT_MAX = Math.PI / 2;
+// Ngữ cảnh vật cản của tư thế p: headX (ch, shd), tâm sọ C (khung thân), mặt đất gp = [nx, ny, nz, d] (độ cao trên đất của điểm khung
+// thân x = n·x + d; null: không xét), zf: đầu dưới vùng nắm tay dọc cán — nắm hai tay thì tới điểm nắm tay trái − FIT.fz, buông (grip 0:
+// Hịch, Binh Thư, chạy vác gươm) chỉ nắm tay phải; phần cán dưới đó tính như đuôi chuôi (nghiêng được, khe FIT.hb).
+// rl: LV ma trận (theo hàng) quay phần k / (LV − 1) góc thân (khung thân → khung lát thân mức k; bodyAt).
+function fitCtx(p, g, gp) {
+  const ch = Math.cos(p.headX || 0), shd = Math.sin(p.headX || 0), K = FIT.skull, gw = Math.min(1, Math.max(0, 2 * (p.grip || 0)));
+  const H = { ch, shd, C: add(g.head, [K[0], ch * K[1] - shd * K[2], shd * K[1] + ch * K[2]]), gp, zf: -GRIP * gw - FIT.fz, rl: null,
+    up: gp && gp[1] < FIT.uq ? norm([gp[0], gp[1], gp[2]]) : [0, 1, 0] };
+  if (g.sl) {
+    const a = Math.cos((p.torsoX || 0) / 2), b = Math.sin((p.torsoX || 0) / 2), c = Math.cos((p.torsoY || 0) / 2), d = Math.sin((p.torsoY || 0) / 2);
+    const e = Math.cos((p.torsoZ || 0) / 2), f = Math.sin((p.torsoZ || 0) / 2);
+    // quaternion của Rx·Ry·Rz (như three Euler "XYZ") → trục, góc
+    let qx = b * c * e + a * d * f, qy = a * d * e - b * c * f, qz = a * c * f + b * d * e, qw = a * c * e - b * d * f;
+    if (qw < 0) { qx = -qx; qy = -qy; qz = -qz; qw = -qw; }
+    const s = Math.hypot(qx, qy, qz), th = 2 * Math.atan2(s, qw), [x, y, z] = s > 1e-9 ? [qx / s, qy / s, qz / s] : [1, 0, 0];
+    H.rl = [];
+    for (let i = 0; i < LV; i++) {
+      const tt = (th * i) / (LV - 1), C = Math.cos(tt), S = Math.sin(tt), U = 1 - C;
+      H.rl.push([C + x * x * U, x * y * U - z * S, x * z * U + y * S, y * x * U + z * S, C + y * y * U, y * z * U - x * S, z * x * U - y * S, z * y * U + x * S, C + z * z * U]);
+    }
+  }
+  return H;
+}
+// khoảng cách từ điểm khung thân tới lưới mặt (bảng g.grid, khung khớp đầu: trừ g.head, quay ngược headX)
+function headAt(g, H, x, y, z) {
+  if (!g.grid) return FIT.gm;
+  const vx = x - g.head[0], vy = y - g.head[1], vz = z - g.head[2];
+  return gridAt(g.grid, vx, H.ch * vy + H.shd * vz, -H.shd * vy + H.ch * vz);
+}
+const upAt = (g, x, y, z) => (g.up ? gridAt(g.up, x, y, z) : FIT.gm);
+// khe ra ngoài thân (lát g.sl) của điểm khung thân: mỗi mức k, quay điểm về khung mức đó (H.rl), lát chứa độ cao của nó mà cùng mức →
+// khoảng cách ngang tới tâm lát trừ bán kính theo hướng (dương ngoài, âm trong thân); nhỏ nhất qua các mức; không lát nào: 9
+function bodyAt(g, H, x, y, z) {
+  const L = g.sl;
+  if (!L || !H.rl) return 9;
+  let s = 9;
+  for (let k = 0; k < LV; k++) {
+    const R = H.rl[k], qy = R[3] * x + R[4] * y + R[5] * z, i = Math.floor((qy - L.y0) / FIT.fc);
+    if (i < 0 || i >= L.n || L.lv[i] !== k) continue;
+    const dx = R[0] * x + R[1] * y + R[2] * z - L.cx[i], dz = R[6] * x + R[7] * y + R[8] * z - L.cz[i];
+    const f = ((Math.atan2(dz, dx) / TAU) * SECT + SECT) % SECT, j = Math.floor(f) % SECT, u = f - Math.floor(f);
+    s = Math.min(s, Math.hypot(dx, dz) - (L.r[i * SECT + j] * (1 - u) + L.r[i * SECT + ((j + 1) % SECT)] * u));
+  }
+  return s;
+}
+const groundAt = (H, x, y, z) => (H.gp ? H.gp[0] * x + H.gp[1] * y + H.gp[2] * z + H.gp[3] : 9);
+// Thiếu khe của điểm (x, y, z) khung thân theo vùng — 0 nắm tay (mặt FIT.hh, cổ uh), 1 gốc lưỡi (mặt + cổ hb, nhân hh / hb cho cùng
+// thang với nắm tay), 2 lưỡi (mặt + cổ hb, đất gr, thân bb), 3 đuôi chuôi (mặt hb, cổ ub, đất gr), 4 mút chắn tay (mặt + cổ hg), 5 ngón
+// tay (mặt + cổ hf), 6 giữa thanh chắn tay (mặt + cổ hgm). _why: vật cản thiếu nhiều nhất (0 mặt, 1 cổ, 2 thân, 3 đất) — pháp tuyến đẩy
+// ra (gradAt). Đuôi chuôi, chắn tay không xét thân: thế thủ của tư thế để núm chuôi trong bụng thân GLB (tay ở rìa tầm với) — đẩy ra
+// phải dựng lưỡi thêm ~40° (đổi thiết kế); xét thân ở ngực thì kẹt nhiều hơn (lệch tư thế > 90° 51–207 khung, đo soát lần 3).
+let _why = 0, _work = 0, _wcap = Infinity, _bld = false, _gc = null, _gk = null;     // _work: số lần đo khe trong lượt fitArms này (trần _wcap = FIT.wk, xem fitTabbed)
+function defAt(g, H, x, y, z, zone) {
+  _work++;
+  const dh = headAt(g, H, x, y, z), du = upAt(g, x, y, z), dm = Math.min(dh, du);
+  let e, w = dh <= du ? 0 : 1, t;
+  if (zone === 0) { e = FIT.hh - dh; w = 0; t = FIT.uh - du; if (t > e) { e = t; w = 1; } }
+  else if (zone === 1) e = ((FIT.hb - dm) * FIT.hh) / FIT.hb;
+  else if (zone === 3) { e = FIT.hb - dh; w = 0; t = FIT.ub - du; if (t > e) { e = t; w = 1; } }
+  else e = (zone === 4 ? FIT.hg : zone === 5 ? FIT.hf : zone === 6 ? FIT.hgm : FIT.hb) - dm;
+  if (zone === 2 || zone === 3) { t = FIT.gr - groundAt(H, x, y, z); if (t > e) { e = t; w = 3; } }
+  if (zone === 2 && g.sl && H.rl) { t = FIT.bb - bodyAt(g, H, x, y, z); if (t > e) { e = t; w = 2; } }
+  _why = w;
+  return e;
+}
+const fieldAt = (g, H, w, x, y, z) => (w === 0 ? headAt(g, H, x, y, z) : w === 1 ? upAt(g, x, y, z) : w === 2 ? bodyAt(g, H, x, y, z) : groundAt(H, x, y, z));
+// hướng ra xa vật cản w ở điểm P (khung thân): sai phân trung tâm, đơn vị; lưới mặt mà hướng chĩa vào tâm sọ (điểm đã lọt qua lớp
+// đỉnh) thì lấy hướng từ tâm sọ; không ra hướng: null
+function gradAt(g, H, w, P) {
+  const e = FIT.gc / 2, f = (x, y, z) => fieldAt(g, H, w, P[0] + x, P[1] + y, P[2] + z);
+  let n = [f(e, 0, 0) - f(-e, 0, 0), f(0, e, 0) - f(0, -e, 0), f(0, 0, e) - f(0, 0, -e)];
+  if (w === 0 && dot(n, sub(P, H.C)) < 0) n = sub(P, H.C);
+  const l = len(n);
+  return l > 1e-9 ? scl(n, 1 / l) : null;
+}
+// Mẫu dọc trục gươm (cổ tay W, lưỡi D): fistGap — hai nắm tay (điểm nắm tay trái − FIT.fz … chắn tay) và gốc lưỡi (… chắn tay + FIT.gz):
+// phần đi theo cổ tay, nghiêng / lật gươm không đổi được; tiltGap — lưỡi (từ chắn tay + gz) và đuôi chuôi dưới nắm tay trái: phần
+// nghiêng gươm quanh cổ tay đổi được. Trả thiếu khe lớn nhất (≥ 1e-4).
+function fistGap(g, H, W, D) {
+  const z0 = H.zf, z1 = g.blade[0] + FIT.gz, n = Math.ceil((z1 - z0) / FIT.gs);
+  let e = 1e-4;
+  for (let i = 0; i <= n; i++) {
+    const z = z0 + ((z1 - z0) * i) / n;
+    e = Math.max(e, defAt(g, H, W[0] + D[0] * z, W[1] + D[1] * z, W[2] + D[2] * z, z < g.blade[0] ? 0 : 1));
+  }
+  return e;
+}
+function tiltGap(g, H, W, D, E = null) {
+  const z0 = g.blade[0] + FIT.gz, zf = H.zf, nb = Math.ceil((g.blade[1] - z0) / FIT.gs), np = Math.max(1, Math.ceil((zf - g.butt) / FIT.gs));
+  let e = 1e-4;
+  for (let i = 0; i <= nb; i++) { const z = z0 + ((g.blade[1] - z0) * i) / nb; e = Math.max(e, defAt(g, H, W[0] + D[0] * z, W[1] + D[1] * z, W[2] + D[2] * z, 2)); }
+  for (let i = 0; i <= np; i++) { const z = g.butt + ((zf - g.butt) * i) / np; e = Math.max(e, defAt(g, H, W[0] + D[0] * z, W[1] + D[1] * z, W[2] + D[2] * z, 3)); }
+  // hai mép lưỡi gần mũi (như điểm fixBlades của gươm GLB, models.js: ±0,065 theo lưỡi sắc, 0,2 dưới mũi) trên đất
+  if (E && H.gp) for (const s of [0.065, -0.065]) { const P = add(W, lin(E, s, D, g.blade[1] - 0.2)); e = Math.max(e, FIT.gr - groundAt(H, P[0], P[1], P[2])); }
+  return e;
+}
+// hướng dời cổ tay ra xa vật cản: tổng pháp tuyến (nhân độ thiếu) ở các mẫu nắm tay / gốc lưỡi còn thiếu khe (E: cả các mút chắn tay),
+// vuông góc lưỡi; không ra hướng thì từ tâm sọ C. null: không có hướng.
+function pushDir(g, H, W, D, C, E = null) {
+  const z0 = H.zf, z1 = g.blade[0] + FIT.gz, n = Math.ceil((z1 - z0) / FIT.gs);
+  let u = [0, 0, 0];
+  const at = (P, zone) => { const e = defAt(g, H, P[0], P[1], P[2], zone); if (e > 1e-4) { const q = gradAt(g, H, _why, P); if (q) u = add(u, scl(q, e)); } };
+  for (let i = 0; i <= n; i++) { const z = z0 + ((z1 - z0) * i) / n; at(add(W, scl(D, z)), z < g.blade[0] ? 0 : 1); }
+  if (E && g.gp) {
+    const X = cross(E, D);
+    for (const [k, zone] of [[1, 4], [0.5, 6], [0.75, 6]]) for (let j = 0; j < g.gp.length; j += 3) at(add(W, add(lin(X, g.gp[j] * k, E, g.gp[j + 1] * k), scl(D, g.gp[j + 2]))), zone);
+  }
+  u = sub(u, scl(D, dot(u, D)));
+  if (len(u) < 1e-9) { u = sub(W, C); u = sub(u, scl(D, dot(u, D))); }
+  return len(u) < 1e-9 ? null : norm(u);
+}
+// Giải toàn cục: hai nắm tay / gốc lưỡi sát mặt thì dời cổ tay ra theo pushDir tới khi tầm với kéo lại (không đỡ hơn); còn thiếu thì dò
+// rìa tầm với (searchW).
+function clearFists(g, H, W, W0, D, gw, C) {
+  let f = fistGap(g, H, W, D);
+  for (let it = 0; it < FIT.it && f > 1e-4 && _work < _wcap; it++) {
+    const u = pushDir(g, H, W, D, C);
+    if (!u) break;
+    const Wn = reach(add(W, scl(u, f + 2e-3)), D, g, gw), fn = fistGap(g, H, Wn, D);
+    if (fn > f - 1e-3) break;
+    W = Wn; f = fn;
+  }
+  return f > 1e-4 ? searchW(g, H, W, W0, D, gw) : W;
+}
+// Giải tại chỗ: hai nắm tay / gốc lưỡi (E: cả mút chắn tay) sát vật cản thì dời cổ tay theo pushDir — cổ tay ở rìa tầm tay phải (hay điểm
+// nắm ở rìa tầm tay trái) thì trượt trên mặt cầu tầm với (bỏ phần hướng ra ngoài cầu; cả hai thì theo tiếp tuyến của đường giao) thay vì
+// bị tầm với kéo lại chỗ cũ; tới FIT.it bước, dừng khi không đỡ hơn.
+function slideFists(g, H, W, D, E, gw, C) {
+  const gap = (Wx) => Math.max(fistGap(g, H, Wx, D), E ? guardGap(g, H, Wx, D, E) : 0);
+  let f = gap(W);
+  for (let it = 0; it < FIT.it && f > 1e-4 && _work < _wcap; it++) {
+    let u = pushDir(g, H, W, D, C, E);
+    if (!u) break;
+    const a = sub(W, g.shR), la = len(a), n1 = la >= FIT.k * (g.R.L1 + g.R.L2) - 1e-3 ? scl(a, 1 / la) : null;
+    const b = sub(sub(W, scl(D, GRIP)), g.shL), lb = len(b), n2 = gw > 0 && lb >= FIT.k * (g.L.L1 + g.L.L2) - 1e-3 ? scl(b, 1 / lb) : null;
+    if (n1 && n2 && (dot(u, n1) > 0 || dot(u, n2) > 0)) { const k = cross(n1, n2), lk = len(k); u = lk > 1e-6 ? scl(k, dot(u, k) / (lk * lk)) : [0, 0, 0]; }
+    else { if (n1 && dot(u, n1) > 0) u = sub(u, scl(n1, dot(u, n1))); if (n2 && dot(u, n2) > 0) u = sub(u, scl(n2, dot(u, n2))); }
+    if (len(u) < 1e-6) break;
+    const un = norm(u);
+    let Wn = reach(add(W, scl(un, f + 2e-3)), D, g, gw), fn = gap(Wn);
+    if (fn > f - 1e-3) break;
+    if (fn <= 1e-4) {      // hết chạm: bước ngắn nhất còn hết chạm (chia đôi) — đẩy vừa đủ, cổ tay không giật qua lại giữa các khung
+      let lo = 0, hi = f + 2e-3;
+      for (let i = 0; i < 5; i++) { const m = (lo + hi) / 2, Wm = reach(add(W, scl(un, m)), D, g, gw); if (gap(Wm) <= 1e-4) { hi = m; Wn = Wm; } else lo = m; }
+      fn = gap(Wn);
+    }
+    W = Wn; f = fn;
+  }
+  return W;
+}
+// Hai nắm tay còn sát mặt ở rìa tầm với (dời theo pháp tuyến bị tầm với kéo lại): dò quanh cổ tay W trên mặt phẳng tiếp xúc cầu tầm tay
+// phải (RING × 8 hướng, rồi vào tầm với) chỗ đủ khe gần cổ tay của tư thế W0 nhất (thế giơ qua đầu: cao nhất có thể), chia đôi đoạn
+// W → chỗ đó tìm mép đủ khe; không chỗ nào đủ khe thì chỗ khe rộng nhất.
+const RING = [0.04, 0.08, 0.12, 0.16];
+function searchW(g, H, W, W0, D, gw) {
+  const n = norm(sub(W, g.shR)), a = norm(cross(n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), b = cross(n, a);
+  let best = { W, f: fistGap(g, H, W, D), d: len(sub(W, W0)) };
+  for (const r of RING) for (let k = 0; k < 8 && _work < _wcap; k++) {
+    const t = (k * Math.PI) / 4, c = reach(add(W, lin(a, r * Math.cos(t), b, r * Math.sin(t))), D, g, gw), f = fistGap(g, H, c, D), d = len(sub(c, W0));
+    if (f <= 1e-4 ? best.f > 1e-4 || d < best.d : best.f > 1e-4 && f < best.f - 1e-4) best = { W: c, f, d };
+  }
+  if (best.f > 1e-4 || best.W === W) return best.W;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 5; i++) { const m = (lo + hi) / 2; if (fistGap(g, H, reach(lin(W, 1 - m, best.W, m), D, g, gw), D) > 1e-4) lo = m; else hi = m; }
+  return reach(lin(W, 1 - hi, best.W, hi), D, g, gw);
+}
+// thiếu khe lớn nhất ở các mút chắn tay (g.gp: điểm khung bàn tay — x = E × D, y = E, z = D; chắn tay đối xứng nên E hay −E như nhau),
+// giữa thanh chắn tay (nửa, ba phần tư đường từ trục ra mút: cần FIT.hgm — lộn né: mút cách cổ áo 6 cm mà giữa thanh lọt 2 cm) và ở ngón
+// tay phải (g.hp, khung bàn tay với lưỡi sắc thật Ee — ngón duỗi theo −y tới 0,13)
+function guardGap(g, H, W, D, E, Ee = null) {
+  let e = 1e-4;
+  const pts = (P, Y, zone, k = 1) => {
+    const X = cross(Y, D);
+    for (let j = 0; j < P.length; j += 3) {
+      const a = P[j] * k, b = P[j + 1] * k, c = P[j + 2];
+      e = Math.max(e, defAt(g, H, W[0] + X[0] * a + Y[0] * b + D[0] * c, W[1] + X[1] * a + Y[1] * b + D[1] * c, W[2] + X[2] * a + Y[2] * b + D[2] * c, zone));
+    }
+  };
+  if (g.gp) { pts(g.gp, E, 4); pts(g.gp, E, 6, 0.5); pts(g.gp, E, 6, 0.75); }
+  if (g.hp && Ee) pts(g.hp, Ee, 5);
+  return e;
+}
+// Giải toàn cục (khung đầu). Hướng gươm ở cổ tay W: góc nhỏ nhất từ hướng của tư thế D0 (lưỡi sắc E0) cho lưỡi và đuôi chuôi hết chạm
+// (tiltGap) — trước trong mặt phẳng đứng của lưỡi, chỉ chiều dựng mũi lên (chiều kia gập lưỡi xuống sau gáy, xuyên lưng), rồi quay quanh
+// trục ra xa tâm sọ C (hai chiều); dò từng FIT.ts tới 90°, chia đôi bước cuối; không góc nào hết chạm thì góc thiếu ít nhất. Trả [D, E].
+function tiltFrom(g, H, W, D0, E0, C) {
+  const e0 = tiltGap(g, H, W, D0);
+  if (e0 <= 1e-4) return [D0, E0];
+  const p = cross(D0, H.up), q = cross(sub(C, W), D0), groups = [];
+  if (len(p) > 0.2) { const k = norm(p); groups.push([dot(rotAx(D0, k, 0.1), H.up) < dot(rotAx(D0, scl(k, -1), 0.1), H.up) ? scl(k, -1) : k]); }
+  if (len(q) > 0.2) { const k = norm(q); groups.push([k, scl(k, -1)]); }
+  let fall = { e: e0, k: null, a: 0 };
+  for (const grp of groups) {
+    let hit = null;
+    for (const k of grp) {
+      let prev = 0;
+      for (let a = FIT.ts; a < TILT_MAX + 1e-6 && (!hit || a < hit.a) && _work < _wcap; a += FIT.ts) {
+        const e = tiltGap(g, H, W, rotAx(D0, k, a));
+        if (e <= 1e-4) {
+          let lo = prev, hi = a;
+          for (let i = 0; i < 5; i++) { const mid = (lo + hi) / 2; if (tiltGap(g, H, W, rotAx(D0, k, mid)) > 1e-4) lo = mid; else hi = mid; }
+          hit = { k, a: hi };
+          break;
+        }
+        if (e < fall.e - 1e-4) fall = { e, k, a };
+        prev = a;
+      }
+    }
+    if (hit) return [rotAx(D0, hit.k, hit.a), rotAx(E0, hit.k, hit.a)];
+  }
+  return fall.k ? [rotAx(D0, fall.k, fall.a), rotAx(E0, fall.k, fall.a)] : [D0, E0];
+}
+// Lật gươm quanh trục (E quanh D) góc nhỏ nhất cho các mút chắn tay và ngón tay phải hết chạm (guardGap; eff: E → lưỡi sắc thật của bàn
+// tay theo nhánh armTo sẽ chọn): gươm dựng trước mặt thì chắn tay nằm ngang hai bên mặt, ngón tay không duỗi vào mặt. Dò cả hai chiều
+// (tới amax, mỗi bước amax / 12; ngón tay không đối xứng), lấy góc nhỏ hơn; không góc nào hết chạm thì góc thiếu ít nhất. Trả E.
+function rollFrom(g, H, W, D, E, eff, amax = Math.PI) {
+  const gap = (Ec) => guardGap(g, H, W, D, Ec, eff(Ec)), e0 = gap(E), st = amax / 12;
+  if (e0 <= 1e-4) return E;
+  let fall = { e: e0, a: 0 }, best = null;
+  for (const sg of [1, -1]) {
+    let prev = 0;
+    for (let a = st; a < amax + 1e-6 && (!best || a < best.a) && _work < _wcap; a += st) {
+      const e = gap(rotAx(E, D, sg * a));
+      if (e <= 1e-4) {
+        let lo = prev, hi = a;
+        for (let i = 0; i < 5; i++) { const mid = (lo + hi) / 2; if (gap(rotAx(E, D, sg * mid)) > 1e-4) lo = mid; else hi = mid; }
+        if (!best || hi < best.a) best = { E: rotAx(E, D, sg * hi), a: hi };
+        break;
+      }
+      if (e < fall.e - 1e-4) fall = { e, a: sg * a };
+      prev = a;
+    }
+  }
+  return best ? best.E : fall.a ? rotAx(E, D, fall.a) : E;
+}
+// Giải tại chỗ (gọi liên tục): lưỡi, đuôi chuôi còn thiếu khe thì nghiêng (D, E) quanh trục mômen của các mẫu thiếu (tổng z · (D × pháp
+// tuyến) · thiếu), chiều ngược lại, hay trục dựng mũi lên — mỗi trục góc nhỏ nhất hết chạm tới FIT.pd; lấy giá nhỏ nhất: góc, nhân 3 nếu
+// quay ngược chiều kp (chiều tư thế đang quay lưỡi — gươm vướng đầu thì vượt qua đầu chứ không lùi lại: Tuyệt Kỹ nhát 3 lưỡi kẹt sau gáy
+// 115° khi tư thế đã bổ ra trước); không trục nào hết chạm thì góc thiếu ít nhất (nếu đỡ hơn). Trả [D, E].
+function tiltLocal(g, H, W, D, E, kp = null) {
+  const e0 = tiltGap(g, H, W, D, E);
+  if (e0 <= 1e-4) return [D, E];
+  const z0 = g.blade[0] + FIT.gz, zf = H.zf, nb = Math.ceil((g.blade[1] - z0) / FIT.gs), np = Math.max(1, Math.ceil((zf - g.butt) / FIT.gs));
+  let t = [0, 0, 0], eg = 0, eo = 0;
+  const acc = (z, zone) => {
+    const P = add(W, scl(D, z)), e = defAt(g, H, P[0], P[1], P[2], zone);
+    if (e > 1e-4) { if (_why === 3) eg += e; else eo += e; const n = gradAt(g, H, _why, P); if (n) t = add(t, scl(cross(D, n), e * z)); }
+  };
+  for (let i = 0; i <= nb; i++) acc(z0 + ((g.blade[1] - z0) * i) / nb, 2);
+  for (let i = 0; i <= np; i++) acc(g.butt + ((zf - g.butt) * i) / np, 3);
+  if (H.gp) for (const s of [0.065, -0.065]) {
+    const r = lin(E, s, D, g.blade[1] - 0.2), P = add(W, r), e = FIT.gr - groundAt(H, P[0], P[1], P[2]);
+    if (e > 1e-4) { t = add(t, scl(cross(r, H.gp), e)); eg += e; }
+  }
+  if (eg > eo) kp = null;          // chạm đất là chính: dừng ở đất (lùi lại được), không vòng qua
+  if (len(t) < 1e-9) { t = cross(D, sub(add(W, scl(D, 0.5)), H.C)); if (len(t) < 1e-9) return [D, E]; }
+  const k = norm(t), st = FIT.pd / 8, up = cross(D, H.up), axes = [k, scl(k, -1)];
+  if (len(up) > 0.2) axes.push(norm(up));
+  let best = null, fall = { e: e0, k, a: 0 };
+  for (const kk of axes) {
+    const w = kp ? 1 + 2 * Math.max(0, -dot(kk, kp)) : 1;
+    let prev = 0;
+    for (let a = st; a < FIT.pd + 1e-6 && (!best || a * w < best.c) && _work < _wcap; a += st) {
+      const e = tiltGap(g, H, W, rotAx(D, kk, a), rotAx(E, kk, a));
+      if (e <= 1e-4) {
+        let lo = prev, hi = a;
+        for (let i = 0; i < 5; i++) { const m = (lo + hi) / 2; if (tiltGap(g, H, W, rotAx(D, kk, m), rotAx(E, kk, m)) > 1e-4) lo = m; else hi = m; }
+        if (!best || hi * w < best.c) best = { k: kk, a: hi, c: hi * w };
+        break;
+      }
+      if (e < fall.e - 1e-4) fall = { e, k: kk, a };
+      prev = a;
+    }
+  }
+  const r = best || fall;
+  return r.a ? [rotAx(D, r.k, r.a), rotAx(E, r.k, r.a)] : [D, E];
+}
+// Bàn tay phải của thân GLB trong khung bàn tay (đỉnh có xương nặng nhất là bàn tay phải hand; inv: ma trận gắn nghịch đảo 4 × 4 theo cột
+// của xương đó — khung bàn tay lúc chạy): đỉnh cách trục z (cán gươm) > 0,03 (ngoài nắm tay quanh cán: ngón, đốt tay duỗi theo −y tới
+// 0,13), mỗi ô FIT.hc một đỉnh. Không đỉnh: null.
+export function handPts(pos, si, sw, hand, inv) {
+  const out = [], seen = new Set();
+  for (let v = 0; v < pos.length / 3; v++) {
+    let q = 0; for (let k = 1; k < 4; k++) if (sw[v * 4 + k] > sw[v * 4 + q]) q = k;
+    if (si[v * 4 + q] !== hand) continue;
+    const X = pos[v * 3], Y = pos[v * 3 + 1], Z = pos[v * 3 + 2];
+    const x = inv[0] * X + inv[4] * Y + inv[8] * Z + inv[12], y = inv[1] * X + inv[5] * Y + inv[9] * Z + inv[13], z = inv[2] * X + inv[6] * Y + inv[10] * Z + inv[14];
+    const key = `${Math.round(x / FIT.hc)},${Math.round(y / FIT.hc)},${Math.round(z / FIT.hc)}`;
+    if (Math.hypot(x, y) <= 0.03 || seen.has(key)) continue;
+    seen.add(key); out.push(x, y, z);
+  }
+  return out.length ? Float32Array.from(out) : null;
+}
+// Các mút chắn tay của gươm (lưới vũ khí khung chuẩn bake/wpn.mjs: gốc chỗ nắm, cán +Z, bề rộng ±Y; P: n × 3): đỉnh rộng hơn 0,6 nửa bề
+// ngang (chỉ chắn tay rộng thế) ở hai bên ±Y, mỗi bên điểm xa nhất theo Y và hai đầu z — ≤ 8 điểm (mút cong của chắn tay).
+export function guardPts(P) {
+  let gw = 0; for (let i = 1; i < P.length; i += 3) gw = Math.max(gw, Math.abs(P[i]));
+  const out = [];
+  for (const sg of [1, -1]) {
+    const ids = []; for (let i = 0; i < P.length / 3; i++) if (P[i * 3 + 1] * sg > 0.6 * gw) ids.push(i);
+    if (!ids.length) continue;
+    const pick = (f) => ids.reduce((a, b) => (f(b) > f(a) ? b : a));
+    for (const f of [(i) => P[i * 3 + 1] * sg, (i) => P[i * 3 + 2], (i) => -P[i * 3 + 2], (i) => P[i * 3 + 1] * sg - Math.abs(P[i * 3 + 2]) * 0.3]) {
+      const i = pick(f); if (!out.some((q) => q === i)) out.push(i);
+    }
+  }
+  return Float32Array.from(out.slice(0, 16).flatMap((i) => [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]]));
+}
+// cổ tay W vào tầm tay phải (rR); nắm hai tay (gw: 0 buông … 1 nắm) thì điểm nắm W − GRIP·D cũng trong tầm tay trái
+function reach(W, D, g, gw) {
+  const rR = FIT.k * (g.R.L1 + g.R.L2), a = inBall(W, g.shR, rR);
+  return gw > 0 ? lin(a, 1 - gw, nearest2(W, g.shR, rR, add(g.shL, scl(D, GRIP)), FIT.k * (g.L.L1 + g.L.L2)), gw) : a;
+}
+// Gươm của tư thế gặp đất (rig khối qua rig-motion.js fixBlades: gập cổ tay quanh trục x cẳng tay k, điểm thấp nhất trong BEND.pts —
+// mũi, hai mép lưỡi gần mũi, núm chuôi của gươm dựng bằng code, models.js — lên BEND.gap trên đất, nghiệm |δ| nhỏ mà cổ tay trong
+// [lo, hi], không quá max): góc gập δ; cổ tay W0, lưỡi D0, lưỡi sắc E0, góc cổ tay a0 của tư thế, mặt đất gp (khung thân). Đích của
+// fitArms là gươm tư thế sau khi đất chặn — lưỡi tư thế bổ xuống đất 40° mà gươm rig khối dừng ở đất (đổi 6°) thì gươm GLB cũng dừng.
+const BEND = { pts: [0, 1.3, 0.065, 1.1, -0.065, 1.1, 0, -0.32], gap: 0.03, lo: -0.5, hi: 1.6, max: 1.0 };
+function designBend(W0, D0, E0, k, a0, gp) {
+  const n = [gp[0], gp[1], gp[2]], base = dot(n, W0) + gp[3];
+  let worst = 0, r = null;
+  for (let i = 0; i < 8; i += 2) { const v = lin(E0, BEND.pts[i], D0, BEND.pts[i + 1]), pen = BEND.gap - base - dot(n, v); if (pen > worst) { worst = pen; r = v; } }
+  if (!r) return 0;
+  const kr = dot(k, r), nk = dot(n, k), A = dot(n, r) - kr * nk, B = dot(n, cross(k, r)), C = kr * nk, R = Math.hypot(A, B);
+  if (R < 1e-4) return 0;
+  const wrap = (x) => x - TAU * Math.round(x / TAU), cost = (d) => Math.abs(d) + 4 * (Math.max(0, BEND.lo - a0 - d) + Math.max(0, a0 + d - BEND.hi));
+  const phi = Math.atan2(B, A), q = (BEND.gap - base - C) / R;
+  let dl;
+  if (q >= 1) dl = wrap(phi);
+  else { const ac = Math.acos(Math.max(-1, q)), d1 = wrap(phi - ac), d2 = wrap(phi + ac); dl = cost(d1) < cost(d2) ? d1 : d2; }
+  return Math.max(Math.max(-BEND.max, Math.min(0, BEND.lo - a0)), Math.min(Math.min(BEND.max, Math.max(0, BEND.hi - a0)), dl));
+}
+// Tư thế p (đã trộn) → o = p với tay phải (shR*, elRx, handRx, handRz) giải theo số đo g (fitGeo). gp: mặt đất trong khung thân (fitCtx;
+// rig-motion.js fitPlane) hay null. reset (mặc định khi dt ≤ 0: gọi rời, khung đầu, nhảy chỗ) thì giải toàn cục; không thì theo lời giải
+// khung trước (o.__s) — dt = 0 (hit-stop: tư thế đứng yên) không kéo về tư thế, lời giải đứng yên. Không cấp phát o.
+export function fitArms(p, g, o = {}, dt = 0, gp = null, reset = !(dt > 0)) {
+  let T = g.tab && p.fk !== undefined && !o.__b ? g.tab[p.fk] : null;
+  // bảng tĩnh chỉ cho tư thế tay (T.ax) đứng yên: chạy (mang gươm một tay) tra bảng khi tay tư thế đã vào thế mang (trong FIT.cq rad
+  // mỗi góc); đang trộn từ thế khác sang thì giải mỗi khung như cũ (trộn vai theo quaternion đi đường khác tư thế: lưỡi lệch 36–68° lúc
+  // bắt đầu chạy)
+  if (T && T.ax && armX(p).some((x, k) => Math.abs(x - T.ax[k]) > FIT.cq)) T = null;
+  if (T) return fitTabbed(p, g, o, dt, gp, reset, T);
+  _work = 0; _wcap = o.__b ? Infinity : FIT.wk; _bld = !!o.__b; _gc = o.__gc || null; _gk = p;
+  Object.assign(o, p);
+  // tư thế ở số đo tư thế: cổ tay W, lưỡi D (trục z bàn tay), lưỡi sắc E (trục y), khuỷu (so với vai) — khung thân trên
+  const f = elFrame(p.shRx, p.shRy, p.shRz, p.elRx);
+  armFK(p.shRx, p.shRy, p.shRz, p.elRx - ARM.off, ARM.L1, ARM.L2, _fk);
+  const elP = [_fk[0], _fk[1], _fk[2]], cx = Math.cos(p.handRx), sx = Math.sin(p.handRx), cz = Math.cos(p.handRz), sz = Math.sin(p.handRz);
+  const W0 = add(SH.R, [_fk[3], _fk[4], _fk[5]]), gw = Math.min(1, Math.max(0, 2 * (p.grip || 0)));
+  let D0 = lin(f.y, -sx, f.z, cx), E0 = lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz);
+  // mũi lưỡi tư thế cắm đất: gập như rig khối (fixBlades) — đích là gươm của tư thế sau khi đất chặn; gọi liên tục thì góc gập đổi không
+  // quá FIT.bdr mỗi khung (fixBlades bật / tắt gập tới 57° giữa hai khung khi lộn né — gươm GLB đi mượt, đất đã có trong fitArms)
+  const H = fitCtx(p, g, gp), S = o.__s, cont = !!(S && !reset), bd0 = gp ? designBend(W0, D0, E0, f.x, p.handRx, gp) : 0;
+  const bm = FIT.bdr * Math.max(1, Math.min(3, dt * 60)), bd = cont ? S.bd + Math.max(-bm, Math.min(bm, bd0 - S.bd)) : bd0;
+  // gươm tư thế gập đủ (như rig khối thật): giới hạn đổi mỗi khung so với nó
+  const Dw = bd0 ? rotAx(D0, f.x, bd0) : D0, Ew = bd0 ? rotAx(E0, f.x, bd0) : E0;
+  if (bd) { D0 = rotAx(D0, f.x, bd); E0 = rotAx(E0, f.x, bd); }
+  let r;
+  if (g.grid && cont) r = fitTrack(g, H, S, W0, D0, E0, elP, gw, p.handRz, Math.min(3, Math.max(0, dt * 60)), angOf(Dw, S.Dw), angOf(Ew, S.Ew), o.__tg || null);
+  else if (g.grid) r = solveG(g, H, W0, D0, E0, elP, gw, p.handRz);
+  else {
+    // không có lưới đầu: tâm sọ (khung đầu) — cổ tay ≥ wr, lưỡi ≥ sr
+    let W = W0, D = D0, E = E0;
+    const C = H.C;
+    for (let it = 0; it < 8; it++) {
+      W = reach(W, D, g, gw);
+      const rr = sub(C, W), R = len(rr);
+      if (R < g.wr) { W = R > 1e-9 ? sub(C, scl(rr, g.wr / R)) : add(C, [0, 0, g.wr]); continue; }
+      if (segGap(C, W, D, g.blade[0], g.blade[1]) >= g.sr - 1e-4) break;
+      const need = Math.asin(Math.min(1, g.sr / R)) - Math.acos(Math.max(-1, Math.min(1, dot(rr, D) / R)));
+      const ax = cross(rr, D), al = len(ax);
+      if (need <= 0 || al < 1e-9) break;
+      D = rotAx(D, scl(ax, 1 / al), need + 1e-3); E = rotAx(E, scl(ax, 1 / al), need + 1e-3);
+    }
+    r = { W: reach(W, D, g, gw), D, E, Eref: S && !reset ? S.E : null };
+  }
+  const lim = cont ? len(sub(elP, S.elP)) * (g.R.L1 / ARM.L1) + FIT.ew * Math.max(1, dt * 60) : Infinity;
+  let A = armPlane(g, r.W, r.D, elP, cont ? S.el : null, lim, cont ? S.elT : null);
+  // lưỡi thật của bàn tay (khuỷu bị giữ thì cổ tay chỉ gập được gần hướng lưỡi) quay quá tư thế + FIT.ca, hay khuỷu vẫn đi quá lim + FIT.eg
+  // (cổ tay, lưỡi cùng đổi làm mặt phẳng tay quay nhanh — lưỡi gần trục vai → cổ tay: N6 LINH_r24 lưỡi lời giải 17° mà lưỡi thật 37°,
+  // khuỷu 0,14 m): chỉ đi phần lớn nhất (chia đôi giữa lời giải khung trước và khung này) còn trong hai giới hạn; không có thì giữ
+  const bladeOf = (A2) => lin(A2.fr.y, -Math.sin(A2.hx), A2.fr.z, Math.cos(A2.hx));
+  const capA = cont && S.Da ? angOf(Dw, S.Dw) + FIT.ca * Math.max(1, Math.min(3, dt * 60)) : Infinity;
+  const okA = (A2) => !cont || (len(sub(A2.el, S.el)) <= lim + FIT.eg && (!S.Da || angOf(bladeOf(A2), S.Da) <= capA));
+  if (cont && !okA(A)) {
+    // cấu hình giữa chừng không được chạm hơn lời giải khung này quá FIT.tr (lộn né: nửa đường giữa hai lời giải lọt mặt 8 cm)
+    const gap = (c) => fistGap(g, H, c.W, c.D) + tiltGap(g, H, c.W, c.D, c.E) + guardGap(g, H, c.W, c.D, c.E, c.E), gr = g.grid ? gap(r) + FIT.tr : Infinity;
+    let lo = 0, hi = 1, best = null;
+    for (let i = 0; i < 6 && _work < _wcap; i++) {
+      const t = (lo + hi) / 2, c = mixC({ W: S.W, D: S.D, E: S.E }, r, t, g, gw), Ac = armPlane(g, c.W, c.D, elP, S.el, lim, S.elT);
+      if (okA(Ac) && (!g.grid || gap(c) <= gr)) { lo = t; best = { c, Ac }; } else hi = t;
+    }
+    if (best) { r = { ...r, W: best.c.W, D: best.c.D, E: best.c.E }; A = best.Ac; }
+    else if (o.__tg || !o.__b) { r = { ...r, W: S.W, D: S.D, E: S.E }; A = armPlane(g, S.W, S.D, elP, S.el, lim, S.elT); }
+  }
+  armTo(o, g, r.W, r.D, r.E, p.handRz, r.Eref, A);
+  o.__s = { W: r.W, D: r.D, E: o.__ey, W0, D0, E0, Wt: reach(W0, r.D, g, gw), el: A.el, elT: A.elT, Da: bladeOf(A), elP, det: r.det || 0, wdet: r.wdet || 0, bd, Dw, Ew };
+  o.__q = [o.shRx, o.shRy, o.shRz, o.elRx, o.handRx, o.handRz]; o.__p = p; o.__fk = undefined;
+  return o;
+}
+// ---- bảng lời giải theo đòn (đợt soát 19a lần 4) -------------------------------------------------------------------------
+// Giải mỗi khung (soát lần 3) theo lời giải khung trước: lệch đi một chút ở khung này đổi hẳn nhánh nghiệm vài chục khung sau (đổi mốc
+// u 1e-5 làm lưỡi lệch 41–100° ở C6, Tuyệt Kỹ), tốn 0,3 ms trung bình, 33 ms khung tệ nhất (máy đích, trận B20), và giải rời từng khung
+// không nhìn trước được: lính Tự do LINH_r24 C6, Tuyệt Kỹ H31 nhát 3 tay kẹt dưới cằm lúc bật nhảy, nhát bổ trễ tư thế 45–102° suốt
+// 20–36 khung, lưỡi không xuống tới đất. Nay mỗi đòn / thế có thẻ (fk, fu) giải sẵn một lần cho mỗi mô hình (fitTables, lúc dựng rig
+// đầu tiên của mô hình) thành bảng góc tay phải theo mốc u (60 mẫu mỗi giây clip); mỗi khung chỉ tra bảng (nội suy) rồi trộn với lời
+// giải khung trước đúng phần tư thế được trộn (fw của anim.js blendPose) — tư thế đi đâu lời giải theo đó, không đổi nhánh, không tốn.
+// Chạy (mang gươm một tay): bảng tĩnh "carry" khi tay tư thế đã vào thế mang — giải mỗi khung thì thế mang chạm cổ áo 0,5–2,4 mm, tốn
+// trần công việc mỗi khung (lính Tự do: 9 500 lần đo khe, 1–2 ms). Tư thế không thẻ (leo, đòn chung của anim.js: Phá Trận, Sát Thát)
+// và lúc mới chuyển sang chạy vẫn giải mỗi khung như cũ, có trần công việc FIT.wk.
+const nearA = (v, ref) => v - TAU * Math.round((v - ref) / TAU);
+// Vai trộn theo phép quay (quaternion), không theo góc Euler: gần khoá khớp (tay giơ thẳng, x ≈ ±π/2) hai góc y, z đổi vọt dù cánh tay
+// gần như đứng yên — trộn góc Euler thì lưỡi lệch 8° một khung tuỳ cách viết góc (đo trên Tuyệt Kỹ H31 cuối clip). Euler YXZ ↔
+// quaternion như three (Quaternion.setFromEuler, Euler.setFromRotationMatrix).
+function qOfE(x, y, z) {
+  const c1 = Math.cos(x / 2), s1 = Math.sin(x / 2), c2 = Math.cos(y / 2), s2 = Math.sin(y / 2), c3 = Math.cos(z / 2), s3 = Math.sin(z / 2);
+  return [s1 * c2 * c3 + c1 * s2 * s3, c1 * s2 * c3 - s1 * c2 * s3, c1 * c2 * s3 - s1 * s2 * c3, c1 * c2 * c3 + s1 * s2 * s3];
+}
+function eOfQ(q) {
+  const [x, y, z, w] = q, m23 = 2 * (y * z - x * w), ex = Math.asin(-Math.max(-1, Math.min(1, m23)));
+  return Math.abs(m23) < 0.9999999 ? [ex, Math.atan2(2 * (x * z + y * w), 1 - 2 * (x * x + y * y)), Math.atan2(2 * (x * y + z * w), 1 - 2 * (x * x + z * z))]
+    : [ex, Math.atan2(-2 * (x * z - y * w), 1 - 2 * (y * y + z * z)), 0];
+}
+const mulQ = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+const conjQ = (a) => [-a[0], -a[1], -a[2], a[3]];
+// trộn hai quaternion phần t (cùng bán cầu, chuẩn hoá lại)
+function mixQ(a, b, t) {
+  const s = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1, r = [0, 0, 0, 0];
+  for (let k = 0; k < 4; k++) r[k] = a[k] + (s * b[k] - a[k]) * t;
+  const l = Math.hypot(r[0], r[1], r[2], r[3]) || 1;
+  for (let k = 0; k < 4; k++) r[k] /= l;
+  return r;
+}
+// góc tay q → cổ tay W, lưỡi D (trục z bàn tay), lưỡi sắc E (trục y), khuỷu (so với vai) theo số đo g
+function fkQ(g, q) {
+  const f = elFrame(q[0], q[1], q[2], q[3]);
+  armFK(q[0], q[1], q[2], q[3] - g.R.off, g.R.L1, g.R.L2, _fk);
+  const cx = Math.cos(q[4]), sx = Math.sin(q[4]), cz = Math.cos(q[5]), sz = Math.sin(q[5]);
+  return { W: add(g.shR, [_fk[3], _fk[4], _fk[5]]), el: [_fk[0], _fk[1], _fk[2]], D: lin(f.y, -sx, f.z, cx), E: lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz) };
+}
+// gươm của tư thế p ở số đo tư thế (cổ tay W0, lưỡi D0, lưỡi sắc E0 đã gập theo đất gp như rig khối, khuỷu elP)
+function designOf(p, gp) {
+  const f = elFrame(p.shRx, p.shRy, p.shRz, p.elRx);
+  armFK(p.shRx, p.shRy, p.shRz, p.elRx - ARM.off, ARM.L1, ARM.L2, _fk);
+  const elP = [_fk[0], _fk[1], _fk[2]], W0 = add(SH.R, [_fk[3], _fk[4], _fk[5]]), cx = Math.cos(p.handRx), sx = Math.sin(p.handRx), cz = Math.cos(p.handRz), sz = Math.sin(p.handRz);
+  let D0 = lin(f.y, -sx, f.z, cx), E0 = lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz);
+  const bd = gp ? designBend(W0, D0, E0, f.x, p.handRx, gp) : 0;
+  if (bd) { D0 = rotAx(D0, f.x, bd); E0 = rotAx(E0, f.x, bd); }
+  return { elP, W0, D0, E0, bd };
+}
+// Khung có thẻ: góc tay = góc khung trước trộn về góc của bảng tại fu, đúng phần fw (tư thế không trộn: lấy thẳng bảng); khung đầu, nhảy
+// chỗ: lấy thẳng bảng; cùng một tư thế gọi lại (hit-stop không trộn lại tư thế): giữ. o.__s ghi trạng thái như fitArms để khung không
+// thẻ sau đó giải tiếp liền mạch.
+function fitTabbed(p, g, o, dt, gp, reset, T) {
+  const q0 = o.__q, same = o.__p === p, us = T.rx ? phaseU(T, p) : p.fu, t = tabAt(T, us);
+  Object.assign(o, p);
+  const d = designOf(p, gp), gw = Math.min(1, Math.max(0, 2 * (p.grip || 0))), S = o.__s, pb = S && q0 && !reset ? S.bd || 0 : 0;
+  // gập cổ tay theo đất (designBend, như rig khối fixBlades): bảng mang góc gập của tư thế không trộn (tb) — bỏ ra, trộn, rồi gập theo tư
+  // thế đang trộn (bdA, đổi ≤ FIT.bt mỗi khung): tư thế trộn chưa chạm đất thì chưa gập (gập sớm một khung so với rig khối làm điểm nắm
+  // tay trái nhảy 6,6 cm — Đòn Quyết lính Tự do; gập nhanh hơn thì khuỷu trái C4 LINH_r24 nhảy 0,07 m). Gập là quay quanh trục x cẳng
+  // tay: handRx. Bảng theo pha (lộn né) giữ góc gập của mẫu (mẫu đúng góc lộn của thân).
+  const bm = FIT.bt * Math.max(1, Math.min(3, dt * 60)), tb = T.bd ? t[7] : 0;
+  let q, bdA = T.rx || !S || !q0 || reset ? d.bd : pb + Math.max(-bm, Math.min(bm, d.bd - pb));
+  const w = reset || !q0 ? 1 : Math.min(1, Math.max(0, p.fw ?? 1)), b = T.rx && q0 ? tabAt(T, o.__fk === p.fk && o.__us !== undefined ? o.__us : 0) : null;
+  // góc tay trộn phần w về bảng
+  const mk = (w) => {
+    let s, r;
+    if (w >= 1) { s = t; r = [t[4], t[5] - tb + (T.rx ? 0 : bdA), t[6]]; }
+    else if (T.rx) {
+      // bảng theo pha (lộn né): mẫu ở mốc us có thân đúng như thân đang trộn — lời giải = mẫu đó + phần lệch khung trước so với mẫu của
+      // khung trước (b), nhỏ dần theo phần tư thế cũ còn lại (1 − fw), như lệch của thân so với dãy không trộn
+      s = mulQ(t, mixQ([0, 0, 0, 1], mulQ(conjQ(b), qOfE(q0[0], q0[1], q0[2])), 1 - w));
+      r = [t[4] + (q0[3] - b[4]) * (1 - w), t[5] + (q0[4] - b[5]) * (1 - w), t[6] + (nearA(q0[5], b[6]) - b[6]) * (1 - w)];
+    } else {
+      s = mixQ(qOfE(q0[0], q0[1], q0[2]), t, w);
+      r = [q0[3] + (t[4] - q0[3]) * w, q0[4] - pb + (t[5] - tb - q0[4] + pb) * w + bdA, q0[5] + (nearA(t[6], q0[5]) - q0[5]) * w];
+    }
+    const e = eOfQ(s);
+    return [e[0], e[1], e[2], r[0], r[1], r[2]];
+  };
+  if (same && q0) { q = q0; bdA = pb; }
+  else q = mk(w);
+  let c = fkQ(g, q);
+  // Liền mạch so với khung trước (mọi bảng; okL): lưỡi quay quá tư thế ≤ FIT.cr, hai trục bàn tay (lưỡi sắc y, x) quay quá tư thế ≤ FIT.cy,
+  // khuỷu phải đi quá tư thế ≤ FIT.cj, khuỷu tay trái (nắm chuôi, ước như gripIK) ≤ FIT.cel. Đo: lộn né lưỡi quay quá tư thế 20–24°,
+  // khuỷu trái 0,06–0,09 m (tay trái gần duỗi); vào C1 từ thế thủ bàn tay lật 75° một khung (bảng C1 LINH_r24 lật chắn tay ngay mẫu đầu).
+  let okL = null;
+  if (S && q0 && !(same && q0) && !reset) {
+    const gpt = (W, D) => sub(W, scl(D, GRIP)), k = g.R.L1 / ARM.L1, ax = (D, E) => cross(E, D);
+    const dD = angOf(d.D0, S.Dw), dE = angOf(d.E0, S.Ew), dX = angOf(ax(d.D0, d.E0), ax(S.Dw, S.Ew)), dEl = len(sub(d.elP, S.elP)) * k;
+    const lP = elbL(g.shL, g.L, gpt(S.W, S.Da)), dL = len(sub(elbL(SH.L, ARM, gpt(d.W0, d.D0)), elbL(SH.L, ARM, gpt(S.W0, S.Dw))));
+    okL = (x) => angOf(x.D, S.Da) - dD <= FIT.cr && angOf(x.E, S.E) - dE <= FIT.cy && angOf(ax(x.D, x.E), ax(S.Da, S.E)) - dX <= FIT.cy
+      && len(sub(x.el, S.el)) - dEl <= FIT.cj && (gw <= 0 || len(sub(elbL(g.shL, g.L, gpt(x.W, x.D)), lP)) - dL <= FIT.cel);
+  }
+  // thân thật trộn khác dãy dựng bảng (thế nhanh: lộn né 19° mỗi khung, nối đòn; giơ gươm qua đầu): lời giải trộn còn chạm quá FIT.tq thì
+  // đẩy ra tại chỗ (settle, trần công việc FIT.wk), khuỷu giữ phía cũ — nhưng chỉ phần lớn nhất (chia đôi giữa lời giải trộn và lời giải
+  // đẩy ra) mà so với khung trước lưỡi không quay quá tư thế FIT.ct, khuỷu không đi quá tư thế FIT.cj (đẩy hết một lần: khuỷu nhảy 0,14 m,
+  // lưỡi 30°)
+  if (g.grid && !(same && q0) && FIT.tq > 0) {
+    const H = fitCtx(p, g, gp), cg = (x) => fistGap(g, H, x.W, x.D) + tiltGap(g, H, x.W, x.D, x.E) + guardGap(g, H, x.W, x.D, x.E, x.E), e0 = cg(c);
+    // trước hết đuổi theo bảng (phần trộn lớn hơn nhỏ nhất mà đủ khe) nếu vẫn liền mạch (okL): bảng đã tránh vật cản theo hướng của cả
+    // thế (lộn né LINH_r24: đẩy tại chỗ vẫn để lưỡi lọt cổ áo 0,8–1,4 cm)
+    let caught = false;
+    if (e0 > FIT.tq && w < 1) {
+      const ct = fkQ(g, mk(1));
+      if (cg(ct) <= FIT.tq) {
+        let lo = w, hi = 1, qq = mk(1), cc = ct;
+        for (let i = 0; i < 5; i++) { const m = (lo + hi) / 2, x = mk(m), cx = fkQ(g, x); if (cg(cx) <= FIT.tq) { hi = m; qq = x; cc = cx; } else lo = m; }
+        if (!okL || okL(cc)) { q = qq; c = cc; caught = true; }
+      }
+    }
+    if (e0 > FIT.tq && !caught) {
+      _work = 0; _wcap = FIT.wk;
+      // đẩy ra từ cấu hình của bảng (bảng không theo pha): đẩy từ lời giải trộn có khi lật chắn tay ngược chiều bảng, khung sau lật lại
+      // 61–63° (C6 LINH_r01 vào thế)
+      const cs = w < 1 && !T.rx ? fkQ(g, mk(1)) : c, r = settle(g, H, { W: cs.W, D: cs.D, E: cs.E }, gw, null, FIT.ce);
+      if (cg(r) < e0 - 1e-3) {
+        const A = armPlane(g, r.W, r.D, d.elP, c.el, FIT.ew, c.el), t2 = {};
+        armTo(t2, g, r.W, r.D, r.E, p.handRz, c.E, A);
+        const qc = [t2.shRx, t2.shRy, t2.shRz, t2.elRx, t2.handRx, t2.handRz], sa = qOfE(q[0], q[1], q[2]), sb = qOfE(qc[0], qc[1], qc[2]);
+        const at = (t) => { const s = eOfQ(mixQ(sa, sb, t)); return [s[0], s[1], s[2], q[3] + (qc[3] - q[3]) * t, q[4] + (qc[4] - q[4]) * t, q[5] + (nearA(qc[5], q[5]) - q[5]) * t]; };
+        const okC = (x) => !S || (angOf(x.D, S.Da) - angOf(d.D0, S.Dw) <= FIT.ct && len(sub(x.el, S.el)) - len(sub(d.elP, S.elP)) <= FIT.cj);
+        let qq = qc, cc = fkQ(g, qc);
+        if (!okC(cc)) {
+          let lo = 0, hi = 1; qq = q; cc = c;
+          for (let i = 0; i < 5; i++) { const t = (lo + hi) / 2, x = at(t), cx = fkQ(g, x); if (okC(cx)) { lo = t; qq = x; cc = cx; } else hi = t; }
+          // mặt, cổ (đầu, râu, cổ áo) trước liền mạch: phần giới hạn còn lọt mặt, cổ quá lời giải đẩy ra + FIT.tq thì đi tiếp tới khi hết
+          // (lộn né trộn 0,8: lưỡi để lại trong mặt 6,5 cm)
+          const Hh = { ...H, gp: null, rl: null }, hg = (x) => fistGap(g, Hh, x.W, x.D) + tiltGap(g, Hh, x.W, x.D, x.E) + guardGap(g, Hh, x.W, x.D, x.E, x.E);
+          const lh = Math.max(hg(r), 0) + FIT.tq;
+          if (hg(cc) > lh) {
+            let l2 = lo, h2 = 1; qq = qc; cc = fkQ(g, qc);
+            for (let i = 0; i < 5; i++) { const t = (l2 + h2) / 2, x = at(t), cx = fkQ(g, x); if (hg(cx) <= lh) { h2 = t; qq = x; cc = cx; } else l2 = t; }
+          }
+        }
+        q = qq; c = cc;
+      }
+    }
+  }
+  // trộn góc khớp có thể đưa điểm nắm ra ngoài tầm tay trái (tay trái hụt chuôi 1 cm giữa hai mẫu): cổ tay vào lại tầm với (reach)
+  if (gw >= 1) {
+    const Wr = reach(c.W, c.D, g, gw);
+    if (len(sub(Wr, c.W)) > 1e-4) {
+      const A = armPlane(g, Wr, c.D, d.elP, c.el, FIT.ew, c.el), t3 = {};
+      armTo(t3, g, Wr, c.D, c.E, p.handRz, c.E, A);
+      q = [t3.shRx, t3.shRy, t3.shRz, t3.elRx, t3.handRx, t3.handRz]; c = fkQ(g, q);
+    }
+  }
+  // ngoài giới hạn liền mạch thì chỉ đi phần lớn nhất (chia đôi giữa góc tay khung trước và khung này) còn trong giới hạn, nhưng không vào
+  // vật cản hơn lời giải khung này (thiếu khe ≤ max(nó, FIT.tq) + 2 mm: đi thêm về lời giải khung này tới khi đủ)
+  if (okL && !okL(c)) {
+    const sa = qOfE(q0[0], q0[1], q0[2]), sb = qOfE(q[0], q[1], q[2]);
+    const at = (t) => { const s = eOfQ(mixQ(sa, sb, t)); return [s[0], s[1], s[2], q0[3] + (q[3] - q0[3]) * t, q0[4] + (q[4] - q0[4]) * t, q0[5] + (nearA(q[5], q0[5]) - q0[5]) * t]; };
+    let lo = 0, hi = 1, qq = q0, cc = fkQ(g, q0);
+    for (let i = 0; i < 5; i++) { const t = (lo + hi) / 2, x = at(t), cx = fkQ(g, x); if (okL(cx)) { lo = t; qq = x; cc = cx; } else hi = t; }
+    if (g.grid) {
+      const H = fitCtx(p, g, gp), cg = (x) => fistGap(g, H, x.W, x.D) + tiltGap(g, H, x.W, x.D, x.E) + guardGap(g, H, x.W, x.D, x.E, x.E), lim = Math.max(cg(c), FIT.tq) + 0.002;
+      if (cg(cc) > lim) {
+        let l2 = lo, h2 = 1, q2 = q, c2 = c;
+        for (let i = 0; i < 5; i++) { const t = (l2 + h2) / 2, x = at(t), cx = fkQ(g, x); if (cg(cx) <= lim) { h2 = t; q2 = x; c2 = cx; } else l2 = t; }
+        qq = q2; cc = c2;
+      }
+    }
+    q = qq; c = cc;
+  }
+  o.shRx = q[0]; o.shRy = q[1]; o.shRz = q[2]; o.elRx = q[3]; o.handRx = q[4]; o.handRz = q[5];
+  o.__q = q; o.__p = p; o.__fk = p.fk; o.__us = us;
+  o.__ey = c.E;
+  o.__s = { W: c.W, D: c.D, E: c.E, W0: d.W0, D0: d.D0, E0: d.E0, Wt: reach(d.W0, c.D, g, gw), el: c.el, elT: c.el, Da: c.D, elP: d.elP, det: 0, wdet: 0, bd: bdA, Dw: d.D0, Ew: d.E0 };
+  return o;
+}
+const armX = (p) => [p.shRx, p.shRy, p.shRz, p.elRx, p.handRx, p.handRz];
+// Mốc mẫu thật (số thực) theo mốc thời gian x = u / u1 · (n − 1) của bảng, trên lưới con XE_K điểm mỗi khoảng mẫu: giữa hai mẫu i, i + 1
+// đi theo phần tay tư thế (không trộn, hàm f) đã đi — chiếu góc tay tư thế tại mốc đó lên đoạn góc tay giữa hai mẫu — chứ không theo phần
+// thời gian: nhát vung nhanh nằm gọn trong một khoảng mẫu thì tay không đi trước tư thế (mốc u của trận không trùng mẫu bảng: N1 H31
+// khuỷu trái đi trước tư thế 0,05 m). Tay tư thế gần đứng yên giữa hai mẫu (< FIT.lx rad) thì dần về theo thời gian.
+const XE_K = 8;
+function xeOf(f, P, n, u1) {
+  const X = P.map(armX), xe = new Float32Array((n - 1) * XE_K + 1);
+  for (let j = 0; j < xe.length; j++) {
+    const x = j / XE_K, i = Math.min(n - 2, Math.floor(x)), xr = armX(f((x / (n - 1)) * u1));
+    let fr = x - i, dd = 0, dn = 0;
+    for (let k = 0; k < 6; k++) { const a = X[i + 1][k] - X[i][k]; dd += a * a; dn += (xr[k] - X[i][k]) * a; }
+    if (dd > 1e-12) fr += (Math.min(1, Math.max(0, dn / dd)) - fr) * Math.min(1, dd / (FIT.lx * FIT.lx));
+    xe[j] = i + fr;
+  }
+  return xe;
+}
+// khuỷu tay trái (khung thân) khi tay trái nắm điểm G — như rig-motion.js gripIK (ik.js armIK, cực POLE_L): vai sh, tay L { L1, L2 }
+function elbL(sh, L, G) {
+  const tx = G[0] - sh[0], ty = G[1] - sh[1], tz = G[2] - sh[2], d0 = Math.hypot(tx, ty, tz), k = d0 > 1e-6 ? 1 / d0 : 0;
+  const ux = d0 > 1e-6 ? tx * k : 0, uy = d0 > 1e-6 ? ty * k : -1, uz = d0 > 1e-6 ? tz * k : 0;
+  const d = Math.min((L.L1 + L.L2) * 0.9995, Math.max(Math.abs(L.L1 - L.L2) + 1e-3, (L.L1 + L.L2) * 0.15, d0));
+  const ca = Math.max(-1, Math.min(1, (L.L1 * L.L1 + d * d - L.L2 * L.L2) / (2 * L.L1 * d))), sa = Math.sqrt(1 - ca * ca);
+  const pd = POLE_L[0] * ux + POLE_L[1] * uy + POLE_L[2] * uz;
+  let nx = POLE_L[0] - ux * pd, ny = POLE_L[1] - uy * pd, nz = POLE_L[2] - uz * pd, nn = Math.hypot(nx, ny, nz);
+  if (nn < 1e-6) { nx = 1; ny = 0; nz = 0; nn = 1; }
+  return [sh[0] + (ux * ca + (nx / nn) * sa) * L.L1, sh[1] + (uy * ca + (ny / nn) * sa) * L.L1, sh[2] + (uz * ca + (nz / nn) * sa) * L.L1];
+}
+// tay của bảng T = { n, u1, q: Float32Array n × 7 — quaternion vai, khuỷu, gập, lật cổ tay } tại u (nội suy giữa hai mẫu kề, mẫu kề
+// cùng bán cầu và góc liền mạch lúc dựng; ngoài [0, u1] lấy mẫu biên) → [qx, qy, qz, qw, elRx, handRx, handRz, góc gập theo đất đã có trong
+// handRx (bảng không theo pha; không có: 0)]
+function tabAt(T, u) {
+  const Q = T.q, B = T.bd, out = [0, 0, 0, 0, 0, 0, 0, 0];
+  if (T.n === 1) { for (let k = 0; k < 7; k++) out[k] = Q[k]; out[7] = B ? B[0] : 0; return out; }
+  let x = Math.min(1, Math.max(0, (u || 0) / T.u1)) * (T.n - 1);
+  // giữa hai mẫu đi theo phần tay tư thế đã đi chứ không theo phần thời gian (T.xe — xeOf, dựng sẵn)
+  if (T.xe) { const sx = x * XE_K, j = Math.min(T.xe.length - 2, Math.floor(sx)); x = T.xe[j] + (T.xe[j + 1] - T.xe[j]) * (sx - j); }
+  const i = Math.min(T.n - 2, Math.floor(x)), f = x - i;
+  for (let k = 0; k < 7; k++) out[k] = Q[i * 7 + k] + (Q[(i + 1) * 7 + k] - Q[i * 7 + k]) * f;
+  if (B) out[7] = B[i] + (B[i + 1] - B[i]) * f;
+  const l = Math.hypot(out[0], out[1], out[2], out[3]) || 1;
+  for (let k = 0; k < 4; k++) out[k] /= l;
+  return out;
+}
+// mặt đất (mặt phẳng y = 0 dưới gốc rig) trong khung thân của tư thế p — như rig-motion.js fitPlane khi đất phẳng, chưa hạ hông theo chân;
+// tp: khớp thân so với hông lúc gắn
+function gpOf(p, tp) {
+  const R = rotXYZ(p.rootX || 0, (p.spin || 0) + (p.hipsYaw || 0), p.rootZ || 0), Rt = rotXYZ(p.torsoX || 0, p.torsoY || 0, p.torsoZ || 0);
+  const ty = R[3] * tp[0] + R[4] * tp[1] + R[5] * tp[2];
+  return [R[3] * Rt[0] + R[4] * Rt[3] + R[5] * Rt[6], R[3] * Rt[1] + R[4] * Rt[4] + R[5] * Rt[7], R[3] * Rt[2] + R[4] * Rt[5] + R[5] * Rt[8], 0.92 + (p.hipsY || 0) + ty];
+}
+// Thế có bảng: [khoá, hàm tư thế (không thẻ), thời lượng clip (s, nhịp mẫu 1/60 s; 0 = tư thế tĩnh, một mẫu), u cuối]
+const TAB_DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };      // clip kỹ năng (data/heroes.js SKILLS: kênh Hịch 3 s, Binh Thư 0,9 s, Bạch Đằng 4,4 s)
+const tabList = () => [...Object.entries(MOVE_RAW).map(([k, f]) => [k, f, MOVES_WC01[k]?.dur ?? TAB_DUR[k], 1]),
+  ["dodge", dodgeRaw, 0.32, 1, { ph: true, mg: [0, 0.01, 0.02, 0.03, 0.04, 0.05] }], ["hit", hitRaw, 0.3, 1], ["down", downRaw, DOWN_U, DOWN_U], ["block", () => BLOCK, 0, 0],
+  ["guard", () => GUARD, 0, 0], ["carry", () => A.run(0, 1, 0.95, carryArms), 0, 0, { st: true }]];
+// Một lượt giải liên tục (như fitArms gọi mỗi khung 1/60 s) qua các mẫu P (đất GP): xuôi (own null); ngược (own: cờ từng mẫu — mẫu không
+// cờ kéo về cấu hình của lượt xuôi F ở mẫu đó thay cho đích thường). Trả từng mẫu { q góc tay, W, D lưỡi thật, E, el, Dw, elP }.
+function tabRun(g, P, GP, own = null, F = null, gc = null) {
+  const n = P.length, o = { __b: 1, __gc: gc }, R = new Array(n);
+  for (let k = 0; k < n; k++) {
+    const i = own ? n - 1 - k : k;
+    o.__tg = own && !own[i] ? F[i] : null;
+    fitArms(P[i], g, o, k ? 1 / 60 : 0, GP[i], k === 0);
+    const S = o.__s;
+    R[i] = { q: o.__q, W: S.W, D: S.Da, E: S.E, el: S.el, Dw: S.Dw, elP: S.elP, W0: S.W0, bd: S.bd };
+  }
+  return R;
+}
+// điểm phạt của một lượt: lệch tư thế quá FIT.tdv, chạm (thiếu khe > 0,4 / 1 cm), lưỡi quay quá tư thế 20°, khuỷu quá 0,05 m, lật tay
+function tabScore(g, P, GP, R) {
+  const k = g.R.L1 / ARM.L1;
+  let s = 0;
+  for (let i = 0; i < R.length; i++) {
+    // chạm mặt, cổ (đầu, râu, cổ áo) nặng hơn hẳn chạm thân, đất
+    const r = R[i], H = fitCtx(P[i], g, GP[i]), Hh = { ...H, gp: null, rl: null }, eh = fistGap(g, Hh, r.W, r.D) + tiltGap(g, Hh, r.W, r.D, r.E) + guardGap(g, Hh, r.W, r.D, r.E, r.E);
+    const e = eh > 0.02 ? eh : fistGap(g, H, r.W, r.D) + tiltGap(g, H, r.W, r.D, r.E) + guardGap(g, H, r.W, r.D, r.E, r.E);
+    s += Math.max(0, angOf(r.D, r.Dw) - FIT.tdv) * (180 / Math.PI) + (eh > 0.02 ? 200 : eh > 0.008 ? 30 : e > 0.02 ? 20 + 1000 * (e - 0.02) : 0);
+    if (!i) continue;
+    const b = R[i - 1], turn = angOf(r.D, b.D) - angOf(r.Dw, b.Dw), elb = len(sub(r.el, b.el)) - len(sub(r.elP, b.elP)) * k;
+    s += (turn > 0.35 ? 60 : 0) + (elb > 0.05 ? 60 : 0) + (angOf(r.E, b.E) > 2.1 && angOf(r.D, b.D) < 1.05 ? 100 : 0);
+  }
+  return s;
+}
+// Bảng của một thế: lượt xuôi F; mẫu F lệch tư thế > FIT.tdv mà lời giải toàn cục của mẫu đó (giải rời) lệch ít hơn FIT.txg trở lên (F
+// kẹt nhánh: tay dưới cằm lúc bật nhảy C6, Tuyệt Kỹ — nhát bổ trễ) thì thử lượt ngược tự do từ cuối clip qua các mẫu đó (cộng m mẫu
+// trước, m theo FIT.tm), ra khỏi đó thì kéo về F — giữ đúng nhánh của nhát bổ, nhập vào F lúc giữ thế; lấy lượt ít điểm phạt nhất.
+// ph: thế tra bảng theo pha góc lộn rootX (lộn né: thân lộn một vòng trong 19 khung, đất quay quanh thân 19° mỗi khung — trộn góc tay
+// theo phần trộn tư thế thì gươm lệch khỏi thân đang trộn: lọt cổ áo 2,6 cm, lưỡi xuống đất 24 cm, đo ở thế trộn 0,6 / 0,8): rx góc lộn
+// từng mẫu, ra / rb mốc bắt đầu / hết lộn.
+function buildTab(g, f, dur, u1, { ph = false, mg = 0, st = false } = {}) {
+  const n = dur > 0 ? Math.max(2, Math.round(dur * 60) + 1) : 1, P = [], GP = [];
+  for (let i = 0; i < n; i++) { const p = f(n > 1 ? (u1 * i) / (n - 1) : 0); P.push(p); GP.push(gpOf(p, g.tp)); }
+  // mg: khe thêm lúc dựng (một số hay danh sách — dựng mỗi khe một bảng, lấy bảng ít điểm phạt nhất đo ở khe thường)
+  const MG = ["hh", "hb", "hg", "hgm", "hf", "uh", "ub"], keep = MG.map((k) => FIT[k]);
+  let q = null, bd = null, best = Infinity;
+  for (const m of Array.isArray(mg) ? mg : [mg]) {
+    for (const k of MG) FIT[k] += m;
+    const c = tabFrom(g, P, GP);
+    MG.forEach((k, i) => (FIT[k] = keep[i]));
+    const s = Array.isArray(mg) ? tabScore(g, P, GP, Array.from({ length: n }, (_, i) => {
+      const x = c.q.subarray(i * 7, i * 7 + 7), e = eOfQ(x), k = fkQ(g, [e[0], e[1], e[2], x[4], x[5], x[6]]), d = designOf(P[i], GP[i]);
+      return { W: k.W, D: k.D, E: k.E, el: k.el, Dw: d.D0, elP: d.elP };
+    })) : 0;
+    if (s < best) { best = s; q = c.q; bd = c.bd; }
+  }
+  const T = { n, u1: u1 || 1, q };
+  if (st) T.ax = armX(P[0]);
+  if (n > 1 && !ph) T.xe = xeOf(f, P, n, u1 || 1);
+  if (!ph) T.bd = bd;
+  if (ph) {
+    T.rx = Float32Array.from(P, (p) => p.rootX || 0);
+    let a = 0, b = n - 1;
+    while (a < n - 1 && T.rx[a + 1] <= T.rx[0] + 1e-3) a++;
+    while (b > 0 && T.rx[b - 1] >= T.rx[n - 1] - 1e-3) b--;
+    T.ra = (a / (n - 1)) * T.u1; T.rb = (b / (n - 1)) * T.u1;
+  }
+  return T;
+}
+// mốc u của bảng pha T có góc lộn bằng góc lộn của thân p (góc của bảng tăng dần; đoạn chưa lộn / lộn xong thì theo fu của tư thế) —
+// nhưng không chậm hơn fu của tư thế quá độ trễ của phần trộn ((1 − fw) / fw mẫu): lộn xong trước khi hết clip (thân thẳng, tay về thế
+// thủ) mà góc lộn trộn bò dần tới đích — theo góc lộn thì tay chậm 0,1 u, lưỡi lệch tư thế 121° lúc hết lộn né (rig kiểm thử)
+function phaseU(T, p) {
+  const R = T.rx, n = T.n, x = p.rootX || 0, u = p.fu || 0, fw = Math.max(0.2, p.fw ?? 1), lag = ((1 - fw) / fw) * (T.u1 / (n - 1));
+  if (x <= R[0] + 1e-3) return Math.min(u, T.ra);
+  if (x >= R[n - 1] - 1e-3) return Math.max(u, T.rb);
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (R[m] <= x) lo = m; else hi = m; }
+  return Math.max(u - lag, ((lo + (R[hi] > R[lo] ? (x - R[lo]) / (R[hi] - R[lo]) : 0)) / (n - 1)) * T.u1);
+}
+// góc tay liên tục (F, rồi lượt ngược nếu cần) qua dãy P → { q: Float32Array (mẫu) × 7, bd: góc gập theo đất lượt đó đã dùng mỗi mẫu }
+function tabFrom(g, P, GP) {
+  const n = P.length, gc = new Map(), F = tabRun(g, P, GP, null, null, gc);
+  let best = F;
+  const bad = F.map((r, i) => {
+    if (angOf(r.D, r.Dw) <= FIT.tdv) return false;
+    const o = { __b: 1, __gc: gc }; fitArms(P[i], g, o, 0, GP[i], true);
+    return angOf(r.D, r.Dw) > angOf(o.__s.Da, o.__s.Dw) + FIT.txg;
+  });
+  if (bad.some(Boolean)) {
+    let sc = tabScore(g, P, GP, F);
+    for (const m of FIT.tm) {
+      const own = bad.slice();
+      for (let i = 0; i < n; i++) if (bad[i]) for (let j = 1; j <= m && i - j >= 0; j++) own[i - j] = true;
+      const B = tabRun(g, P, GP, own, F, gc), s = tabScore(g, P, GP, B);
+      if (s < sc) { sc = s; best = B; }
+    }
+  }
+  // góc tay liên tục: quaternion vai cùng bán cầu với mẫu trước, góc lật cổ tay liền mạch
+  const Q = [];
+  for (let i = 0; i < n; i++) {
+    const a = best[i].q, s = qOfE(a[0], a[1], a[2]), p = Q[i - 1], sg = p && s[0] * p[0] + s[1] * p[1] + s[2] * p[2] + s[3] * p[3] < 0 ? -1 : 1;
+    Q.push([sg * s[0], sg * s[1], sg * s[2], sg * s[3], a[3], a[4], p ? nearA(a[5], p[6]) : a[5], best[i].bd || 0]);
+  }
+  smoothTab(g, P, GP, best, Q);
+  const q = new Float32Array(n * 7);
+  for (let i = 0; i < n; i++) for (let k = 0; k < 7; k++) q[i * 7 + k] = Q[i][k];
+  return { q, bd: Float32Array.from(Q, (x) => x[7]) };
+}
+// Lượt giải nhận nhảy cổ tay / khuỷu / lưỡi để khỏi chạm (giữ lại thì kẹt): mẫu nào đổi quá tư thế hơn FIT.jw (cổ tay, khuỷu, m) hay
+// FIT.jt (lưỡi, rad) thì rải ra K mẫu quanh đó — nội suy góc tay giữa hai đầu cửa sổ (vai theo quaternion) — nhận khi các mẫu giữa không
+// chạm hơn (≤ max(trước, 0,4 cm) + 0,2 cm) và cả cửa sổ hết nhảy; không thì thử cửa sổ dài hơn, không được thì để nguyên.
+function smoothTab(g, P, GP, R, Q) {
+  const n = R.length, cfg = (x) => { const e = eOfQ(x); return fkQ(g, [e[0], e[1], e[2], x[4], x[5], x[6]]); };
+  const gapAt = (i, c) => { const H = fitCtx(P[i], g, GP[i]); return fistGap(g, H, c.W, c.D) + tiltGap(g, H, c.W, c.D, c.E) + guardGap(g, H, c.W, c.D, c.E, c.E); };
+  const gpt = (W, D) => sub(W, scl(D, GRIP)), ex = (i, a, b) => Math.max((len(sub(a.W, b.W)) - len(sub(R[i].W0, R[i - 1].W0))) / FIT.jw,
+    (len(sub(a.el, b.el)) - len(sub(R[i].elP, R[i - 1].elP))) / FIT.jw, (angOf(a.D, b.D) - angOf(R[i].Dw, R[i - 1].Dw)) / FIT.jt,
+    (len(sub(gpt(a.W, a.D), gpt(b.W, b.D))) - len(sub(gpt(R[i].W0, R[i].Dw), gpt(R[i - 1].W0, R[i - 1].Dw)))) / FIT.jw);
+  let C = Q.map(cfg);
+  const G0 = C.map((c, i) => gapAt(i, c));
+  for (let i = 1; i < n; i++) {
+    const x = ex(i, C[i], C[i - 1]);
+    if (x <= 1) continue;
+    let done = false;
+    for (const f of [1.2, 2, 3]) for (const at of [0.5, 1, 0]) {
+      if (done) break;
+      const K = Math.ceil(x * f) + 1, a = Math.max(0, i - Math.max(1, Math.round(K * at))), b = Math.min(n - 1, a + K), C2 = C.slice(), T = [];
+      let ok = b > a + 1;
+      for (let j = a + 1; j < b && ok; j++) {
+        const t = (j - a) / (b - a), s = mixQ(Q[a], Q[b], t), qj = [s[0], s[1], s[2], s[3], 0, 0, 0, 0];
+        for (let k = 4; k < 8; k++) qj[k] = Q[a][k] + (Q[b][k] - Q[a][k]) * t;
+        C2[j] = cfg(qj); T.push(qj);
+        if (gapAt(j, C2[j]) > Math.max(G0[j], 0.004) + 0.004) ok = false;
+      }
+      for (let j = a + 1; j <= b && ok; j++) if (ex(j, C2[j], C2[j - 1]) > 1.05 || (angOf(C2[j].E, C2[j - 1].E) > 1.75 && angOf(C2[j].D, C2[j - 1].D) < 1.05)) ok = false;
+      if (!ok) continue;
+      for (let j = a + 1; j < b; j++) { Q[j] = T[j - a - 1]; G0[j] = gapAt(j, C2[j]); }
+      C = C2;
+      done = true;
+    }
+  }
+}
+// Bảng lời giải mọi thế có thẻ cho số đo g (fitGeo), dựng một lần cho mỗi khoá key (rig-motion.js: dyn.head — lưới mặt của mô hình,
+// dùng chung mọi rig của mô hình đó); ms: thời gian dựng.
+const TABS = new WeakMap();
+export function fitTables(g, key = g) {
+  let t = TABS.get(key);
+  if (!t) {
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+    t = {};
+    for (const [k, f, dur, u1, op] of tabList()) t[k] = buildTab(g, f, dur, u1, op);
+    Object.defineProperty(t, "ms", { value: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0 });
+    TABS.set(key, t);
+  }
+  return t;
+}
+// lời giải toàn cục chỉ theo tư thế (không theo khung trước): lúc dựng bảng nhớ theo mẫu (_gc, khoá là tư thế) — lượt xuôi, các lượt ngược
+// và phần dò mẫu kẹt cùng dùng
+function solveG(g, H, W0, D0, E0, elP, gw, hz0) {
+  const c = _gc && _gc.get(_gk);
+  if (c) return c;
+  const r = fitSolve(g, H, W0, D0, E0, elP, gw, hz0);
+  if (_gc) _gc.set(_gk, r);
+  return r;
+}
+// Giải toàn cục (soát lần 2): cổ tay của tư thế vào tầm với, hướng gươm tính từ của tư thế ở chỗ đó (tiltFrom); hai nắm tay sát mặt thì
+// dời ra (pháp tuyến, tới khi tầm với kéo lại thì dò rìa tầm với — searchW), tính lại hướng gươm; hai lượt (hướng mới đổi chỗ nắm tay
+// trái); vẫn sát mặt nhiều (thiếu khe nắm tay > FIT.fd: hướng của tư thế chĩa chuôi về mặt khi tay ở rìa tầm với — H31 khung chuyển C6,
+// Tuyệt Kỹ: 3,8 cm) thì dựng mũi thêm từng FIT.ts, lấy góc đầu tiên đủ khe nắm tay và lưỡi, không có thì góc thiếu ít nhất; cuối cùng
+// lật chắn tay (nhánh lưỡi sắc gần góc lật của tư thế).
+function fitSolve(g, H, W0, D0, E0, elP, gw, hz0) {
+  const C = H.C;
+  let W = reach(W0, D0, g, gw), D, E;
+  [D, E] = tiltFrom(g, H, W, D0, E0, C);
+  W = reach(W, D, g, gw);
+  for (let round = 0; round < 2 && _work < _wcap; round++) {
+    if (fistGap(g, H, W, D) <= 1e-4) break;
+    W = clearFists(g, H, W, W0, D, gw, C);
+    [D, E] = tiltFrom(g, H, W, D0, E0, C);
+    W = reach(W, D, g, gw);
+  }
+  if (fistGap(g, H, W, D) > FIT.fd) {
+    const p0 = cross(D0, H.up);
+    if (len(p0) > 0.2) {
+      let k = norm(p0);
+      if (dot(rotAx(D0, k, 0.1), H.up) < dot(rotAx(D0, scl(k, -1), 0.1), H.up)) k = scl(k, -1);
+      let best = { s: fistGap(g, H, W, D) + tiltGap(g, H, W, D), W, D, E };
+      for (let a = FIT.ts; a < TILT_MAX + 1e-6 && best.s > 2e-4 + 1e-6 && _work < _wcap; a += FIT.ts) {
+        const Da = rotAx(D0, k, a), Wa = clearFists(g, H, reach(W, Da, g, gw), W0, Da, gw, C), sa = fistGap(g, H, Wa, Da) + tiltGap(g, H, Wa, Da);
+        if (sa < best.s - 1e-4) best = { s: sa, W: Wa, D: Da, E: rotAx(E0, k, a) };
+      }
+      ({ W, D, E } = best);
+    }
+  }
+  W = reach(W, D, g, gw);
+  const Ar = armPlane(g, W, D, elP);
+  return { W, D, E: rollFrom(g, H, W, D, E, (e) => edgeOf(e, Ar, hz0, null)), Eref: null };
+}
+// Giải tiếp theo khung trước S (gọi liên tục; fr: số khung 1/60 s đã qua, 0 = hit-stop): (1) mang lời giải trước theo tư thế — hướng
+// lưỡi quay theo phép quay ngắn nhất của lưỡi tư thế (đổi không hơn lưỡi tư thế), khung bàn tay theo khung tay tư thế, cổ tay giữ độ lệch
+// so với đích (cổ tay tư thế vào tầm với) — rồi đẩy ra khỏi vật cản tại chỗ (settle); vẫn chạm thì lấy phần lớn nhất của bước mang theo
+// mà đẩy ra được (gươm bị chặn, như vướng thật); (2) kéo về đích mỗi khung FIT.rd (lưỡi), rr (lật), rw (cổ tay) (× FIT.gf khi lời giải
+// chạm hơn đích nhiều) rồi đẩy ra — chạm hơn thì lưỡi về trước, vòng qua bên, chỉ kéo phần không chạm (chia đôi), trượt cổ tay trên mặt
+// cầu tầm với; không nhích được mà còn xa đích thì đi thẳng tới đích một bước chấp nhận thiếu khe tới FIT.tr; (3) so với khung trước,
+// lưỡi, lưỡi sắc quay không hơn tư thế quá FIT.cd, ce, cổ tay đi không hơn cổ tay tư thế (theo tỉ lệ dài tay) quá cw.
+function fitTrack(g, H, S, W0, D0, E0, elP, gw, hz0, fr, dzw, dyw, TG = null) {
+  const gap = (c) => fistGap(g, H, c.W, c.D) + tiltGap(g, H, c.W, c.D, c.E) + guardGap(g, H, c.W, c.D, c.E, c.E);
+  const P = { W: S.W, D: S.D, E: S.E }, Dt = norm(swing(S.D, S.D0, D0));
+  const T = { W: null, D: Dt, E: perpN(xfer(S.E, S.D0, S.E0, D0, E0), Dt) };
+  T.W = reach(add(reach(W0, Dt, g, gw), sub(S.W, S.Wt)), Dt, g, gw);
+  const kt = cross(S.D0, D0), kp = len(kt) > 0.02 ? norm(kt) : null, rm = FIT.ce * Math.max(fr, 1);   // chiều tư thế đang quay lưỡi; lật tối đa
+  let base = settle(g, H, T, gw, kp, rm), eb = gap(base);
+  if (eb > 4e-4) {
+    let lo = 0, hi = 1, blk = false;
+    const p0 = settle(g, H, P, gw, kp, rm), e0 = gap(p0);
+    if (e0 < eb - 1e-4) { base = p0; eb = e0; blk = true; }
+    for (let i = 0; i < 5 && _work < _wcap; i++) {
+      const t = (lo + hi) / 2, c = settle(g, H, mixC(P, T, t, g, gw), gw, kp, rm), e = gap(c);
+      if (e <= Math.max(e0, 4e-4) + 1e-4) { lo = t; if (e < eb - 1e-4 || blk) { base = c; eb = e; blk = true; } } else hi = t;
+    }
+  }
+  let det = 0, wd = 0;
+  // đích kéo về: gươm của tư thế (cổ tay vào tầm với) nếu không chạm; chạm thì lời giải toàn cục của khung này (fitSolve: dựng mũi, dời
+  // tay lên rìa tầm với — thế giơ qua đầu: tay cao nhất có thể) — tư thế C6 bật nhảy, Tuyệt Kỹ giơ gươm mà đích chạm đầu thì kéo theo
+  // tư thế, tay kẹt dưới mặt (giữ gươm ngang ngực)
+  let tg = TG ? { W: TG.W, D: TG.D, E: TG.E } : { W: reach(W0, D0, g, gw), D: D0, E: E0 };
+  if (TG) { if (eb > gap(tg) + 0.02) tg.f = FIT.gf; }
+  else if (fr > 0 && gap(tg) > 4e-4) {
+    const G = solveG(g, H, W0, D0, E0, elP, gw, hz0), Ee = edgeOf(G.E, armPlane(g, G.W, G.D, elP), hz0, null);
+    tg = { W: G.W, D: G.D, E: dot(Ee, base.E) < -0.5 && gap({ W: G.W, D: G.D, E: scl(Ee, -1) }) <= gap({ W: G.W, D: G.D, E: Ee }) + 1e-4 ? scl(Ee, -1) : Ee };
+    // lời giải khung này chạm hơn lời giải toàn cục > 2 cm (lộn né: đầu sát đất, tư thế đổi 30–45° mỗi khung — lời giải tụt lại, chuôi
+    // vào cổ áo LINH_r01 1,7 cm): kéo về nhanh gấp FIT.gf
+    if (eb > gap(tg) + 0.02) tg.f = FIT.gf;
+  }
+  // kéo lưỡi về đích nhanh ít nhất FIT.rx lần tốc độ quay của lưỡi tư thế (nhát bổ quay 15–20° mỗi khung: kéo FIT.rd 6° thì trễ mãi)
+  if (fr > 0) tg.rd = _bld ? Math.max(FIT.rd, (FIT.rx * dzw) / fr) : FIT.rd;
+  if (fr > 0) {
+    const a0 = angOf(base.D, tg.D), st = Math.min(a0, tg.rd * fr * (tg.f || 1)), ok = (c, e) => e <= Math.max(eb, 4e-4) + 1e-4 && angOf(c.D, tg.D) < a0 - 0.3 * st;
+    const kr = cross(base.D, tg.D), R = relaxC(base, tg, g, gw, fr, 1), Rs = settle(g, H, R, gw, len(kr) > 0.02 ? norm(kr) : kp, rm), er = gap(Rs);
+    const Rd = a0 > 1e-3 ? settle(g, H, relaxC(base, tg, g, gw, fr, 1, true), gw, len(kr) > 0.02 ? norm(kr) : kp, rm) : null, ed = Rd ? gap(Rd) : 9;
+    let full = false, moved = true;
+    if (ok(Rs, er) || (a0 < 1e-3 && er <= Math.max(eb, 4e-4) + 1e-4)) { base = Rs; eb = er; full = true; }
+    else if (Rd && ok(Rd, ed)) { base = Rd; eb = ed; }     // lưỡi về trước (cổ tay đứng): dựng gươm rồi mới đưa tay
+    else {
+      // lưỡi kẹt trước vật cản trên đường về đích: vòng qua bên — quay quanh trục lệch ±30…80° (quanh lưỡi) khỏi trục về thẳng, chiều
+      // vòng của khung trước trước (S.det), lấy trục đầu tiên vẫn tới gần đích mà không chạm hơn
+      const k0 = len(kr) > 1e-6 ? norm(kr) : null, sg = S.det || 1;
+      if (k0 && a0 > 0.2) for (const a of [0.5 * sg, -0.5 * sg, 1.0 * sg, -1.0 * sg, 1.4 * sg, -1.4 * sg]) {
+        if (_work > _wcap) break;
+        const k = rotAx(k0, base.D, a), Dc = rotAx(base.D, k, st), c = { W: reach(base.W, Dc, g, gw), D: Dc, E: rotAx(base.E, k, st) }, e = gap(c);
+        if (ok(c, e)) { base = c; eb = e; det = Math.sign(a); break; }
+      }
+      if (!det) {
+        let lo = 0, hi = 1;
+        for (let i = 0; i < 5; i++) { const t = (lo + hi) / 2, c = relaxC(base, tg, g, gw, fr, t); if (gap(c) <= Math.max(eb, 4e-4) + 1e-4) lo = t; else hi = t; }
+        if (lo > 0) { base = relaxC(base, tg, g, gw, fr, lo); eb = gap(base); } else moved = false;
+      }
+    }
+    // cổ tay kẹt xa đích (hai nắm tay vướng mặt, cổ trên đường về — C6 bật nhảy: tay giữ ngang ngực thay vì giơ qua đầu): trượt trên mặt
+    // cầu tầm với theo hướng về đích lệch ±30…80° (quanh pháp tuyến cầu), chiều của khung trước trước, bước FIT.rw, lấy hướng đầu tiên tới
+    // gần đích mà không chạm hơn
+    const Wt = tg.W, dt0 = len(sub(Wt, base.W)), sw = Math.min(dt0, FIT.rw * fr * (tg.f || 1) + 0.12 * dt0);
+    if (dt0 > 0.03 && !full) {
+      const nr = norm(sub(base.W, g.shR)), u0 = perpN(sub(Wt, base.W), nr), sg = S.wdet || 1;
+      for (const a of [0, 0.5 * sg, -0.5 * sg, 1.0 * sg, -1.0 * sg, 1.4 * sg, -1.4 * sg]) {
+        if (_work > _wcap) break;
+        const c = { W: reach(add(base.W, scl(rotAx(u0, nr, a), sw)), base.D, g, gw), D: base.D, E: base.E }, e = gap(c);
+        if (e <= Math.max(eb, 4e-4) + 1e-4 && len(sub(Wt, c.W)) < dt0 - 0.3 * sw) { base = c; eb = e; wd = Math.sign(a); moved = true; break; }
+      }
+    }
+    // vẫn đứng yên xa đích (kẹt trong hốc: C6, Tuyệt Kỹ bật nhảy, tay dưới cằm, lưỡi theo tư thế quay ra sau — mọi bước đều chạm hơn một
+    // chút, đi thẳng tới đích qua được nếu cho thiếu khe ~1 cm): một bước thẳng tới đích (mixC, phần lớn hơn trong hai phần lưỡi FIT.rd,
+    // cổ tay rw) rồi đẩy ra, nhận khi thiếu khe ≤ FIT.tr — các khe còn lớn hơn nửa bản lưỡi, nắm tay (lệch tư thế > 90°: 98 → 6 khung)
+    if (!moved && (dt0 > 0.05 || a0 > 0.2) && _work < _wcap) {
+      const t = Math.min(1, Math.max(st / Math.max(a0, 1e-6), sw / Math.max(dt0, 1e-6))), c = settle(g, H, mixC(base, tg, t, g, gw), gw, null, rm), e = gap(c);
+      if (e <= Math.max(eb, FIT.tr)) { base = c; eb = e; }
+    }
+  }
+  let { W, D, E } = base;
+  // giới hạn mỗi khung so với khung trước (theo tư thế + FIT.cd / ce / cw)
+  const m = Math.max(fr, 1), aD = angOf(D, S.D), lD = dzw + FIT.cd * m;
+  if (aD > lD) { const Dc = rotAx(S.D, norm(cross(S.D, D)), lD); E = perpN(swing(E, D, Dc), Dc); D = Dc; }
+  // lưỡi hai mặt sắc: E hay −E như nhau (chắn tay đối xứng) — lấy chiều gần lưỡi sắc khung trước mang theo tư thế (T.E: tư thế lật 119°
+  // một khung khi hết Phá Trận thì theo đúng tư thế) rồi mới so lật với khung trước; so với E ngược chiều thì chặn lật 140° xuống 29° giữa
+  // chừng, chắn tay vào cổ áo (Đòn Quyết LINH_r01 5,4 cm)
+  if (dot(E, T.E) < 0) E = scl(E, -1);
+  const aE = angOf(E, S.E), lE = dyw + FIT.ce * m;
+  if (aE > lE) {
+    const Ep = perpN(S.E, D), ph = Math.atan2(dot(D, cross(Ep, E)), dot(Ep, E));
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 8; i++) { const t = (lo + hi) / 2; if (angOf(rotAx(Ep, D, ph * t), S.E) > lE) hi = t; else lo = t; }
+    E = perpN(rotAx(Ep, D, ph * lo), D);
+  }
+  const lW = len(sub(W0, S.W0)) * ((g.R.L1 + g.R.L2) / (ARM.L1 + ARM.L2)) + FIT.cw * m, dW = sub(W, S.W), aW = len(dW);
+  if (aW > lW) { const Wc = reach(add(S.W, scl(dW, lW / aW)), D, g, gw); if (TG || _work >= _wcap || gap({ W: Wc, D, E }) <= gap({ W, D, E }) + 1e-4) W = Wc; }
+  const far = len(sub(tg.W, W)) > 0.03;
+  return { W, D, E, Eref: E, det: det || (S.det && angOf(D, D0) > 0.2 ? S.det : 0), wdet: wd || (S.wdet && far ? S.wdet : 0) };
+}
+// Cấu hình (W, D, E) giữa a (t = 0) và b (t = 1): cổ tay nội suy rồi vào tầm với, lưỡi, lưỡi sắc quay theo phép quay ngắn nhất
+function mixC(a, b, t, g, gw) {
+  const k = cross(a.D, b.D), s = len(k), th = Math.atan2(s, dot(a.D, b.D)) * t;
+  let D = a.D, E = a.E;
+  if (s > 1e-9) { D = rotAx(a.D, scl(k, 1 / s), th); E = rotAx(a.E, scl(k, 1 / s), th); }
+  const Eb = perpN(b.E, D), ph = Math.atan2(dot(D, cross(E = perpN(E, D), Eb)), dot(E, Eb));
+  E = perpN(rotAx(E, D, ph * t), D);
+  return { W: reach(lin(a.W, 1 - t, b.W, t), D, g, gw), D, E };
+}
+// Kéo c về đích tg (phần t của một bước fr khung): lưỡi quay về tg.D tới FIT.rd·fr, lật về tg.E tới rr·fr, cổ tay về tg.W tới rw·fr
+// cộng 12% khoảng cách (xa thì về nhanh hơn)
+function relaxC(c, tg, g, gw, fr, t, onlyD = false) {
+  let D = c.D, E = c.E;
+  fr *= tg.f || 1;
+  const a = angOf(D, tg.D);
+  if (a > 1e-6) { const k = norm(cross(D, tg.D)), s = Math.min(a, (tg.rd || FIT.rd) * fr) * t; D = rotAx(D, k, s); E = rotAx(E, k, s); }
+  const Et = perpN(tg.E, D), ph = Math.atan2(dot(D, cross(E, Et)), dot(E, Et));
+  E = perpN(rotAx(E, D, Math.max(-FIT.rr * fr, Math.min(FIT.rr * fr, ph)) * t), D);
+  const dw = sub(tg.W, c.W), lw = len(dw), st = onlyD ? 0 : Math.min(lw, FIT.rw * fr + 0.12 * lw) * t;
+  return { W: reach(lw > 1e-9 ? add(c.W, scl(dw, st / lw)) : c.W, D, g, gw), D, E };
+}
+// Đẩy cấu hình c ra khỏi vật cản tại chỗ, ba lượt: hai nắm tay (slideFists), lưỡi / đuôi chuôi nghiêng (tiltLocal), chắn tay / ngón tay lật
+// (rollFrom tới 90°), mút chắn tay còn chạm thì dời hai tay — mỗi bước chỉ nhận khi tổng thiếu khe giảm
+function settle(g, H, c, gw, kp = null, rmax = Math.PI / 2) {
+  let { W, D, E } = c;
+  const gap = (W1, D1, E1) => fistGap(g, H, W1, D1) + tiltGap(g, H, W1, D1, E1) + guardGap(g, H, W1, D1, E1, E1);
+  let e = gap(W, D, E);
+  for (let round = 0; round < 3 && e > 4e-4 && _work < _wcap; round++) {
+    const e1 = e;
+    if (fistGap(g, H, W, D) > 1e-4) { const Wn = slideFists(g, H, W, D, null, gw, H.C), en = gap(Wn, D, E); if (en < e - 1e-5) { W = Wn; e = en; } }
+    if (tiltGap(g, H, W, D, E) > 1e-4) {
+      const [Dn, En] = tiltLocal(g, H, W, D, E, kp), Wn = reach(W, Dn, g, gw), en = gap(Wn, Dn, En);
+      if (en < e - 1e-5) { W = Wn; D = Dn; E = En; e = en; }
+    }
+    if (guardGap(g, H, W, D, E, E) > 1e-4) {
+      const En = rollFrom(g, H, W, D, E, (x) => x, rmax), en = gap(W, D, En);
+      if (en < e - 1e-5) { E = En; e = en; }
+      if (guardGap(g, H, W, D, E) > 1e-4) { const Wn = slideFists(g, H, W, D, E, gw, H.C), en2 = gap(Wn, D, E); if (en2 < e - 1e-5) { W = Wn; e = en2; } }
+    }
+    if (e > e1 - 1e-5) break;
+  }
+  return { W, D, E };
+}
+// Sau rig-motion.js fixBlades (cổ tay phải gập thêm cho mũi lưỡi khỏi cắm đất, góc mới hx): giữ lưỡi theo hướng mới, đưa lại cổ tay
+// vào tầm với (điểm nắm đổi chỗ theo lưỡi — lính Tự do vai rộng hụt chuôi 1,5–3 cm ở thế bổ đất). q: tư thế đã fitArms. Lưỡi gập theo
+// đất mà vào mặt, cổ (thiếu khe lưỡi / đuôi chuôi / nắm tay > FIT.rf hơn lời giải fitArms — lộn né: đầu sát đất, gập lưỡi lên đầu 1,5–1,8
+// cm, soát 19a lần 3) thì trả null: giữ lời giải fitArms (đất đã tính trong fitArms theo mặt phẳng gp); force: không xét (rig-motion.js
+// đổi dần góc gập giữa góc đã nhận khung trước và góc nhận khung này).
+export function refitArms(q, g, hx, o = {}, force = false) {
+  const f = elFrame(q.shRx, q.shRy, q.shRz, q.elRx);
+  armFK(q.shRx, q.shRy, q.shRz, q.elRx - g.R.off, g.R.L1, g.R.L2, _fk);
+  const cx = Math.cos(hx), sx = Math.sin(hx), cz = Math.cos(q.handRz), sz = Math.sin(q.handRz), gw = Math.min(1, Math.max(0, 2 * (q.grip || 0)));
+  const D = lin(f.y, -sx, f.z, cx), E = lin(f.x, -sz, lin(f.y, cx, f.z, sx), cz), W = reach(add(g.shR, [_fk[3], _fk[4], _fk[5]]), D, g, gw);
+  if (!force && g.grid && q.__s) {
+    const H = fitCtx(q, g, null), S = q.__s, bad = (W1, D1) => Math.max(fistGap(g, H, W1, D1), tiltGap(g, H, W1, D1));
+    if (bad(W, D) > bad(S.W, S.D) + FIT.rf) return null;
+  }
+  Object.assign(o, q);
+  return armTo(o, g, W, D, E, q.handRz, E, armPlane(g, W, D, [_fk[0], _fk[1], _fk[2]]));
+}
+// IK tay phải tới cổ tay W, lưỡi D, lưỡi sắc E → o (khuỷu A: armPlane). Lưỡi hai mặt sắc: E hay −E theo edgeOf (Eref: lưỡi sắc thật
+// khung trước — giữ chiều; không có thì nhánh góc lật gần hz0 của tư thế); lưỡi sắc thật của bàn tay ghi vào o.__ey.
+function armTo(o, g, W, D, E, hz0, Eref, A) {
+  const Ee = edgeOf(E, A, hz0, Eref);
+  let d = rollOf(Ee, A.fr, A.hx) - hz0; d -= TAU * Math.round(d / TAU);
+  o.shRx = A.a0; o.shRy = A.a1; o.shRz = A.a2; o.elRx = A.ex; o.handRx = A.hx; o.handRz = hz0 + d;
+  o.__ey = Ee;                                                                            // lưỡi sắc thật của bàn tay (khung sau so theo)
+  return o;
+}
+// Khuỷu tay phải: cổ tay W, lưỡi D → { a0, a1, a2 vai, ex khuỷu, fr khung cẳng tay, hx gập cổ tay, el khuỷu so với vai, elT đích khuỷu }.
+// Mặt phẳng tay chứa lưỡi (cổ tay chỉ gập quanh x, lật quanh z): khuỷu ở một trong hai phía của (vai → cổ tay) trong mặt phẳng đó — gọi
+// rời: phía gần khuỷu elP của tư thế mà cổ tay gập trong khoảng tự nhiên WRIST (như solveRight; phía kia có khi gập 150–190°, khuỷu nhảy
+// 0,1–0,36 m giữa hai khung, đo đợt soát 19a lần 2); gọi liên tục (ep: khuỷu khung trước, et: đích khuỷu khung trước): phía của khung
+// trước (gần et — đang dời khuỷu sang phía kia thì giữ phía đó tới hết, không quay lại giữa chừng), chỉ đổi phía khi cổ tay phía này gập
+// quá khoảng tự nhiên hơn phía kia FIT.ws — FIT.ws2 khi lưỡi gần trục vai → cổ tay (sin < sin FIT.ed: đổi lúc đó lệch lưỡi ít, khuỷu đi
+// dần; chờ tới khi lưỡi xa trục thì khuỷu nhảy nửa vòng — Hịch LINH_r24 0,27 m, C6 H31 0,26 m một khung, soát lần 3); khuỷu mới cách
+// khuỷu trước quá lim (lưỡi gần song song cánh tay — mặt phẳng tay quay nửa vòng giữa hai khung: khuỷu nhảy 0,2–0,3 m ở Binh Thư, Hịch,
+// cuối Tuyệt Kỹ) thì khuỷu chỉ quay quanh trục vai → cổ tay một cung lim từ chỗ cũ về phía đó, cổ tay gập theo lưỡi gần nhất có thể —
+// nhưng lưỡi không lệch quá FIT.ed (lưỡi xa trục cánh tay thì khuỷu phải theo: lệch lưỡi ≈ góc lưỡi–cánh tay × góc khuỷu còn thiếu).
+function armPlane(g, W, D, elP, ep = null, lim = Infinity, et = null) {
+  const v = sub(W, g.shR), n = cross(v, D), side = len(n) > 1e-6 * len(v) ? norm(cross(n, v)) : null;
+  let best = -Infinity, r = null;
+  const solve = (pl) => {
+    armIK(v[0], v[1], v[2], pl[0], pl[1], pl[2], g.R.L1, g.R.L2, _ik2);
+    armFK(_ik2[0], _ik2[1], _ik2[2], _ik2[3], g.R.L1, g.R.L2, _fk);
+    const ex = _ik2[3] + g.R.off, f = elFrame(_ik2[0], _ik2[1], _ik2[2], ex), hx = Math.atan2(-dot(D, f.y), dot(D, f.z));
+    return { a0: _ik2[0], a1: _ik2[1], a2: _ik2[2], ex, fr: f, hx, el: [_fk[0], _fk[1], _fk[2]] };
+  };
+  const cs = (side ? [side, scl(side, -1)] : [ep || elP]).map((pl) => { const c = solve(pl); c.pen = Math.max(0, WRIST[0] - c.hx) + Math.max(0, c.hx - WRIST[1]); return c; });
+  if (ep) {
+    // phía của khung trước; phía hợp tư thế (khuỷu theo elP, cổ tay tự nhiên) mà gần khuỷu trước trong lim thì theo nó luôn — lưỡi gần
+    // song song cánh tay hai phía sát nhau, đổi không nhảy
+    const ref = et || ep;
+    cs.sort((a, b) => len(sub(a.el, ref)) - len(sub(b.el, ref)));
+    const sc = (c) => dot(norm(c.el), norm(elP)) - 2 * c.pen, sw = len(cross(norm(v), D)) < Math.sin(FIT.ed) ? FIT.ws2 : FIT.ws;
+    r = cs.length > 1 && cs[0].pen > cs[1].pen + sw ? cs[1] : cs[0];
+    if (cs.length > 1) { const d = sc(cs[0]) >= sc(cs[1]) ? cs[0] : cs[1]; if (d !== r && len(sub(d.el, ep)) <= lim) r = d; }
+  } else for (const c of cs) { const s = dot(norm(c.el), norm(elP)) - 2 * c.pen; if (s > best) { best = s; r = c; } }
+  const vh = norm(v), sa = len(cross(vh, D)), elT = r.el;
+  if (ep && len(sub(r.el, ep)) > lim) {
+    const pe = perpN(ep, vh), pr = perpN(r.el, vh), rc = len(sub(r.el, scl(vh, dot(r.el, vh))));
+    const mx = sa > Math.sin(FIT.ed) ? Math.asin(Math.sin(FIT.ed) / sa) : Math.PI;
+    const th = Math.atan2(dot(vh, cross(pe, pr)), dot(pe, pr)), a = Math.min(Math.abs(th), Math.max(lim / Math.max(rc, 1e-3), Math.abs(th) - mx));
+    if (a < Math.abs(th)) r = solve(rotAx(pe, vh, Math.sign(th) * a));
+  }
+  r.elT = elT;
+  return r;
+}
+// góc lật bàn tay (quanh z sau khi gập hx quanh x của khung cẳng tay fr) cho trục y bàn tay theo E
+const rollOf = (E, fr, hx) => Math.atan2(-dot(E, fr.x), dot(E, lin(fr.y, Math.cos(hx), fr.z, Math.sin(hx))));
+// Lưỡi hai mặt sắc: trục y thật của bàn tay là E hay −E — cùng chiều lưỡi sắc khung trước Eref nếu có (không lật qua lại), không thì
+// nhánh có góc lật gần hz0 của tư thế (lật ít nhất).
+function edgeOf(E, A, hz0, Eref) {
+  if (Eref) return dot(E, Eref) < 0 ? scl(E, -1) : E;
+  let d = rollOf(E, A.fr, A.hx) - hz0; d -= TAU * Math.round(d / TAU);
+  return Math.abs(d) > Math.PI / 2 ? scl(E, -1) : E;
+}

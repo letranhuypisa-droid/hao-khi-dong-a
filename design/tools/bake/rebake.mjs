@@ -16,7 +16,9 @@ let XA = null;
 
 // Hàn đỉnh trùng vị trí (đường may UV của Meshy biến mất) rồi giảm lưới tự do còn ~tris tam giác. Trả { pos, idx, src: đỉnh mới →
 // một đỉnh gốc cùng vị trí, id: đỉnh gốc → đỉnh mới }.
-export async function weldSimplify(pos, idx, tris) {
+// attr (tuỳ chọn, lính đám đông — kit.mjs): { data: Float32Array (đỉnh gốc × k), k, w } thuộc tính giữ khi giảm (trọng số khúc), lock:
+// Uint8Array (đỉnh gốc) đỉnh không được gộp.
+export async function weldSimplify(pos, idx, tris, attr = null) {
   const key = new Map(), id = new Int32Array(pos.length / 3), P = [], src = [];
   for (let v = 0; v < id.length; v++) {
     const k = `${Math.round(pos[v * 3] * 1e4)},${Math.round(pos[v * 3 + 1] * 1e4)},${Math.round(pos[v * 3 + 2] * 1e4)}`;
@@ -26,7 +28,12 @@ export async function weldSimplify(pos, idx, tris) {
   }
   const W = Float32Array.from(P), I = Uint32Array.from(idx, (i) => id[i]);
   await MeshoptSimplifier.ready;
-  const [out] = I.length / 3 > tris ? MeshoptSimplifier.simplify(I, W, 3, tris * 3, 1.0, []) : [I];
+  let out = I;
+  if (I.length / 3 > tris && attr) {
+    const k = attr.data ? attr.k : 0, A = new Float32Array(src.length * k), L = attr.lock ? Uint8Array.from(src, (v) => attr.lock[v]) : null;
+    for (let g = 0; g < src.length; g++) for (let j = 0; j < k; j++) A[g * k + j] = attr.data[src[g] * k + j];
+    [out] = MeshoptSimplifier.simplifyWithAttributes(I, W, 3, A, k, new Array(k).fill(attr.w ?? 0), L, tris * 3, 1.0, []);
+  } else if (I.length / 3 > tris) [out] = MeshoptSimplifier.simplify(I, W, 3, tris * 3, 1.0, []);
   return { pos: W, idx: out, src: Int32Array.from(src), id };
 }
 

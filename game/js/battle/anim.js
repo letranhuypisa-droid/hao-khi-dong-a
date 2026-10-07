@@ -29,6 +29,9 @@ export function blendPose(a, b, t) {
   // kênh grip (0..1, tay trái nắm chuôi vũ khí hai tay — rig-motion.js): chỉ có khi một trong hai tư thế có (tư thế song
   // đao của H35 không có kênh này nên kết quả trộn giữ nguyên như cũ); thiếu thì coi là 0
   if (a.grip !== undefined || b.grip !== undefined) p.grip = (a.grip || 0) + ((b.grip || 0) - (a.grip || 0)) * t;
+  // thẻ bảng lời giải tay đại kiếm (anim-wc01.js fitArms, thân GLB): tư thế đích mang thẻ (fk đòn, fu mốc) thì kết quả mang thẻ đó
+  // và phần trộn fw — lời giải tay phải trộn đúng phần đó. Tư thế không thẻ (mọi lớp khác) không đổi gì.
+  if (b.fk !== undefined) { p.fk = b.fk; p.fu = b.fu; p.fw = t; }
   return p;
 }
 

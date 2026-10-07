@@ -498,8 +498,9 @@ const FLAP = {
 // ĐỀ XUẤT BẢN THỬ: rad vạt trước vểnh thêm khi đùi nằm ngang (quỵ gối lúc chết: ống quần lòi ra trước vạt 7 cm →
 // 2 cm; phần còn lại là gốc vạt nằm trong đùi, không tránh được với điểm xoay ở eo)
 const FLAP_LAP = 0.25;
-// Tua giáo, đuôi ngựa: dây n đốt treo ở điểm neo (khung khớp j) — neo = chân mũi giáo, mông ngựa.
-const TAS = {
+// Tua giáo, đuôi ngựa: dây n đốt treo ở điểm neo (khung khớp j) — neo = chân mũi giáo, mông ngựa. Lính GLB: soldiers.js glbKit
+// thay neo giáo bằng chân mũi giáo Meshy đo lúc nướng (meta.tas).
+export const TAS = {
   DV_GIAO: { j: JI.faR, p: [0, HAND, SPEAR.DV_GIAO - 0.79], n: 3, seg: 0.1, damp: 3.5 },
   NG_GIAO: { j: JI.faR, p: [0, HAND, SPEAR.NG_GIAO - 0.79], n: 3, seg: 0.1, damp: 3.5 },
   NG_KY: { j: JI.pelvis, p: [0, 0.13, -0.8], n: 3, seg: 0.21, damp: 3.4 },
