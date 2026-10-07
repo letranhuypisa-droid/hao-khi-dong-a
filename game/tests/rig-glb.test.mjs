@@ -151,8 +151,9 @@ const DKM = hkm("wpn/daikiem.hkm"), DK = DKM.meta;
 const BLADE = { guard: DK.guard ?? 0.07, tip: DK.hi[2], butt: DK.lo[2], gp: W1.guardPts(DKM.geos.body.attributes.position.array) };
 // Như makeRig với thân GLB: khớp theo meta.rest, gươm GLB (lưỡi, điểm fixBlades: mũi, hai mép 0,2 dưới mũi, núm — models.js), lưới đầu
 // từ lưới thân (models.js headOf). M: mô hình (lưới da cho kiểm thử va chạm).
+const MODELS = {};
 function glbRig(id, withModel = false) {
-  const b = readFileSync(new URL(`char/${id}.hkm`, MD)), M = parseHKM(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
+  const M = (MODELS[id] ||= (() => { const b = readFileSync(new URL(`char/${id}.hkm`, MD)); return parseHKM(b.buffer.slice(b.byteOffset, b.byteOffset + b.length)); })());
   const r = M.meta.rest, rig = makeRig({ weapon: "daikiem" });
   for (const k of ["shL", "elL", "handL", "shR", "elR", "handR", "head"]) rig.p[k].position.set(r[k][0], r[k][1], r[k][2]);
   rig.dyn.blade = BLADE; rig.dyn.head = headOf(M);
@@ -337,6 +338,80 @@ t("WC01 nối đòn 60 khung / giây (thân GLB thật, mọi đòn + lộn né)
   if (elbOver > frames / 200) bad.unshift(`khuỷu nhảy > 0,05 m hơn tư thế ở ${elbOver} / ${frames} khung`);
   const kinds = ["lưỡi quay", "lưỡi lệch", "bàn tay lật", "khuỷu nhảy", "gươm vào", "bàn tay sát"].map((k) => `${k} ${bad.filter((s) => s.includes(k)).length}`);
   assert.ok(!bad.length, `${kinds.join(", ")} — ${bad.slice(0, 12).join("; ")}`);
+});
+// Soát lần 4 — phát như lab của soát (chaos2.js, labplay.js, groundpen.js): rig mới, idle(0), 40 khung ở u = 0 rồi 60 khung / giây tới
+// u = 1, trộn 0,8, gốc ở 0, đất phẳng; song song rig khối cùng tư thế. Trả từng khung: hướng lưỡi (trục z bàn tay phải, khung thân) của
+// thân GLB và của rig khối, điểm lưỡi thấp nhất (mũi, hai mép 0,2 dưới mũi, núm — điểm fixBlades) so với đất.
+function labPlay(id, m, eps = 0) {
+  const rig = glbRig(id), ref = makeRig({ weapon: "daikiem" }), mg = new RigMotion(rig), mr = new RigMotion(ref), DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };
+  const f = W1.HERO_ANIM_WC01[m], N = Math.round((MOVES_WC01[m]?.dur ?? DUR[m]) * 60), pts = rig.dyn.blades[0].pts, v = new THREE.Vector3(), out = [];
+  const ax = (r) => new THREE.Vector3(0, 0, 1).transformDirection(r.p.handR.matrixWorld).transformDirection(r.p.torso.matrixWorld.clone().invert());
+  let pose = W1.idle(0);
+  const st = (u) => { pose = A.blendPose(pose, f(u), 0.8); step(rig, mg, pose); step(ref, mr, pose); };
+  for (let i = 0; i < 40; i++) st(0);
+  for (let i = 1; i <= N; i++) {
+    st(Math.min(1, (i / N) * (1 + eps)));
+    let low = 9;
+    for (let k = 0; k < pts.length; k += 3) low = Math.min(low, v.set(pts[k], pts[k + 1], pts[k + 2]).applyMatrix4(rig.p.handR.matrixWorld).y);
+    out.push({ u: i / N, z: ax(rig), zc: ax(ref), low });
+  }
+  return out;
+}
+// Lời giải tay phải phải là hàm liền của tư thế: đổi mốc u của đòn 1e-5 (tương đối) thì lưỡi đổi ≤ 5° mọi khung. Bản c23105e (giải mỗi
+// khung theo lịch sử): Tuyệt Kỹ H31 lệch tới 98°, LINH_r24 95°, LINH_r01 45°; C6 H31 58°, LINH_r24 41°; Đòn Quyết LINH_r24 12°. Bản này
+// ≤ 0,1°.
+t("WC01 tra bảng (thân GLB thật, phát như lab): đổi mốc u 1e-5 thì lưỡi đổi ≤ 5° mọi khung (Tuyệt Kỹ, C6, C1, Đòn Quyết)", () => {
+  const bad = [];
+  for (const id of ["H31", "LINH_r01", "LINH_r24"]) for (const m of ["ult", "C6", "C1", "DQ"]) {
+    const a = labPlay(id, m), b = labPlay(id, m, 1e-5);
+    let mx = 0, at = 0;
+    for (let i = 0; i < a.length; i++) { const d = (a[i].z.angleTo(b[i].z) * 180) / Math.PI; if (d > mx) { mx = d; at = a[i].u; } }
+    if (mx > 5) bad.push(`${id} ${m}@${at.toFixed(3)} ${mx.toFixed(1)}°`);
+  }
+  assert.ok(!bad.length, bad.join("; "));
+});
+// Nhát bổ, bổ đất (từ khung giữa nhát bổ CHOP_MID tới hết giữ thế SLAM_HOLD; Tuyệt Kỹ ba nhát): lưỡi lệch lưỡi rig khối > 45° không quá
+// 3 khung liền; C6 lưỡi xuống tới đất (điểm thấp nhất ≤ 6 cm, soát lần 2: 3,4 cm). Bản c23105e: Tuyệt Kỹ nhát 3 lệch > 45° suốt 28 khung
+// (H31), 14 khung (LINH_r24), C6 LINH_r24 17 khung, lưỡi C6 LINH_r24 thấp nhất 0,46 m. Bản này: 0 khung, lệch lớn nhất trong nhát bổ 38°.
+t("WC01 nhát bổ (C1, C4, C6, Đòn Quyết, Tuyệt Kỹ; thân GLB thật): lưỡi lệch tư thế > 45° ≤ 3 khung liền, C6 lưỡi xuống tới đất", () => {
+  const CH = { C1: [[0.5, 0.78]], C4: [[0.56, 0.8]], C6: [[0.56, 0.82]], DQ: [[0.53, 0.85]], ult: [[0.16, 0.27], [0.41, 0.52], [0.69, 0.8]] }, bad = [];
+  for (const id of ["H31", "LINH_r01", "LINH_r24"]) for (const [m, W] of Object.entries(CH)) {
+    const r = labPlay(id, m);
+    let run = 0, worst = 0, at = 0;
+    for (const x of r) {
+      const dev = (x.z.angleTo(x.zc) * 180) / Math.PI;
+      if (W.some(([a, b]) => x.u >= a - 1e-9 && x.u <= b + 1e-9) && dev > 45) { run++; if (run > worst) { worst = run; at = x.u; } } else run = 0;
+    }
+    if (worst > 3) bad.push(`${id} ${m} ${worst} khung liền > 45° (tới u ${at.toFixed(3)})`);
+    if (m === "C6") { const low = Math.min(...r.map((x) => x.low)); if (low > 0.06) bad.push(`${id} C6 lưỡi thấp nhất ${low.toFixed(3)} m`); }
+  }
+  assert.ok(!bad.length, bad.join("; "));
+});
+// Công mỗi khung (RigMotion.update của thân GLB, chuỗi nối đòn như trên + lộn né + chạy): số lần tra bảng khoảng cách mặt / cổ (đếm qua
+// Proxy trên bảng — không phụ thuộc máy): lớn nhất ≤ 20 000, trung bình ≤ 800. Bản c23105e: lớn nhất 97 000–142 000 (lộn né), trung bình
+// 2 700–3 800; bản này 6 000–11 200 (đẩy ra khi lời giải trộn còn chạm, trần FIT.wk), trung bình 74–122 (khung tra bảng ~0).
+t("WC01 công mỗi khung (thân GLB thật, nối đòn + lộn né + chạy): tra bảng khoảng cách ≤ 20 000 lần mỗi khung, trung bình ≤ 800", () => {
+  const DT = 1 / 60, DUR = { hich: 3, binhThu: 0.9, ult: 4.4 }, seq = [], bad = [];
+  for (const k of Object.keys(W1.HERO_ANIM_WC01)) {
+    for (let i = 0; i < 18; i++) seq.push(["idle", () => W1.POSES_WC01.idle(i * DT), 0.15]);
+    const f = W1.HERO_ANIM_WC01[k], N = Math.ceil((MOVES_WC01[k]?.dur ?? DUR[k]) / DT);
+    for (let i = 1; i <= N; i++) seq.push([k, () => f(i / N), 0.8]);
+  }
+  for (let i = 1; i <= 20; i++) seq.push(["dodge", () => W1.POSES_WC01.dodgeRoll(Math.min(1, (i * DT) / 0.32)), 0.6]);
+  for (let i = 1; i <= 90; i++) seq.push(["run", () => W1.POSES_WC01.run(i * DT * 11, 1, 0.95), 0.35]);
+  let n = 0;
+  const count = (G) => (G ? new Proxy(G, { get: (o, k) => { if (k === "d") n++; return o[k]; } }) : G);
+  for (const id of ["H31", "LINH_r01", "LINH_r24"]) {
+    const rig = glbRig(id), m = new RigMotion(rig);
+    m.fit.grid = count(m.fit.grid); m.fit.up = count(m.fit.up);
+    let pose = W1.POSES_WC01.idle(0), max = 0, sum = 0, at = "";
+    for (const [k, f, kb] of seq) {
+      pose = A.blendPose(pose, f(), kb); n = 0; step(rig, m, pose);
+      sum += n; if (n > max) { max = n; at = k; }
+    }
+    if (max > 20000 || sum / seq.length > 800) bad.push(`${id}: lớn nhất ${max} (${at}), trung bình ${(sum / seq.length).toFixed(0)}`);
+  }
+  assert.ok(!bad.length, bad.join("; "));
 });
 t("rig khối (tay đúng số tư thế 0,34 + 0,36, vai ±0,3): không giải lại tay phải — góc khớp đúng tư thế", () => {
   const rig = makeRig({ weapon: "daikiem" }), m = new RigMotion(rig);

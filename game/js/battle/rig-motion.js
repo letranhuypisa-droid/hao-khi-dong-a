@@ -20,7 +20,7 @@
 import * as THREE from "three";
 import * as IK from "./ik.js";
 import { LEG } from "./models.js";
-import { FIT, fitGeo, fitArms, refitArms } from "./anim-wc01.js";
+import { FIT, fitGeo, fitArms, refitArms, fitTables } from "./anim-wc01.js";
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
@@ -129,6 +129,9 @@ export class RigMotion {
     // tay phải đại kiếm theo số đo tay của rig (anim-wc01.js fitGeo / fitArms; null = rig khối, tư thế dùng thẳng); fq: tư thế đã
     // giải lại (dùng lại mỗi lượt, giữ lời giải khung trước), fr: tư thế sau refitArms, gp: mặt đất trong khung thân (fitPlane)
     this.fit = this.grip ? fitGeo(P, d.blade, d.head || null) : null; this.fq = {}; this.fr = {}; this.gp = [0, 1, 0, 0]; this.kb = 0;
+    // bảng lời giải tay phải theo đòn / thế có thẻ (anim-wc01.js fitTables): dựng một lần cho mỗi mô hình, lúc dựng rig đầu tiên của mô
+    // hình đó (dyn.head dùng chung) — trước trận, không phải lúc ra đòn
+    if (this.fit && this.fit.grid) this.fit.tab = fitTables(this.fit, d.head);
     // đế giày (khung cổ chân): rig khối LEG; thân GLB theo lưới (models.js rig.foot từ meta.foot)
     this.foot = rig.foot || LEG;
     this.legs = [
@@ -170,9 +173,10 @@ export class RigMotion {
     // ---- 1. chân bám đất ----
     this.legIK(dt, pose, ground, snap, !(o && o.ik === false));
     // tay phải đại kiếm theo số đo rig (thân GLB): q = tư thế đã giải lại tay phải — lưỡi, tay trái theo q; giải tiếp theo lời giải khung
-    // trước (this.fq giữ qua các khung; dt = 0 khi hit-stop: đứng yên), khung đầu / nhảy chỗ (snap) giải toàn cục; mặt đất theo fitPlane
+    // trước (this.fq giữ qua các khung; dt = 0 khi hit-stop: đứng yên), khung đầu / nhảy chỗ (snap) giải toàn cục; mặt đất theo fitPlane —
+    // trừ lúc leo boong (o.ik false: gốc rig ở mạn thuyền, đất dưới chân không phải mặt đứng)
     let q = pose;
-    if (this.fit) { this.fitPlane(ground); q = this.setArmR(fitArms(pose, this.fit, this.fq, dt, this.gp, snap)); }
+    if (this.fit) { this.fitPlane(ground); q = this.setArmR(fitArms(pose, this.fit, this.fq, dt, o && o.ik === false ? null : this.gp, snap)); }
     // ---- 2. ma trận phần trên (hông đã hạ) để lấy điểm neo; lưỡi vũ khí không cắm đất ----
     for (let i = 0; i < this.chain.length; i++) this.chain[i].updateWorldMatrix(false, false);
     if (this.blades.length) this.fixBlades(q, ground);
