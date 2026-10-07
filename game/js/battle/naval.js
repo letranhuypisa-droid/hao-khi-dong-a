@@ -32,7 +32,7 @@
 //   snapshot() / restore(snap)                     thuyền, trạng thái, ván bắc (lính do director dựng lại theo pha)
 //   dispose()
 // Móc director (naval.on, tuỳ chọn): capture(boat), marker(raftId, hero), ferry(hero) (mở bảng chọn), rescue(hero),
-// shipCaptured(boat); naval.canMarker(id) → bool (mặc định: mốc còn ẩn).
+// shipCaptured(boat); naval.canMarker(id) → bool (mặc định: mốc còn ẩn); naval.canFerry() → bool (mặc định: được gọi đò).
 // Dịch chuyển tức thời người đang đứng trên boong (checkpoint, đặt tướng theo pha): gọi leave(o) trước (hoặc board(o, boong
 // mới) sau khi đặt) — không thì bước sau naval kéo người đó về lại boong cũ.
 // Thuộc tính trên vật: o.deck (Deck | null), o.dlx/o.dlz/o.dli/o.dyaw (toạ độ trên boong), o.climbY (đang leo), a.boat
@@ -169,7 +169,7 @@ export class Naval {
     this.climbs = []; this.ferries = []; this.rafts = [];
     this.t = 0; this.nFerry = 0; this.rescueT = 0; this._crewN = 0;
     this.inter = { key: null, t: 0, t0: 0 };
-    this.on = {}; this.canMarker = null;
+    this.on = {}; this.canMarker = null; this.canFerry = null;
     this._env = { tideY: world.tideY, t: 0, bedHeight: world.groundY, stakeActive: null };
     // cầu bến: boong tĩnh sẵn trong world.decks; cửa gốc bến ↔ đất
     for (const d of world.pierDecks || []) {
@@ -878,7 +878,7 @@ export class Naval {
         if (w.tideY - w.groundY(x, z) >= NAV.ferryWater && !this.decks.find(x, z, 0)) ferryOk = true;
       }
     }
-    if (ferryOk && !this.ferries.some((f) => !f.done)) out.push({ kind: "ferry", id: "ferry", deck: D, hold: H.ferry, label: "Gọi đò chuyển" });
+    if (ferryOk && (!this.canFerry || this.canFerry()) && !this.ferries.some((f) => !f.done)) out.push({ kind: "ferry", id: "ferry", deck: D, hold: H.ferry, label: "Gọi đò chuyển" });
     return out;
   }
   // hai boong nối nhau bằng ván bắc (đi bộ qua được, khỏi nhắc "lên boong")

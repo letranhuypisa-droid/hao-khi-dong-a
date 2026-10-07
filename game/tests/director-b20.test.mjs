@@ -1,8 +1,6 @@
-// tests/director-b20.test.mjs — bố trí của director B20 (battle/director-b20.js, đợt 9 pha D2): làn dọc sông (tra độ dài cung theo
-// x), đội hình hạm đội (đủ thành phần, neo trong khúc cọc, không đè bè cỏ, kỳ hạm cạnh M2), vòng tuần hộ vệ (không chạm làn hạm
-// đội, không cắt ngang sông, đủ nước), chỗ đậu đoàn thuyền nhẹ, làn áp mạn của thuyền tiên phong không xuyên thuyền khác.
-// Phần 2 (D2b): làn thoát ra cửa sông của hộ vệ đợt hai (né bãi lộ / cụm Phàn Tiếp, không đâm thân thuyền neo, qua bãi cọc để
-// mắc cọc được), chỗ áp mạn của cụm Liên Hoàn, số boss.
+// tests/director-b20.test.mjs — bố trí của director B20 (battle/director-b20.js): làn dọc sông (tra độ dài cung theo x), đội hình hạm
+// đội (đủ thành phần, neo trong khúc cọc, không đè bè cỏ, kỳ hạm cạnh M2), chỗ đậu đoàn thuyền nhẹ, làn áp mạn của thuyền tiên phong
+// không xuyên thuyền khác, chỗ áp mạn của cụm Liên Hoàn, số boss. (Đợt 20: bỏ phần hộ vệ tuần / thuyền dò / hộ vệ đợt hai chạy thoát.)
 //   node hao-khi-viet/game/tests/director-b20.test.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
@@ -14,7 +12,7 @@ const threeUrl = pathToFileURL(join(here, "../vendor/three/three.module.js")).hr
 registerHooks({ resolve: (s, c, next) => (s === "three" ? { url: threeUrl, shortCircuit: true } : next(s, c)) });
 globalThis.document ??= { createElement: () => ({ width: 0, height: 0, style: {}, getContext: () => new Proxy({}, { get: (o, k) => (k in o ? o[k] : () => ({ width: 0 })), set: (o, k, v) => ((o[k] = v), true) }) }) };
 
-const { lanePath, laneS, patrolLoop, PAR_B20, fleeDz, fleeZonesFor, fleePath, clusterSlot } = await import("../js/battle/director-b20.js");
+const { lanePath, laneS, PAR_B20, clusterSlot } = await import("../js/battle/director-b20.js");
 const { Track, HULLS } = await import("../js/battle/boats.js");
 const B = await import("../js/data/battle-b20.js");
 const { bedHeight } = await import("../js/data/terrain-b20.js");
@@ -36,7 +34,8 @@ t("laneS: điểm trên làn ở độ dài cung laneS(x) có hoành độ x (sa
     for (const x of [-250, 40, 333.3, 470, 655, 800, 1180]) { const p = tr.at(laneS(tr, x)); near(p.x, x, 0.05, `dz ${dz}`); near(dzOf(p.x, p.z), dz, 0.05); }
   }
 });
-t("par B20 = 780 s (canon 13 phút)", () => assert.equal(PAR_B20, 780));
+const { BATTLES } = await import("../js/data/battles.js");
+t("par B20 = tổng par các pha (phút) × 60 = par ở sổ trận (HUD và màn kết quả cùng số)", () => { near(PAR_B20, B.PHASES.reduce((a, p) => a + p.par, 0) * 60, 1); assert.equal(BATTLES.B20.par.nhanh, PAR_B20); });
 
 console.log("Hạm đội");
 t("đội hình: 24 thuyền đúng thành phần canon (1 kỳ hạm, 1 thuyền Phàn Tiếp, 6 hộ vệ, 16 chiến thuyền), id không trùng", () => {
@@ -63,23 +62,11 @@ t("mỗi mốc cọc có thuyền neo trong khuôn bãi (để bãi đã mở gi
   for (const m of B.STAKES) assert.ok(anchored.some((s) => Math.abs(s.x - m.x) <= m.along / 2 && Math.abs(s.dz) <= m.across / 2), m.id);
 });
 
-console.log("Hộ vệ, đoàn thuyền nhẹ");
-const O = B.ESCORT_OPS;
-t("vòng tuần hộ vệ: cùng phía làn xuất phát, không chạm làn ngoài của hạm đội (≥ 3 m), đủ nước lúc triều 50%", () => {
+console.log("Đoàn thuyền nhẹ");
+t("chỗ đậu đoàn thuyền nhẹ (pha 2+): ngoài làn hạm đội, còn nổi tới khi cọc nhô (30%; nước ròng thì nằm trên bùn như mọi thuyền trong khúc cọc)", () => {
   const outer = Math.max(...F.lanes.map(Math.abs)) + HULLS.flagship.beam / 2;
-  for (const [id, , , lane] of F.ships.filter((s) => s[1] === "escort")) {
-    const st = O.stations[id]; assert.ok(st, id);
-    assert.equal(Math.sign(F.lanes[lane]), st[2], `${id}: vòng tuần phía bên kia sông`);
-    for (const p of patrolLoop(st)) {
-      assert.ok(Math.abs(dzOf(p.x, p.z)) - HULLS.escort.beam / 2 >= outer + 3 - 1e-9, `${id} sát làn hạm đội`);
-      assert.ok(TIDE_Y(50) - bedHeight(p.x, p.z) >= HULLS.escort.draft + 0.3, `${id} cạn ở ${p.x.toFixed(0)}`);
-    }
-  }
-});
-t("chỗ đậu đoàn thuyền nhẹ (pha 2+): ngoài vòng tuần hộ vệ, còn nổi tới khi cọc nhô (30%; nước ròng thì nằm trên bùn như mọi thuyền trong khúc cọc)", () => {
-  const loopOut = O.dz[1] + HULLS.escort.beam / 2;
   for (const [x, dz] of [B.FLOTILLA.hold.lead, ...B.FLOTILLA.hold.boats]) {
-    assert.ok(Math.abs(dz) - HULLS.lead.beam / 2 >= loopOut + 2, `chỗ đậu ${x},${dz} sát vòng tuần`);
+    assert.ok(Math.abs(dz) - HULLS.lead.beam / 2 >= outer + 2, `chỗ đậu ${x},${dz} sát làn hạm đội`);
     assert.ok(TIDE_Y(B.TIDE.strandAt) - bedHeight(x, zc(x) + dz) >= HULLS.lead.draft + 0.3, `chỗ đậu ${x},${dz} cạn`);
   }
 });
@@ -92,38 +79,12 @@ t("thuyền tiên phong áp mạn theo làn kề thuyền đích, không xuyên 
   }
 });
 
-console.log("Pha 4–6 (D2b)");
-const E = B.EBB_OPS, C = B.CLUSTER;
+console.log("Pha 3–6: cụm Liên Hoàn, boss");
+const C = B.CLUSTER;
 // thân thuyền neo lúc pha 4: đội hình ở FLEET.stopX, J8 dạt sát mạn thuyền chỉ huy, J12 tiến lên thế chỗ (cụm Liên Hoàn)
 const pt0 = anchored.find((s) => s.id === "PT");
 const n1 = clusterSlot({ x: pt0.x, z: pt0.dz, yaw: Math.PI / 2, beam: pt0.H.beam }, { x: pt0.x, z: 36, beam: HULLS.junk.beam });
 const p4ships = anchored.map((s) => (s.id === "J8" ? { ...s, dz: n1.z } : s.id === "J12" ? { ...s, x: pt0.x } : s));
-const clusterZone = [pt0.x - pt0.H.len / 2 - E.avoid, pt0.x + pt0.H.len / 2 + E.avoid, 1];
-t("làn thoát: ngoài vùng né |dz| = lane, trong vùng né laneOut, vùng một phía chỉ đẩy phía đó; liền mạch (bước 1 m lệch ≤ 1,5 m)", () => {
-  assert.equal(fleeDz(300, 1), E.lane); assert.equal(fleeDz(300, -1), -E.lane);
-  const Z = [[600, 700, 1]];
-  assert.equal(fleeDz(650, 1, Z), E.laneOut); assert.equal(fleeDz(650, -1, Z), -E.lane);
-  assert.equal(fleeDz(650, -1, [[600, 700, 0]]), -E.laneOut);
-  let prev = fleeDz(500, 1, Z); for (let x = 501; x < 800; x++) { const v = fleeDz(x, 1, Z); assert.ok(Math.abs(v - prev) <= 1.5, `x ${x}`); prev = v; }
-});
-t("hộ vệ đợt hai: 8 chỗ xuất phát, chạy tới quá cửa sông; làn không đâm thân thuyền neo (khe ≥ 2 m), kể cả cụm Phàn Tiếp, bãi lộ", () => {
-  assert.equal(E.starts.length, B.FLEET.escorts[1]);
-  const eb = HULLS.escort.beam / 2;
-  const ex = (id) => { const m = B.STAKES.find((q) => q.id === id); return [m.x - m.along / 2 - E.avoid, m.x + m.along / 2 + E.avoid, 0]; };
-  for (const zones of [[clusterZone], [clusterZone, ex("M2")], [clusterZone, ex("M1"), ex("M3")]]) for (const [x0, side] of E.starts) {
-    const P = fleePath(x0, zc(x0) + fleeDz(x0, side, fleeZonesFor(x0, side, zones)), side, zones);
-    assert.ok(P[P.length - 1].x >= B.MAP.exitX, "chưa tới cửa sông");
-    for (const p of P) for (const s of p4ships) {
-      if (Math.abs(p.x - s.x) > s.H.len / 2 + HULLS.escort.len / 2) continue;
-      const gap = Math.abs(dzOf(p.x, p.z) - s.dz) - s.H.beam / 2 - eb;
-      assert.ok(gap >= 2, `hộ vệ xuất phát ${x0} đâm ${s.id} ở x ${p.x.toFixed(0)} (khe ${gap.toFixed(1)})`);
-    }
-  }
-});
-t("làn thoát (không né) nằm trong khuôn bãi cọc: hộ vệ chạy qua bãi đã mở lúc nước 30% thì mắc cọc; chỗ xuất phát đủ nước lúc 50%", () => {
-  for (const m of B.STAKES) assert.ok(E.lane <= m.across / 2, m.id);
-  for (const [x, side] of E.starts) assert.ok(TIDE_Y(50) - bedHeight(x, zc(x) + fleeDz(x, side, fleeZonesFor(x, side, [clusterZone]))) >= HULLS.escort.draft + 0.3, `xuất phát ${x} cạn`);
-});
 t("cụm Liên Hoàn: J8 sát mạn thuyền chỉ huy đúng khe gap, cùng hướng; J12 (làn +36) cách J8 ≥ 2 m; cả cụm cạn lúc nước ròng", () => {
   near(Math.abs(n1.z - pt0.dz) - pt0.H.beam / 2 - HULLS.junk.beam / 2, C.gap, 1e-9); near(n1.x, pt0.x, 1e-9);
   assert.ok(36 - n1.z - HULLS.junk.beam >= 2);

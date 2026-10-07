@@ -2,7 +2,7 @@
 // trên một ctx giả (tướng H31, Hào Khí, director rỗng) và một hudState giả theo từng cảnh, nền là lab-b20.html (thế giới thật,
 // hạm đội mẫu — bản đồ nhỏ lấy thuyền từ đó). Không chạy luật trận; để xem và chụp màn từng trạng thái widget.
 //
-//   hud-lab.html?s=p1in          cảnh (danh sách SCENES dưới; thanh chọn ở đáy màn)
+//   hud-lab.html?s=p1wait        cảnh (danh sách SCENES dưới; thanh chọn ở đáy màn)
 //   &touch                       dựng nút cảm ứng như điện thoại (battle.js buildTouch)
 //   &plain                       nền phẳng thay cho lab-b20 (nhanh, không WebGL)
 //   &nobar                       ẩn thanh chọn cảnh (chụp màn)
@@ -15,7 +15,7 @@ import { buildTouch } from "./battle/battle.js";
 import { HEROES, SKILLS } from "./data/heroes.js";
 import { moveInfoOf } from "./data/moves-info.js";
 import { PHASES, MAP, BOSSES, TIDE } from "./data/battle-b20.js";
-import { createRiver, setPhase, riverTick } from "./sim/river.js";
+import { createRiver, setPhase, riverTick, launch } from "./sim/river.js";
 import { zc } from "./data/terrain-b20.js";
 
 const Q = new URLSearchParams(location.search);
@@ -42,10 +42,10 @@ const hero = {
   ultInfo() { return { id: "bachDang", name: SKILLS.bachDang.name, icon: info.ult.icon, key: "R", cost: 100, ready: this.ki >= 100, cd: `${Math.floor(this.ki / 100)}/4` }; },
   nextHeavyInfo() { return { id: "C1", key: "C1", icon: "c1", name: info.C1.name, label: `C1 ${info.C1.name}`, hot: false, ready: false, charge: 0 }; },
 };
-const director = { phase: 0, time: 0, baseHint: "", M: { par: 780 }, events: {}, keSach: { hud: () => [] }, msgs: [], ko: 0, pickups: [], followers: null,
+const director = { phase: 0, time: 0, baseHint: "", M: { par: 330 }, launchLure() { lab.sounds.push("launch"); }, events: {}, keSach: { hud: () => [] }, msgs: [], ko: 0, pickups: [], followers: null,
   lastFront: null, order() {} };
 const ctx = {
-  mode: "nhanh", touch: Q.has("touch"), battle: { id: "B20", data: { PHASES, FRONTS: {}, EVENTS: {} }, hud: HUD_B20, par: { nhanh: 780, chuan: 780 }, touch: { interact: true } },
+  mode: "nhanh", touch: Q.has("touch"), battle: { id: "B20", data: { PHASES, FRONTS: {}, EVENTS: {} }, hud: HUD_B20, par: { nhanh: 330, chuan: 330 }, touch: { interact: true } },
   hero, director, sim: { fronts: {}, heroFront: null, cooldowns: {}, reinf: null }, hk: { value: 46, overflow: 0, tpc: false, tpcLeft: 0 },
   stats: { level: 25, mods: {} }, crowd: { agents: [] }, units: [], project: () => null, R: 25,
   audio: { play: (n) => lab.sounds.push(n), unlock() {} }, naval: null,
@@ -53,7 +53,7 @@ const ctx = {
 const lab = window.__hudlab = { ctx, sounds: [], picked: null, bgReady: Q.has("plain"), ready: false };
 
 // ---- các cảnh: sim/river.js thật tua tới trạng thái cần xem + phần director giả (boss, Tương tác, Đò chuyển) -------------
-const TIDE0 = { 1: 100, 2: 57 };                      // Con nước lúc vào pha (sim tua thẳng từ P1 thì chưa đúng mức)
+const TIDE0 = { 1: 100, 2: 100 };                     // Con nước lúc vào pha (sim tua thẳng từ P1 thì chưa đúng mức)
 function river(phase, fn) {
   const st = createRiver({ mode: "nhanh", quyetSachOk: true });
   for (let p = 1; p <= phase; p++) setPhase(st, p);
@@ -66,24 +66,20 @@ const X24 = BOSSES.X24, X20 = BOSSES.X20;
 const boss = (B, o) => ({ id: B.id, name: B.name, nameHan: B.nameHan, title: B.id === "X20" ? "Vạn hộ thủy quân Nguyên · Đại tướng" : "Tướng thủy quân Nguyên",
   maxHp: B.id === "X20" ? 12000 : 4200, poiseMax: B.poise, phases: B.poisePhases ?? 1, phase: 1, hpLock: B.hpLockPct ?? 0, broken: false, captured: false, ...o });
 const FERRY = { items: [
-  { id: "esc3", label: "Thuyền hộ vệ đã chiếm", sub: "cách 60 m · cờ 陳", kind: "captured" },
-  { id: "M2", label: "Bè cỏ mốc M2", sub: "cách 110 m · mốc cọc ẩn", kind: "raft" },
+  { id: "PT", label: "Thuyền chỉ huy Phàn Tiếp", sub: "cách 60 m · mắc cạn", kind: "ship" },
+  { id: "J3", label: "Chiến thuyền Nguyên", sub: "cách 110 m · mắc cạn", kind: "ship" },
   { id: "P_S", label: "Bến phục binh bờ nam", sub: "cách 180 m", kind: "pier" },
-  { id: "flag", label: "Kỳ hạm Ô Mã Nhi", sub: "cách 240 m · còn hộ vệ: chưa áp mạn", kind: "flagship" },
+  { id: "flag", label: "Kỳ hạm Ô Mã Nhi", sub: "cách 240 m · mắc cạn", kind: "flagship" },
 ], onPick: (it) => { lab.picked = it.id; } };
 const P = Number(Q.get("p") ?? 0.55);
 
 const SCENES = {
-  p1in: () => ({ hk: 38, st: riverHud(river(0, (s) => { tickN(s, 22); s.nghi.gap = 27; s.nghi.kk = 62; s.nghi.stance = "giuvung"; s.nghi.lost = 1; s.wings.flotilla.boats = 7; })) }),
-  p1near: () => ({ hk: 44, st: riverHud(river(0, (s) => { tickN(s, 40); s.nghi.gap = 11.5; s.nghi.kk = 100; s.ks.nghiBinh.state = "sansang"; s.ks.nghiBinh.got = 5; s.nghi.stance = "tiencong"; s.nghi.stanceCd = 2; s.nghi.lost = 2; s.wings.flotilla.boats = 6; })) }),
-  p1far: () => ({ hk: 34, st: riverHud(river(0, (s) => { tickN(s, 15); s.nghi.gap = 49; s.nghi.kk = 28; s.nghi.stance = "theota"; })) }),
-  p2: () => ({ hk: 58, st: riverHud(river(1, (s) => { tickN(s, 50); s.fleet.escortsDown = 2; s.fleet.captured = 2; }), { scout: { target: "M1", sec: 12, warn: true },
-    interact: { text: "Chiếm thuyền hộ vệ", p: P, kind: "capture" } }) }),
-  p3: () => ({ hk: 66, st: riverHud(river(2, (s) => { tickN(s, 38); s.markers.M1.state = "active"; s.markers.M3.state = "exposed"; s.markers.M2.officerOn = true; s.markers.M2.officerOnT = 6; s.ks.kichCoc.got = 5; }),
-    { interact: { text: "Mở bãi cọc · chặt dây bè cỏ", p: P, kind: "marker" } }) }),
-  p3ready: () => ({ hk: 74, st: riverHud(river(2, (s) => { tickN(s, 60); s.markers.M1.state = "active"; s.markers.M2.state = "active"; s.ks.kichCoc.state = "sansang"; s.ks.kichCoc.got = 10; })) }),
-  p4: () => ({ hk: 82, st: riverHud(river(3, (s) => { tickN(s, 32); s.escape.value = 58; s.wings.rut.order = { id: "giuvung", left: 12 }; s.fleet.escortsDown = 9; s.fleet.downP4 = 3; }), { escorts: null }) }),
-  p4warn: () => ({ hk: 88, st: riverHud(river(3, (s) => { tickN(s, 60); s.escape.value = 86; s.fleet.downP4 = 4; }), {}) }),
+  p1wait: () => ({ hk: 30, st: riverHud(river(0)) }),
+  p1go: () => ({ hk: 38, st: riverHud(river(0, (s) => { launch(s); tickN(s, 10); })) }),
+  p1back: () => ({ hk: 44, st: riverHud(river(0, (s) => { launch(s); tickN(s, 40); })) }),
+  p2tua: () => ({ hk: 58, st: riverHud(river(1, (s) => { s.nghi.kk = 100; s.ks.nghiBinh.state = "thanhcong"; s.ks.nghiBinh.got = 20; tickN(s, 20); })) }),
+  p3tua: () => ({ hk: 66, st: riverHud(river(2, (s) => { s.ks.nghiBinh.state = "thanhcong"; tickN(s, 10); })) }),
+  p4tua: () => ({ hk: 82, st: riverHud(river(3, (s) => { s.ks.nghiBinh.state = "thanhcong"; tickN(s, 10); })) }),
   p5boss: () => ({ hk: 92, st: riverHud(river(4), { bosses: [boss(X24, { hp: 2310, poise: 380 })], interact: null }) }),
   p5ferry: () => ({ hk: 92, st: riverHud(river(4), { bosses: [boss(X24, { hp: 2310, poise: 380 })], ferry: FERRY }) }),
   p5broken: () => ({ hk: 95, st: riverHud(river(4), { bosses: [boss(X24, { hp: 1200, poise: 0, broken: true })] }) }),
@@ -93,13 +89,13 @@ const SCENES = {
 };
 
 // ---- dựng ------------------------------------------------------------------------------------------------------------------
-const name = Q.get("s") in SCENES ? Q.get("s") : "p1in";
+const name = Q.get("s") in SCENES ? Q.get("s") : "p1wait";
 const sc = SCENES[name]();
-director.phase = sc.st.phase; director.time = [40, 150, 300, 420, 560, 700][sc.st.phase] + 7;
+director.phase = sc.st.phase; director.time = [40, 90, 110, 130, 180, 330][sc.st.phase] + 7;
 director.baseHint = PHASES[sc.st.phase].goal;
 ctx.hk.value = sc.hk; ctx.hk.tpc = !!sc.tpc; ctx.hk.tpcLeft = sc.tpc ? 19 : 0;
-director.msgs = [{ text: ["Thuyền nhẹ: giữ khoảng cách 15–40 m với thuyền đầu hạm đội.", "Thuyền dò luồng rời hạm đội, nhắm mốc M1!", "Tướng địch đang đứng ở mốc M2 — hạ hắn trước khi mốc lộ.",
-  "Nước rút! Mỗi thuyền hộ vệ bị hạ kéo Thoát vây −15.", "Phàn Tiếp xích thuyền: Liên Hoàn Thuyền!", "Kỳ hạm mắc cạn! Hào Khí khóa 100."][sc.st.phase], T: 9, t: 1, kind: "info" }];
+director.msgs = [{ text: ["Thuyền nhẹ ra khiêu chiến: đoàn tự áp sát đầu hạm đội rồi tự lui dụ.", "Cảnh tua: hạm đội Nguyên vào bãi cọc, chờ triều rút.", "Triều bắt đầu rút, bè cỏ trôi đi.",
+  "Nước xuống: cọc nhô, thuyền Nguyên mắc cọc.", "Phàn Tiếp xích thuyền: Liên Hoàn Thuyền!", "Kỳ hạm mắc cạn! Hào Khí khóa 100."][sc.st.phase], T: 9, t: 1, kind: "info" }];
 
 const hudRoot = document.createElement("div"); hudRoot.className = "hud"; stage.appendChild(hudRoot);
 const touchRoot = document.createElement("div"); touchRoot.className = "touch"; stage.appendChild(touchRoot);

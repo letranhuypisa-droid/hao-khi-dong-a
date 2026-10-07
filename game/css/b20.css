@@ -183,3 +183,14 @@
   .stage.b20::after { content: "Xoay ngang điện thoại để chơi trận Bạch Đằng"; position: absolute; inset: 0; z-index: 60; display: grid; place-items: center;
     padding: 32px; text-align: center; background: rgba(21,18,16,.94); color: var(--vang2); font: 900 1.15rem/1.5 var(--serif); letter-spacing: .06em; }
 }
+
+/* đợt 20: nút Ra khiêu chiến (P1, tới khi ra lệnh) và bảng Cảnh tua (P2–P4) */
+.b20-launch { position: absolute; left: 50%; bottom: clamp(150px, 36vh, 280px); transform: translateX(-50%); z-index: 6; pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 10px 30px 8px; border-radius: 10px; border: 2px solid var(--vang); color: #1d1a17; background: linear-gradient(#ffe7a0, #d9a93e); box-shadow: 0 6px 22px rgba(0,0,0,.55); font-family: var(--serif); }
+.b20-launch[hidden] { display: none; }
+.b20-launch::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; }
+.b20-launch b { font-size: 1.15rem; font-weight: 900; letter-spacing: .12em; }
+.b20-launch small { font: 600 .68rem var(--sans); opacity: .8; letter-spacing: .03em; }
+.b20-launch:active { transform: translateX(-50%) scale(.97); }
+.b20-sec.tua { border-left-color: #6fa8c0; } .b20-sec.tua .sub { color: var(--trung); font-size: .7rem; }
+.b20-sec.lure.wait .sub { color: var(--vang2); font-weight: 700; }

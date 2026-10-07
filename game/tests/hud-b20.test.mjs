@@ -3,8 +3,8 @@
 //   node hao-khi-viet/game/tests/hud-b20.test.mjs
 import assert from "node:assert/strict";
 import { riverHud, HudB20, HUD_B20, wireHudB20, FERRY_SVG, MAP_BOUNDS, MAP_CANVAS } from "../js/battle/hud-b20.js";
-import { createRiver, setPhase, riverTick, markerAction, onEscortDown, order, setMarkerOfficer } from "../js/sim/river.js";
-import { TIDE, LIGHT_BOATS, STAKES, FLEET, MAP } from "../js/data/battle-b20.js";
+import { createRiver, setPhase, riverTick, launch } from "../js/sim/river.js";
+import { TIDE, TUA, LIGHT_BOATS, STAKES, MAP } from "../js/data/battle-b20.js";
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -16,50 +16,41 @@ const ticks = (st, n) => { for (let i = 0; i < n; i++) riverTick(st, []); return
 function at(i, opts = {}) { const st = createRiver({ mode: "nhanh", ...opts }); for (let p = 1; p <= i; p++) setPhase(st, p); return st; }
 
 console.log("riverHud (hudState từ sim sông)");
-t("P1: triều lên tới đỉnh, bảng Nghi binh đủ trường, Kế Sách đủ 3 mục", () => {
+t("P1 chưa ra lệnh: bảng Nghi binh chờ lệnh, triều chưa lên, Kế Sách đủ 3 mục", () => {
   const st = ticks(at(0), 10), h = riverHud(st);
-  assert.equal(h.phase, 0); assert.ok(h.tide.rate > 0 && h.tide.next.pct === TIDE.p1.to && h.tide.next.label === "Đỉnh triều");
-  near(h.tide.next.sec, (TIDE.p1.to - h.tide.pct) / h.tide.rate, 1e-9); assert.equal(h.tide.warn, false);
-  assert.deepEqual(h.lure.band, [LIGHT_BOATS.gap.min, LIGHT_BOATS.gap.max]); assert.equal(h.lure.boatsMax, LIGHT_BOATS.n);
-  assert.equal(h.lure.gap, st.nghi.gap); assert.equal(h.lure.toLine, Math.max(0, MAP.khucCoc - st.fleet.headX));
+  assert.equal(h.phase, 0); assert.equal(h.tide.next, null, "triều chưa chạy"); assert.equal(h.lure.launched, false); assert.equal(h.lure.stance, null);
+  assert.deepEqual(h.lure.band, [LIGHT_BOATS.gap.min, LIGHT_BOATS.gap.max]); assert.equal(h.lure.toLine, Math.max(0, MAP.khucCoc - st.fleet.headX));
   assert.deepEqual(h.ks.map((k) => [k.id, k.state]), [["nghiBinh", "khadung"], ["kichCoc", "khoa"], ["conNuoc", "khoa"]]);
-  assert.ok(h.ks[0].left > 0 && /Khiêu khích/.test(h.ks[0].detail)); assert.equal(h.ks[0].label, "Chính sử"); assert.equal(h.ks[0].quyMo, "Lớn");
-  assert.equal(h.escorts, null); assert.equal(h.escape, null); assert.equal(h.markers.length, 3, "mốc luôn có cho bản đồ nhỏ");
+  assert.match(h.ks[0].detail, /chờ lệnh/); assert.equal(h.ks[0].label, "Chính sử"); assert.equal(h.ks[0].quyMo, "Lớn");
+  assert.equal(h.tua, null); assert.equal(h.markers.length, 3); assert.deepEqual(h.markers.map((m) => m.state), ["hidden", "hidden", "hidden"]);
 });
-t("P2: hộ vệ đợt 1 (cần 4), mốc cọc, triều xuống về sàn 55", () => {
-  const st = at(1); ticks(st, 20); onEscortDown(st, "capture");
-  const h = riverHud(st);
-  assert.equal(h.lure, null); assert.deepEqual([h.escorts.down, h.escorts.need, h.escorts.total, h.escorts.wave], [1, 4, FLEET.escorts[0], 1]);
-  assert.ok(h.tide.rate < 0 && h.tide.next.pct === TIDE.p2Floor);
-  assert.deepEqual(h.markers.map((m) => m.state), ["hidden", "hidden", "hidden"]);
+t("P1 sau lệnh: triều lên tới đỉnh, thế tự chọn, Khiêu khích; không còn trường thuyền mất / số thuyền", () => {
+  const st = createRiver({ mode: "nhanh" }); launch(st); ticks(st, 10); const h = riverHud(st);
+  assert.ok(h.tide.rate > 0 && h.tide.next.pct === TIDE.p1.to && h.tide.next.label === "Đỉnh triều");
+  near(h.tide.next.sec, (TIDE.p1.to - h.tide.pct) / h.tide.rate, 1e-9);
+  assert.equal(h.lure.launched, true); assert.equal(h.lure.stance, "tiencong"); assert.equal(h.lure.gap, st.nghi.gap); assert.equal(h.lure.kk, st.nghi.kk);
+  assert.match(h.ks[0].detail, /Khiêu khích/); assert.ok(h.ks[0].left > 0);
+  for (const k of ["boats", "boatsMax", "lostMax", "stanceCd", "max"]) assert.equal(h.lure[k], undefined, k);
 });
-t("P3: tướng địch đứng mốc → officerT; mở mốc; triều đứng rồi rút về 50", () => {
-  const st = at(2); setMarkerOfficer(st, "M2", true); ticks(st, 4); markerAction(st, "M1", "activate");
-  let h = riverHud(st);
-  const m2 = h.markers.find((m) => m.id === "M2");
-  assert.equal(m2.officerOn, true); assert.equal(m2.officerT, 4); assert.equal(m2.exposeSec, STAKES[1].exposeSec);
-  assert.equal(h.markers[0].state, "active"); assert.equal(h.tide.hold, true); assert.equal(h.tide.next, null);
-  assert.equal(h.escorts, null, "P3 không có bảng hộ vệ");
-  markerAction(st, "M3", "activate"); st.ks.kichCoc.state = "sansang";
-  st.drop = { from: st.tide, t: 0 }; ticks(st, 2); h = riverHud(st);
-  assert.equal(h.tide.hold, false); assert.equal(h.tide.next.pct, TIDE.p3HoldTo);
-});
-t("P4: Thoát vây + Giữ vững ×0,7, hộ vệ đợt 2, mốc 30% rồi 0%, cảnh báo T−30", () => {
-  const st = at(3); ticks(st, 5); order(st, "rut", "giuvung");
-  let h = riverHud(st);
-  assert.ok(h.escape.holding && h.escape.holdLeft > 0); near(h.escape.rate, 0.5 * FLEET.cmdShips * 0.7, 1e-9);
-  assert.equal(h.escorts.wave, 2); assert.equal(h.escorts.waveTotal, FLEET.escorts[1]);
-  assert.equal(h.tide.next.pct, TIDE.strandAt); assert.equal(h.tide.warn, h.tide.next.sec <= TIDE.warn);
-  ticks(st, 200); h = riverHud(st); assert.equal(h.tide.next, null);
-  const st2 = at(3); ticks(st2, 80); assert.equal(riverHud(st2).tide.warn, false, "0% còn > 30 s");
-  ticks(st2, 30); const h2 = riverHud(st2);
-  assert.ok(h2.tide.pct <= TIDE.strandAt && h2.tide.next.pct === 0 && h2.tide.warn);
+t("P2–P4 cảnh tua: bảng tua theo bước, giây còn lại là giây THẬT (÷ TUA.rate), triều rút về 50 rồi 30 / 0", () => {
+  const p2 = riverHud(at(1)); assert.deepEqual(p2.tua, { step: 1, label: p2.tua.label }); assert.equal(p2.lure, null); assert.equal(p2.tide.next, null);
+  const st = at(2); ticks(st, 3); const p3 = riverHud(st);
+  assert.equal(p3.tua.step, 2); assert.ok(p3.tide.rate < 0 && p3.tide.next.pct === TIDE.p3HoldTo);
+  near(p3.tide.next.sec, (st.tide - TIDE.p3HoldTo) / -st.tideRate / TUA.rate, 1e-9);
+  const s4 = at(3); const p4 = riverHud(s4); assert.equal(p4.tua.step, 3); assert.equal(p4.tide.next.pct, TIDE.strandAt);
+  near(p4.tide.next.sec, (50 - TIDE.strandAt) / (50 / TIDE.tua.p4Sec) / TUA.rate, 1e-9);
+  ticks(s4, TIDE.tua.p4Sec); assert.equal(riverHud(s4).tide.next, null);
+  assert.deepEqual(riverHud(at(2)).markers.map((m) => m.state), ["active", "active", "active"], "cọc lộ từ pha 3");
 });
 t("P5–P6: không bảng pha; extra (boss, Tương tác, Đò chuyển) gộp đè", () => {
   const h = riverHud(at(5), { bosses: [{ id: "X20" }], hkLock: true, lure: null });
-  assert.equal(h.phase, 5); assert.equal(h.tide.pct, 0); assert.equal(h.escape, null); assert.equal(h.hkLock, true); assert.equal(h.bosses[0].id, "X20");
+  assert.equal(h.phase, 5); assert.equal(h.tide.pct, 0); assert.equal(h.tua, null); assert.equal(h.hkLock, true); assert.equal(h.bosses[0].id, "X20");
 });
 t("Quyết sách đúng → intel", () => { assert.equal(riverHud(at(0, { quyetSachOk: true })).intel, true); assert.equal(riverHud(at(0)).intel, false); });
+t("hudState không còn khối của cơ chế đã bỏ (hộ vệ, Thoát vây, thuyền dò)", () => {
+  const h = riverHud(at(3));
+  for (const k of ["escorts", "escape", "scout"]) assert.equal(h[k], undefined, k);
+});
 
 console.log("Bản đồ nhỏ, hình Đò chuyển");
 t("HUD_B20 đúng khuôn BattleDef.hud; wireHudB20", () => {
@@ -78,7 +69,7 @@ function el() {
   const cls = new Set();
   return { style: {}, dataset: {}, hidden: false, textContent: "", innerHTML: "", className: "", children: [], parentElement: null,
     classList: { add: (...c) => c.forEach((x) => cls.add(x)), remove: (...c) => c.forEach((x) => cls.delete(x)), toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)), contains: (c) => cls.has(c) },
-    querySelector() { return el(); }, appendChild(c) { this.children.push(c); c.parentElement = this; }, remove() { this.removed = true; } };
+    querySelector() { return el(); }, addEventListener(type, fn) { (this.handlers ||= {})[type] = fn; }, appendChild(c) { this.children.push(c); c.parentElement = this; }, remove() { this.removed = true; } };
 }
 globalThis.document = { createElement: () => el() };
 function fakeHud() {
@@ -104,18 +95,31 @@ t("dựng: lớp hud-b20, đồng hồ Con nước ở ô trên, thanh boss ẩn
   hb.dispose(); assert.equal(hud.top, null); assert.equal(hud.panels.size, 0); assert.equal(ctx.hudB20, null); assert.ok(hb.bossEl.removed);
   assert.ok(!hud.root.classList.contains("hud-b20"));
 });
-t("bảng theo pha: Nghi binh P1, hộ vệ + mốc P2, mốc P3, Thoát vây P4, Hào Khí khóa P6", () => {
+t("bảng theo pha: Nghi binh P1, Cảnh tua P2–P4, Hào Khí khóa P6", () => {
   const { hud, hb } = mk(), html = (st) => { hb.update(st, 0.1); return hud.panels.get("b20") || ""; };
   assert.ok(/NGHI BINH/.test(html(riverHud(ticks(at(0), 3)))));
-  const p2 = html(riverHud(at(1))); assert.ok(/HỘ VỆ/.test(p2) && /MỐC CỌC/.test(p2));
-  const p3 = html(riverHud(at(2))); assert.ok(/MỐC CỌC/.test(p3) && !/HỘ VỆ/.test(p3));
-  const p4 = html(riverHud(at(3))); assert.ok(/THOÁT VÂY/.test(p4) && /ĐỢT 2/.test(p4) && !/MỐC CỌC/.test(p4));
+  for (const i of [1, 2, 3]) { const p = html(riverHud(at(i))); assert.ok(/CẢNH TUA/.test(p) && new RegExp(`${i}/3`).test(p) && !/NGHI BINH/.test(p), "P" + (i + 1)); }
   assert.ok(/HÀO KHÍ KHÓA 100/.test(html(riverHud(at(5), { hkLock: true }))));
   assert.ok(/Kế Sách Lớn · Nghi binh lúc triều lên/.test(html(riverHud(at(0)))), "Kế Sách đang chạy đầy đủ");
+  const p3 = html(riverHud(at(2))); assert.ok(/Kế Sách Lớn · Kích hoạt bãi cọc/.test(p3) && !/THOÁT VÂY|HỘ VỆ|MỐC CỌC/.test(p3));
 });
-t("khoảng cách Nghi binh: trong dải / quá sát / quá xa", () => {
-  const { hud, hb } = mk(), st = at(0);
-  for (const [g, word] of [[27, "Trong dải"], [10, "Quá sát!"], [50, "Quá xa"]]) { st.nghi.gap = g; hb.update(riverHud(st), 0.1); assert.ok(hud.panels.get("b20").includes(word), word); }
+t("bảng Nghi binh: chờ lệnh → khiêu chiến → lui dụ → qua Khúc cọc", () => {
+  const { hud, hb } = mk(), st = at(0), w = (word) => assert.ok(hud.panels.get("b20").includes(word), word);
+  hb.update(riverHud(st), 0.1); w("Chờ lệnh"); w("chờ ở thượng lưu");
+  launch(st); ticks(st, 3); hb.update(riverHud(st), 0.1); w("Khiêu chiến"); w("áp sát");
+  st.nghi.stance = "giuvung"; hb.update(riverHud(st), 0.1); w("Lui dụ");
+  st.nghi.crossedAt = 5; hb.update(riverHud(st), 0.1); w("Qua Khúc cọc");
+});
+t("nút Ra khiêu chiến: hiện tới khi ra lệnh; bấm gọi director.launchLure; nhắc phím (cảm ứng: chạm); dispose gỡ", () => {
+  const a = mk(); let n = 0; a.ctx.director = { launchLure: () => { n++; return true; } }; a.ctx.fmt = (x) => (x === "{kesach}" ? "G" : x);
+  const st = at(0);
+  assert.equal(a.hb.launchEl.hidden, true, "ẩn lúc dựng");
+  a.hb.update(riverHud(st), 0.1); assert.equal(a.hb.launchEl.hidden, false); assert.equal(a.hb.lk.textContent, "hoặc bấm G");
+  a.hb.launchEl.handlers.pointerdown({}); assert.equal(n, 1);
+  launch(st); a.hb.update(riverHud(st), 0.1); assert.equal(a.hb.launchEl.hidden, true, "đã ra lệnh thì ẩn");
+  a.hb.update(riverHud(at(1)), 0.1); assert.equal(a.hb.launchEl.hidden, true);
+  const b = mk(true); b.hb.update(riverHud(at(0)), 0.1); assert.equal(b.hb.lk.textContent, "chạm để ra lệnh");
+  a.hb.dispose(); assert.ok(a.hb.launchEl.removed);
 });
 t("nhắc Tương tác: phím X / cảm ứng, tiến độ; null thì ẩn", () => {
   const a = mk(); a.hb.update({ phase: 1, interact: { text: "Chiếm thuyền hộ vệ", p: 0.4 } }, 0.01);
@@ -151,17 +155,10 @@ t("thanh boss: khóa Sinh lực, Vỡ Thế → Bắt sống, bị bắt hiện 
   assert.ok(hb.bossEl.classList.contains("locked")); assert.equal(hb.bw.block.style.left, "10.0%"); assert.ok(/khóa ở 10%/.test(hb.bw.bhint.textContent));
   up([{ ...X24, captured: true }, { ...X20, hp: 5000 }]); assert.ok(!hb.bossEl.classList.contains("locked"));
 });
-t("tiếng báo: T−30 Con nước, tướng địch đứng mốc, thuyền nhẹ quá sát (≤ 1 lần / 4 s), Thoát vây ≥ 80 — mỗi lần một", () => {
-  const { hb, sounds } = mk(), n = () => sounds.filter((s) => s === "warn").length;
-  hb.update({ phase: 3, tide: { pct: 40, rate: -0.3, next: { pct: 30, sec: 20, label: "Cọc nhô" }, warn: true } }, 0.1); assert.equal(n(), 1);
-  hb.update({ phase: 3, tide: { pct: 39, rate: -0.3, next: { pct: 30, sec: 19, label: "Cọc nhô" }, warn: true } }, 0.1); assert.equal(n(), 1);
-  hb.update({ phase: 2, markers: [{ id: "M1", state: "hidden", officerOn: true, officerT: 1 }] }, 0.1); assert.equal(n(), 2);
-  hb.update({ phase: 2, markers: [{ id: "M1", state: "hidden", officerOn: true, officerT: 2 }] }, 0.1); assert.equal(n(), 2);
-  const lure = { gap: 10, band: [15, 40], max: 60, kk: 0, boats: 8, boatsMax: 8, lostMax: 2 };
-  hb.update({ phase: 0, lure }, 0.1); hb.update({ phase: 0, lure }, 0.1); assert.equal(n(), 3);
-  for (let i = 0; i < 45; i++) hb.update({ phase: 0, lure }, 0.1); assert.equal(n(), 4);
-  hb.update({ phase: 3, escape: { value: 82, full: false, holding: false, rate: 1 } }, 0.1); assert.equal(n(), 5);
-  const q = mk(); q.hb.cues = false; q.hb.update({ phase: 0, lure }, 0.1); assert.equal(q.sounds.length, 0, "cues: false thì im");
+t("không còn tiếng báo riêng của HUD (T−30, mốc, thuyền quá sát, Thoát vây): chỉ ui khi mở Đò chuyển", () => {
+  const { hb, sounds } = mk();
+  hb.update(riverHud(at(3)), 0.1); hb.update(riverHud(at(0)), 0.1); assert.deepEqual(sounds, []);
+  hb.update({ phase: 4, ferry: { items: [{ id: "a", label: "A", kind: "ship" }], onPick() {} } }, 0.1); assert.deepEqual(sounds, ["ui"]);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

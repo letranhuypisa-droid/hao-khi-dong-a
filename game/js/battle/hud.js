@@ -453,12 +453,12 @@ export class HUD {
     });
   }
 
-  // Nút "Tình hình" (HUD gọn): hiện khi ngăn có gì; số báo = số Kế Sách đang theo dõi + số bảng của trận (B20: Nghi binh, hộ vệ,
-  // mốc cọc, Thoát vây…); nhấp nháy khi có việc gấp (Kế Sách sẵn sàng, Nghi binh quá sát, Thoát vây ≥ 80, tướng địch đứng mốc…).
+  // Nút "Tình hình" (HUD gọn): hiện khi ngăn có gì; số báo = số Kế Sách đang theo dõi + số bảng của trận (B20: Nghi binh,
+  // Cảnh tua…); nhấp nháy khi có việc gấp (Kế Sách sẵn sàng, Hào Khí khóa 100 chờ Tổng Phản Công).
   sitBadge(nKs) {
     const E = this.el, secs = E.ks.querySelectorAll(".b20-sec:not(.ksl), .ksl .ks:not(.mini)").length;
     const n = nKs + secs + E.ks.querySelectorAll(".hud-panel:not([data-panel=b20])").length;
-    const hot = !!E.ks.querySelector(".ks.sansang, .b20-sec.lure.near, .b20-sec.escape.hot, .mchip.danger, .b20-sec.rally, .b20-sec .sub.warn");
+    const hot = !!E.ks.querySelector(".ks.sansang, .b20-sec.rally");
     E.sit.hidden = !E.ks.innerHTML.trim();
     E.sitn.textContent = n > 0 ? String(n) : "";
     E.sit.classList.toggle("hot", hot);

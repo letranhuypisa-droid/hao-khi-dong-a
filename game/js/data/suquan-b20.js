@@ -50,7 +50,7 @@ export const CARDS = [
     body: [
       "Tướng thủy quân nhà Nguyên (樊楫) trong cuộc tiến quân 1287–1288, cùng Ô Mã Nhi chỉ huy chiến thuyền.",
       "Tháng 4 năm 1288 ông rút theo sông Bạch Đằng ra biển và bị bắt sống trong trận. Các nguồn ghi khác nhau về kết cục của ông sau đó.",
-      "Trong game ông là tướng cẩn trọng, sớm nghi lòng sông, cho thuyền dò luồng và xích thuyền khi bị dồn; các cơ chế ấy và câu thoại \"Nước này quá lặng\" là Hư cấu.",
+      "Trong game ông là tướng cẩn trọng, sớm nghi lòng sông, xích thuyền khi bị dồn; cơ chế ấy và câu thoại \"Nước này quá lặng\" là Hư cấu.",
     ],
     src: [TT, NS, CANON("X24")], panels: ["K1"],
   },
@@ -81,7 +81,7 @@ export const CARDS = [
       "Hưng Đạo vương cho đóng cọc gỗ lớn, vạt nhọn một đầu, thành nhiều bãi dưới lòng sông Bạch Đằng từ trước, ngụy trang để lúc triều lên cọc chìm khuất.",
       "Khảo cổ học đã tìm thấy các bãi cọc ở Yên Giang, Đồng Má Ngựa, Đồng Vạn Muối, Cao Quỳ (Quảng Ninh): cọc gỗ đường kính 10–30 cm, dài 1,5–3 m.",
       "Cọc năm 1288 là gỗ vạt nhọn, không bịt sắt; cọc bịt sắt là chi tiết trận Bạch Đằng năm 938 của Ngô Quyền.",
-      "Ba mốc cọc, bè cỏ neo bằng dây và thao tác \"Mở bãi cọc\" trong game là Hư cấu.",
+      "Ba mốc cọc và bè cỏ ngụy trang neo bằng dây trong game là Hư cấu.",
     ],
     src: [TT, KC], panels: ["O4", "O5", "K1", "K6"],
   },
@@ -91,7 +91,7 @@ export const CARDS = [
     body: [
       "Thế trận dựa vào con nước: lúc triều lên, cọc chìm khuất, hạm đội Nguyên đi qua được; khi triều rút, cọc nhô lên, thuyền lớn mắc cọc, nghiêng, không xoay trở được.",
       "Quân mai phục ở các nhánh sông đổ ra, quân Trần đánh từ nhiều phía vào đoàn thuyền đã mắc lại.",
-      "Trong game, đồng hồ Con nước chạy theo pha trận, khúc sông được thu ngắn còn khoảng 1,2 km; Kế Sách \"Con nước\" và thanh Thoát vây là cơ chế của game (Hư cấu).",
+      "Trong game, đồng hồ Con nước chạy theo pha trận, khúc sông được thu ngắn còn khoảng 1,2 km; Kế Sách \"Con nước\" là cơ chế của game (Hư cấu).",
     ],
     src: [TT, CANON("B20")], panels: ["O6", "K1"],
   },

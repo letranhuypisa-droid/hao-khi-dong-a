@@ -1,12 +1,12 @@
 // b20-run.mjs — chạy trọn một trận B20 Bạch Đằng bằng bot (xác định: Date.now cố định lúc dựng, rAF rỗng, chỉ tua bằng advance)
-// và in số đo: thời gian từng pha, Kế Sách, dòng Hào Khí, lúc Tổng Phản Công, số lần gục / Gượng dậy, hộ vệ chiếm / thoát,
-// mốc mở / lộ, thanh Thoát vây, thuyền nhẹ mất, tổng thời gian so với par 13 phút.
+// và in số đo: thời gian từng pha, Kế Sách, dòng Hào Khí, lúc Tổng Phản Công, số lần gục / Gượng dậy, thuyền tiên phong dọn / đẩy lui,
+// tổng thời gian so với par.
 //
 // CHẠY:  B20_PARAMS='{"diff":"quansi","seed":1001}' node hao-khi-viet/game/tools/shot.mjs hao-khi-viet/game/tools/b20-run.mjs --port 8951
 //   (Git Bash: giá trị env không bắt đầu bằng "/")
 // THAM SỐ (JSON ở B20_PARAMS, hoặc file ở B20_PARAMS_FILE):
 //   diff     quansi | danbinh | tuongquan | …     seed   Date.now cố định lúc dựng trận (seed trận)
-//   botSeed  PRNG của bot (mặc định = seed)       bot    "b20" (bot B20 đợt D4) | "legacy" (objective D2 + bot tắt orders/kesach/hunt/heal)
+//   botSeed  PRNG của bot (mặc định = seed)       bot    "b20" (bot B20, window.__objectiveB20)
 //   maxSec   giây tua tối đa (mặc định 1500)      maxRetries  thua thì tải lại checkpoint tối đa bấy nhiêu lần (mặc định 3)
 //   shots    thư mục ảnh (null: không chụp) — chụp 2 ảnh mỗi pha (vào pha +6 s, giữa pha) và lúc thắng
 //   phase    vào thẳng đầu pha (1..6, ?debug&phase=N)   out   file JSON kết quả (tuỳ chọn)
@@ -24,28 +24,23 @@ const INSTALL = (prm) => `(() => {
   const PRM = ${JSON.stringify(prm)}, c = __hk, d = c.director, h = c.hero;
   const TR = window.__r = { frames: 0, hk: [], samples: [], ev: [], phaseAt: [0], lastPhase: d.phase, rev: h.revives, downs: 0, deaths: 0, lastAlive: true };
   const opts = { seed: PRM.botSeed, ...PRM.botOpts };
-  let bot;
-  if (PRM.bot === "legacy") bot = __bot(c.battle.debug.objective, { smart: true, orders: false, kesach: false, hunt: false, heal: false, ...opts });
-  else bot = __bot(window.__objectiveB20, opts);
+  const bot = __bot(window.__objectiveB20, opts);
   const push = (kind, extra = {}) => TR.ev.push({ t: Math.round(d.time * 10) / 10, kind, phase: d.phase + 1, ...extra });
   // theo dõi sự kiện qua móc director (chỉ đọc, gọi hàm gốc)
   const wrap = (name, fn) => { const o = d[name]?.bind(d); d[name] = (...a) => { fn(...a); return o?.(...a); }; };
   wrap("onRevive", () => push("revive", { hp: Math.round(h.hp) }));
-  wrap("captureEscort", (b) => push("escortCaptured", { id: b.id }));
-  wrap("escortEscaped", (e) => push("escortEscaped", { id: e.id }));
-  wrap("openMarker", (id) => push("markerOpen", { id }));
-  wrap("onMarkerExposed", (e) => push("markerExposed", { id: e.id, by: e.by }));
-  wrap("onBoatLost", (e) => push("flotillaLost", { why: e.why, left: e.left }));
+  wrap("launchLure", () => push("launch"));
+  wrap("beginFight", () => push("beginFight"));
   wrap("tryTPC", () => { if (!c.hk.tpc && c.hk.value >= 100) push("tpc", { hk: Math.round(c.hk.value) }); });
   wrap("onCaptured", (u) => push("captured", { id: u.id }));
   wrap("ferryTo", (id) => push("ferry", { id }));
   const oh = d.handle.bind(d);
-  d.handle = (evs) => { for (const e of evs) if (e.type === "ksResult" || e.type === "ksReady" || e.type === "baited" || e.type === "escapeFull" || e.type === "strandAt" || e.type === "ksOpen") push(e.type, { id: e.id, ok: e.ok, why: e.why }); return oh(evs); };
+  d.handle = (evs) => { for (const e of evs) if (e.type === "ksResult" || e.type === "baited" || e.type === "strandAt" || e.type === "ksOpen" || e.type === "fleetIn" || e.type === "tide50" || e.type === "tideZero") push(e.type, { id: e.id, ok: e.ok, why: e.why }); return oh(evs); };
   window.__rBot = (cc) => {
     const dd = cc.director;
     if (TR.frames % 30 === 0) {
       const st = cc.sim;
-      TR.samples.push({ t: Math.round(dd.time), ph: dd.phase + 1, hk: Math.round(cc.hk.value), tide: Math.round(cc.world.tidePct), esc: Math.round(st.escape.value),
+      TR.samples.push({ t: Math.round(dd.time), ph: dd.phase + 1, hk: Math.round(cc.hk.value), tide: Math.round(cc.world.tidePct),
         kk: Math.round(st.nghi.kk), gap: Math.round(st.nghi.gap), hp: Math.round(cc.hero.hp / cc.hero.maxHp * 100), ki: Math.round(cc.hero.ki), mode: window.__botDbg?.mode || "" });
     }
     if (dd.phase !== TR.lastPhase) { TR.phaseAt[dd.phase] = Math.round(dd.time); TR.lastPhase = dd.phase; push("phase"); }
@@ -97,11 +92,11 @@ export default async (p) => {
     last = await p.eval(STEP(Math.min(Math.round(P.chunk * 30), left)));
     const s = last.s;
     if (last.phase !== lastPh) { lastPh = last.phase; phT0 = last.t; }
-    if (last.t - lastLog >= 30) { lastLog = last.t; log(`t=${s.t} P${s.phase + 1} pos=${s.pos} hp=${s.hp} hk=${s.hk} tide=${s.tide} gap=${s.gap} kk=${s.kk} st=${s.stance} lost=${s.lost} esc=${s.escorts} mk=${s.markers} escape=${s.escape} ks=${s.ks} deck=${s.deck} bosses=${s.bosses} x20=${s.x20} mode=${last.mode} | ${s.msgs.slice(-1)[0] || ""}`); }
+    if (last.t - lastLog >= 30) { lastLog = last.t; log(`t=${s.t} P${s.phase + 1} pos=${s.pos} hp=${s.hp} hk=${s.hk} tide=${s.tide} gap=${s.gap} kk=${s.kk} st=${s.stance} raids=${s.raids} tua=${s.tua} ks=${s.ks} deck=${s.deck} bosses=${s.bosses} x20=${s.x20} mode=${last.mode} | ${s.msgs.slice(-1)[0] || ""}`); }
     if (P.shots) {
       const k = last.phase;
       if (!shotAt[k + "a"] && last.t - phT0 >= 6) { shotAt[k + "a"] = 1; await SHOT(p, `${P.shots}/p${k + 1}-a.png`); }
-      if (!shotAt[k + "b"] && last.t - phT0 >= [40, 60, 40, 60, 45, 45][k]) { shotAt[k + "b"] = 1; await SHOT(p, `${P.shots}/p${k + 1}-b.png`); }
+      if (!shotAt[k + "b"] && last.t - phT0 >= [40, 8, 5, 8, 45, 45][k]) { shotAt[k + "b"] = 1; await SHOT(p, `${P.shots}/p${k + 1}-b.png`); }
     }
     if (last.over) {
       if (last.won) { log("WON"); if (P.shots) { await p.eval(`(__hk.advance(3, null, false), true)`); await SHOT(p, `${P.shots}/win-outro.png`); } break; }
@@ -121,13 +116,12 @@ export default async (p) => {
       ks: res.keSachList.map((k) => ({ id: k.id, state: k.state, got: k.got, why: k.why || null })), keSachOk: res.keSachOk,
       hkTimeline: TR.samples.filter((s, i) => i % 15 === 0).map((s) => [s.t, s.ph, s.hk]), tpc: res.tpcLog,
       revivesUsed: ev.filter((e) => e.kind === "revive").length, downs: ev.filter((e) => e.kind === "heroDown").length, lost: ev.filter((e) => e.kind === "lost").length,
-      retries: d.retries, escorts: rr.escorts, escaped: d.escaped, markers: rr.markers, markersActive: rr.markersActive, markersExposed: rr.markersExposed,
-      escape: rr.escape, escapeFull: rr.escapeFull, flotillaLost: rr.flotillaLost, strandShare: rr.strandShare, ko: res.ko, main: res.main, side: res.side,
+      retries: d.retries, raidsCleared: d.raidsCleared, raidsRepelled: d.raidsRepelled, strandShare: rr.strandShare, ko: res.ko, main: res.main, side: res.side,
       captured: res.captured, bot, events: ev };
   })()`);
   out.params = P;
   const fmt = (s) => (s == null ? "-" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
-  log(`RESULT won=${out.won} time=${fmt(out.timeSec)} (${out.timeSec}s, par ${out.par}) phases=${JSON.stringify(out.phaseTimes)} ks=${out.ks.map((k) => k.id + ":" + k.state).join(" ")} tpc=${JSON.stringify(out.tpc)} revives=${out.revivesUsed} lost=${out.lost} escorts=${JSON.stringify(out.escorts)} escaped=${out.escaped} markers=${JSON.stringify(out.markers)} escape=${out.escape} flotLost=${out.flotillaLost} wall=${Math.round((Date.now() - t0) / 1000)}s errors=${p.errors.length}`);
+  log(`RESULT won=${out.won} time=${fmt(out.timeSec)} (${out.timeSec}s, par ${out.par}) phases=${JSON.stringify(out.phaseTimes)} ks=${out.ks.map((k) => k.id + ":" + k.state).join(" ")} tpc=${JSON.stringify(out.tpc)} revives=${out.revivesUsed} lost=${out.lost} raids=${out.raidsCleared}/${out.raidsRepelled} wall=${Math.round((Date.now() - t0) / 1000)}s errors=${p.errors.length}`);
   log("HK " + JSON.stringify(out.hkTimeline));
   log("EV " + JSON.stringify(out.events.filter((e) => e.kind !== "ferry").map((e) => `${e.t}:${e.kind}${e.id ? ":" + e.id : ""}${e.ok !== undefined ? ":" + e.ok : ""}`)));
   log("BOT " + JSON.stringify(out.bot));

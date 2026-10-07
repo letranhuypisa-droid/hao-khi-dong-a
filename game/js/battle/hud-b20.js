@@ -1,46 +1,41 @@
-// battle/hud-b20.js — HUD riêng của B20 Bạch Đằng: đồng hồ Con nước, bảng Nghi binh (P1), hộ vệ, mốc cọc, Thoát vây (P4),
-// Kế Sách (3 Kế Sách Lớn), thanh boss (khóa Sinh lực, "Bắt sống"), nhắc Tương tác, bảng Đò chuyển, bản đồ nhỏ khúc sông,
-// tiếng báo của HUD. Dựng trên các ô chung của hud.js (đợt 9 lõi): setTopWidget (dưới thanh Hào Khí), setPanel (cột phải),
-// prompt (nhắc giữ phím có vòng), picker (chọn ≤ 4 nơi đến); thanh boss là khối riêng gắn vào gốc HUD. Kiểu: css/b20.css.
+// battle/hud-b20.js — HUD riêng của B20 Bạch Đằng: đồng hồ Con nước, bảng Nghi binh (P1) với nút Ra khiêu chiến, bảng Cảnh tua (P2–P4),
+// Kế Sách (3 Kế Sách Lớn), thanh boss (khóa Sinh lực, "Bắt sống"), nhắc Tương tác, bảng Đò chuyển, bản đồ nhỏ khúc sông. Dựng trên các ô
+// chung của hud.js (đợt 9 lõi): setTopWidget (dưới thanh Hào Khí), setPanel (cột phải), prompt (nhắc giữ phím có vòng), picker (chọn ≤ 4
+// nơi đến); thanh boss và nút Ra khiêu chiến là khối riêng gắn vào gốc HUD. Kiểu: css/b20.css.
 //
 // ==== CÁCH NỐI (D2 — director-b20.js, battles/b20.js) ====
 //   BattleDef:   import { HUD_B20 } from "../battle/hud-b20.js";   def.hud = HUD_B20   (bản đồ nhỏ + ẩn bảng mặt trận)
 //                hoặc wireHudB20(def). Director: keSach.hud = () => [] (Kế Sách B20 do HudB20 vẽ, đủ 3 mục kể cả mục khóa).
 //   Director:    constructor: this.hudB20 = new HudB20(ctx)       (HUD dựng trước Director — ctx.hud đã có)
 //                mỗi khung (BattleDef.frameVisuals(ctx, dt) hoặc cuối director.update): ctx.hudB20.update(director.hudState(), dt)
+//                nút Ra khiêu chiến gọi ctx.director.launchLure()
 //                restoreCheckpoint / hết trận: không cần gì; rời trận: BattleDef.dispose(ctx) → ctx.hudB20?.dispose()
-//   hudState:    riverHud(riverSt, extra) dựng sẵn tide / lure / escorts / markers / escape / ks / intel từ sim/river.js; director
-//                chỉ cần thêm extra = { bosses, interact, ferry, boats?, scout?, hkLock?, escaped? } (hình dưới).
+//   hudState:    riverHud(riverSt, extra) dựng sẵn tide / lure / tua / markers / ks / intel từ sim/river.js; director chỉ cần thêm
+//                extra = { bosses, interact, ferry, boats?, hkLock? } (hình dưới).
 //
 // ==== HÌNH hudState (mọi khối có thể null / thiếu = ẩn) ====
 //   phase        0..5 (P1..P6)
-//   tide         { pct, rate /*điểm/s, âm = rút*/, next: { pct, sec, label } | null, warn /*T−30 trước mốc*/ }
-//   lure         { gap /*m, đoàn thuyền nhẹ trước đầu hạm đội*/, band: [15, 40], max: 60, kk /*0..100*/, boats, boatsMax,
-//                  lostMax, stance: "tiencong"|"giuvung"|"theota"|null, stanceCd, toLine /*m đầu hạm đội còn tới Khúc cọc*/ }
-//   escorts      { down, need, total, wave /*1|2*/, downWave, waveTotal, escaped }
-//   markers      [{ id, state: "hidden"|"active"|"exposed", officerOn, officerT /*s tướng địch đứng mốc*/, exposeSec }] — mọi pha
-//                  (bản đồ nhỏ luôn vẽ mốc cho người chơi); bảng mốc cọc chỉ hiện ở P2–P3
-//   scout        { target, sec, warn /*Tình báo sớm*/ } | null      — thuyền dò đang tới mốc nào, còn bao giây
-//   escape       { value, full, holding, holdLeft, rate }
+//   tide         { pct, rate /*điểm/s mô phỏng, âm = rút*/, next: { pct, sec /*giây THẬT*/, label } | null }
+//   lure         { launched, stance: "tiencong"|"giuvung"|null, kk /*0..100*/, gap /*m*/, band: [15, 40], toLine /*m đầu hạm đội còn tới Khúc cọc*/,
+//                  crossed }   — chỉ ở P1; launched = false thì hiện nút Ra khiêu chiến
+//   tua          { step /*1..3*/, label } | null            — cảnh tua P2–P4
+//   markers      [{ id, state: "hidden"|"active" }] — bãi cọc cho bản đồ nhỏ (active từ P3: cọc lộ dần)
 //   ks           [{ id, name, quyMo, state: "khoa"|"khadung"|"sansang"|"thanhcong"|"thatbai", word, detail, left, got, hk, label, phase }]
 //   bosses       [{ id, name, nameHan, title, hp, maxHp, hpLock /*% khóa, 0 = không*/, poise, poiseMax, phases, phase /*1..*/,
 //                  broken /*Vỡ Thế*/, captured, unit? /*đơn vị để ẩn khung mục tiêu trùng*/ }]   — chỉ hiện boss đầu tiên chưa bị bắt
 //                  (hoặc vừa bị bắt ≤ 4 s: dấu "Đã bắt sống")
-//   interact     { text /*"Chiếm thuyền hộ vệ"*/, p /*0..1*/, kind, key? } | null
+//   interact     { text /*"Lên boong"*/, p /*0..1*/, kind, key? } | null
 //   ferry        { items: [{ id, label, sub, kind: "ship"|"escort"|"raft"|"pier"|"flagship"|"bank"|"light" }], onPick(item), title? } | null
 //                  — mở bảng khi ĐỐI TƯỢNG ferry đổi (director tạo object mới mỗi lần mở); null thì đóng
 //   boats        [{ x, z, yaw, side: "ta"|"dich", type, state, captured, lead }] (không có thì đọc ctx.naval.boats)
 //   hkLock       true ở P6 (Hào Khí khóa 100 tới khi dùng Tổng Phản Công)
-//   intel        Quyết sách đúng: "Kế đã định" trên bản đồ nhỏ + đường hạm đội
+//   intel        Quyết sách đúng: "Kế đã định" trên bản đồ nhỏ (đường hạm đội, vòng bãi cọc)
 //
-// Tiếng báo (ctx.audio.play) do HudB20 phát — director đừng phát trùng: "warn" khi đồng hồ Con nước vào T−30, khi tướng địch
-// bắt đầu đứng một mốc cọc ẩn, khi đoàn thuyền nhẹ sát quá 15 m (≤ 1 lần / 4 s), khi Thoát vây vượt 80; "ui" khi mở Đò chuyển.
-// Mọi số ở đây là ĐỀ XUẤT BẢN THỬ (bố cục, màu, ngưỡng báo).
+// Mọi số ở đây là ĐỀ XUẤT BẢN THỬ (bố cục, màu).
 
-import { MAP, RIVER, STAKES, TIDE, LIGHT_BOATS, KE_SACH, KS_ORDER, ESCAPE, FLEET } from "../data/battle-b20.js";
+import { MAP, RIVER, STAKES, TIDE, TUA, LIGHT_BOATS, KE_SACH, KS_ORDER } from "../data/battle-b20.js";
 import { zc, hw, TRIBS, tribPoint, tribHalfW } from "../data/terrain-b20.js";
-import { tidePct, secondsTo, activeMarkers, KS_STATE_WORD } from "../sim/river.js";
-import { ICON } from "../data/moves-info.js";
+import { tidePct, secondsTo, KS_STATE_WORD } from "../sim/river.js";
 
 const fmtS = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : `${Math.ceil(s)} s`);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -49,52 +44,36 @@ const pct = (v) => `${(clamp01(v) * 100).toFixed(1)}%`;
 const setT = (el, s) => { if (el._t !== s) { el._t = s; el.textContent = s; } };
 const setSt = (el, k, s) => { const c = "_" + k; if (el[c] !== s) { el[c] = s; el.style[k] = s; } };
 const PHASE_NAMES = ["P1", "P2", "P3", "P4", "P5", "P6"];
-const STANCE = { tiencong: { name: "Tiến công", sub: "khiêu chiến" }, giuvung: { name: "Giữ vững", sub: "giữ khoảng cách" }, theota: { name: "Theo ta", sub: "lui nhanh" } };
-const MARK_GLYPH = { hidden: "✦", active: "◆", exposed: "✖" };
-const MARK_WORD = { hidden: "chưa mở", active: "đã mở", exposed: "bị lộ" };
-const TRIB_WINGS = ["chanh", "rut", "gia"];
+const MARK_GLYPH = { hidden: "✦", active: "◆" };
+const TUA_LABEL = ["Hạm đội Nguyên theo mồi vào bãi cọc, triều vẫn đang lên", "Triều bắt đầu rút, bè cỏ trôi đi, cọc gỗ dần lộ ra", "Nước xuống thấp: cọc nhô, thuyền Nguyên mắc cọc"];
 
 // ---- hudState từ sim/river.js (thuần, kiểm thử được trong Node) -----------------------------------------------------------
-// st: trạng thái createRiver. extra: phần director thêm (bosses, interact, ferry, boats, scout, hkLock, escaped…), gộp đè lên.
+// st: trạng thái createRiver. extra: phần director thêm (bosses, interact, ferry, boats, hkLock…), gộp đè lên.
 export function riverHud(st, extra = {}) {
   const ph = st.phase, L = LIGHT_BOATS, v = tidePct(st), rate = st.tideRate;
+  const k = ph >= 1 && ph <= 3 ? TUA.rate : 1;                       // cảnh tua: giây mô phỏng → giây thật
   let next = null;
   if (ph === 0 && rate > 0) next = { pct: TIDE.p1.to, sec: (TIDE.p1.to - v) / rate, label: "Đỉnh triều" };
-  else if (ph === 1 && rate < 0) next = { pct: TIDE.p2Floor, sec: secondsTo(st, TIDE.p2Floor), label: "Triều rút (sàn)" };
-  else if (ph === 2 && st.drop && rate < 0) next = { pct: TIDE.p3HoldTo, sec: secondsTo(st, TIDE.p3HoldTo), label: "Triều rút" };
-  else if (ph === 3) next = v > TIDE.strandAt + 1e-6 ? { pct: TIDE.strandAt, sec: secondsTo(st, TIDE.strandAt), label: "Cọc nhô" }
-    : v > 1e-6 ? { pct: 0, sec: secondsTo(st, 0), label: "Nước ròng" } : null;
-  const tide = { pct: v, rate, next, warn: ph === 3 && !!next && next.sec <= TIDE.warn, hold: ph === 2 && !st.drop };
-  const out = { phase: ph, tide, intel: !!st.intel, lure: null, escorts: null, markers: null, escape: null, ks: [] };
+  else if (ph === 2 && rate < 0) next = { pct: TIDE.p3HoldTo, sec: secondsTo(st, TIDE.p3HoldTo) / k, label: "Triều rút" };
+  else if (ph === 3) next = v > TIDE.strandAt + 1e-6 ? { pct: TIDE.strandAt, sec: secondsTo(st, TIDE.strandAt) / k, label: "Cọc nhô" }
+    : v > 1e-6 ? { pct: 0, sec: secondsTo(st, 0) / k, label: "Nước ròng" } : null;
+  const out = { phase: ph, tide: { pct: v, rate, next }, intel: !!st.intel, lure: null, tua: null, markers: null, ks: [] };
   if (ph === 0) {
-    const n = st.nghi, fl = st.wings.flotilla;
-    // gap < 0: đầu hạm đội đã vượt đoàn thuyền nhẹ (không ra thế đứng nào) — thanh hiện 0, không số âm (review B20: "−184 m")
-    out.lure = { gap: Math.max(0, n.gap), overrun: n.gap < 0, band: [L.gap.min, L.gap.max], max: 60, kk: n.kk, boats: fl.boats, boatsMax: L.n, lostMax: L.lossMax,
-      stance: n.stance, stanceCd: n.stanceCd, toLine: Math.max(0, MAP.khucCoc - st.fleet.headX), crossed: n.crossedAt >= 0 };
+    const n = st.nghi;
+    // gap < 0: đầu hạm đội đã vượt đoàn thuyền nhẹ — hiện 0, không số âm
+    out.lure = { launched: n.launched, stance: n.stance, kk: n.kk, gap: Math.max(0, n.gap), band: [L.gap.min, L.gap.max],
+      toLine: Math.max(0, MAP.khucCoc - st.fleet.headX), crossed: n.crossedAt >= 0 };
   }
-  if (ph === 1 || ph === 3) {                                    // P2: hộ vệ đợt 1 (cần hạ 4); P4: đợt 2 (mỗi chiếc −15 Thoát vây)
-    const f = st.fleet, w1 = FLEET.escorts[0];
-    out.escorts = ph === 3
-      ? { down: f.escortsDown, need: 0, total: f.escortsTotal, wave: 2, downWave: f.downP4, waveTotal: FLEET.escorts[1], escaped: 0 }
-      : { down: f.escortsDown, need: 4, total: f.escortsTotal || w1, wave: 1, downWave: f.escortsDown, waveTotal: f.escortsTotal || w1, escaped: 0 };
-  }
-  out.markers = STAKES.map((s) => { const m = st.markers[s.id]; return { id: s.id, state: m.state, officerOn: m.officerOn, officerT: m.officerOnT, exposeSec: s.exposeSec }; });
-  if (ph === 3) {
-    let holding = false, holdLeft = 0;
-    for (const id of TRIB_WINGS) { const o = st.wings[id].order; if (o?.id === "giuvung") { holding = true; holdLeft = Math.max(holdLeft, o.left); } }
-    out.escape = { value: st.escape.value, full: st.escape.full, holding, holdLeft,
-      rate: st.escape.full ? 0 : ESCAPE.perCmdShip * st.fleet.cmdActive * (holding ? ESCAPE.holdMult : 1) };
-  }
+  if (ph >= 1 && ph <= 3) out.tua = { step: ph, label: TUA_LABEL[ph - 1] };
+  out.markers = STAKES.map((s) => ({ id: s.id, state: ph >= 2 ? "active" : "hidden" }));
   for (const id of KS_ORDER) {
-    const k = st.ks[id]; if (!k) continue;
-    const K = KE_SACH[id];
+    const ks = st.ks[id]; if (!ks) continue;
+    const K = KE_SACH[id], live = ks.state === "khadung" || ks.state === "sansang";
     let detail = "";
-    if (id === "nghiBinh") detail = k.state === "khadung" || k.state === "sansang" ? `Khiêu khích ${Math.floor(st.nghi.kk)}/100 · mất ${st.nghi.lost}/${L.lossMax}` : "";
-    if (id === "kichCoc") detail = k.state === "khadung" || k.state === "sansang" ? `mốc đã mở ${activeMarkers(st)}/${K.need}` : "";
-    // Con nước còn cần ≥ 2 mốc cọc đã mở: thiếu mốc thì báo hỏng ngay (trước đây chỉ biết lúc nước ròng)
-    if (id === "conNuoc") detail = k.state === "khadung" ? (activeMarkers(st) < K.need ? "đã hỏng (thiếu mốc cọc)" : `Thoát vây ${Math.floor(st.escape.value)}/100`) : "";
-    out.ks.push({ id, name: K.name, quyMo: K.quyMo === "lon" ? "Lớn" : "Nhỏ", state: k.state, word: KS_STATE_WORD[k.state], detail,
-      left: k.state === "khadung" || k.state === "sansang" ? k.left : 0, got: k.got, hk: K.hk, label: K.label, labelAction: K.labelAction || null, phase: K.phase, why: k.why });
+    if (id === "nghiBinh" && live) detail = st.nghi.launched ? `Khiêu khích ${Math.floor(st.nghi.kk)}/100` : "chờ lệnh khiêu chiến";
+    if (id === "conNuoc" && ks.state === "khadung") detail = "chờ nước ròng";
+    out.ks.push({ id, name: K.name, quyMo: K.quyMo === "lon" ? "Lớn" : "Nhỏ", state: ks.state, word: KS_STATE_WORD[ks.state], detail,
+      left: live ? ks.left : 0, got: ks.got, hk: K.hk, label: K.label, phase: K.phase, why: ks.why });
   }
   return Object.assign(out, extra);
 }
@@ -152,7 +131,7 @@ function buildBase(W, H, X, Z) {
   return { cv, W, H };
 }
 // Lớp nền: đất, sông, nhánh sông, bản doanh, bến (ảnh đệm) + khúc cọc tô theo Con nước (triều ròng thành bãi bùn), mốc Khúc
-// cọc (P1–P2), cửa sông (P4: lối thoát của hạm đội).
+// cọc (P1–P2).
 function drawBaseB20(M, ctx) {
   const { c, W, H, X, Z } = M, st = ctx.hudB20?.state, ph = st?.phase ?? ctx.director?.phase ?? 0;
   if (!baseCache || baseCache.W !== W || baseCache.H !== H) baseCache = buildBase(W, H, X, Z);
@@ -175,10 +154,6 @@ function drawBaseB20(M, ctx) {
     c.beginPath(); c.moveTo(X(MAP.khucCoc), Z(zc(MAP.khucCoc) - hw(MAP.khucCoc) - 6)); c.lineTo(X(MAP.khucCoc), Z(zc(MAP.khucCoc) + hw(MAP.khucCoc) + 6)); c.stroke();
     c.setLineDash([]);
   }
-  if (ph === 3) {                                                  // lối thoát ra biển: vạch đỏ nhấp nháy
-    c.strokeStyle = Math.floor(M.t * 3) % 2 ? "#ff5a3a" : "rgba(255,90,58,.45)"; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(X(MAP.exitX), Z(zc(MAP.exitX) - hw(MAP.exitX))); c.lineTo(X(MAP.exitX), Z(zc(MAP.exitX) + hw(MAP.exitX))); c.stroke();
-  }
 }
 // Một thuyền: hình thoi dài theo hướng mũi (yaw: +z cục bộ là mũi, hướng thế giới (sin yaw, cos yaw)).
 function boatMark(c, X, Z, sx, b) {
@@ -191,8 +166,8 @@ function boatMark(c, X, Z, sx, b) {
   if (b.state === "stranded" || b.state === "caught") { c.fillStyle = COL.ink; c.fillRect(-1, -0.6, 2, 1.2); }
   c.restore();
 }
-// Lớp trên: thuyền (đỏ = Nguyên, vàng = ta / đã chiếm; kỳ hạm viền vàng), mốc cọc ✦ (chỉ người chơi thấy; ◆ đã mở, ✖ lộ),
-// tướng địch đứng mốc (vòng đỏ nhấp nháy), thuyền dò đang nhắm mốc, "Kế đã định" khi Quyết sách đúng.
+// Lớp trên: thuyền (đỏ = Nguyên, vàng = ta; kỳ hạm viền vàng), bãi cọc ✦ (◆ khi cọc đã lộ dần theo nước rút),
+// "Kế đã định" khi Quyết sách đúng.
 function drawTopB20(M, ctx) {
   const { c, X, Z, sx, t } = M, st = ctx.hudB20?.state;
   const boats = st?.boats || ctx.naval?.boats || [];
@@ -210,13 +185,8 @@ function drawTopB20(M, ctx) {
       const m = marks?.find((q) => q.id === s.id), state = m?.state ?? "hidden", x = X(s.x), z = Z(s.z);
       if (st?.intel) { c.strokeStyle = "rgba(241,217,138,.9)"; c.lineWidth = 1; c.beginPath(); c.arc(x, z, 6, 0, 7); c.stroke(); }
       if (!marks) continue;
-      if (m?.officerOn && state === "hidden" && Math.floor(t * 4) % 2) { c.strokeStyle = "#ff5a3a"; c.lineWidth = 2; c.beginPath(); c.arc(x, z, 7.5, 0, 7); c.stroke(); }
       c.fillStyle = COL.ink; c.fillText(MARK_GLYPH[state], x + 0.6, z + 0.8);
       c.fillStyle = state === "hidden" ? COL.mark : state === "active" ? COL.gold : "#ff7a5c"; c.fillText(MARK_GLYPH[state], x, z);
-    }
-    if (st?.scout?.target) {                                      // thuyền dò → mốc: mũi tên đỏ từ bờ nam giữa hạm đội
-      const s = STAKES.find((q) => q.id === st.scout.target);
-      if (s && Math.floor(t * 3) % 2) { c.strokeStyle = "#ff5a3a"; c.lineWidth = 1; c.beginPath(); c.arc(X(s.x), Z(s.z), 9, 0, 7); c.stroke(); }
     }
   }
 }
@@ -224,57 +194,23 @@ export const HUD_B20 = { bounds: MAP_BOUNDS, canvas: MAP_CANVAS, drawBase: drawB
 export function wireHudB20(def) { def.hud = HUD_B20; return def; }
 
 // ---- khối HTML của cột phải (chuỗi cho hud.setPanel; hud.js chỉ vẽ lại khi chuỗi đổi) --------------------------------------
-function lureHTML(L, t) {
-  const [lo, hi] = L.band, g = Math.round(L.gap * 2) / 2, near = L.gap < lo, far = L.gap > hi;
-  const cls = near ? "near" : far ? "far" : "in", word = near ? "Quá sát!" : far ? "Quá xa" : "Trong dải";
-  const why = near ? `Sát dưới ${lo} m: cứ ${LIGHT_BOATS.lossEvery} s mất 1 thuyền` : far ? `Xa quá ${hi} m: hạm đội chần chừ, Khiêu khích tụt` : null;
-  const S = L.stance && STANCE[L.stance];
-  const chip = S ? `<span class="b20-chip stance"><img src="${ICON(L.stance)}" alt="">${S.name}${L.stanceCd > 0 ? ` <small>${L.stanceCd}s</small>` : ""}</span>`
-    : `<span class="b20-chip stance none">chưa lệnh</span>`;
-  const pips = Array.from({ length: L.boatsMax }, (_, i) => `<i class="${i < L.boats ? "ok" : "lost"}"></i>`).join("");
-  const lostTooMany = L.boatsMax - L.boats > L.lostMax;
-  // nhấp nháy "Quá sát!" bằng hoạt ảnh CSS (css/b20.css, chỉ opacity): trước đây --pulse = sin(t) ghi vào chuỗi HTML nên bảng phân tích lại 20 lần/s
-  return `<section class="b20-sec lure ${cls}">
-    <header><b>NGHI BINH</b>${chip}</header>
-    <div class="row"><span>Khoảng cách</span><b class="gapv">${g} m</b><em class="gs">${word}</em></div>
-    <div class="gapbar"><i class="zn" style="width:${pct(lo / L.max)}"></i><i class="zb" style="left:${pct(lo / L.max)};width:${pct((hi - lo) / L.max)}"></i>
-      <u style="left:${pct(L.gap / L.max)}"></u><s style="left:${pct(lo / L.max)}">${lo}</s><s style="left:${pct(hi / L.max)}">${hi}</s></div>
+function lureHTML(L) {
+  const word = !L.launched ? "Chờ lệnh" : L.crossed ? "Qua Khúc cọc" : L.stance === "tiencong" ? "Khiêu chiến" : "Lui dụ";
+  const status = !L.launched ? "Hạm đội Nguyên đang chờ ở thượng lưu — bấm Ra khiêu chiến khi sẵn sàng"
+    : L.crossed ? "Đã qua mốc Khúc cọc — đoàn tự giữ dải tới khi đầu hạm đội theo qua"
+    : L.stance === "tiencong" ? "Đoàn thuyền đang áp sát đầu hạm đội, bắn tên khiêu khích"
+    : `Đoàn thuyền đang lui dụ, hạm đội Nguyên đuổi theo · còn ${Math.round(L.toLine)} m tới Khúc cọc`;
+  return `<section class="b20-sec lure ${L.launched ? "go" : "wait"}">
+    <header><b>NGHI BINH</b><span class="b20-chip stance${L.launched ? "" : " none"}">${word}</span></header>
     <div class="row"><span>Khiêu khích</span><div class="bar kk${L.kk >= 100 ? " full" : ""}"><div style="width:${pct(L.kk / 100)}"></div></div><b>${Math.floor(L.kk)}</b></div>
-    <div class="row"><span>Thuyền nhẹ</span><span class="pips${lostTooMany ? " bad" : ""}">${pips}</span><b>${L.boats}/${L.boatsMax}</b></div>
-    <div class="sub${why ? " warn" : ""}">${why ?? (L.crossed ? "Đã qua mốc Khúc cọc — giữ dải tới khi đầu hạm đội theo qua" : `Đầu hạm đội còn ${Math.round(L.toLine)} m tới Khúc cọc · mất tối đa ${L.lostMax}`)}</div>
+    <div class="sub">${status}</div>
   </section>`;
 }
-function escortsHTML(E, phase) {
-  const tot = E.wave === 2 ? E.waveTotal : E.total, down = E.wave === 2 ? E.downWave : E.down;
-  const pips = Array.from({ length: tot }, (_, i) => `<i class="${i < down ? "down" : ""}"></i>`).join("");
-  const head = E.wave === 2 ? `đã hạ ${down}/${tot}${E.escaped ? ` · thoát ${E.escaped}` : ""}` : `đã hạ <b>${down}</b>/${E.need} · còn ${Math.max(0, tot - down)}`;
-  const sub = phase === 3 ? "Mỗi thuyền hộ vệ bị hạ: Thoát vây −15" : phase === 1 ? "Hạ trấn thủ, giữ Tương tác 3 s trên boong để chiếm" : "Còn hộ vệ thì kỳ hạm chưa áp mạn được";
-  return `<section class="b20-sec esc"><header><b>HỘ VỆ${E.wave === 2 ? " · ĐỢT 2" : ""}</b><span>${head}</span></header>
-    <div class="ships">${pips}</div><div class="sub">${sub}</div></section>`;
+function tuaHTML(T) {
+  return `<section class="b20-sec tua"><header><b>CẢNH TUA</b><span>${T.step}/3</span></header>
+    <div class="sub">${T.label}</div><div class="sub">Chưa có việc cho tướng — chờ nước ròng rồi ra đánh.</div></section>`;
 }
-function markersHTML(M, scout, phase) {
-  const act = M.filter((m) => m.state === "active").length;
-  const chips = M.map((m) => {
-    const danger = m.state === "hidden" && m.officerOn, left = Math.max(0, (m.exposeSec ?? 10) - (m.officerT ?? 0));
-    const p = m.state === "hidden" ? clamp01((m.officerT ?? 0) / (m.exposeSec ?? 10)) : 0;
-    const sub = danger ? `lộ sau ${Math.ceil(left)} s` : MARK_WORD[m.state];
-    return `<div class="mchip ${m.state}${danger ? " danger" : ""}"><div class="mring" style="--p:${p.toFixed(3)}"><span>${MARK_GLYPH[m.state]}</span></div><b>${m.id}</b><small>${sub}</small></div>`;
-  }).join("");
-  const need = KE_SACH.kichCoc.need;
-  const sub = scout?.target ? `<div class="sub warn">${scout.warn ? "Tình báo sớm: " : ""}thuyền dò → ${scout.target} · ${fmtS(scout.sec)}</div>`
-    : `<div class="sub">${phase === 2 ? "Đứng trên bè cỏ, giữ Tương tác 5 s để chặt dây — không để tướng địch đứng mốc 10 s" : "Chặn thuyền dò luồng trước khi chạm mốc"}</div>`;
-  return `<section class="b20-sec mk"><header><b>MỐC CỌC</b><span>đã mở <b>${act}</b>/${need}</span></header><div class="mchips">${chips}</div>${sub}</section>`;
-}
-function escapeHTML(X, t) {
-  const v = Math.floor(X.value), hot = v >= 80 && !X.full;
-  const hold = X.holding ? `<span class="b20-chip hold on"><img src="${ICON("giuvung")}" alt="">Giữ vững ×0,7${X.holdLeft ? ` · ${Math.ceil(X.holdLeft)} s` : ""}</span>`
-    : `<span class="b20-chip hold"><img src="${ICON("giuvung")}" alt="">Chưa Giữ vững · Mệnh Lệnh → Giữ vững</span>`;
-  return `<section class="b20-sec escape${X.full ? " full" : hot ? " hot" : ""}">
-    <header><b>THOÁT VÂY</b><b class="v">${v}<small>/100</small></b></header>
-    <div class="bar esc"><div style="width:${pct(X.value / 100)}"></div></div>
-    <div class="row">${hold}<span class="rate">${X.full ? "Hạm đội đã thoát vây" : `+${X.rate.toFixed(1).replace(".", ",")}/s`}</span></div></section>`;
-}
-function ksHTML(list, phase, fmt = (s) => s) {
+function ksHTML(list, phase) {
   return `<section class="b20-sec ksl">` + list.map((k) => {
     const cur = k.phase === phase || k.state === "sansang";
     const left = k.left > 0 ? ` · ${fmtS(k.left)}` : "";
@@ -282,8 +218,8 @@ function ksHTML(list, phase, fmt = (s) => s) {
       const w = k.state === "khoa" ? `mở ở ${PHASE_NAMES[k.phase] ?? ""}` : k.word;
       return `<div class="ks mini ${k.state}"><b>${k.name}</b><span>${w}</span><em>${Math.round(k.got)}/${k.hk}</em></div>`;
     }
-    return `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${left}${k.detail ? " · " + k.detail : ""}${k.state === "sansang" && k.id === "kichCoc" ? " · bấm " + fmt("{kesach}") : ""}</span>
-      <i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}${k.labelAction ? ` · thao tác ${k.labelAction}` : ""}</em></i></div>`;
+    return `<div class="ks ${k.state}"><b>Kế Sách ${k.quyMo} · ${k.name}</b><span>${k.word}${left}${k.detail ? " · " + k.detail : ""}</span>
+      <i>Hào Khí ${Math.round(k.got)}/${k.hk} · <em>${k.label}</em></i></div>`;
   }).join("") + `</section>`;
 }
 function rallyHTML(fmt = (s) => s) {
@@ -301,8 +237,8 @@ const BOSS_HTML = `<div class="bn"><b data-b="bname"></b><span data-b="bhan"></s
   <div class="bhint" data-b="bhint"></div>`;
 
 export class HudB20 {
-  constructor(ctx, { cues = true } = {}) {
-    this.ctx = ctx; this.hud = ctx.hud; ctx.hudB20 = this; this.cues = cues;
+  constructor(ctx) {
+    this.ctx = ctx; this.hud = ctx.hud; ctx.hudB20 = this;
     const root = this.root = this.hud.root;
     root.classList.add("hud-b20"); root.parentElement?.classList.add("b20");
     this.hud.setTopWidget(TIDE_HTML);
@@ -312,8 +248,12 @@ export class HudB20 {
     const boss = this.bossEl = document.createElement("div");
     boss.className = "b20-boss"; boss.hidden = true; boss.innerHTML = BOSS_HTML; root.appendChild(boss);
     this.bw = {}; for (const k of ["bname", "bhan", "btitle", "bhp", "block", "bhpt", "bpo", "bpips", "bhint"]) this.bw[k] = q(boss, k);
+    // nút Ra khiêu chiến (P1, tới khi ra lệnh): bấm / chạm → director.launchLure(); phím G là Lệnh Kế Sách (cùng việc)
+    const btn = this.launchEl = document.createElement("button");
+    btn.type = "button"; btn.className = "b20-launch"; btn.hidden = true; btn.innerHTML = `<b>RA KHIÊU CHIẾN</b><small data-b="lk"></small>`;
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault?.(); e.stopPropagation?.(); this.ctx.director?.launchLure?.(); });
+    root.appendChild(btn); this.lk = q(btn, "lk");
     this.state = null; this.t = 0; this.acc = 1; this.ferryRef = null; this.bossId = null; this.capT = 0;
-    this.cue = { tideWarn: false, officer: {}, near: -99, esc80: false };
     this.cache = {};
   }
 
@@ -323,6 +263,7 @@ export class HudB20 {
     this.state = st; this.t += dt; this.acc += dt; this.acc0 = (this.acc0 || 0) + dt;
     this.prompt(st.interact);
     this.ferry(st.ferry);
+    this.launchBtn(st.lure);
     if (this.acc < 0.05) return;
     this.acc = 0;
     const acc = this.acc0; this.acc0 = 0;
@@ -330,7 +271,12 @@ export class HudB20 {
     this.panels(st);
     this.boss(st.bosses, acc);
     this.targetVis();
-    if (this.cues) this.sounds(st);
+  }
+  // Nút Ra khiêu chiến: hiện tới khi đã ra lệnh; nhắc phím Kế Sách (cảm ứng: không nhắc phím)
+  launchBtn(L) {
+    const b = this.launchEl, show = !!L && !L.launched;
+    if (b.hidden === show) b.hidden = !show;
+    if (show) setT(this.lk, this.ctx.touch ? "chạm để ra lệnh" : `hoặc bấm ${this.ctx.fmt ? this.ctx.fmt("{kesach}") : "G"}`);
   }
 
   // Tên phím Tương tác theo thiết bị đang dùng: cảm ứng ✋ (giữ nút Tương tác — cả lúc chưa chạm lần nào khi đã dựng nút cảm ứng),
@@ -358,33 +304,31 @@ export class HudB20 {
     const items = f.items.slice(0, 4).map((it) => ({ ...it, svg: it.svg ?? FERRY_SVG[it.kind] ?? FERRY_SVG.ship }));
     this.hud.picker(items, (it) => f.onPick?.(it), f.title ?? "Đò chuyển · chọn nơi đến");
     this.hud.el.picker.classList.add("b20-ferry");
-    if (this.cues) this.ctx.audio?.play?.("ui");
+    this.ctx.audio?.play?.("ui");
   }
 
-  // Đồng hồ Con nước dưới thanh Hào Khí: %, mũi tên lên/xuống, mốc kế (cọc nhô 30%, nước ròng 0%), nhấp nháy từ T−30.
+  // Đồng hồ Con nước dưới thanh Hào Khí: %, mũi tên lên/xuống, mốc kế (cọc nhô 30%, nước ròng 0%).
   tide(T, phase) {
     const w = this.tw; if (!T) { this.hud.setTopWidget(null); return; }
     const v = Math.round(T.pct), dir = T.rate > 0.001 ? "up" : T.rate < -0.001 ? "down" : "flat";
-    const nx = T.next ? `${T.next.label} ${T.next.pct}% · ${fmtS(T.next.sec)}` : T.hold ? "Triều đứng · chờ Kế Sách bãi cọc" : phase >= 4 ? "Nước ròng · thuyền mắc cạn" : "";
-    const key = `${v}|${dir}|${nx}|${T.warn ? 1 : 0}`;
+    const nx = T.next ? `${T.next.label} ${T.next.pct}% · ${fmtS(T.next.sec)}` : phase === 1 ? "Triều đứng · vào bãi cọc" : phase >= 4 ? "Nước ròng · thuyền mắc cạn" : "";
+    const key = `${v}|${dir}|${nx}`;
     if (key === this.cache.tide) return;
     this.cache.tide = key;
     w.tv.textContent = `${v}%`; w.ta.className = "bt-a " + dir; w.ta.textContent = dir === "up" ? "▲" : dir === "down" ? "▼" : "■";
     w.tn.textContent = nx; w.tf.style.width = `${Math.max(0, Math.min(100, T.pct))}%`;
     w.tm.style.left = T.next ? `${T.next.pct}%` : "-10px"; w.tm.hidden = !T.next;
-    w.box.classList.toggle("warn", !!T.warn); w.box.classList.toggle("low", T.pct <= TIDE.strandAt);
+    w.box.classList.toggle("low", T.pct <= TIDE.strandAt);
   }
 
-  // Cột phải: bảng của pha (Nghi binh / hộ vệ + mốc cọc / Thoát vây + hộ vệ đợt 2 / Hào Khí khóa) rồi Kế Sách.
+  // Cột phải: bảng của pha (Nghi binh / Cảnh tua / Hào Khí khóa) rồi Kế Sách.
   panels(st) {
-    const t = this.t, ph = st.phase;
+    const ph = st.phase;
     let html = "";
-    if (st.lure) html += lureHTML(st.lure, t);
-    if (st.escape) html += escapeHTML(st.escape, t);
-    if (st.escorts) html += escortsHTML(st.escorts, ph);
-    if (st.markers && (ph === 1 || ph === 2)) html += markersHTML(st.markers, st.scout, ph);
+    if (st.lure) html += lureHTML(st.lure);
+    if (st.tua) html += tuaHTML(st.tua);
     if (st.hkLock && !this.ctx.hk?.tpc) html += rallyHTML(this.ctx.fmt);
-    if (st.ks?.length) html += ksHTML(st.ks, ph, this.ctx.fmt);
+    if (st.ks?.length) html += ksHTML(st.ks, ph);
     this.hud.setPanel("b20", html || null);
   }
 
@@ -421,20 +365,11 @@ export class HudB20 {
     this.root.classList.toggle("b20-notarget", h.state === "ride" || h.state === "climb" || far);
   }
 
-  sounds(st) {
-    const au = this.ctx.audio, C = this.cue;
-    if (!au?.play) return;
-    const tw = !!st.tide?.warn; if (tw && !C.tideWarn) au.play("warn"); C.tideWarn = tw;
-    for (const m of st.markers || []) { const on = m.state === "hidden" && !!m.officerOn; if (on && !C.officer[m.id]) au.play("warn"); C.officer[m.id] = on; }
-    if (st.lure && st.lure.gap < st.lure.band[0] && this.t - C.near > 4) { au.play("warn"); C.near = this.t; }
-    const e80 = !!st.escape && st.escape.value >= 80 && !st.escape.full; if (e80 && !C.esc80) au.play("warn"); C.esc80 = e80;
-  }
-
   dispose() {
     const h = this.hud;
     h.setTopWidget(null); h.setPanel("b20", null); h.prompt(null); if (h.pickerOpen) h.picker(null);
     h.el.picker?.classList.remove("b20-ferry");
-    this.bossEl.remove(); this.root.classList.remove("hud-b20", "b20-bossing", "b20-boss-target", "b20-notarget"); this.root.parentElement?.classList.remove("b20");
+    this.bossEl.remove(); this.launchEl.remove(); this.root.classList.remove("hud-b20", "b20-bossing", "b20-boss-target", "b20-notarget"); this.root.parentElement?.classList.remove("b20");
     if (this.ctx.hudB20 === this) this.ctx.hudB20 = null;
   }
 }

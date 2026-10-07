@@ -33,9 +33,9 @@ export const BATTLES = {
     heroes: ["H31", "H34", "H38"], playable: ["H31"], fixedR: 25, preset: { level: 25 }, modes: ["nhanh"], wip: true,
     models: ["H40", "X20", "X24"],                        // Nguyễn Khoái (vào từ pha 2), Ô Mã Nhi, Phàn Tiếp (boss)
     keSach: { nhanh: 3, chuan: 3 },                       // 3 Kế Sách Lớn (Nội Bàng — Nhỏ, chỉ Trận chuẩn — chưa làm)
-    par: { nhanh: 780 },                                  // par Trận nhanh 13 phút (canon B20; = PAR_B20 của director-b20.js — HUD và màn kết quả cùng số)
+    par: { nhanh: 330 },                                  // par Trận nhanh (ĐỀ XUẤT BẢN THỬ: tổng par các pha; = PAR_B20 của director-b20.js — HUD và màn kết quả cùng số)
     loading: { title: "Sông Bạch Đằng · 1288" },
-    result: { title: "Thắng trận Bạch Đằng", missionsTotal: 6, sideTotal: 4, eventNames: {}, cLabel: "Hộ vệ, mốc cọc" },
+    result: { title: "Thắng trận Bạch Đằng", missionsTotal: 3, sideTotal: 2, eventNames: {}, cLabel: "Bãi cọc" },
     resultUI: () => import("../ui/result-b20.js"),
     marks: () => import("./battle-b20.js").then((m) => m.KS_ORDER.map((id) => m.KE_SACH[id].name)),
     load: () => import("../battles/b20.js"), comic: () => import("./comic-b20.js"), suquan: () => import("./suquan-b20.js"),

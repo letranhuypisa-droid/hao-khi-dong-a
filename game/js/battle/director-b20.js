@@ -1,36 +1,29 @@
-// battle/director-b20.js — luật trận B20 Bạch Đằng (9/4/1288), đợt 9 pha D2 (phần 1 D2a: pha 1–3; phần 2 D2b: pha 4–6, boss, cảnh kết).
+// battle/director-b20.js — luật trận B20 Bạch Đằng (9/4/1288). Đợt 20 gọn lại: MỘT lệnh "Ra khiêu chiến", rồi cảnh tua triều rút; chỉ khi
+// thuyền Nguyên mắc cọc người chơi mới ra đánh (đúng chính sử: thuyền nhẹ dụ địch, triều rút, cọc nhô, quân Trần đánh ra).
 //
 // Giao diện Director như battle/director.js (danh sách móc ở đầu battles/b15.js): phase, time, over, result, msgs, events,
 // keSach{hud,trigger}, pickups, M, retries, order, tryTPC, fillActors, restoreCheckpoint, lose, update(dt), on* của tướng/lính/
 // sĩ quan, cộng các móc H31 (onArmyBuff, onMark, pickMarkTarget, onUlt, onUltEnd). Luật khúc sông ở sim/river.js (ctx.sim là
-// trạng thái createRiver — Con nước, Nghi binh, mốc cọc, Thoát vây, cánh thủy quân, Kế Sách); director tick nó 1 Hz, áp sự
-// kiện, đặt thuyền theo số của mô phỏng (đầu hạm đội st.fleet.headX, đoàn thuyền nhẹ st.nghi.flotX, nội suy giữa hai tick).
+// trạng thái createRiver — Con nước, Nghi binh, Kế Sách, cánh thủy quân); director tick nó 1 Hz (giây mô phỏng), áp sự kiện, đặt thuyền
+// theo số của mô phỏng (đầu hạm đội st.fleet.headX, đoàn thuyền nhẹ st.nghi.flotX, nội suy giữa hai tick).
 // Lớp thủy chiến: battle/naval.js (ctx.naval). HUD riêng: battle/hud-b20.js (HudB20 + riverHud → director.hudState()).
 //
-// Pha (canon, B20-GAMEPLAY §D2):
-//   P1 Dụ địch lúc triều lên — tướng trên thuyền chỉ huy nhẹ giữa 8 thuyền nhẹ; hạm đội (24 thuyền) đuổi sau theo headX. Mệnh
-//      Lệnh cho cánh "flotilla" = thế đứng (mô phỏng). Cứ 14 s một thuyền tiên phong rời đầu hạm đội áp mạn một thuyền nhẹ (lần
-//      đầu thuyền của tướng), lính tràn sang; KO → provoke "ko", Đội trưởng vỡ thế / ngã → provoke "officer"; thuyền nhẹ bị
-//      áp mạn không dọn trong 25 s thì mất (flotillaLoss). Đầu hạm đội qua Khúc cọc (sự kiện khucCoc) → P2.
-//   P2 Đánh hộ vệ hạm đội — hạm đội vào khúc cọc tới x 800 rồi neo; 6 thuyền hộ vệ tách đội đi tuần hai mép sông; mỗi thuyền là
-//      Cứ Điểm động (10 thủy thủ + trấn thủ Đội trưởng, dựng khi tướng tới gần), hạ trấn thủ rồi giữ X 3 s để chiếm (cờ 陳,
-//      dừng, thành nơi đến đò). Sự kiện scout → thuyền dò luồng (4 + Đội trưởng) từ thuyền Phàn Tiếp tới bè cỏ của mốc; tới
-//      ≤ 8 m mà Đội trưởng còn sống thì mốc lộ. Nguyễn Khoái (H40) đứng thuyền ở phao chặn luồng x 840. ≥ 4 hộ vệ hạ (hoặc hết
-//      180 s) → P3.
-//   P3 Kích hoạt bãi cọc — ba toán dò luồng (Đội trưởng dò luồng + 6) tới bè cỏ ở +14 / +40 / +66 s; mỗi giây báo
-//      setMarkerOfficer (Đội trưởng sống, đứng trên bè, tướng xa hơn 8 m). Giữ X 5 s trên bè → mở mốc (bè trôi đi, mời đò chuyển);
-//      Lệnh Kế Sách (G) khi Sẵn sàng. Nước về 50% (tide50) → P4.
-//   P4 Thủy triều rút — 8 thuyền hộ vệ đợt hai (E7…E14) lần lượt tách khối hạm đội chạy ra cửa sông theo làn (né bãi đã lộ, né cụm
-//      Phàn Tiếp); hộ vệ đợt một còn sót bỏ vòng tuần chạy theo. Chiếm được thì onEscortDown (Thoát vây −15), tới cửa sông thì thoát
-//      ra biển (bỏ khỏi trận). Giữ vững cho cánh thuyền phục ở cửa nhánh sông (mô phỏng ×0,7; thuyền phục chèo ra cửa lạch). Báo trước
-//      T−30. Phàn Tiếp gom thuyền: J8 dạt sát mạn thuyền chỉ huy, J12 tiến lên thế chỗ (cụm Liên Hoàn). strandAt (30%): thuyền có tâm
-//      trong bãi đã mở thì "mắc cọc" (dừng, chưa nghiêng); cọc nhô dần (cảnh setTide). tideZero → P5.
+// Pha (canon, B20-GAMEPLAY §D2; đợt 20 đổi P2–P4 thành cảnh tua):
+//   P1 Dụ địch lúc triều lên — tướng trên thuyền chỉ huy nhẹ giữa 8 thuyền nhẹ. Hạm đội (24 thuyền) và đoàn thuyền đứng yên tới khi người
+//      chơi ra lệnh khiêu chiến (nút Ra khiêu chiến / phím Kế Sách / Mệnh Lệnh Tiến công → launchLure): từ đó đoàn thuyền nhẹ TỰ LÁI (sim/
+//      river.js tickLure) — áp sát khiêu chiến, rồi tự lui dụ hạm đội (đuổi theo headX) qua mốc Khúc cọc. Cứ 14 s một thuyền tiên phong
+//      Nguyên áp mạn thuyền của tướng, lính tràn sang; KO → Khiêu khích "ko", Đội trưởng vỡ thế / ngã → "officer". Không mất thuyền nhẹ.
+//      Đầu hạm đội qua Khúc cọc (sự kiện khucCoc) → P2.
+//   P2–P4 CẢNH TUA — người chơi không có việc; mô phỏng chạy TUA.rate lần nhanh hơn, máy quay điện ảnh cao nhìn khối hạm đội:
+//      P2 hạm đội theo mồi vào bãi cọc tới x 800 rồi neo (sự kiện fleetIn), đoàn thuyền nhẹ về đậu ven bờ, Nguyễn Khoái (H40) ở phao chặn
+//      luồng x 840; P3 bãi cọc tự xét (Kế Sách), bè cỏ ngụy trang trôi đi, nước về 50% (tide50), Phàn Tiếp gom thuyền (cụm Liên Hoàn);
+//      P4 nước 50 → 0: cọc nhô ở 30% (strandAt: thuyền trong bãi mắc cọc), nước ròng (tideZero) → P5.
 //   P5 Chiến thuyền mắc cạn — thuyền trong bãi nằm cạn nghiêng theo strandShare (1 → mọi thuyền trong bãi; 0,5 → một nửa xác định,
-//      luôn gồm cụm Phàn Tiếp), ván dốc xuống bùn; kỳ hạm chỉ "mắc" (chưa nghiêng, chưa lên được). Thuyền phục ba nhánh sông xuất
-//      kích, cập mạn thuyền mắc cạn, quân ta lên boong. Tướng lội bãi bùn giữa các thân thuyền. Phàn Tiếp (X24) đánh trên thuyền chỉ
-//      huy; dưới 50% Sinh lực "Liên Hoàn Thuyền" (ván + xích nối ba boong, cả cụm đứng vững); Sinh lực khóa 25% — Vỡ Thế rồi Đòn Quyết
-//      "Bắt sống" (defeatMeans "bị bắt"): đứng thẳng, vũ khí đặt xuống, quân ta hạ giáo vây quanh; setCmdShips(1). Kỳ hạm lún, nghiêng
-//      4 s (rung màn, băng chữ "Kỳ hạm mắc cạn") → P6.
+//      luôn gồm cụm Phàn Tiếp), ván dốc xuống bùn; kỳ hạm chỉ "mắc" (chưa nghiêng, chưa lên được). Tướng được đặt cạnh ván dốc thuyền
+//      Phàn Tiếp, hồi đầy Sinh lực. Thuyền phục ba nhánh sông xuất kích, cập mạn thuyền mắc cạn, quân ta lên boong. Tướng lội bãi bùn giữa
+//      các thân thuyền. Phàn Tiếp (X24) đánh trên thuyền chỉ huy; dưới 50% Sinh lực "Liên Hoàn Thuyền" (ván + xích nối ba boong, cả cụm
+//      đứng vững); Sinh lực khóa 25% — Vỡ Thế rồi Đòn Quyết "Bắt sống" (defeatMeans "bị bắt"): đứng thẳng, vũ khí đặt xuống, quân ta
+//      hạ giáo vây quanh. Kỳ hạm lún, nghiêng 4 s (rung màn, băng chữ "Kỳ hạm mắc cạn") → P6.
 //   P6 Bạch Đằng Quyết Chiến — Hào Khí đặt 100 và khóa tới khi kích Tổng Phản Công (nhắc bấm F; Tuyệt Kỹ đầu tiên trong Tổng Phản
 //      Công là bản Hào Khí, không tốn Khí Lực — canon). Kỳ hạm có ván dốc từ bùn. Ô Mã Nhi (X20, Đại tướng): boong dưới 100 → 50% cùng
 //      các nhóm tinh nhuệ; tới 50% lui lên lầu chỉ huy qua cầu thang (không nhận đòn), Đội trưởng + 4 tinh nhuệ giữ cầu thang; lầu
@@ -38,31 +31,30 @@
 //      cả khúc sông) → thắng. Đỗ Hành (người bắt Ô Mã Nhi theo Toàn thư) chỉ là tên trong lời kết.
 // Thua duy nhất khi tướng gục hết Gượng dậy (canon; không hết giờ).
 //
-// Checkpoint đầu mỗi pha: { phase, river (snapshotRiver), hk, tướng, hộ vệ đã hạ, … }; restoreCheckpoint → setupPhase(i, snap)
-// dựng lại pha tất định (thuyền theo kịch bản pha, thủy thủ dựng lại, tướng ở chỗ đầu pha). ?debug&battle=B20&phase=N (1..6):
-// dựng trạng thái hợp lý của đầu pha N (fastForward) rồi setupPhase.
-// API cho bot / kịch bản: ferryTo(id), ferryItems(), hold(sec) (giữ Tương tác), openFerry(), keSachTrigger(), goPhase(i),
-// ships (id → Boat), flot (thuyền nhẹ; [0] thuyền chỉ huy), esc (id → hộ vệ; wave 1|2, patrol / flee / stuck / down / gone), vg (tiên
-// phong), scouts, squads, bosses { X24, X20 } (BigUnit), x20 { st: "deck"|"retreat"|"wait"|"tower", phase }, sorties, hulls, stranded.
-// Hàm thuần xuất kèm: fleeDz, fleeZonesFor, fleePath (làn thoát ra cửa sông), clusterSlot (chỗ áp mạn trong cụm Liên Hoàn).
+// Checkpoint đầu mỗi pha: { phase, river (snapshotRiver), hk, tướng, … }; restoreCheckpoint → setupPhase(i, snap) dựng lại pha tất định
+// (thuyền theo kịch bản pha, tướng ở chỗ đầu pha). ?debug&battle=B20&phase=N (1..6): dựng trạng thái hợp lý của đầu pha N (fastForward)
+// rồi setupPhase.
+// API cho bot / kịch bản: launchLure(), ferryTo(id), ferryItems(), hold(sec) (giữ Tương tác), openFerry(), keSachTrigger(), goPhase(i),
+// ships (id → Boat), flot (thuyền nhẹ; [0] thuyền chỉ huy), vg (tiên phong), bosses { X24, X20 } (BigUnit), x20 { st: "deck"|"retreat"|
+// "wait"|"tower", phase }, sorties, hulls, stranded, tua (đang trong cảnh tua), raidsCleared / raidsRepelled.
+// Hàm thuần xuất kèm: lanePath, laneS (làn dọc sông), clusterSlot (chỗ áp mạn trong cụm Liên Hoàn).
 // Mọi số không nguồn là ĐỀ XUẤT BẢN THỬ (khối FORMATION… cuối data/battle-b20.js).
 
-import { MAP, PHASES, STAKES, FLEET, LIGHT_BOATS, KE_SACH, KS_ORDER, WINGS, WING_ORDERS, ALLY_GENERALS, TIDE, FORMATION, FLOTILLA,
-  VANGUARD, ESCORT_OPS, SCOUT_OPS, SQUADS, FERRY, HK_B20, BOSSES, EBB_OPS, CLUSTER, SORTIE, HULL_CREW, BOSS_OPS } from "../data/battle-b20.js";
-import { riverTick, setPhase, tideAt, tidePct, provoke, flotillaLoss, onEscortDown, markerAction, setMarkerOfficer, keSachTrigger,
-  order as riverOrder, strandShare, riverResult, snapshotRiver, activeMarkers, KS_STATE_WORD, setCmdShips } from "../sim/river.js";
+import { MAP, PHASES, SIDE_MISSIONS, STAKES, FLEET, LIGHT_BOATS, KE_SACH, KS_ORDER, WINGS, WING_ORDERS, ALLY_GENERALS, TUA, FORMATION, FLOTILLA,
+  VANGUARD, FERRY, HK_B20, BOSSES, CLUSTER, SORTIE, HULL_CREW, BOSS_OPS } from "../data/battle-b20.js";
+import { riverTick, setPhase, tideAt, tidePct, launch, provoke, order as riverOrder, strandShare, riverResult, snapshotRiver, KS_STATE_WORD } from "../sim/river.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone, raiseTo } from "../sim/haokhi.js";
 import { HAO_KHI, HERO, MODES } from "../data/tuning.js";
 import { HudB20, riverHud } from "./hud-b20.js";
 import { strandSelect } from "./naval.js";
 import { BOAT, HULLS } from "./boats.js";
 import { BigUnit } from "./units.js";
-import { zc, hw, TIDE_Y } from "../data/river-b20.js";
+import { zc } from "../data/river-b20.js";
 import { TRIBS, tribPoint } from "../data/terrain-b20.js";
 import { makeRng } from "../core/rng.js";
 import { collide } from "./ground.js";
 
-export const PAR_B20 = 780;                                         // par Trận nhanh 13 phút (canon B20)
+export const PAR_B20 = Math.round(PHASES.reduce((a, p) => a + p.par, 0) * 60);   // par Trận nhanh = tổng par các pha ≈ 5,5 phút (ĐỀ XUẤT BẢN THỬ đợt 20, bot đo ≈ 3 phút; canon cũ 13 phút gồm đánh hộ vệ, mở cọc)
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -74,14 +66,12 @@ const lbl = (l) => `<span class="label ${LC[l]}">${l}</span>`;
 const DOWN = Math.PI / 2;                                           // hướng xuôi dòng (+x)
 const PHASE_NOTES = [
   ["Chính sử", "Triều lên. Thuyền nhẹ quân Trần ra khiêu chiến rồi giả thua, dụ thủy quân Nguyên vào khúc sông đã đóng cọc."],
-  ["Hư cấu", "Thuyền hộ vệ tuần quanh hạm đội và thuyền dò luồng của Phàn Tiếp là chi tiết của game."],
-  ["Chính sử", "Cọc gỗ lớn vạt nhọn đã đóng sẵn thành bãi dưới lòng sông; triều lên thì cọc chìm khuất."],
+  ["Chính sử", "Triều đang lên: hạm đội Nguyên theo mồi vào khúc sông, cọc gỗ đã đóng sẵn chìm khuất dưới nước."],
+  ["Chính sử", "Triều bắt đầu rút. Cọc gỗ lớn vạt nhọn đã đóng sẵn thành bãi dưới lòng sông."],
   ["Chính sử", "Nước triều rút. Thuyền Nguyên quay mũi ra biển thì vướng bãi cọc."],
   ["Chính sử", "Nước ròng, thuyền Nguyên mắc cọc giữa bãi; quân Trần đánh ra."],
   ["Chính sử", "Trong trận này Ô Mã Nhi, Phàn Tiếp, Tích Lệ Cơ Ngọc đều bị bắt sống."],
 ];
-const STANCE_SAY = { tiencong: "Tiến công: áp sát đầu hạm đội mà khiêu chiến (≈ 16 m)", giuvung: "Giữ vững: giữ cách đầu hạm đội ≈ 28 m",
-  theota: "Theo ta: lui nhanh xuôi dòng (≈ 46 m)" };
 
 // ---- đường làn dọc sông: điểm mỗi 20 m ở lệch dz khỏi tâm dòng; Catmull-Rom qua điểm cách đều x nên x(u) tuyến tính ----------
 const LANE = { x0: -320, x1: 1260, step: 20, sub: 10 };
@@ -91,36 +81,6 @@ export function laneS(track, x) {
   const u = clamp((x - LANE.x0) / LANE.step, 0, track.n), k = u * LANE.sub, S = track.S;
   const i = Math.min(Math.floor(k), S.length - 2), f = k - i;
   return S[i] + (S[i + 1] - S[i]) * f;
-}
-// vòng tuần của thuyền hộ vệ: chữ nhật bo góc ở mép sông side (±1), x0..x1, |dz| 48..58
-export function patrolLoop([x0, x1, side], [d0, d1] = ESCORT_OPS.dz) {
-  const xm = (x0 + x1) / 2, dm = (d0 + d1) / 2, P = (x, d) => ({ x, z: zc(x) + side * d });
-  return [P(x0, d0), P(xm, d0), P(x1, d0), P(x1 + 9, dm), P(x1, d1), P(xm, d1), P(x0, d1), P(x0 - 9, dm)];
-}
-// Pha 4: lệch ngang làn thoát ra cửa sông ở hoành độ x, phía side (±1): |dz| = EBB_OPS.lane; trong vùng né zones [[x0, x1, phía
-// 0 = cả hai | ±1], …] (bãi cọc đã lộ, cụm thuyền Phàn Tiếp) thì laneOut, hoà dần trong blend m (smoothstep).
-export function fleeDz(x, side, zones = [], O = EBB_OPS) {
-  let w = 0;
-  for (const [a, b, sd] of zones) {
-    if (sd && sd !== side) continue;
-    const k = x < a ? 1 - (a - x) / O.blend : x > b ? 1 - (x - b) / O.blend : 1;
-    if (k > w) w = k;
-  }
-  return side * lerp(O.lane, O.laneOut, smooth01(w));
-}
-// Vùng né thực cho một thuyền xuất phát ở x0, phía side: đổi làn giữa lane và laneOut phải cắt ngang làn ±36 của khối hạm đội neo —
-// nên vùng né nào chạm khối (x < EBB_OPS.block) thì kéo dài thành laneOut suốt từ chỗ xuất phát tới hết khối, đổi làn sau khối.
-export function fleeZonesFor(x0, side, zones = [], O = EBB_OPS) {
-  const Z = zones.filter((z) => !z[2] || z[2] === side), hit = Z.filter((z) => z[0] < O.block && z[1] > x0 - O.blend);
-  if (!hit.length) return Z;
-  return [[x0 - O.blend - 1, Math.max(O.block, ...hit.map((z) => z[1])), side], ...Z.filter((z) => !hit.includes(z))];
-}
-// Làn thoát từ (x0, z0): điểm mỗi 10 m theo fleeDz (vùng né thực fleeZonesFor) tới quá cửa sông 20 m. out: làn ngoài suốt (hộ vệ
-// đợt một bỏ vòng tuần — vốn ở ngoài khối hạm đội).
-export function fleePath(x0, z0, side, zones = [], out = false, O = EBB_OPS) {
-  const P = [{ x: x0, z: z0 }], Z = fleeZonesFor(x0, side, zones, O);
-  for (let x = Math.ceil((x0 + 8) / 10) * 10; x <= MAP.exitX + 20; x += 10) P.push({ x, z: zc(x) + (out ? side * O.laneOut : fleeDz(x, side, Z, O)) });
-  return P;
 }
 // Chỗ áp mạn của thuyền n trong cụm Liên Hoàn: sát mạn thuyền chỉ huy pt (phía n đang đứng), khe CLUSTER.gap, cùng hướng. Thuần
 // (pt, n: { x, z, yaw?, beam }).
@@ -140,10 +100,10 @@ export class DirectorB20 {
     this.events = {}; this.pickups = []; this.flags = []; this.keepers = {}; this.generals = {}; this.followers = null;
     this.retries = 0; this.lastFront = "flotilla"; this.baseHint = null; this.orders = 0; this.counterBoss = 0;
     this.main = [false, false, false, false, false, false]; this.phaseTimes = [0, 0, 0, 0, 0, 0];
-    this.scoutsStopped = 0; this.escaped = 0; this.captured = {}; this.bossesMet = [];
+    this.captured = {}; this.bossesMet = []; this.raidsCleared = 0; this.raidsRepelled = 0;
     this.skSum = 0; this.skN = 0; this.hkLock = false; this.lastMs = 0;
-    this.ships = {}; this.flot = []; this.ambush = []; this.esc = {}; this.vg = []; this.scouts = []; this.squads = [];
-    this.vgN = 0; this.vgNext = 0; this.scoutN = 0; this.opsT = 0; this.tideShown = -1;
+    this.ships = {}; this.flot = []; this.ambush = []; this.vg = [];
+    this.vgN = 0; this.vgNext = 0; this.tideShown = -1; this.tua = null;
     this.interact = null; this.ferryPick = null; this.holdT = 0; this.needRelease = false; this.guardDue = [];
     this.buffs = [];                                     // Hịch Tướng Sĩ: [{ a, id, k, until }] Công quân ta tạm tăng (id: lính trong bể dùng lại)
     this.playTime = 0;                                   // giây đã chơi, cộng dồn qua các lần tải lại checkpoint (time thì tua về đầu pha)
@@ -161,17 +121,16 @@ export class DirectorB20 {
       ratio: () => { let g = 0, h = 0; for (const id in this.st.ks) { g += this.st.ks[id].got; h += KE_SACH[id].hk; } return h ? g / h : 0; },
       successCount: () => riverResult(this.st).keSachOk,
     };
-    // móc lớp thủy chiến: chiếm thuyền, mở mốc, gọi đò, vớt tướng
+    // móc lớp thủy chiến: gọi đò, vớt tướng
     const nav = this.nav;
     nav.on = {
-      capture: (b) => this.captureEscort(b),
-      marker: (id) => this.openMarker(id),
       ferry: () => this.openFerry("interact"),
       rescue: () => { this.ferryPick = null; this.say("Tướng rơi xuống sông — thân binh vớt lên (−5% Sinh lực).", 3, "bad"); },
       relanded: (o) => { if (o === this.hero) { this.ferryPick = null; this.say("Thuyền dưới chân rời trận — tướng sang thuyền quân ta gần nhất.", 3); } },
       ferryRetarget: (f) => this.say(`Nơi đến không còn — đò cập ${f.dest.deck.label ? f.dest.deck.label.toLowerCase() : "thuyền quân ta gần nhất"}.`, 3),
     };
-    nav.canMarker = (id) => this.phase === 2 && this.st.markers[id]?.state === "hidden";
+    nav.canMarker = () => false;                         // bản thử không còn mở mốc cọc (cọc đóng sẵn)
+    nav.canFerry = () => this.phase >= 4;                // đò chuyển chỉ từ lúc ra đánh (pha 5): trước đó tướng ở lại thuyền chỉ huy
     ctx.fx.noBlood = true;                               // B20: không máu (R-spec §6) — tia trúng đòn đổi màu bụi gỗ / tia lửa (fx.js)
     ctx.poiseAbs = true;                                 // Phá Thế địch không nhân S(R) (canon: Đội trưởng 100, Tướng 600, Đại tướng 1000 mỗi tầng)
     this.hudB20 = new HudB20(ctx);
@@ -195,14 +154,13 @@ export class DirectorB20 {
   hk(amount, src, optional = false) { const g = gain(this.ctx.hk, amount, src, { optional }); if (g && Math.abs(g) >= 0.5) this.ctx.hud?.hkPulse(g); return g; }
   get hero() { return this.ctx.hero; }
   basePos() { return null; }
-  heroBoat() { return this.hero.deck?.boat || null; }
   lead() { return this.flot[0] || null; }
   env() { return this.nav._envNow(); }
-  // mở màn: ba dòng cách nhau 4 s (trước đây hiện cùng lúc — 4 tin, ~230 px chữ che trận ở điện thoại; review B20)
+  // mở màn: các dòng cách nhau vài giây (trước đây hiện cùng lúc — 4 tin, ~230 px chữ che trận ở điện thoại; review B20)
   introP1() {
     this.say(PHASES[0].tip, 9);
-    this.later(4, () => { if (this.phase === 0) this.note(0); });
-    this.later(8, () => { if (this.phase === 0) this.say("{Act:cmd} để mở vòng Mệnh Lệnh → cánh Thuyền nhẹ: Tiến công khiêu chiến, Giữ vững giữ khoảng cách, Theo ta lui nhanh.", 9); });
+    this.later(5, () => { if (this.phase === 0) this.note(0); });
+    this.later(10, () => { if (this.phase === 0 && !this.st.nghi.launched) this.say("Hạm đội Nguyên đang chờ ở thượng lưu: bấm {kesach} hoặc nút Ra khiêu chiến khi sẵn sàng.", 9); });
   }
 
   // ---- vòng lặp --------------------------------------------------------------------------------------------------------------
@@ -210,13 +168,14 @@ export class DirectorB20 {
     const ctx = this.ctx, st = this.st, hk = ctx.hk;
     if (this.over) return;
     this.time += dt; this.playTime += dt;
-    // mô phỏng khúc sông 1 Hz
-    this.simAcc += dt;
+    // mô phỏng khúc sông 1 Hz theo giây MÔ PHỎNG; cảnh tua (P2–P4) chạy TUA.rate lần nhanh hơn đồng hồ thật
+    const sdt = dt * (this.phase >= 1 && this.phase <= 3 ? TUA.rate : 1);
+    this.simAcc += sdt;
     while (this.simAcc >= 1) { this.simAcc -= 1; this.tick1(); }
     const f = Math.min(1, this.simAcc);
     this.headS = this.headPrev + (this.headCur - this.headPrev) * f;
     this.flotS = this.flotPrev + (this.flotCur - this.flotPrev) * f;
-    const pct = tideAt(st, dt);
+    const pct = tideAt(st, sdt);
     if (Math.abs(pct - this.tideShown) > 0.004) { this.tideShown = pct; ctx.world.setTide(pct); }
     // Hào Khí
     if (hkTick(hk, dt)) this.onTpcEnd();
@@ -229,10 +188,7 @@ export class DirectorB20 {
     // từng pha
     if (this.phase === 0) this.updateLure(dt);
     this.updateFleetVis();
-    if (this.phase >= 1) this.updateEscorts(dt);
-    if (this.phase === 1 || this.phase === 2) this.updateScouts(dt);
-    if (this.phase === 2) this.updateSquads(dt);
-    if (this.phase >= 3) this.updateEbb(dt);
+    if (this.phase === 2 || this.phase === 3) this.updateCluster(dt);
     if (this.phase >= 4) { this.updateHulls(dt); this.updateSortie(dt); }
     this.updateBosses(dt);
     this.separate();
@@ -247,10 +203,6 @@ export class DirectorB20 {
   // mỗi khung (BattleDef.frameVisuals): HUD riêng của trận
   frame(dt) {
     this.pickerFrame();
-    // vòng mốc cọc (world.addBase "moc") chỉ có nghĩa tới P3; từ P4 (nước rút, bãi bùn) và lúc cảnh kết thì ẩn — trước đây vòng
-    // trắng còn nằm trên bùn trong cảnh kết (review B20)
-    const showMk = this.phase <= 2 && !this.outro;
-    if (showMk !== this.mkShown) { this.mkShown = showMk; for (const s of STAKES) { const v = this.ctx.world.bases?.[s.id]; if (v?.ring) v.ring.visible = showMk; if (v?.prog) v.prog.visible = showMk; } }
     this.bqT -= dt;
     if (this.bqT <= 0 && this.bq.length) { const b = this.bq.shift(); this.ctx.fx.banner(b.text, b.color, b.T); this.bqT = b.T + 0.6; }   // fx gỡ băng sau T + 0,4 s
     // trạng thái HUD dựng lại 20 lần/s (HudB20 chỉ đọc nhắc giữ phím, bảng đò mỗi khung — hai trường ấy cập nhật mỗi khung)
@@ -273,20 +225,16 @@ export class DirectorB20 {
     }
   }
   // Điểm máy quay cần thấy (naval.render → FleetRenderer: thân thuyền, buồm, lầu chỉ huy chắn giữa thì mờ chấm): ngực tướng; cảnh
-  // bắt sống: người bị bắt; cảnh kỳ hạm mắc cạn, cảnh kết: không (nhìn cả thân thuyền — không đục lỗ chấm giữa kỳ hạm). Thay sailCamera cũ (xoay máy quay song song
+  // bắt sống: người bị bắt; cảnh kỳ hạm mắc cạn, cảnh kết, cảnh tua: không (nhìn cả thân thuyền — không đục lỗ chấm giữa kỳ hạm). Thay sailCamera cũ (xoay máy quay song song
   // tấm buồm, kéo sát tướng còn ~6 m — review B20: vẫn bị che, máy quay dí vào lính, mạn thuyền).
   seeTarget() {
-    if (this.outro || this.cine?.kind === "flagship") return null;
+    if (this.outro || this.cine?.kind === "flagship" || this.cine?.kind === "tua") return null;
     if (this.cine?.see) return this.cine.see();
     const h = this.hero; return h ? { x: h.x, y: h.y + 1.3, z: h.z } : null;
   }
 
   tick1() {
     const st = this.st, ev = [];
-    if (this.phase === 2) for (const q of this.squads) if (q.raft) {
-      const o = q.officer, h = this.hero;
-      setMarkerOfficer(st, q.id, !!o && o.alive && !o.dead && o.deck === q.raft && dist(o, h) > SQUADS.heroR);
-    }
     this.headPrev = this.headS; this.flotPrev = this.flotS;
     riverTick(st, ev);
     this.headCur = st.fleet.headX; this.flotCur = st.nghi.flotX;
@@ -294,7 +242,7 @@ export class DirectorB20 {
     this.handle(ev);
     if (this.phase === 0 && st.nghi.stance === "tiencong" && st.nghi.gap <= LIGHT_BOATS.provokeR) this.tauntVolley();
   }
-  // Khiêu chiến (Tiến công, cách ≤ provokeR m): nỏ thủ trên thuyền nhẹ bắn tên sang boong đầu hạm đội — chỉ là hình (Khiêu khích do
+  // Khiêu chiến (thế tiencong, cách ≤ provokeR m): nỏ thủ trên thuyền nhẹ bắn tên sang boong đầu hạm đội — chỉ là hình (Khiêu khích do
   // mô phỏng cộng), không sát thương.
   tauntVolley() {
     const crowd = this.ctx.crowd, head = Object.values(this.ships).filter((b) => b.ctl?.row === 0 && b.visible);
@@ -315,33 +263,20 @@ export class DirectorB20 {
       switch (e.type) {
         case "hk": this.hk(e.amount, e.source); break;
         case "hkSet": raiseTo(ctx.hk, e.value, "kịch bản: pha 6"); ctx.hud?.hkPulse(100); this.hkLock = !!e.lock; break;
-        case "ksOpen": { const K = KE_SACH[e.id]; this.banner(`KẾ SÁCH LỚN · ${K.name.toUpperCase()}`, "#f1d98a", 1.6);
+        case "ksOpen": {                                  // bãi cọc và Con nước tự xét trong cảnh tua: chỉ báo kết quả
+          if (e.id !== "nghiBinh") break;
+          const K = KE_SACH[e.id]; this.banner(`KẾ SÁCH LỚN · ${K.name.toUpperCase()}`, "#f1d98a", 1.6);
           this.say(`Kế Sách Lớn "${K.name}" khả dụng${e.window ? ` (${e.window} s)` : ""}: ${K.text}`, 8, "good"); break; }   // luật chơi: không nhãn (nhãn sử ở dòng thành công)
         case "ksResult": { const K = KE_SACH[e.id];
           this.banner(`${K.name.toUpperCase()} · ${e.ok ? "THÀNH CÔNG" : "THẤT BẠI"}`, e.ok ? "#f1d98a" : "#ff8a6a", 1.8);
           ctx.audio.play(e.ok ? "capture" : "horn");
           this.say(e.ok ? `Kế Sách "${K.name}" thành công. ${lbl(K.label)}${K.lore}` : `Kế Sách "${K.name}" thất bại: ${e.why}`, 7, e.ok ? "good" : "bad"); break; }
-        case "baited": this.say("Khiêu khích đầy: hạm đội Nguyên đã mắc mồi. Lui qua mốc Khúc cọc, giữ cách 15–40 m.", 6, "good"); ctx.audio.play("drum"); break;
-        case "stance": break;
-        case "boatLost": this.onBoatLost(e); break;
+        case "baited": this.say("Khiêu khích đầy: hạm đội Nguyên đã mắc mồi. Đoàn thuyền tự lui dụ về phía Khúc cọc, giữ cách 15–40 m.", 6, "good"); ctx.audio.play("drum"); break;
         case "flotillaCrossed": this.say("Đoàn thuyền nhẹ đã qua mốc Khúc cọc — giữ khoảng cách tới khi đầu hạm đội theo qua.", 5, "good"); break;
         case "khucCoc": if (this.phase === 0) this.goPhase(1); break;
-        case "escorts": if (e.wave === 1) this.say(`Phàn Tiếp tung ${e.n} thuyền hộ vệ đi tuần quanh hạm đội.`, 5, "bad"); break;
-        case "escortDown": this.say(`Đã hạ ${st.fleet.escortsDown}${this.phase === 1 ? "/4" : ""} thuyền hộ vệ · còn ${e.left} chiếc.`, 4, "good"); break;
-        case "escortsReady": if (this.phase === 1) { this.say("Đã hạ 4 thuyền hộ vệ: hạm đội hở sườn, tới các mốc cọc!", 5, "good"); this.goPhase(2); } break;
-        case "p2Timeout": if (this.phase === 1) { this.say("Hết giờ đánh hộ vệ — hộ vệ còn lại sẽ nhập đợt hai ở pha 4.", 5, "bad"); this.goPhase(2); } break;
-        case "scoutWarn": this.say(`${lbl("Hư cấu")}Tình báo sớm: thuyền dò luồng sắp rời hạm đội, nhắm mốc ${e.target} (${e.in} s).`, 5, "bad"); break;
-        case "scout": this.spawnScout(e.target); break;
-        case "markerExposed": this.onMarkerExposed(e); break;
-        case "markerActive": this.say(`Đã mở mốc ${e.id} (${e.active}/${KE_SACH.kichCoc.need}).`, 4, "good"); break;
-        case "ksReady": this.banner("KẾ SÁCH SẴN SÀNG · BẤM {KESACH}", "#ffd27a", 1.8); ctx.audio.play("drums3");
-          this.say(`Đủ ${KE_SACH.kichCoc.need} mốc: bấm {kesach} (Lệnh Kế Sách) để kích hoạt bãi cọc — hoặc mở nốt mốc thứ ba.`, 7, "good"); break;
-        case "tideDrop": this.say(`Kế Sách bãi cọc đã chốt: nước bắt đầu rút về 50% trong ${e.sec} s.`, 5); break;
+        case "fleetIn": if (this.phase === 1) this.goPhase(2); break;
         case "tide50": if (this.phase === 2) this.goPhase(3); break;
-        case "tideWarn": this.banner(e.at === "strand" ? "30 S NỮA · CỌC NHÔ" : "30 S NỮA · NƯỚC RÒNG", "#ffd27a", 1.4);
-          this.say(e.at === "strand" ? "30 s nữa nước xuống 30%: cọc nhô, thuyền trong bãi cọc đã mở sẽ mắc cọc." : "30 s nữa nước ròng: thuyền Nguyên mắc cạn giữa bãi cọc.", 5, "bad"); break;
         case "strandAt": this.onStrandAt(e); break;
-        case "escapeFull": this.say("Thanh Thoát vây đã đầy: hạm đội thoát khỏi vòng vây — Kế Sách Con nước hỏng.", 6, "bad"); break;
         case "tideZero": if (this.phase === 3) this.goPhase(4); break;
         case "sortie": this.say(`${lbl("Chính sử")}Thuyền phục sông Chanh, sông Rút, sông Giá xuất kích, đánh vào thuyền Nguyên mắc cạn!`, 6, "good"); break;
         case "order": break;
@@ -361,40 +296,42 @@ export class DirectorB20 {
     setPhase(this.st, i, ev);
     this.phase = i; this.phaseStart = this.time;
     this.enterPhase(i);
-    this.handle(ev);
     const P = PHASES[i];
     this.bq.length = 0; this.bqT = 0;
     this.banner(`${P.id} · ${P.name.toUpperCase()}`, "#e6dcc3", 2.2); ctx.audio.play("drums3");
+    this.handle(ev);                                     // (sau băng chữ pha: băng Kế Sách tự xét xếp hàng đợi sau nó)
     this.frameCamera(i);
-    if (i === 1 || i === 4) ctx.audio.play("horn");
-    this.say(P.tip, 8);
+    if (i === 4) ctx.audio.play("horn");
+    if (!P.auto) this.say(P.tip, 8);
     this.note(i);
     this.saveCheckpoint();
   }
-  // Nhiệm vụ chính của pha i đạt chưa — theo kết quả thật lúc rời pha (trước đây rời pha là tích: P1–P4 tích cả khi Kế Sách hỏng).
-  // P1 Nghi binh thành công; P2 hạ ≥ 4 hộ vệ (hết giờ thì chưa); P3 Kích hoạt bãi cọc thành công; P4 Con nước thành công; P5 bắt sống
+  // Nhiệm vụ chính của pha i đạt chưa — theo kết quả thật lúc rời pha. P1 Nghi binh thành công; P2–P4 (cảnh tua): P2 hạm đội vào đủ,
+  // P3 bãi cọc giữ được hạm đội, P4 Con nước thành công (cả ba tự xét, không tính nhiệm vụ chính của màn kết quả — PHASES[i].auto); P5 bắt sống
   // Phàn Tiếp (pha 5 chỉ kết thúc như thế — kỳ hạm mắc cạn ngay sau); P6 bắt sống Ô Mã Nhi.
   phaseDone(i) {
     const ks = (id) => this.st.ks[id]?.state === "thanhcong";
-    return [ks("nghiBinh"), this.st.fleet.escortsDown >= 4, ks("kichCoc"), ks("conNuoc"), !!this.captured.X24, !!this.captured.X20][i] ?? false;
+    return [ks("nghiBinh"), ks("nghiBinh"), ks("kichCoc"), ks("conNuoc"), !!this.captured.X24, !!this.captured.X20][i] ?? false;
   }
-  // Camera đầu pha: quay về phía việc của pha (P1 hạm đội phía thượng lưu, P2 khúc cọc hạ lưu, P3 bè cỏ ẩn gần nhất, P5–P6 thuyền
-  // mắc cạn cần lên).
+  // Camera đầu pha: P1 nhìn ngược dòng về hạm đội; P5–P6 quay về phía thuyền mắc cạn cần lên (P2–P4 là máy quay cảnh tua).
   frameCamera(i) {
-    const cam = this.ctx.cam, h = this.hero; if (!cam) return;
-    let tgt = null;
-    if (i === 2) {
-      const at = (r) => ({ x: r.deck.m[9], z: r.deck.m[11] });
-      const R = this.nav.rafts.filter((r) => this.st.markers[r.id]?.state === "hidden").sort((a, b) => dist(at(a), h) - dist(at(b), h))[0];
-      if (R) tgt = at(R);
-    }
-    else if (i === 3) {                        // P4: thuyền hộ vệ đợt hai gần nhất (đang tách khỏi hạm đội)
-      let bd = Infinity; for (const id in this.esc) { const e = this.esc[id]; if (e.wave === 2 && !e.gone && dist(e.boat, h) < bd) { bd = dist(e.boat, h); tgt = e.boat; } }
-    }
-    else if (i === 4) tgt = this.ships.PT; else if (i === 5) tgt = this.ships.FS;
+    const cam = this.ctx.cam, h = this.hero; if (!cam || (i >= 1 && i <= 3)) return;
+    const tgt = i === 4 ? this.ships.PT : i === 5 ? this.ships.FS : null;
     // thuyền mắc cạn to và gần: lệch camera sang một bên cho thân thuyền không che cả khung
-    cam.yaw = tgt ? Math.atan2(tgt.x - h.x, tgt.z - h.z) + (i >= 4 ? 0.75 : 0) : i === 0 ? -DOWN : DOWN;
+    cam.yaw = tgt ? Math.atan2(tgt.x - h.x, tgt.z - h.z) + 0.75 : -DOWN;
     cam.idle = 0; cam.pitch = Math.max(cam.pitch, 0.4);
+  }
+  // Hết cảnh tua: tướng ra đánh — bãi bùn cạnh ván dốc thuyền Phàn Tiếp, hồi đầy Sinh lực (B20 không có đồ hồi máu; trước đây chiếm hộ vệ +15%)
+  beginFight() {
+    if (this.phase !== 4 || !this.tua) return;
+    this.endTua(); this.placeHeroForPhase(4); this.frameCamera(4);
+    this.hero.heal(1); this.ctx.fx.flash?.(0.5);
+    this.say("Nước ròng: lội bãi bùn, leo ván dốc lên thuyền chỉ huy Phàn Tiếp. Đánh tới Vỡ Thế rồi Đòn Quyết để bắt sống.", 8);
+  }
+  // Quân ta vây Phàn Tiếp (cảnh bắt sống) rút đi khi sang pha 6 (vòng giáo + thân binh chật boong hẹp, cản đường tướng xuống ván dốc)
+  dismissCaptors() {
+    const crowd = this.ctx.crowd;
+    for (const a of [...crowd.agents]) if (a.role === "captor") crowd.release(a);
   }
   // Việc làm ngay khi sang pha (đang chơi; tải lại checkpoint thì setupPhase dựng thẳng trạng thái đầu pha).
   enterPhase(i) {
@@ -402,25 +339,26 @@ export class DirectorB20 {
     if (i === 1) {
       for (const v of [...this.vg]) this.vgDrift(v);
       this.flotToHold(false);
-      for (const id in this.esc) if (!this.esc[id].down) this.setPatrol(this.esc[id], false);
       ctx.world.boom?.show();
       this.spawnKhoai();
+      this.startTua();
+      this.say("Cảnh tua: hạm đội Nguyên vào bãi cọc, chờ triều rút — chưa có việc cho tướng.", 8);
     }
-    if (i === 2) this.planSquads();
-    if (i === 3) {
-      this.startEbb();
-      this.say("Hộ vệ đợt hai tách khỏi hạm đội chạy ra cửa sông: chặn, chiếm từng thuyền (đò chuyển: giữ Tương tác) — mỗi thuyền hạ kéo Thoát vây −15.", 8, "bad");
-      this.say("{Act:cmd} để mở Mệnh Lệnh → cánh thuyền phục gần nhất: Giữ vững chặn cửa nhánh sông, thanh Thoát vây chậm lại ×0,7.", 8);
+    if (i === 2) {
+      this.revealStakes();
+      this.startCluster();
     }
     if (i === 4) {
-      this.stopFleeing();
       this.strandFleet(false);
       for (const b of this.ambush) b.hidden = false;
       this.spawnX24(); this.startSortie();
-      this.say("Nước ròng: lội bãi bùn, leo ván dốc lên thuyền chỉ huy Phàn Tiếp. Đánh tới Vỡ Thế rồi Đòn Quyết để bắt sống.", 8);
+      // cảnh tua còn chạy BOAT.settle s cho thuyền lún nghiêng, rồi cắt về tướng bên ván dốc thuyền Phàn Tiếp (beginFight)
+      this.later(BOAT.settle + 0.6, () => this.beginFight());
     }
     if (i === 5) {
+      this.dismissCaptors();
       this.strandFlagship(false); this.spawnX20(); this.sortieToFS();
+      this.placeHeroForPhase(5); ctx.fx.flash?.(0.4);     // cảnh bắt sống xong: tướng ở bãi bùn cạnh ván dốc kỳ hạm (đứng kẹt giữa Phàn Tiếp bị bắt và lan can thì không tự ra được)
       this.rallyAt = this.time + 2.5;                   // băng chữ nhắc F sau băng chữ đầu pha (goPhase xoá hàng đợi băng chữ)
       this.say("Hào Khí đặt 100 và khóa tới khi kích Tổng Phản Công ({tpc}). Tuyệt Kỹ đầu tiên trong Tổng Phản Công là bản Hào Khí, không tốn Khí Lực.", 8, "good");
       this.say("Lên kỳ hạm theo ván dốc từ bãi bùn. Ô Mã Nhi đánh ở boong dưới rồi lui lên lầu chỉ huy.", 8);
@@ -436,29 +374,29 @@ export class DirectorB20 {
       Object.assign(st, clone(snap.river));
       Object.assign(ctx.hk, clone(snap.hk));
       this.time = snap.time; this.phaseStart = snap.time; this.ko = snap.ko; this.koMs = snap.koMs;
-      this.main = [...snap.main]; this.phaseTimes = [...snap.phaseTimes]; this.scoutsStopped = snap.scoutsStopped; this.escaped = snap.escaped;
+      this.main = [...snap.main]; this.phaseTimes = [...snap.phaseTimes];
       this.captured = { ...snap.captured }; this.bossesMet = [...snap.bossesMet]; this.orders = snap.orders; this.counterBoss = snap.counterBoss;
-      this.hkLock = snap.hkLock; this.vgN = snap.vgN || 0; this.scoutN = snap.scoutN || 0; this.tpcLog = clone(snap.tpcLog || []);
+      this.hkLock = snap.hkLock; this.vgN = snap.vgN || 0; this.tpcLog = clone(snap.tpcLog || []);
+      this.raidsCleared = snap.raidsCleared || 0; this.raidsRepelled = snap.raidsRepelled || 0;
     }
     this.phase = i; this.simAcc = 0; this.tideShown = -1;
     this.headPrev = this.headCur = this.headS = st.fleet.headX;
     this.flotPrev = this.flotCur = this.flotS = st.nghi.flotX;
     this.vgNext = this.time + VANGUARD.first;
     ctx.world.setTide(tidePct(st)); this.tideShown = tidePct(st);
-    // mốc cọc: cảnh theo trạng thái mô phỏng (bè đã cắt thì trôi hết)
+    // bãi cọc: cảnh theo pha (từ pha 3 cọc lộ dần, bè cỏ ngụy trang đã trôi hết); vòng mốc cũ của world-b20 (Tương tác mở mốc) ẩn
     const S = ctx.world.scenery;
     for (const s of STAKES) {
-      const state = st.markers[s.id].state;
-      S?.stakes?.setState(s.id, state);
-      if (state === "active") { const r = S?.rafts?.list?.find((q) => q.id === s.id); if (r) { r.t = 20; r.gone = true; } }
+      S?.stakes?.setState(s.id, i >= 2 ? "active" : "hidden");
+      if (i >= 2) { const r = S?.rafts?.list?.find((q) => q.id === s.id); if (r) { r.t = 20; r.gone = true; } }
+      const v = ctx.world.bases?.[s.id]; if (v?.ring) v.ring.visible = false; if (v?.prog) v.prog.visible = false;
     }
     if (i >= 1) ctx.world.boom?.show(); else ctx.world.boom?.hide();
-    this.buildFleet(i, snap);
-    if (i >= 3) this.buildEbb(i, snap);
+    this.buildFleet();
     this.buildFlotilla(i);
     this.buildAmbush();
     if (i >= 1) this.spawnKhoai();
-    if (i === 2) this.planSquads();
+    if (i === 2) this.startCluster(); else if (i >= 3) this.placeCluster();
     if (i >= 4) this.strandFleet(true);
     if (i >= 5) this.strandFlagship(true);
     nav.update(0);
@@ -470,7 +408,7 @@ export class DirectorB20 {
     if (snap) { h.hp = Math.max(snap.hero.hp, h.maxHp * (BOSS_OPS.retryHp[i] ?? HERO.retryHp)); h.ki = snap.hero.ki; h.revives = snap.hero.revives; }
     this.placeHeroForPhase(i);
     this.spawnGuards(true);
-    this.frameCamera(i);
+    if (i >= 1 && i <= 3) this.startTua(); else this.frameCamera(i);
   }
   // Dọn mọi thứ của pha trước: đò, leo, người trên boong, thuyền, lính, đơn vị lớn, bảng chọn.
   clearAll() {
@@ -479,19 +417,15 @@ export class DirectorB20 {
     for (const a of [...ctx.crowd.agents]) ctx.crowd.release(a);
     for (const u of ctx.units) if (u.alive) u.dispose();
     ctx.units.length = 0;
-    this.ships = {}; this.flot = []; this.ambush = []; this.esc = {}; this.vg = []; this.scouts = []; this.squads = [];
+    this.ships = {}; this.flot = []; this.ambush = []; this.vg = [];
     this.generals = {}; this.khoai = null; this.guardDue = []; this.buffs = [];
     this.ferryPick = null; this.interact = null; this.holdT = 0; this.needRelease = false; this.timers = []; this.stranded = [];
     this.bosses = {}; this.x20 = null; this.chained = null; this.cl = null; this.sorties = []; this.hulls = {}; this.stairGuard = null; this.outro = null;
+    this.cine = null; this.tua = null;
   }
   placeHeroForPhase(i) {
     const h = this.hero, L = this.lead();
-    if (i <= 1) { this.placeOn(L.deck, 0, -1.8, i === 0 ? -DOWN : 0); return; }
-    if (i <= 3) {
-      const cap = Object.values(this.esc).find((e) => e.down && e.boat);
-      if (cap) this.placeOn(cap.boat.deck, 0, -1.5, 0); else this.placeOn(L.deck, 0, -1.8, 0);
-      return;
-    }
+    if (i <= 3) { this.placeOn(L.deck, 0, -1.8, i === 0 ? -DOWN : 0); return; }
     const b = i === 4 ? this.ships.PT : this.ships.FS, R = b?.ramp || (b && this.nav.addRamp(b));
     if (R) {
       this.nav.leave(h);
@@ -510,27 +444,17 @@ export class DirectorB20 {
   }
 
   // ---- hạm đội -------------------------------------------------------------------------------------------------------------
-  buildFleet(i, snap) {
+  // Mọi thuyền là thuyền thường trong khối (kể cả sáu thuyền hộ vệ — bản thử không có chiếm thuyền); chỉ có bắt tướng.
+  buildFleet() {
     const nav = this.nav, F = FORMATION;
     for (const [id, type, row, lane] of F.ships) {
       const dz = F.lanes[lane], b = nav.addBoat({ type, side: "dich", id, flag: F.flags[id] || "元", path: lanePath(dz), speed: 0,
         label: F.labels[id] || (type === "escort" ? `Thuyền hộ vệ ${id}` : "Chiến thuyền Nguyên") });
       b.ctl = { src: "head", dx: -F.rowGap * row, dz, row };
-      if (type !== "escort") b.capturable = false;       // chỉ thuyền hộ vệ là Cứ Điểm động chiếm được (kỳ hạm, thuyền chỉ huy: bắt tướng)
+      b.capturable = false;
       this.ships[id] = b;
-      if (type === "escort") {
-        const down = snap ? !!snap.esc?.[id]?.down : false;
-        this.esc[id] = { id, boat: b, down, crewLeft: snap?.esc?.[id]?.crewLeft ?? ESCORT_OPS.crew, officerAlive: snap?.esc?.[id]?.officerAlive ?? true,
-          spawned: false, agents: [], officer: null, v: 0, s: 0, engaged: false, patrol: false };
-        b.capturable = false;
-      }
       b.drive = () => laneS(b.track, this.slotX(b));
       b.update(0, this.env());
-    }
-    // pha 2+: hộ vệ tách đội (đã hạ thì đậu ở vòng tuần, cờ 陳)
-    if (i >= 1) for (const id in this.esc) {
-      const e = this.esc[id];
-      if (e.down) this.parkCaptured(e); else this.setPatrol(e, true);
     }
     this.updateFleetVis();
   }
@@ -538,95 +462,10 @@ export class DirectorB20 {
   // đuôi hạm đội còn ngoài bản đồ (mở màn) thì giấu
   updateFleetVis() { for (const id in this.ships) { const b = this.ships[id]; if (b.ctl?.src === "head") b.visible = b.x > FORMATION.hideX; } }
 
-  // Thuyền hộ vệ đi tuần: đường = chỗ đang đứng → vòng tuần (lặp); now = đặt thẳng vào vòng (tải lại checkpoint).
-  setPatrol(e, now) {
-    const b = e.boat, loop = patrolLoop(ESCORT_OPS.stations[e.id]);
-    const path = now ? [...loop, loop[0]] : [{ x: b.x, z: b.z }, ...loop, loop[0]];
-    b.ctl = null; b.drive = null; b.setPath(path, 0);
-    e.a0 = now ? 0 : b.track.S[LANE.sub]; e.s = 0; e.v = now ? ESCORT_OPS.speed : b.speed; e.patrol = true;
-    b.drive = (dt) => {
-      const tgt = e.down ? 0 : e.engaged ? 0 : e.s < e.a0 ? ESCORT_OPS.transit : ESCORT_OPS.speed;
-      e.v += clamp(tgt - e.v, -1.2 * dt, 0.8 * dt);
-      e.s += e.v * dt;
-      const L = b.track.len;
-      if (e.s > L) e.s = e.a0 + (e.s - L) % Math.max(1, L - e.a0);
-      return e.s;
-    };
-    b.update(0, this.env());
-  }
-  // at: { x, z, yaw } chỗ đã chiếm (tải lại checkpoint pha 5–6); không có thì đậu ở vòng tuần (đợt một) hoặc chỗ đang đứng
-  parkCaptured(e, at = null) {
-    const b = e.boat, sta = ESCORT_OPS.stations[e.id];
-    if (at || !sta) this.placeBoat(b, at ? at.x : b.x, at ? at.z : b.z, at?.yaw ?? b.yaw);
-    else { const loop = patrolLoop(sta); b.ctl = null; b.drive = null; b.setPath([loop[0], loop[1]], 0); b.targetSpeed = 0; b.speed = 0; b.stop(); }
-    b.captured = true; b.side = "ta"; b.flag = "陳"; b.label = `${b.hull.name} (đã chiếm)`; b.deck.label = b.label;
-    b.update(0, this.env());
-  }
-  // Thuyền hộ vệ: dừng nghênh chiến khi tướng tới gần / đò nhắm tới; thủy thủ dựng khi tướng trong spawnR, cất khi xa.
-  updateEscorts(dt) {
-    const h = this.hero, O = ESCORT_OPS;
-    this.opsT -= dt;
-    const ops = this.opsT <= 0; if (ops) this.opsT = 0.25;
-    let want = null;
-    for (const id in this.esc) {
-      const e = this.esc[id], b = e.boat;
-      if (e.down || e.gone || !(e.patrol || e.flee || e.stuck)) continue;
-      const d = dist(b, h), onIt = h.deck === b.deck;
-      e.engaged = onIt || (e.patrol && d < O.engage) || (e.ferryT > 0 && (e.ferryT -= dt) > 0);
-      if (!ops) continue;
-      if (e.spawned && d > O.despawnR && !onIt) this.stowEscortCrew(e);
-      else if (!e.spawned && (d < O.spawnR || onIt) && (!want || d < want.d)) want = { e, d };
-    }
-    // dựng thủy thủ thuyền gần nhất trong tầm; đủ maxSpawned thuyền thì cất thuyền xa nhất (không có tướng trên boong) nhường chỗ
-    if (want) {
-      const on = Object.values(this.esc).filter((q) => q.spawned);
-      if (on.length >= O.maxSpawned) {
-        const far = on.filter((q) => h.deck !== q.boat.deck).sort((a, b) => dist(b.boat, h) - dist(a.boat, h))[0];
-        if (far && dist(far.boat, h) > want.d + 10) this.stowEscortCrew(far);
-      }
-      if (Object.values(this.esc).filter((q) => q.spawned).length < O.maxSpawned) this.spawnEscortCrew(want.e);
-    }
-  }
-  spawnEscortCrew(e) {
-    const b = e.boat;
-    b.crew = []; b.officer = null;
-    const crew = this.nav.spawnCrew(b, { n: e.crewLeft, officer: e.officerAlive, name: `Trấn thủ thuyền hộ vệ ${e.id}`, role: "garrison", aggro: 18 });
-    for (const a of crew) a.escort = e.id;
-    e.agents = crew; e.officer = crew.officer; if (e.officer) e.officer.escort = e.id;
-    e.spawned = true; b.capturable = true;
-  }
-  stowEscortCrew(e) {
-    const crowd = this.ctx.crowd, b = e.boat;
-    e.crewLeft = e.agents.filter((a) => crowd.hittable(a) && a.deck === b.deck).length;
-    e.officerAlive = !!e.officer && e.officer.alive && !e.officer.dead;
-    for (const a of e.agents) if (a.alive && a.role !== "free" && a.role !== "swim") crowd.release(a);
-    if (e.officer?.alive) e.officer.dispose();
-    e.agents = []; e.officer = null; b.crew = []; b.officer = null; e.spawned = false; b.capturable = false;
-  }
-  // naval.on.capture: tướng giữ X 3 s trên boong hộ vệ (trấn thủ đã ngã, ≤ 2 lính địch)
-  captureEscort(b) {
-    const ctx = this.ctx, e = this.esc[b.id];
-    if (!e || e.down) { this.nav.captureShip(b); return; }
-    this.nav.captureShip(b);
-    e.down = true; e.engaged = false; b.drive = null; b.stop();
-    const ev = []; onEscortDown(this.st, "capture", ev); this.handle(ev);
-    this.hero.heal(0.15);
-    ctx.audio.play("capture");
-    this.say(`Chiếm thuyền hộ vệ ${e.id}: cờ 陳 kéo lên, thuyền thành bến đò cho quân ta (+15% Sinh lực).`, 5, "good");
-    // vài quân ta lên giữ thuyền
-    const g = this.nav.spawnCrew(b, { side: "ta", n: 3, role: "zone", kitMix: ["DV_GIAO", "DV_NO", "DV_DAO"] });
-    for (const a of g) a.escort = e.id;
-    for (const a of e.agents) if (a.side === "dich" && ctx.crowd.hittable(a)) this.nav.toSwim(a);
-  }
-
   // ---- đoàn thuyền nhẹ -----------------------------------------------------------------------------------------------------
   buildFlotilla(i) {
-    const nav = this.nav, sl = FLOTILLA.slots;
-    const lost = new Set(), n = LIGHT_BOATS.n - 1, left = this.st.wings.flotilla.boats;
-    // thuyền đã mất (mô phỏng: boats còn lại) không dựng lại — bỏ từ thuyền sau cùng
-    for (let k = n; k >= 1 && lost.size < Math.max(0, LIGHT_BOATS.n - left); k--) lost.add(k);
+    const nav = this.nav, sl = FLOTILLA.slots, n = LIGHT_BOATS.n - 1;
     for (let k = 0; k <= n; k++) {
-      if (lost.has(k)) continue;
       const [dx, dz] = k === 0 ? [0, 0] : sl[k - 1];
       const b = nav.addBoat({ type: k === 0 ? "lead" : "light", side: "ta", id: "L" + k, flag: "陳", path: lanePath(dz), speed: 0,
         label: k === 0 ? "Thuyền chỉ huy nhẹ" : `Thuyền nhẹ ${k}` });
@@ -642,7 +481,6 @@ export class DirectorB20 {
   flotToHold(now) {
     const H = FLOTILLA.hold;
     this.flot.forEach((b) => {
-      if (b.lost) return;
       const [x, dz] = b.slot === 0 ? H.lead : H.boats[(b.slot - 1) % H.boats.length], z = zc(x) + dz;
       b.ctl = null; b.drive = null;
       // mũi ngược dòng (-x) khi đậu: nhìn về phía hạm đội đang vào khúc cọc
@@ -680,38 +518,41 @@ export class DirectorB20 {
     this.khoai = b;
   }
 
-  // ---- P1: mồi nhử, thuyền tiên phong ----------------------------------------------------------------------------------------
+  // ---- P1: ra khiêu chiến, thuyền tiên phong ----------------------------------------------------------------------------------
+  // Nút Ra khiêu chiến (hud-b20), phím Kế Sách, Mệnh Lệnh Tiến công: một lần; từ đó đoàn thuyền nhẹ tự lái (sim/river.js tickLure).
+  launchLure() {
+    if (this.phase !== 0 || this.over) return false;
+    const ev = [], r = launch(this.st, ev);
+    if (!r.ok) return false;
+    this.vgNext = this.time + VANGUARD.first; this.orders++;
+    this.banner("RA KHIÊU CHIẾN", "#f1d98a", 1.4); this.ctx.audio.play("drum"); this.ctx.audio.play("horn");
+    this.say("Thuyền nhẹ ra khiêu chiến: đoàn tự áp sát đầu hạm đội, bắn tên khiêu khích rồi tự lui dụ về phía Khúc cọc. Tướng giữ thuyền, đánh lính Nguyên đổ bộ.", 8, "good");
+    this.handle(ev);
+    return true;
+  }
   updateLure(dt) {
-    if (this.time >= this.vgNext && this.vg.filter((v) => v.state !== "drift").length < VANGUARD.max && this.flot.some((b) => !b.lost)) {
+    if (!this.st.nghi.launched) return;
+    if (this.time >= this.vgNext && this.vg.filter((v) => v.state !== "drift").length < VANGUARD.max && this.flot.length) {
       this.vgNext = this.time + VANGUARD.every; this.spawnVanguard();
     }
     for (const v of [...this.vg]) this.updateVanguard(v, dt);
   }
-  pickVgTarget() {
-    const hb = this.heroBoat(), busy = new Set(this.vg.filter((v) => v.state !== "drift").map((v) => v.target));
-    const ours = this.flot.filter((b) => !b.lost && !busy.has(b));
-    if (!this.vgN || !ours.length) return hb && this.flot.includes(hb) && !busy.has(hb) ? hb : ours[0] || null;
-    // sau lần đầu: thuyền nhẹ khác (gần hạm đội nhất), không phải thuyền đang chở tướng nếu còn chọn được
-    const pool = ours.filter((b) => b !== hb && b.slot !== 0);
-    const list = pool.length ? pool : ours;
-    return list.reduce((a, b) => (b.x < a.x ? b : a));
-  }
   spawnVanguard() {
-    const T = this.pickVgTarget(); if (!T) return;
-    // áp mạn phía ngoài (xa tâm đoàn), đi tới theo làn kề bên thuyền đích (làn áp mạn dzA) — không xuyên qua thuyền khác
+    const T = this.lead(); if (!T) return;
+    // áp mạn phía ngoài, đi tới theo làn kề bên thuyền đích (làn áp mạn dzA) — không xuyên qua thuyền khác
     const n = ++this.vgN, nav = this.nav, dz0 = T.ctl?.dz ?? 0, sg = dz0 > 0 ? -1 : 1;
     const dzA = dz0 - sg * (T.hull.beam / 2 + 1.1 + VANGUARD.gap);
     const x = this.headS + 6, z = zc(x) + dzA;
     const b = nav.addBoat({ type: "scout", side: "dich", id: "V" + n, flag: "元", label: "Thuyền tiên phong" });
-    b.x = x; b.z = z; b.yaw = DOWN; b.speed = 0; b.capturable = false; b.update(0, this.env());   // chỉ hộ vệ chiếm được (thuyền tiên phong lui, chìm)
+    b.x = x; b.z = z; b.yaw = DOWN; b.speed = 0; b.capturable = false; b.update(0, this.env());
     const off = n % VANGUARD.officerEvery === 0;
     const crew = nav.spawnCrew(b, { n: VANGUARD.crew, officer: off, name: "Đội trưởng tiên phong", role: "garrison", aggro: 20,
       kitMix: ["NG_DAO", "NG_GIAO", "NG_DAO", "NG_CUNG"] });
-    const v = { n, boat: b, target: T, sg, state: "chase", t: 0, lossT: 0, crew, officer: crew.officer, link: null, provoked: false };
+    const v = { n, boat: b, target: T, sg, state: "chase", t: 0, crew, officer: crew.officer, link: null, provoked: false };
     for (const a of crew) a.vg = v;
     if (v.officer) v.officer.vg = v;
     this.vg.push(v);
-    this.say(`Thuyền tiên phong Nguyên rời đầu hạm đội, đuổi ${T === this.heroBoat() ? "thuyền của tướng" : T.label.toLowerCase()}!`, 4, "bad");
+    this.say("Thuyền tiên phong Nguyên rời đầu hạm đội, đuổi thuyền của tướng!", 4, "bad");
     this.ctx.audio.play("horn", x, z);
   }
   vgCleared(v) {
@@ -723,7 +564,7 @@ export class DirectorB20 {
     const b = v.boat, T = v.target, nav = this.nav;
     v.t += dt;
     if (v.state === "chase") {
-      if (!T || T.lost || T.state === "sunk") { this.vgDrift(v); return; }
+      if (!T || T.state === "sunk") { this.vgDrift(v); return; }
       const off = v.sg * (T.hull.beam / 2 + b.hull.beam / 2 + VANGUARD.gap), c = Math.cos(T.yaw), s = Math.sin(T.yaw);
       const px = T.x + off * c, pz = T.z - off * s, dx = px - b.x, dz = pz - b.z, d = Math.hypot(dx, dz);
       const sp = Math.min(VANGUARD.speedMax, (T.speed || 0) + VANGUARD.chase), step = sp * dt;
@@ -750,13 +591,10 @@ export class DirectorB20 {
       if (o && o.alive && !o.dead && (o.deck === T.deck || o.deck === P)) aboard++;
       v.clearT = aboard || v.t < 3 ? 0 : (v.clearT || 0) + dt;
       if (this.vgCleared(v) || v.clearT >= VANGUARD.repel) {
-        this.say(this.vgCleared(v) ? "Dọn sạch thuyền tiên phong — nó trôi lại phía hạm đội." : "Đẩy lui thuyền tiên phong: nó cắt ván bắc, lùi về phía hạm đội.", 3, "good");
+        const cleared = this.vgCleared(v);
+        if (cleared) this.raidsCleared++; else this.raidsRepelled++;
+        this.say(cleared ? "Dọn sạch thuyền tiên phong — nó trôi lại phía hạm đội." : "Đẩy lui thuyền tiên phong: nó cắt ván bắc, lùi về phía hạm đội.", 3, "good");
         this.vgDrift(v); return;
-      }
-      const heroThere = this.hero.deck === T.deck || this.hero.deck === b.deck || this.hero.deck === P;
-      if (T.slot !== 0 && !heroThere && aboard) {
-        v.lossT += dt;
-        if (v.lossT >= VANGUARD.lose) { this.lossBoat = T; const ev = []; flotillaLoss(this.st, 1, ev); this.handle(ev); this.lossBoat = null; this.vgDrift(v); }
       }
       return;
     }
@@ -778,224 +616,37 @@ export class DirectorB20 {
     const crowd = this.ctx.crowd;
     for (const a of v.crew) if (crowd.hittable(a) && a.deck === v.boat.deck) { a.role = "garrison"; a.anchor = v.boat.anchor; }
   }
-  // Mô phỏng báo mất thuyền nhẹ: thuyền vừa bị áp mạn (flotillaLoss) hoặc thuyền sau cùng (sát hạm đội) chìm; người rơi nước bơi.
-  onBoatLost(e) {
-    let T = this.lossBoat;
-    if (!T) { const c = this.flot.filter((b) => !b.lost && b.slot !== 0); T = c.length ? c.reduce((a, b) => (b.x < a.x ? b : a)) : null; }
-    this.say(`Mất một thuyền nhẹ (${e.why}): còn ${e.left}/${LIGHT_BOATS.n}.`, 4, "bad");
-    this.ctx.audio.play("warn");
-    if (!T || T.lost) return;
-    T.lost = true;
-    for (const v of this.vg) if (v.target === T && v.state !== "drift") this.vgDrift(v);
-    for (const [o, D] of [...this.nav.riders]) if (D === T.deck && o.K && this.ctx.crowd.hittable(o)) this.nav.toSwim(o);
-    if (this.hero.deck === T.deck) this.placeOn(this.lead().deck, 0, -1.8);
-    T.drive = null; T.sink();
-    const b = T; this.later(8, () => { if (this.flot.includes(b)) { this.nav.removeBoat(b); this.flot.splice(this.flot.indexOf(b), 1); } });
-  }
   later(sec, fn) { (this.timers ||= []).push({ at: this.time + sec, fn }); }
-
-  // ---- P2–P3: thuyền dò luồng --------------------------------------------------------------------------------------------------
-  raftOf(id) { return this.nav.rafts.find((r) => r.id === id) || null; }
-  spawnScout(target) {
-    const R = this.raftOf(target), src = this.ships.PT || this.ships.FS; if (!R || !src) return;
-    const n = ++this.scoutN, nav = this.nav, rx = R.deck.m[9], rz = R.deck.m[11];
-    const sx = src.x + 10, sz = src.z + (rz > src.z ? 8 : -8), ex = rx + (sx < rx ? -7 : 7);
-    const b = nav.addBoat({ type: "scout", side: "dich", id: "S" + n, flag: "元", label: `Thuyền dò luồng → ${target}`,
-      path: [{ x: sx, z: sz }, { x: (sx + ex) / 2, z: (sz + rz) / 2 + 6 }, { x: ex, z: rz }], speed: SCOUT_OPS.speed });
-    b.capturable = false;
-    const crew = nav.spawnCrew(b, { n: SCOUT_OPS.crew, officer: true, name: "Đội trưởng dò luồng", role: "garrison", aggro: 16, kitMix: ["NG_CUNG", "NG_DAO"] });
-    const s = { n, target, boat: b, crew, officer: crew.officer, state: "go", t: 0 };
-    for (const a of crew) a.scout = s;
-    if (s.officer) s.officer.scout = s;
-    this.scouts.push(s);
-    this.say(`Phàn Tiếp cử thuyền dò luồng tới mốc ${target} — chặn nó trước khi chạm bè cỏ (đò chuyển: giữ Tương tác).`, 6, "bad");
-    this.ctx.audio.play("horn", sx, sz);
-  }
-  updateScouts(dt) {
-    const st = this.st;
-    for (const s of [...this.scouts]) {
-      const b = s.boat, o = s.officer, R = this.raftOf(s.target);
-      s.t += dt;
-      const alive = o && o.alive && !o.dead;
-      if (s.state === "go") {
-        if (s.ferryT > 0) { s.ferryT -= dt; b.stop(); } else if (b.state === "hold" && !b.arrived) b.go(SCOUT_OPS.speed);
-        if (!alive) {
-          s.state = "stopped"; b.stop(); this.scoutsStopped++;
-          this.say(`Chặn được thuyền dò luồng tới mốc ${s.target}.`, 4, "good"); this.ctx.audio.play("cheer"); continue;
-        }
-        if (st.markers[s.target]?.state !== "hidden") { s.state = "back"; this.scoutHome(s); continue; }
-        if (R && Math.hypot(b.x - R.deck.m[9], b.z - R.deck.m[11]) <= SCOUT_OPS.exposeR) {
-          const ev = []; markerAction(st, s.target, "expose", ev); this.handle(ev);
-          s.state = "back"; this.scoutHome(s);
-        }
-      } else if (s.state === "back" && (s.t > 40 || b.arrived)) this.removeScout(s);
-      else if (s.state === "stopped" && s.t > 60 && dist(b, this.hero) > 60) this.removeScout(s);
-    }
-  }
-  scoutHome(s) {
-    const b = s.boat, src = this.ships.PT || this.ships.FS; s.t = 0;
-    b.setPath([{ x: b.x, z: b.z }, { x: src.x - 12, z: src.z }], 0); b.go(SCOUT_OPS.speed);
-  }
-  removeScout(s) {
-    const crowd = this.ctx.crowd;
-    for (const a of s.crew) if (a.alive && a.role !== "free" && a.role !== "swim") crowd.release(a);
-    if (s.officer?.alive) s.officer.dispose();
-    this.nav.removeBoat(s.boat); this.scouts.splice(this.scouts.indexOf(s), 1);
-  }
-  onMarkerExposed(e) {
-    this.ctx.world.scenery?.stakes?.setState(e.id, "exposed");
-    this.banner(`MỐC ${e.id} BỊ LỘ`, "#ff8a6a", 1.6); this.ctx.audio.play("horn");
-    this.say(`Mốc ${e.id} bị lộ (${e.by === "scout" ? "thuyền dò chạm bè cỏ" : "tướng địch đứng mốc quá 10 s"}): hạm đội sẽ né bãi này.`, 6, "bad");
-  }
-
-  // ---- P3: đội dò luồng lên bè, mở mốc ----------------------------------------------------------------------------------------
-  // Ba toán tới ba mốc còn ẩn, theo thứ tự gần khối hạm đội nhất (tâm khối = kỳ hạm), tới nơi ở phaseStart + arrive[k].
-  planSquads() {
-    const st = this.st, cx = this.ships.FS?.x ?? 656;
-    const ids = STAKES.filter((s) => st.markers[s.id].state === "hidden").sort((a, b) => Math.abs(a.x - cx) - Math.abs(b.x - cx) || (a.x - b.x)).map((s) => s.id);
-    this.squads = ids.slice(0, SQUADS.arrive.length).map((id, k) => ({ id, k, at: this.phaseStart + SQUADS.arrive[k], state: "wait", raft: null, crew: [], officer: null }));
-  }
-  updateSquads(dt) {
-    const nav = this.nav, crowd = this.ctx.crowd, st = this.st;
-    for (const q of this.squads) {
-      const R = this.raftOf(q.id); if (!R) continue;
-      if (q.state === "wait" && this.time >= q.at - SQUADS.lead) {
-        if (st.markers[q.id].state !== "hidden") { q.state = "skip"; continue; }
-        const rx = R.deck.m[9], rz = R.deck.m[11], dx = SQUADS.speed * SQUADS.lead, sx = rx + (q.k % 2 ? dx : -dx), ex = rx + (q.k % 2 ? 7.5 : -7.5);
-        const b = nav.addBoat({ type: "scout", side: "dich", id: "Q" + q.id, flag: "元", label: `Đội dò luồng → ${q.id}`,
-          path: [{ x: sx, z: rz + 3 }, { x: ex, z: rz }], speed: SQUADS.speed });
-        b.capturable = false;
-        const crew = nav.spawnCrew(b, { n: SQUADS.crew, officer: true, name: "Đội trưởng dò luồng", role: "garrison", aggro: 14, kitMix: ["NG_DAO", "NG_GIAO", "NG_CUNG"] });
-        q.boat = b; q.crew = crew; q.officer = crew.officer; q.state = "go";
-        for (const a of crew) a.squad = q;
-        if (q.officer) q.officer.squad = q;
-        this.say(`Đội dò luồng Nguyên chèo tới bè cỏ ${q.id}: không để Đội trưởng đứng mốc quá 10 s!`, 5, "bad");
-      } else if (q.state === "go" && (q.boat.arrived || Math.hypot(q.boat.x - R.deck.m[9], q.boat.z - R.deck.m[11]) < 8.5)) {
-        // lên bè: Đội trưởng leo lên giữa bè, lính đứng rải trên bè
-        q.boat.stop(); q.state = "on"; q.raft = R.deck;
-        const spots = nav.deckSpots(R.deck, q.crew.length, makeRng(17 + q.k));
-        q.crew.forEach((a, i) => {
-          if (!crowd.hittable(a)) return;
-          const s = spots[i]; R.deck.toWorld(s.x, s.z, _W, s.i); nav.leave(a); a.x = _W.x; a.z = _W.z; nav.board(a, R.deck);
-          a.anchor = { x: R.deck.m[9], z: R.deck.m[11], r: 3 }; a.sx = a.x; a.sz = a.z; a._pins = null;
-        });
-        if (q.officer?.alive && !q.officer.dead) nav.climbTo(q.officer, R.deck, { x: 0, z: 0 });
-        // thuyền toán dò lùi ra khỏi bè (không chắn Tương tác "Mở bãi cọc" bằng "lên boong"), rồi rời trận
-        const b = q.boat, back = q.k % 2 ? 1 : -1; b.deck.noBoard = true; q.leaveT = this.time;
-        b.setPath([{ x: b.x, z: b.z }, { x: b.x + back * 14, z: b.z + 10 }, { x: b.x + back * 40, z: b.z + 18 }], 0); b.go(3);
-      } else if (q.state === "on" && st.markers[q.id].state !== "hidden") q.state = "done";
-      if (q.boat && q.leaveT !== undefined && this.time - q.leaveT > 25 && q.boat.visible) {
-        for (const a of q.crew) if (a.alive && a.deck === q.boat.deck && a.role !== "free") crowd.release(a);
-        nav.removeBoat(q.boat); q.boat.visible = false;
-      }
-    }
-  }
-  // naval.on.marker: giữ X 5 s trên bè cỏ (pha 3, mốc ẩn, không địch trong 6 m)
-  openMarker(id) {
-    const ctx = this.ctx, ev = [], r = markerAction(this.st, id, "activate", ev);
-    if (!r.ok) { this.say(`Chưa mở được mốc ${id} (${r.why}).`, 3, "bad"); return; }
-    ctx.world.scenery?.stakes?.setState(id, "active");
-    this.banner(`MỞ BÃI CỌC ${id}`, "#f1d98a", 1.6); ctx.audio.play("capture");
-    this.say(`${lbl("Hư cấu")}Chặt dây bè cỏ ${id}: bè trôi đi, bãi cọc vẫn chìm dưới nước triều. Gọi đò rời bè!`, 6, "good");
-    this.handle(ev);
-    this.openFerry("auto");
-  }
-  // Lệnh Kế Sách (G)
+  // Lệnh Kế Sách (phím G / nút Kế Sách): pha 1 chưa ra lệnh thì RA KHIÊU CHIẾN; còn lại chỉ báo lý do.
   keSachTrigger() {
-    const st = this.st, k = st.ks.kichCoc;
-    if (k?.state === "sansang") { const ev = []; const r = keSachTrigger(st, "kichCoc", ev); this.handle(ev); return r.ok; }
-    const ready = KS_ORDER.find((id) => st.ks[id]?.state === "sansang");
-    if (ready === "nghiBinh") this.say("Nghi binh tự chốt khi đoàn thuyền nhẹ đã qua Khúc cọc và giữ đúng khoảng cách.", 3);
-    else this.say(this.phase === 2 ? `Kế Sách bãi cọc chưa Sẵn sàng: mở ít nhất ${KE_SACH.kichCoc.need} mốc.` : "Chưa có Kế Sách Sẵn sàng.", 2.5);
+    if (this.phase === 0 && !this.st.nghi.launched) return this.launchLure();
+    if (this.phase === 0) this.say("Đoàn thuyền nhẹ đang tự lái: khiêu chiến rồi lui dụ hạm đội. Tướng đánh lính Nguyên đổ bộ.", 3);
+    else this.say(this.tua ? "Cảnh tua: chờ nước rút, thuyền Nguyên sẽ mắc cọc." : "Kế Sách Bạch Đằng tự xét; không còn lệnh nào ở pha này.", 2.5);
     return false;
   }
 
-  // ---- P4: nước rút — hộ vệ đợt hai chạy ra cửa sông, Phàn Tiếp gom thuyền, cọc nhô ---------------------------------------------
-  // Vùng né của làn thoát (theo trạng thái lúc gọi): bãi cọc đã lộ (cả hai phía — hạm đội né mốc lộ), cụm thuyền Phàn Tiếp (phía +).
-  fleeZones() {
-    const Z = [], O = EBB_OPS, pt = this.ships.PT;
-    for (const s of STAKES) if (this.st.markers[s.id].state === "exposed") Z.push([s.x - s.along / 2 - O.avoid, s.x + s.along / 2 + O.avoid, 0]);
-    if (pt) Z.push([pt.x - pt.hull.len / 2 - O.avoid, pt.x + pt.hull.len / 2 + O.avoid, 1]);
-    return Z;
+  // ---- P2–P4: cảnh tua ---------------------------------------------------------------------------------------------------------
+  // Máy quay điện ảnh cao trên bờ nam nhìn giữa khối hạm đội (theo đầu hạm đội lúc vào bãi cọc, rồi đứng ở giữa bãi cọc); mô phỏng chạy
+  // TUA.rate lần nhanh hơn (update). Tướng vẫn đứng trên thuyền chỉ huy đậu ven bờ (flotToHold), đi lại được, nhưng không có việc.
+  fleetMidX() { return clamp(this.headS - 110, 330, 690); }
+  startTua() {
+    const at = () => { const x = this.fleetMidX(); return { x, z: zc(x) }; };
+    this.tua = true;
+    this.cine = { kind: "tua", t: 0, T: Infinity, p0: null,
+      pos: () => { const m = at(); return { x: m.x - 60, y: 120, z: m.z + 210 }; },
+      look: () => { const m = at(); return { x: m.x + 10, y: 0, z: m.z }; } };
   }
-  // Thuyền hộ vệ mới (đợt hai) — đăng ký như E1…E6 (esc, ships)
-  addEscort(id, wave) {
-    const b = this.nav.addBoat({ type: "escort", side: "dich", id, flag: "元", label: `Thuyền hộ vệ ${id}` });
-    b.capturable = false; this.ships[id] = b;
-    return (this.esc[id] = { id, boat: b, wave, down: false, gone: false, stuck: false, flee: false, patrol: false, crewLeft: ESCORT_OPS.crew,
-      officerAlive: true, spawned: false, agents: [], officer: null, v: 0, s: 0, engaged: false, side: 1, dep: 0 });
+  endTua() {
+    if (!this.tua) return;
+    this.tua = null; this.cine = null;
+    if (this.ctx.cam) this.ctx.cam.idle = 0;
   }
-  // Chạy ra cửa sông theo làn thoát từ (x, z); đứng chờ tới giờ dep; dừng khi tướng đứng trên boong / đò ta nhắm tới / mắc cọc.
-  setFlee(e, { x, z, side, dep, zones = null, out = false }) {
-    const b = e.boat, O = EBB_OPS;
-    b.ctl = null; b.drive = null; b.setPath(fleePath(x, z, side, zones || this.fleeZones(), out), 0);
-    Object.assign(e, { flee: true, patrol: false, stuck: false, side, dep, s: 0, v: 0, out, p4: true });
-    b.drive = (dt) => {
-      const tgt = e.down || e.stuck || e.engaged || this.time < e.dep ? 0 : O.speed;
-      e.v += clamp(tgt - e.v, -1.5 * dt, 0.6 * dt);
-      e.s = Math.min(b.track.len, e.s + e.v * dt);
-      return e.s;
-    };
-    b.update(0, this.env());
+  // P3: cọc đóng sẵn lộ dần theo nước rút — bè cỏ ngụy trang trôi đi (scenery: stakes.setState "active" thả bè).
+  revealStakes() {
+    const S = this.ctx.world.scenery;
+    for (const s of STAKES) S?.stakes?.setState(s.id, "active");
   }
-  // đặt thuyền đứng yên ở (x, z) hướng yaw (tải lại checkpoint)
-  placeBoat(b, x, z, yaw) {
-    const fx = Math.sin(yaw), fz = Math.cos(yaw);
-    b.ctl = null; b.drive = null; b.setPath([{ x: x - fx * 2, z: z - fz * 2 }, { x, z }], 99); b.targetSpeed = 0; b.speed = 0; b.stop();
-    b.update(0, this.env());
-  }
-  // Đầu pha 4: 8 hộ vệ đợt hai ở chỗ xuất phát, rời đi lần lượt; hộ vệ đợt một còn sót bỏ vòng tuần chạy theo làn ngoài; cụm Phàn Tiếp.
-  startEbb() {
-    const O = EBB_OPS, zones = this.fleeZones();
-    O.starts.forEach(([x, side], k) => {
-      const e = this.addEscort("E" + (FLEET.escorts[0] + 1 + k), 2);
-      this.setFlee(e, { x, z: zc(x) + fleeDz(x, side, fleeZonesFor(x, side, zones)), side, dep: this.phaseStart + O.first + O.every * k, zones });
-    });
-    for (const id in this.esc) {
-      const e = this.esc[id], b = e.boat;
-      if (e.wave !== 2 && !e.down && !e.gone) this.setFlee(e, { x: b.x, z: b.z, side: Math.sign(b.z - zc(b.x)) || 1, dep: this.time + 2, out: true });
-    }
-    this.startCluster();
-  }
-  // Tải lại checkpoint pha 4–6: pha 4 dựng lại từ đầu (tất định); pha 5–6 theo ảnh chụp (chỗ đứng, đã hạ / thoát / mắc).
-  buildEbb(i, snap) {
-    if (i === 3) { this.startEbb(); return; }         // hộ vệ đợt một còn sót đã về vòng tuần (buildFleet) — chạy từ đó
-    this.placeCluster();
-    for (const id in snap?.esc || {}) {
-      const s = snap.esc[id]; if (s.x === undefined) continue;
-      const e = this.esc[id] || this.addEscort(id, s.wave || 2), b = e.boat;
-      e.patrol = false; e.p4 = !!s.p4;
-      if (s.gone) { this.nav.removeBoat(b); delete this.ships[id]; Object.assign(e, { gone: true, flee: false, stuck: false }); continue; }
-      if (s.down) { e.down = true; this.parkCaptured(e, s); continue; }
-      if (s.stuck) { this.placeBoat(b, s.x, s.z, s.yaw); Object.assign(e, { stuck: true, flee: false, side: s.side || 1 }); continue; }
-      this.setFlee(e, { x: s.x, z: s.z, side: s.side || 1, dep: this.time, out: !!s.out });
-    }
-  }
-  updateEbb(dt) {
-    const O = EBB_OPS;
-    for (const id in this.esc) {
-      const e = this.esc[id]; if (!e.flee || e.down || e.gone) continue;
-      if (e.boat.x >= MAP.exitX - O.exitR || e.s >= e.boat.track.len - 0.5) this.escortEscaped(e);
-    }
-    if (this.phase === 3) { this.updateCluster(dt); this.ambushHold(); }
-  }
-  escortEscaped(e) {
-    if (e.spawned) this.stowEscortCrew(e);
-    e.gone = true; e.flee = false; this.escaped++;
-    this.nav.removeBoat(e.boat); delete this.ships[e.id];
-    this.say(`Thuyền hộ vệ ${e.id} thoát ra cửa sông (${this.escaped} thuyền đã thoát).`, 4, "bad"); this.ctx.audio.play("horn");
-  }
-  // Giữ vững cho cánh thuyền phục (pha 4): 4 thuyền của nhánh ấy chèo ra cửa lạch, chắn ngang (mô phỏng: Thoát vây ×0,7).
-  ambushHold() {
-    for (const id of ["chanh", "rut", "gia"]) {
-      if (this.st.wings[id]?.order?.id !== "giuvung") continue;
-      const tr = TRIBS.find((q) => q.id === id), boats = this.ambush.filter((b) => b.ambush === id && !b.guarding);
-      boats.forEach((b) => {
-        const k = this.ambush.filter((q) => q.ambush === id).indexOf(b), p = tribPoint(tr, 6 + k * 2, (k - 1.5) * 6.5), q = tribPoint(tr, 34, 0);
-        b.guarding = true; b.hidden = false; b.setPath([{ x: b.x, z: b.z }, q, p], 0); b.go(4);
-      });
-    }
-  }
+
   // Phàn Tiếp gom thuyền (canon Liên Hoàn Thuyền): J8 dạt ngang sát mạn thuyền chỉ huy, J12 tiến lên thế chỗ J8 (theo làn).
   startCluster() {
     const pt = this.ships.PT, [n1, n2] = CLUSTER.ids.map((id) => this.ships[id]); if (!pt || !n1 || !n2) return;
@@ -1024,56 +675,32 @@ export class DirectorB20 {
     if (n2.ctl) { n2.ctl.dx = pt.ctl.dx; n2.update(0, this.env()); }
     this.cl = { done: true };
   }
-  // strandAt (30%): thuyền có tâm trong bãi cọc đã mở thì mắc cọc (dừng, chưa nghiêng) — cả hộ vệ đang chạy qua bãi.
+  // thuyền b có tâm trong khuôn một bãi cọc (mở rộng pad m)
+  inField(b, pad = 0) { return STAKES.some((s) => Math.abs(b.x - s.x) <= s.along / 2 + pad && Math.abs(b.z - zc(b.x)) <= s.across / 2 + pad); }
+  // strandAt (30%): thuyền có tâm trong bãi cọc thì mắc cọc (dừng, chưa nghiêng). Cụm Liên Hoàn chưa kịp xếp thì xếp ngay.
   onStrandAt() {
-    const st = this.st, inActive = (b) => STAKES.some((s) => st.markers[s.id].state === "active" && Math.abs(b.x - s.x) <= s.along / 2 && Math.abs(b.z - zc(b.x)) <= s.across / 2);
-    let n = 0, ne = 0;
-    for (const id in this.ships) {
-      const b = this.ships[id], e = this.esc[id];
-      if ((e && (e.down || e.gone)) || !inActive(b)) continue;
-      if (e) { e.stuck = true; e.flee = false; ne++; } else b.drive = null;
-      b.catch(); n++;
-    }
-    if (!activeMarkers(st)) {                // không mốc nào mở: cọc vẫn ngụy trang dưới bè, không thuyền nào mắc
-      this.banner("NƯỚC 30% · CỌC CHƯA MỞ", "#ff8a6a", 1.6);
-      this.say("Nước xuống 30% nhưng chưa mở mốc cọc nào: hạm đội Nguyên không vướng cọc.", 6, "bad");
-      return;
-    }
+    if (this.cl && !this.cl.done) this.placeCluster();
+    let n = 0;
+    for (const id in this.ships) { const b = this.ships[id]; if (!this.inField(b)) continue; b.drive = null; b.catch(); n++; }
     this.banner("CỌC NHÔ · THUYỀN NGUYÊN MẮC CỌC", "#f1d98a", 1.6);
-    this.say(`Nước xuống 30%: cọc nhô khỏi mặt nước — ${n} thuyền Nguyên mắc cọc${ne ? ` (${ne} thuyền hộ vệ đang chạy)` : ""}.`, 6, "good");
+    this.say(`Nước xuống 30%: cọc nhô khỏi mặt nước — ${n} thuyền Nguyên mắc cọc.`, 6, "good");
     this.ctx.audio.play("drums3");
   }
 
   // ---- P5: nước ròng — mắc cạn, thuyền phục xuất kích, Phàn Tiếp ------------------------------------------------------------------
-  // Nước ròng (vào pha 5): hộ vệ còn đang chạy ra cửa sông dừng hẳn (nằm cạn nếu chỗ cạn, không thì đứng giữa dòng — mất nước, mất
-  // lối). Trước đây vẫn chạy tiếp và thoát trong lúc tướng bị giữ ở trận boss, làm hỏng nhiệm vụ phụ "Không để thuyền nào ra cửa sông".
-  stopFleeing() {
-    for (const id in this.esc) {
-      const e = this.esc[id]; if (!e.flee || e.down || e.gone) continue;
-      Object.assign(e, { flee: false, stuck: true }); e.boat.drive = null; e.boat.stop(); e.boat.catch();
-    }
-  }
   // Mắc cạn theo strandShare (1 → mọi thuyền trong bãi cọc; 0,5 → một nửa xác định, luôn có cụm Phàn Tiếp). Kỳ hạm chỉ "mắc" (đứng trên
-  // bùn, chưa nghiêng, chưa lên được) tới cảnh kỳ hạm mắc cạn. Hộ vệ chưa hạ còn trong bãi cạn nằm lại, đã ra lòng sông sâu thì chạy tiếp.
+  // bùn, chưa nghiêng, chưa lên được) tới cảnh kỳ hạm mắc cạn.
   strandFleet(now) {
-    const env = this.env(), gy = this.ctx.world.groundY, y0 = TIDE_Y(0), settle = (b) => { if (now) b.update(BOAT.settle + 0.01, env); };
-    const shoal = (b) => y0 - gy(b.x, b.z) < b.hull.draft + 0.25;
-    const inField = (b) => STAKES.some((s) => Math.abs(b.x - s.x) <= s.along / 2 + 8 && Math.abs(b.z - zc(b.x)) <= s.across / 2 + 8);
-    for (const id in this.esc) {
-      const e = this.esc[id], b = e.boat;
-      if (e.down || e.gone || !(e.patrol || e.flee || e.stuck) || !shoal(b)) continue;
-      Object.assign(e, { stuck: true, flee: false, patrol: false }); b.drive = null; b.strand(); settle(b);
-    }
+    const env = this.env(), settle = (b) => { if (now) b.update(BOAT.settle + 0.01, env); };
     // cụm Liên Hoàn: cùng độ nghiêng, mạn thấp quay về phía kỳ hạm (−dz: roll < 0 hạ mạn +x cục bộ); J8, J12 không bắc ván dốc (ván
     // xích nối từ thuyền chỉ huy)
     const pt = this.ships.PT, keep = ["PT", ...CLUSTER.ids].filter((id) => this.ships[id]);
     if (pt) { pt.tiltRoll = -Math.abs(pt.tiltRoll); for (const id of CLUSTER.ids) { const b = this.ships[id]; if (b) { b.tiltPitch = pt.tiltPitch; b.tiltRoll = pt.tiltRoll; b.rampOk = false; } } }
-    const ids = Object.keys(this.ships).filter((id) => id !== "FS" && !this.esc[id] && (inField(this.ships[id]) || this.ships[id].state === "caught" || keep.includes(id)));
+    const ids = Object.keys(this.ships).filter((id) => id !== "FS" && (this.inField(this.ships[id], 8) || this.ships[id].state === "caught" || keep.includes(id)));
     const pick = strandSelect(ids, this.strandPart(), keep);
     for (const id of pick) { const b = this.ships[id]; b.drive = null; b.strand(); settle(b); }
-    // thuyền trong bãi đã mở mà không nằm cạn (strandShare 0,5) vẫn mắc cọc, đứng yên (cả khi tải lại checkpoint)
-    const st = this.st, inActive = (b) => STAKES.some((s) => st.markers[s.id].state === "active" && Math.abs(b.x - s.x) <= s.along / 2 && Math.abs(b.z - zc(b.x)) <= s.across / 2);
-    for (const id of ids) { const b = this.ships[id]; if (!pick.includes(id) && inActive(b)) { b.drive = null; b.catch(); } }
+    // thuyền trong bãi mà không nằm cạn (strandShare 0,5) vẫn mắc cọc, đứng yên (cả khi tải lại checkpoint)
+    for (const id of ids) { const b = this.ships[id]; if (!pick.includes(id) && this.inField(b)) { b.drive = null; b.catch(); } }
     const fs = this.ships.FS;
     if (fs && fs.state !== "stranded" && fs.state !== "settle") { fs.drive = null; fs.catch(); fs.rampOk = false; fs.deck.noBoard = true; fs.update(0, env); }
     this.stranded = pick;
@@ -1088,8 +715,7 @@ export class DirectorB20 {
   // Kích hoạt bãi cọc thành công: thủy binh Nguyên trên thuyền mắc cạn trong bãi đã mở đánh ×navalC (canon c ×0,3).
   crewWeak(b, agents) {
     if (this.st.ks.kichCoc?.state !== "thanhcong") return;
-    const st = this.st, inActive = STAKES.some((s) => st.markers[s.id].state === "active" && Math.abs(b.x - s.x) <= s.along / 2 + 8 && Math.abs(b.z - zc(b.x)) <= s.across / 2 + 8);
-    if (!inActive) return;
+    if (!this.inField(b, 8)) return;
     const k = KE_SACH.kichCoc.effect.navalC;
     for (const a of agents) if (a.side === "dich") a.cong *= k;
   }
@@ -1129,7 +755,7 @@ export class DirectorB20 {
     const h = this.hero, O = HULL_CREW, crowd = this.ctx.crowd;
     let want = null, on = 0;
     for (const id of this.stranded) {
-      if (id === "FS" || id === "PT" || this.esc[id] || !this.ships[id]) continue;
+      if (id === "FS" || id === "PT" || !this.ships[id]) continue;
       const q = this.hulls[id] || (this.hulls[id] = { id, boat: this.ships[id], left: O.n, spawned: false, agents: [], force: false });
       const d = dist(q.boat, h), onIt = h.deck === q.boat.deck;
       if (q.spawned) {
@@ -1149,7 +775,7 @@ export class DirectorB20 {
   // hai thuyền đầu vào thuyền chỉ huy Phàn Tiếp; còn lại: thuyền mắc cạn gần cửa lạch nhất, hai thuyền phục mỗi thân), quân ta lên
   // boong. fs: pha 6 (tải lại) — SORTIE.fsBoats thuyền đầu cập kỳ hạm.
   startSortie({ fs = false } = {}) {
-    const nav = this.nav, cand = this.stranded.filter((id) => id !== "FS" && id !== "PT" && !CLUSTER.ids.includes(id) && !this.esc[id] && this.ships[id]);
+    const nav = this.nav, cand = this.stranded.filter((id) => id !== "FS" && id !== "PT" && !CLUSTER.ids.includes(id) && this.ships[id]);
     this.sorties = [];
     let nfs = fs ? SORTIE.fsBoats : 0;
     for (const tr of TRIBS) {
@@ -1387,7 +1013,6 @@ export class DirectorB20 {
   }
   onX24Captured(u) {
     const ctx = this.ctx, O = BOSS_OPS;
-    setCmdShips(this.st, 1);
     this.ringGuards(u);
     ctx.crowd.rout(u.x, u.z, 30);
     this.hk(HAO_KHI.src.mainMission, "bắt sống Phàn Tiếp");
@@ -1494,37 +1119,27 @@ export class DirectorB20 {
     for (const id in this.bosses) { const u = this.bosses[id]; if (u.alive && !u.captured && u.awake && u.deck && u.deck === h.deck) return true; }
     return false;
   }
-  // Bảng chọn nơi đến (≤ 4, gần trước theo mức ưu tiên của pha). src: "interact" | "order" | "auto".
+  // Bảng chọn nơi đến (≤ 4, gần trước theo mức ưu tiên của pha). src: "interact" | "order".
   openFerry(src = "interact") {
     const items = this.ferryItems();
     if (!items.length) { this.say("Không có nơi đến đò trong tầm.", 2.5); return false; }
-    this.ferryPick = { items, deck: this.hero.deck, onPick: (it) => { this.ferryPick = null; this.ferryTo(it.id); }, title: src === "auto" ? "Bè đang trôi · gọi đò rời bè" : "Đò chuyển · chọn nơi đến" };
+    this.ferryPick = { items, deck: this.hero.deck, onPick: (it) => { this.ferryPick = null; this.ferryTo(it.id); }, title: "Đò chuyển · chọn nơi đến" };
     return true;
   }
   ferryItems() {
-    const h = this.hero, nav = this.nav, st = this.st, out = [], cur = h.deck, ph = this.phase;
+    const h = this.hero, out = [], cur = h.deck, ph = this.phase;
     const add = (id, label, kind, D, pri, sub = "") => {
       if (!D || D === cur || D.off) return;
       const x = D.m[9], z = D.m[11], d = Math.hypot(x - h.x, z - h.z);
       if (d < 6 || d > FERRY.maxDist) return;
       out.push({ id, label, kind, pri, d, sub: sub ? `${sub} · ${Math.round(d)} m` : `${Math.round(d)} m` });
     };
-    if (ph === 2) for (const R of nav.rafts) if (st.markers[R.id]?.state === "hidden") add("raft:" + R.id, `Bè cỏ ${R.id}`, "raft", R.deck, 0, "chưa mở");
-    if (ph === 1 || ph === 2) {
-      for (const s of this.scouts) if (s.state === "go") add(s.boat.id, `Chặn thuyền dò → ${s.target}`, "escort", s.boat.deck, 0, "địch");
-      for (const q of this.squads) if (q.state === "go" && q.boat) add(q.boat.id, `Chặn đội dò luồng → ${q.id}`, "escort", q.boat.deck, 0, "địch");
-    }
-    if (ph >= 1) for (const id in this.esc) {
-      const e = this.esc[id]; if (e.down || e.gone || !(e.patrol || e.flee || e.stuck)) continue;
-      add(id, e.flee ? `Chặn thuyền hộ vệ ${id}` : `Áp mạn thuyền hộ vệ ${id}`, "escort", e.boat.deck, ph === 3 ? 0 : 1, e.flee ? "đang chạy" : e.stuck ? "mắc cọc" : "địch");
-    }
-    for (const id in this.esc) { const e = this.esc[id]; if (e.down && !e.gone) add(id, `Thuyền hộ vệ ${id} (đã chiếm)`, "captured", e.boat.deck, 2); }
     if (ph >= 4) for (const id of this.stranded || []) {
       const b = this.ships[id]; if (!b) continue;
       add(id, b.label, b.type === "flagship" ? "flagship" : "ship", b.deck, (id === "PT" && ph === 4) || id === "FS" ? -1 : 0, "mắc cạn");
     }
-    const L = this.lead(); if (L && !L.lost) add(L.id, "Thuyền chỉ huy nhẹ", "light", L.deck, 2);
-    if (ph === 0) for (const b of this.flot) if (b.slot !== 0 && !b.lost) add(b.id, b.label, "light", b.deck, 1);
+    const L = this.lead(); if (L) add(L.id, "Thuyền chỉ huy nhẹ", "light", L.deck, 2);
+    if (ph === 0) for (const b of this.flot) if (b.slot !== 0) add(b.id, b.label, "light", b.deck, 1);
     for (const d of this.ctx.world.pierDecks || []) add("pier:" + d.pier, d.label, "pier", d, 3);
     out.sort((a, b) => a.pri - b.pri || a.d - b.d);
     return out.slice(0, 4).map(({ id, label, kind, sub }) => ({ id, label, kind, sub }));
@@ -1533,8 +1148,6 @@ export class DirectorB20 {
   ferryTo(id) {
     const h = this.nav.ferry(this.hero, id, { onDone: () => this.onFerryDone(id) });
     if (!h) { this.say("Chưa gọi được đò (đang có chuyến, hoặc tướng đang leo).", 2.5); return null; }
-    const e = this.esc[id]; if (e) e.ferryT = 12;
-    const s = this.scouts.find((q) => q.boat.id === id); if (s) s.ferryT = 12;
     this.ctx.audio.play("drum");
     return h;
   }
@@ -1575,10 +1188,8 @@ export class DirectorB20 {
     this.ko++;
     if (u.tier === "doitruong") this.hk(HAO_KHI.src.killCaptain, "hạ đội trưởng");
     this.provokeOfficer(u);
-    this.banner(u.escort ? "ĐÃ HẠ TRẤN THỦ" : u.squad ? "ĐÃ HẠ ĐỘI TRƯỞNG DÒ LUỒNG" : u.id === "FS:stair" ? "ĐÃ HẠ TOÁN GIỮ CẦU THANG" : "ĐÃ HẠ ĐỘI TRƯỞNG", "#e6dcc3", 1.2);
+    this.banner(u.id === "FS:stair" ? "ĐÃ HẠ TOÁN GIỮ CẦU THANG" : "ĐÃ HẠ ĐỘI TRƯỞNG", "#e6dcc3", 1.2);
     ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
-    if (u.escort) this.say(`Trấn thủ thuyền hộ vệ ${u.escort} đã ngã — hạ bớt thủy thủ rồi giữ Tương tác 3 s trên boong để chiếm.`, 5, "good");
-    if (u.squad) this.say(`Đội trưởng dò luồng ở ${u.squad.id} đã ngã: mốc thôi bị dò.`, 4, "good");
     if (u.id === "FS:stair") this.say("Đội trưởng giữ cầu thang đã ngã — lên lầu chỉ huy!", 4, "good");
   }
   provokeOfficer(u) { if (u.vg && !u.vg.provoked && this.phase === 0) { u.vg.provoked = true; const ev = []; provoke(this.st, "officer", 1, ev); this.handle(ev); } }
@@ -1626,24 +1237,30 @@ export class DirectorB20 {
   // ---- lệnh, Tổng Phản Công ----------------------------------------------------------------------------------------------------
   heroWing() {
     if (this.phase === 0) return "flotilla";
-    // P4: luôn cánh thuyền phục có cửa lạch gần nhất (Giữ vững chặn cửa nhánh — trước đây xa > 160 m thì rơi về cánh thuyền nhẹ, mất
-    // lượt lệnh); P5–P6: trong 160 m; P2–P3: cánh thuyền nhẹ (đò chuyển).
-    const h = this.hero; let best = "flotilla", bd = this.phase === 3 ? Infinity : this.phase >= 4 ? 160 : 0;
+    // P5–P6: cánh thuyền phục có cửa lạch gần nhất trong 160 m; còn lại cánh thuyền nhẹ (đò chuyển).
+    const h = this.hero; let best = "flotilla", bd = this.phase >= 4 ? 160 : 0;
     for (const id of ["chanh", "rut", "gia"]) { const d = Math.abs(h.x - WINGS[id].mouthX); if (d < bd) { bd = d; best = id; } }
     return best;
   }
   order(wing, id) {
     const st = this.st, ctx = this.ctx;
     if (!WINGS[wing]) wing = this.heroWing();
+    // pha 1, đoàn thuyền nhẹ: mọi lệnh (trừ tiếp viện) là Ra khiêu chiến — một lần
+    if (this.phase === 0 && wing === "flotilla" && id !== "tiepvien") {
+      const ok = this.launchLure();
+      if (!ok) this.say("Đoàn thuyền nhẹ đã ra khiêu chiến và đang tự lái.", 2.5);
+      return { ok };
+    }
+    if (this.phase >= 1 && this.phase <= 3) { this.say("Cảnh tua: chờ nước rút — chưa có lệnh nào ở lúc này.", 2.5); return { ok: false, why: "tua" }; }
     const ev = [], r = riverOrder(st, wing, id, ev);
     if (r.ok) {
       this.orders++; ctx.audio.play("drum");
-      if (r.stance) this.say(`Thuyền nhẹ — ${STANCE_SAY[r.stance]}.`, 4, "good");
-      else if (r.ferry) this.openFerry("order");
+      if (r.ferry) this.openFerry("order");
       else this.say(`${WING_ORDERS[id].name} → ${WINGS[wing].name}${id === "tiepvien" ? ` (tới sau ${WING_ORDERS.tiepvien.delay} s)` : ""}.`, 3.5, "good");
     } else {
       const why = { cd: `${WING_ORDERS[id]?.name ?? id} đang hồi (${Math.ceil(r.cd || 0)} s).`, phuc: "Thuyền phục phải ẩn trong nhánh sông tới pha 5.",
-        phase: "Lệnh này chưa dùng được ở pha này.", charges: "Hết lượt tiếp viện.", id: "Không có cánh quân này." }[r.why] || "Lệnh chưa thực hiện được.";
+        phase: "Lệnh này chưa dùng được ở pha này.", charges: "Hết lượt tiếp viện.", id: "Không có cánh quân này.",
+        nouse: "Lệnh Giữ vững không dùng ở Bạch Đằng." }[r.why] || "Lệnh chưa thực hiện được.";
       this.say(why, 2.5);
     }
     this.handle(ev);
@@ -1667,12 +1284,7 @@ export class DirectorB20 {
 
   // ---- HUD ------------------------------------------------------------------------------------------------------------------
   hudState() {
-    const scout = this.scoutHud(), f = this.st.fleet;
-    const extra = { bosses: this.bossHud(), interact: this.cine || this.outro ? null : this.interact, ferry: this.ferryPick, scout, hkLock: this.hkLock && !this.ctx.hk.tpc, escaped: this.escaped };
-    if (this.phase === 3) {                 // P4: hộ vệ trong đợt chạy ra cửa sông (8 đợt hai + đợt một còn sót)
-      let tot = 0; for (const id in this.esc) if (this.esc[id].p4) tot++;
-      extra.escorts = { down: f.escortsDown, need: 0, total: f.escortsTotal, wave: 2, downWave: f.downP4, waveTotal: tot || FLEET.escorts[1], escaped: this.escaped };
-    }
+    const extra = { bosses: this.bossHud(), interact: this.cine || this.outro ? null : this.interact, ferry: this.ferryPick, hkLock: this.hkLock && !this.ctx.hk.tpc };
     return riverHud(this.st, extra);
   }
   // Thanh boss (hud-b20): Phàn Tiếp (P5), Ô Mã Nhi (P6, 2 tầng: boong dưới, lầu chỉ huy); khóa hiển thị = mức bắt sống
@@ -1687,38 +1299,15 @@ export class DirectorB20 {
     }
     return out;
   }
-  scoutHud() {
-    let best = null;
-    for (const s of this.scouts) if (s.state === "go") {
-      const R = this.raftOf(s.target); if (!R) continue;
-      const sec = Math.max(0, Math.hypot(s.boat.x - R.deck.m[9], s.boat.z - R.deck.m[11]) - SCOUT_OPS.exposeR) / SCOUT_OPS.speed;
-      if (!best || sec < best.sec) best = { target: s.target, sec, warn: false };
-    }
-    const f = this.st.fleet;
-    if (!best && this.st.intel && (this.phase === 1 || this.phase === 2)) {
-      const left = f.scoutNext - this.st.t - this.simAcc;
-      if (left > 0 && left <= FLEET.scoutWarn) {
-        const tg = STAKES.map((s, i) => STAKES[(f.scoutN + i) % STAKES.length]).find((s) => this.st.markers[s.id].state === "hidden");
-        if (tg) best = { target: tg.id, sec: left, warn: true };
-      }
-    }
-    return best;
-  }
-
   // ---- checkpoint, thắng thua ---------------------------------------------------------------------------------------------
   saveCheckpoint() {
     const h = this.hero;
-    const esc = {};
-    for (const id in this.esc) {
-      const e = this.esc[id], b = e.boat;
-      esc[id] = { down: e.down, crewLeft: e.down ? 0 : ESCORT_OPS.crew, officerAlive: !e.down, wave: e.wave || 1 };
-      if (this.phase >= 4) Object.assign(esc[id], { gone: !!e.gone, stuck: !!e.stuck, flee: !!e.flee, out: !!e.out, p4: !!e.p4, side: e.side, x: b.x, z: b.z, yaw: b.yaw });
-    }
     this.checkpoint = {
       phase: this.phase, time: this.time, river: snapshotRiver(this.st), hk: clone(this.ctx.hk),
       hero: { hp: h.hp, ki: h.ki, revives: h.revives }, ko: this.ko, koMs: this.koMs, main: [...this.main], phaseTimes: [...this.phaseTimes],
-      esc, scoutsStopped: this.scoutsStopped, escaped: this.escaped, captured: { ...this.captured }, bossesMet: [...this.bossesMet],
-      orders: this.orders, counterBoss: this.counterBoss, hkLock: this.hkLock, vgN: this.vgN, scoutN: this.scoutN, tpcLog: clone(this.tpcLog || []),
+      captured: { ...this.captured }, bossesMet: [...this.bossesMet],
+      orders: this.orders, counterBoss: this.counterBoss, hkLock: this.hkLock, vgN: this.vgN, tpcLog: clone(this.tpcLog || []),
+      raidsCleared: this.raidsCleared, raidsRepelled: this.raidsRepelled,
     };
   }
   restoreCheckpoint() {
@@ -1730,31 +1319,22 @@ export class DirectorB20 {
     this.setupPhase(c.phase, c);
     this.say(`Tải lại đầu pha ${PHASES[this.phase].id}.`, 3);
   }
-  // ?debug&phase=N: trạng thái hợp lý ở đầu pha n (0..5) — Kế Sách các pha trước coi như thành công, 4 hộ vệ đã chiếm, M1 M2 mở.
+  // ?debug&phase=N: trạng thái hợp lý ở đầu pha n (0..5) — Nghi binh thành công, Kế Sách các pha trước coi như đã tự xét.
   fastForward(n) {
     const st = this.st, ev = [];
     const ok = (id) => { const k = st.ks[id]; if (k) { k.state = "thanhcong"; k.got = KE_SACH[id].hk; k.left = 0; } };
     for (let i = 1; i <= n; i++) {
-      if (i === 1) { st.fleet.headX = MAP.khucCoc; st.nghi.flotX = MAP.khucCoc + 28; st.nghi.gap = 28; st.nghi.kk = 100; st.nghi.stance = "giuvung"; ok("nghiBinh"); st.fleet.reachShare = KE_SACH.nghiBinh.effect.reachShare; }
-      if (i === 2) { st.fleet.headX = FLEET.stopX; st.fleet.escortsDown = 4; st.fleet.captured = 4; }
-      if (i === 3) { st.markers.M1.state = "active"; st.markers.M2.state = "active"; ok("kichCoc"); }
-      if (i === 4) { st.escape.value = 45; }
-      if (i === 5) setCmdShips(st, 1);
+      if (i === 1) { st.nghi.launched = true; st.fleet.headX = MAP.khucCoc; st.nghi.flotX = MAP.khucCoc + 28; st.nghi.gap = 28; st.nghi.kk = 100; st.nghi.stance = "giuvung"; ok("nghiBinh"); st.fleet.reachShare = KE_SACH.nghiBinh.effect.reachShare; }
+      if (i === 2) st.fleet.headX = FLEET.stopX;
       setPhase(st, i, ev);
       this.main[i - 1] = i - 1 === 4 ? true : this.phaseDone(i - 1);
     }
     this.hkLock = ev.some((e) => e.type === "hkSet");
     const hk = this.ctx.hk; hk.value = HK_B20.debugAt[n]; hk.floor = Math.min(75, Math.floor(hk.value / 25) * 25);
-    const snapEsc = {}; for (const id of ["E1", "E2", "E3", "E4"]) if (n >= 2) snapEsc[id] = { down: true, crewLeft: 0, officerAlive: false };
-    if (n >= 4) EBB_OPS.starts.forEach(([x, side], k) => {
-      const down = k < 5, z = zc(x) + side * (EBB_OPS.lane + (x > 620 && x < 700 && side > 0 ? EBB_OPS.laneOut - EBB_OPS.lane : 0));
-      snapEsc["E" + (FLEET.escorts[0] + 1 + k)] = { down, stuck: !down, wave: 2, p4: true, side, x, z, yaw: DOWN, crewLeft: down ? 0 : ESCORT_OPS.crew, officerAlive: !down };
-      if (down) { st.fleet.escortsDown++; st.fleet.captured++; st.fleet.downP4++; }
-    });
     this.time = this.phaseStart = 0;
     this.setupPhase(n, { river: snapshotRiver(st), hk: clone(hk), time: 0, ko: 0, koMs: 0, main: [...this.main], phaseTimes: [...this.phaseTimes],
-      scoutsStopped: 0, escaped: 0, captured: n >= 5 ? { X24: true } : {}, bossesMet: [], orders: 0, counterBoss: 0, hkLock: this.hkLock,
-      hero: { hp: this.hero.maxHp, ki: this.hero.kiMax * 0.5, revives: this.hero.revives }, esc: snapEsc });
+      captured: n >= 5 ? { X24: true } : {}, bossesMet: [], orders: 0, counterBoss: 0, hkLock: this.hkLock,
+      hero: { hp: this.hero.maxHp, ki: this.hero.kiMax * 0.5, revives: this.hero.revives } });
     this.say(`?debug: vào thẳng đầu pha ${PHASES[n].id} (trạng thái dựng sẵn).`, 5);
     this.note(n);
   }
@@ -1773,15 +1353,16 @@ export class DirectorB20 {
   buildResult(won, why) {
     const ctx = this.ctx, st = this.st, hk = ctx.hk, rr = riverResult(st);
     let q = 0, q0 = 0; for (const id in st.wings) { q += st.wings[id].q; q0 += st.wings[id].q0; }
-    const side = { S_SCOUT: this.scoutsStopped > 0 && rr.markersExposed === 0, S_STAKES3: rr.markersActive === STAKES.length,
-      S_X24: !!this.captured.X24, S_NOEXIT: this.phase >= 4 && this.escaped === 0 };
-    const mainDone = this.main.filter(Boolean).length, sideDone = Object.values(side).filter(Boolean).length;
+    const side = { S_RAID: this.raidsCleared > 0 && this.raidsRepelled === 0, S_X24: !!this.captured.X24 };
+    // nhiệm vụ chính: các pha người chơi làm (P1, P5, P6 — pha cảnh tua auto không tính); phụ: SIDE_MISSIONS
+    const real = PHASES.map((p, i) => i).filter((i) => !PHASES[i].auto);
+    const mainDone = real.filter((i) => this.main[i]).length, sideDone = SIDE_MISSIONS.filter((m) => side[m.id]).length;
     const keSachList = KS_ORDER.filter((id) => st.ks[id]).map((id) => { const k = st.ks[id]; return { id, state: k.state, name: KE_SACH[id].name, word: KS_STATE_WORD[k.state], got: k.got, hk: KE_SACH[id].hk, why: k.why }; });
     return {
       // timeSec: giây đã chơi cộng dồn qua các lần thử lại (time tua về đầu pha khi tải lại — trước đây ghi kỷ lục nhanh hơn thật)
       won, why, battle: "B20", R: ctx.R, difficulty: ctx.diff.id, mode: this.mode, timeSec: this.playTime, clockSec: this.time, parSec: PAR_B20,
-      missions: (mainDone / 6) * 0.8 + (sideDone / 4) * 0.2, missionsTotal: 6, sideTotal: 4, eventNames: {},
-      qRatio: q0 ? q / q0 : 1, baseRatio: (Math.min(1, rr.escorts.down / FLEET.escorts[0]) + rr.markersActive / STAKES.length) / 2, ko: this.ko,
+      missions: (mainDone / real.length) * 0.8 + (sideDone / SIDE_MISSIONS.length) * 0.2, missionsTotal: real.length, sideTotal: SIDE_MISSIONS.length, eventNames: {},
+      qRatio: q0 ? q / q0 : 1, baseRatio: rr.strandShare, ko: this.ko,
       hkRaw: hk.rawTotal, hkOptional: hk.optional,
       hkLog: { ...hk.log, ...Object.fromEntries(Object.entries(hk.script || {}).map(([k, v]) => [`${k} (đặt thẳng, điểm thanh)`, v])) },
       avgSK: this.skN ? this.skSum / this.skN : 50, bossDefeated: !!this.captured.X20, tpcCount: hk.tpcCount, chestCoins: 0, extraTT: 0,

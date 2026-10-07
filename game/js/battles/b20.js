@@ -1,12 +1,13 @@
 // battles/b20.js — BattleDef của B20 Bạch Đằng (9/4/1288), đợt 9 pha D: trận thật (battle/director-b20.js) trên lớp thủy chiến
 // (battle/naval.js), HUD riêng (battle/hud-b20.js), trời 6 pha (data/atmo-b20.js). Các móc theo danh sách ở đầu battles/b15.js.
+// Đợt 20: pha 1 một lệnh "Ra khiêu chiến", pha 2–4 cảnh tua triều rút, ra đánh từ pha 5 (xem battle/director-b20.js).
 //
 // Dựng: thế giới world-b20 (địa hình khúc sông, nước theo Con nước, cảnh, hai cầu bến là boong) + Naval.install (mặt đất trận:
 // độ cao lưới đang vẽ, boong, nước sâu không lội được, thân thuyền) → mô phỏng sim/river.js (createRiver: Tiết Chế +15% cửa sổ
-// Kế Sách, Phụ Tử Chi Binh +20 Sĩ Khí cánh, Quyết sách đúng → Tình báo sớm) → Hào Khí mở màn 30, sàn 25 tới mốc đầu (VS: Vân Đồn
+// Kế Sách, Phụ Tử Chi Binh +20 Sĩ Khí cánh, Quyết sách đúng → "Kế đã định" trên bản đồ nhỏ) → Hào Khí mở màn 30, sàn 25 tới mốc đầu (VS: Vân Đồn
 // coi như đã thắng) → tướng H31 xuất hiện trên thuyền chỉ huy nhẹ (director đặt lên boong) → DirectorB20.
 // Mỗi khung: frameVisuals vẽ hạm đội (naval.render) và HUD riêng (director.frame → HudB20.update(hudState)).
-// par Trận nhanh 780 s (canon 13 phút). debug: { objective, state } — mục tiêu theo pha cho bot (D4 dựng bot B20 trên đó).
+// par Trận nhanh PAR_B20 (director-b20.js). debug: { state } — ảnh chụp trạng thái cho kịch bản; bot B20 là window.__objectiveB20 (js/debug.js).
 // ?debug&battle=B20&phase=N (1..6): vào thẳng đầu pha N (director fastForward). ?debug&battle=B20&sandbox: NavalSandbox — sân thử
 // lớp thủy chiến của D1 (thuyền chỉ huy nhẹ chạy, hộ vệ áp mạn, thuyền dò, bè cỏ, chiến thuyền + kỳ hạm ở khúc cọc, ván dốc, lầu
 // kỳ hạm; window.__hk.sandbox, __hk.naval, __hk.tide(pct)).
@@ -181,54 +182,17 @@ class NavalSandbox extends DirectorB20Stub {
   }
 }
 
-// CŨ (khung D2, chỉ còn chế độ "legacy" của bộ chạy thử ngoài repo dùng): bot B20 thật là __objectiveB20 trong js/debug.js. P1 đứng trên
-// thuyền chỉ huy, P2 thuyền hộ vệ gần nhất còn tuần, P3 bè cỏ mốc ẩn gần nhất, P4 thuyền chỉ huy nhẹ, P5 thuyền Phàn Tiếp, P6 kỳ hạm.
-// ferry: id nơi đến cho director.ferryTo.
-function objectiveB20(ctx) {
-  const d = ctx.director, h = ctx.hero, st = ctx.sim;
-  const near = (list) => list.reduce((a, b) => (!a || Math.hypot(b.x - h.x, b.z - h.z) < Math.hypot(a.x - h.x, a.z - h.z) ? b : a), null);
-  if (d.phase === 0) return { x: h.x, z: h.z, ferry: null };
-  if (d.phase === 1 || d.phase === 3) {   // P2 hộ vệ đang tuần; P4 hộ vệ đang chạy ra cửa sông / mắc cọc
-    const e = near(Object.values(d.esc).filter((q) => !q.down && !q.gone && (d.phase === 1 ? q.patrol : q.flee || q.stuck)).map((q) => q.boat));
-    if (e) return { x: e.x, z: e.z, ferry: e.id };
-  }
-  if (d.phase === 2) {
-    const r = near(ctx.naval.rafts.filter((q) => st.markers[q.id]?.state === "hidden").map((q) => ({ x: q.deck.m[9], z: q.deck.m[11], id: "raft:" + q.id })));
-    if (r) return { ...r, ferry: r.id };
-  }
-  // P5 Phàn Tiếp, P6 Ô Mã Nhi (đơn vị boss nếu đã có — đi theo người, không theo tâm thuyền)
-  const u = d.phase === 4 ? d.bosses?.X24 : d.phase === 5 ? d.bosses?.X20 : null;
-  const b = d.phase === 4 ? d.ships.PT : d.phase === 5 ? d.ships.FS : d.flot[0];
-  // (khác boong: điểm qua cửa kế tiếp — chân ván dốc, ván xích, cầu thang cùng boong thì đi thẳng)
-  // (điểm cửa đẩy thêm 2,5 m theo hướng đi để tướng bước hẳn lên ván dốc thay vì dừng ngay chân ván)
-  if (u && u.alive && !u.captured) {
-    // Ô Mã Nhi đã lui lên lầu chỉ huy, tướng còn ở boong dưới: tới chân cầu thang (giữa thân) rồi leo lên lầu
-    const D = b?.deck;
-    if (d.phase === 5 && d.x20 && d.x20.st !== "deck" && D && h.deck === D && h.y < D.toWorld(0, -10.8, {}).y - 1) {
-      // (trước cột buồm chính ở tim thuyền: vòng qua cột; lệch khỏi trục thang: về chân thang trước; trên trục thang: đi thẳng lên)
-      const L = D.toLocal(h.x, h.z, {}), ax = Math.abs(L.x);
-      const W = L.z > 3.2 && ax < 1.3 ? D.toWorld(L.x < 0 ? -1.7 : 1.7, 3.6, {})        // cột buồm chính ở tim
-        : (ax > 1.4 || L.z >= 3.0) && L.z > -5.9 ? D.toWorld(0, 1.0, {}) : D.toWorld(0, -9, {});
-      return { x: W.x, z: W.z, ferry: null, boss: u.id };
-    }
-    const w = ctx.naval.route(h, u, u.x, u.z); if (!w) return { x: u.x, z: u.z, ferry: b?.id ?? null, boss: u.id };
-    const dx = w.x - h.x, dz = w.z - h.z, L = Math.hypot(dx, dz) || 1;
-    return { x: w.x + dx / L * 2.5, z: w.z + dz / L * 2.5, ferry: b?.id ?? null, boss: u.id };
-  }
-  return b ? { x: b.x, z: b.z, ferry: b.id } : { x: h.x, z: h.z };
-}
 // Ảnh chụp gọn trạng thái trận B20 (như __state của B15) cho kịch bản kiểm thử.
 function stateB20(ctx) {
   const d = ctx.director, st = ctx.sim, h = ctx.hero;
   return { t: Math.round(d.time), phase: d.phase, hp: Math.round(h.hp), ki: Math.round(h.ki), hk: +ctx.hk.value.toFixed(1), tpc: ctx.hk.tpc,
     pos: [Math.round(h.x), Math.round(h.z)], deck: h.deck?.label ?? null, st: h.state, tide: +ctx.world.tidePct.toFixed(1), head: Math.round(st.fleet.headX),
-    flot: Math.round(st.nghi.flotX), gap: +st.nghi.gap.toFixed(1), kk: Math.round(st.nghi.kk), stance: st.nghi.stance, lost: st.nghi.lost,
-    escorts: `${st.fleet.escortsDown}/${st.fleet.escortsTotal}`, markers: Object.values(st.markers).map((m) => m.id + ":" + m.state).join(" "),
-    escape: Math.round(st.escape.value), ks: Object.values(st.ks).map((k) => `${k.id}:${k.state}:${k.got}`).join(" "), ko: d.ko,
-    vg: d.vg.map((v) => v.state).join(","), scouts: d.scouts.map((s) => s.target + ":" + s.state).join(","), squads: d.squads.map((q) => q.id + ":" + q.state).join(","),
+    flot: Math.round(st.nghi.flotX), gap: +st.nghi.gap.toFixed(1), kk: Math.round(st.nghi.kk), stance: st.nghi.stance, launched: st.nghi.launched,
+    ks: Object.values(st.ks).map((k) => `${k.id}:${k.state}:${k.got}`).join(" "), ko: d.ko,
+    vg: d.vg.map((v) => v.state).join(","), raids: `${d.raidsCleared}/${d.raidsRepelled}`, tua: !!d.tua,
     agents: ctx.crowd.agents.length, units: ctx.units.length, boats: ctx.naval.boats.length, msgs: d.msgs.map((m) => m.text.replace(/<[^>]+>/g, "")).slice(-3),
     bosses: Object.values(d.bosses || {}).map((u) => `${u.id}:${Math.round(u.hp / u.maxHp * 100)}%${u.captured ? ":bắt" : u.broken > 0 ? ":vỡ" : ""}`).join(" "),
-    x20: d.x20?.st ?? null, chained: !!d.chained, stranded: (d.stranded || []).length, escaped: d.escaped,
+    x20: d.x20?.st ?? null, chained: !!d.chained, stranded: (d.stranded || []).length,
     over: d.over, res: d.result?.why };
 }
 
@@ -248,7 +212,7 @@ export const B20 = {
                                                           // đặt ở khung đầu: lượt làm nóng, khung đầu ở 10,5 m rồi khung 2 giật lùi 1,4 m)
   par: { nhanh: PAR, chuan: PAR },
   outroSec: BOSS_OPS.outroSec,                            // cảnh kết: director kéo máy quay lên nhìn cả khúc sông (battle.js giữ màn thắng chờ)
-  controlsNote: "trên boong thuyền hộ vệ địch đã hạ trấn thủ giữ 3 s để chiếm, cạnh boong khác 1 s để lên boong, trên bè cỏ 5 s để mở mốc cọc, 0,4 s để gọi đò chuyển (1–4 hoặc chạm để chọn nơi đến, bấm lại Tương tác hoặc Né để đóng)",
+controlsNote: "pha 1: nút Ra khiêu chiến (hoặc phím Kế Sách) một lần, đoàn thuyền nhẹ tự lái; cạnh boong khác giữ 1 s để lên boong, 0,4 s để gọi đò chuyển (1–4 hoặc chạm để chọn nơi đến, bấm lại Tương tác hoặc Né để đóng)",
   buildWorld(scene, { shadows, ctx }) {
     const world = buildWorldB20(scene, { shadows, tide: TIDE0 });
     Naval.install(ctx, world, { cap: 40, shadows });   // ctx.naval; ground: địa hình B20, boong, mặt nước (naval.js terrainB20)
@@ -277,7 +241,7 @@ export const B20 = {
   },
   dispose(ctx) { ctx.hudB20?.dispose?.(); ctx.naval?.dispose(); },
   touch: { interact: true },
-  debug: { objective: objectiveB20, state: stateB20 },     // objective: cũ (xem trên); state: __state() của debug.js
+  debug: { state: stateB20 },                              // state: __state() của debug.js
 };
 wireAtmoB20(B20);                                         // atmo (6 pha), music (boss ở P6 và Tổng Phản Công), bed (khoảng cách tới địch)
 wireHudB20(B20);                                          // bản đồ nhỏ khúc sông, ẩn bảng mặt trận

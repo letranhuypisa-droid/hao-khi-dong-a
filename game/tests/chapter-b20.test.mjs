@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import * as C from "../js/meta/chapter.js";
 import * as P from "../js/meta/progress.js";
 import { BATTLES, loadChapterMeta } from "../js/data/battles.js";
-import { createRiver, riverResult, markerAction } from "../js/sim/river.js";
+import { createRiver, riverResult } from "../js/sim/river.js";
 import { missionRows, keSachRows, riverRows, resultB20HTML, resultHTML } from "../js/ui/result-b20.js";
 import { applyCouncil, councilResult, councilErrors } from "../js/ui/council.js";
 import { MODES } from "../js/data/tuning.js";
@@ -58,11 +58,11 @@ await t("thẻ Kế Sách B20 ghi đúng điều kiện mở (thành công)", ()
 console.log("Thưởng, xếp hạng trận ngoài thang R");
 const baseRes = { battle: "B20", won: true, R: 25, difficulty: "quansi", mode: "nhanh", timeSec: 700, missions: 0.9, qRatio: 0.8, baseRatio: 0.8,
   keSach: 1, keSachOk: 3, hkRaw: 120, avgSK: 60, bossDefeated: true, tpcCount: 1, ko: 700 };
-await t("scoreBattle: par riêng (B20 780 s = PAR_B20) và kLost bỏ trọn điểm K; mặc định như cũ", () => {
-  assert.equal(BATTLES.B20.par.nhanh, 780, "par màn kết quả = par HUD (PAR_B20, canon 13 phút)");
-  const a = P.scoreBattle({ ...baseRes, timeSec: 900 }), b = P.scoreBattle({ ...baseRes, timeSec: 900, par: BATTLES.B20.par.nhanh });
-  assert.equal(a.parts.T, Math.max(0, 1 - (900 - MODES.nhanh.par) / MODES.nhanh.par));
-  assert.ok(b.parts.T > a.parts.T);
+await t("scoreBattle: par riêng (B20 330 s = PAR_B20) và kLost bỏ trọn điểm K; mặc định như cũ", () => {
+  assert.equal(BATTLES.B20.par.nhanh, 330, "par màn kết quả = par HUD (PAR_B20, tổng par các pha)");
+  const par = BATTLES.B20.par.nhanh, a = P.scoreBattle({ ...baseRes, timeSec: 700 }), b = P.scoreBattle({ ...baseRes, timeSec: 700, par });
+  assert.equal(a.parts.T, Math.max(0, 1 - (700 - MODES.nhanh.par) / MODES.nhanh.par));
+  assert.equal(b.parts.T, Math.max(0, 1 - (700 - par) / par)); assert.notEqual(b.parts.T, a.parts.T, "par riêng của B20 khác par chung");
   const k = P.scoreBattle({ ...baseRes, kLost: true });
   assert.equal(k.parts.K, 0); assert.equal(P.scoreBattle(baseRes).diem - k.diem, 10);
 });
@@ -86,35 +86,33 @@ await t("applyFixedRewards: ví + save.battles.B20 (best, bestTime, plays), khô
 });
 
 console.log("Màn kết quả B20 (ui/result-b20.js)");
-await t("hàng nhiệm vụ: 6 chính theo PHASES, 4 phụ; cờ từ res.main / res.side, thiếu thì suy", () => {
-  const r = missionRows({ main: [1, 1, 0, 1, 1, 1], side: { S_X24: true }, phaseTimes: [80] });
-  assert.equal(r.main.length, 6); assert.equal(r.side.length, 4); assert.equal(r.mainDone, 5); assert.equal(r.sideDone, 1);
-  assert.equal(r.main[0].time, 80); assert.equal(r.main[1].time, null);
-  const st = createRiver({}); for (const id of ["M1", "M2", "M3"]) { st.markers[id].state = "hidden"; }
-  st.phase = 2; for (const id of ["M1", "M2", "M3"]) markerAction(st, id, "activate");
-  const d = missionRows({ mainDone: 2, river: riverResult(st) });
-  assert.equal(d.mainDone, 2); assert.equal(d.side.find((m) => m.id === "S_STAKES3").done, riverResult(st).markersActive === 3);
+await t("hàng nhiệm vụ: 3 chính (P1, P5, P6 — pha cảnh tua không hiện), 2 phụ; cờ từ res.main / res.side, thiếu thì suy", () => {
+  const r = missionRows({ main: [1, 1, 1, 1, 0, 1], side: { S_X24: true }, phaseTimes: [80, 30, 10, 20, 0, 60] });
+  assert.deepEqual(r.main.map((m) => m.id), ["P1", "P5", "P6"]); assert.equal(r.side.length, 2); assert.equal(r.mainDone, 2); assert.equal(r.sideDone, 1);
+  assert.equal(r.main[0].time, 80); assert.equal(r.main[1].time, null); assert.equal(r.main[2].time, 60);
+  const d = missionRows({ mainDone: 2, captured: { X24: true }, river: riverResult(createRiver({})) });
+  assert.equal(d.mainDone, 2); assert.equal(d.side.find((m) => m.id === "S_X24").done, true); assert.equal(d.side.find((m) => m.id === "S_RAID").done, false);
 });
 await t("Kế Sách: 3 dòng theo thứ tự trận từ riverResult thật, chữ trạng thái, lý do thất bại", () => {
-  const st = createRiver({}); st.ks.conNuoc.state = "thatbai"; st.ks.conNuoc.why = "Thanh Thoát vây đã đầy.";
+  const st = createRiver({}); st.ks.conNuoc.state = "thatbai"; st.ks.conNuoc.why = "Bãi cọc chỉ giữ được một nửa hạm đội.";
   const K = keSachRows({ river: riverResult(st) });
   assert.deepEqual(K.map((k) => k.id), ["nghiBinh", "kichCoc", "conNuoc"]);
-  assert.equal(K[2].word, "Thất bại"); assert.equal(K[2].why, "Thanh Thoát vây đã đầy.");
+  assert.equal(K[2].word, "Thất bại"); assert.equal(K[2].why, "Bãi cọc chỉ giữ được một nửa hạm đội.");
 });
-await t("khúc sông: mốc cọc, hộ vệ, thuyền nhẹ, vào bãi, mắc cạn (mất điểm K), Thoát vây, Tình báo sớm", () => {
+await t("khúc sông: hạm đội vào bãi cọc, mắc cạn (mất điểm K), Kế đã định", () => {
   const st = createRiver({ quyetSachOk: true });
   const R = riverRows({ river: riverResult(st) }, { council: { historical: true } });
-  assert.deepEqual(R.map((x) => x.k), ["Mốc cọc", "Thuyền hộ vệ bị hạ", "Thuyền nhẹ mất ở pha 1", "Hạm đội vào bãi cọc", "Hạm đội mắc cạn", "Thoát vây", "Tình báo sớm"]);
-  assert.match(R[4].v, /mất điểm Kế Sách/);                 // strandShare 0,5 khi chưa có Kế Sách → kRank false
-  assert.match(R[6].v, /^có/);
+  assert.deepEqual(R.map((x) => x.k), ["Hạm đội vào bãi cọc", "Hạm đội mắc cạn", "Kế đã định"]);
+  assert.match(R[1].v, /mất điểm Kế Sách/);                 // strandShare 0,5 khi chưa có Kế Sách → kRank false
+  assert.match(R[2].v, /^có/);
   assert.deepEqual(riverRows({}), []);
 });
 await t("HTML: không lỗi với kết quả tối thiểu và kết quả đủ; escape chữ; có nhãn Chính sử", () => {
   assert.equal(resultHTML, resultB20HTML);
   const h0 = resultB20HTML({});
-  assert.match(h0, /Sáu pha theo con nước/); assert.match(h0, /Không có số liệu khúc sông/);
+  assert.match(h0, /Nhiệm vụ theo con nước/); assert.match(h0, /Không có số liệu khúc sông/);
   const st = createRiver({}); st.ks.nghiBinh.state = "thatbai"; st.ks.nghiBinh.why = "<b>x</b>";
-  const h = resultB20HTML({ river: riverResult(st), captured: { X20: true }, mainDone: 6 }, { council: { historical: true } });
+  const h = resultB20HTML({ river: riverResult(st), captured: { X20: true }, mainDone: 3 }, { council: { historical: true } });
   assert.ok(!h.includes("<b>x</b>") && h.includes("&lt;b&gt;x&lt;/b&gt;"));
   assert.match(h, /Kế đã định/); assert.match(h, /Ô Mã Nhi/); assert.match(h, /label cs/);
 });
