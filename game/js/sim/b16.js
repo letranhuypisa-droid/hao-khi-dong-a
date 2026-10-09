@@ -3,9 +3,11 @@
 //
 // Pha (data/battle-b16.js PHASES): 0 Hiệu triệu dân binh → 1 Đánh úp bến → 2 Cổng nam → 3 Trấn Nam vương → 4 Tụng giá hoàn kinh.
 // Đầu vào mỗi bước (inp): hero { x, z, alive }, foesAt(x, z, r) → số địch còn đánh được trong vòng, ramMoving (xe húc có người đẩy và
-// không bị chặn — director quyết), bossDown (Thoát Hoan đã rút). Sự kiện trả về: { type, … } theo thứ tự xảy ra trong bước.
+// không bị chặn — director quyết), bossDown (Thoát Hoan đã rút). Đợt 2 (tùy chọn, thiếu thì coi là 0): torchesAt(i) số lính cầm đuốc
+// sát kho i, landingDef người giữ bến (lính ta trong vòng bến; tướng do luật tự tính), counterLeft số lính phản công còn đánh được. Sự kiện trả về: { type, … } theo thứ tự xảy ra trong bước.
 
-import { VILLAGES, VILLAGES_TO_ADVANCE, BOATS, BOAT_RULE, LANDING, RAM, GATES, GATE_SOUTH, GATE_EAST, PALACE, TIMEOUT_B16, KE_SACH } from "../data/battle-b16.js";
+import { VILLAGES, VILLAGES_TO_ADVANCE, BOATS, BOAT_RULE, LANDING, RAM, GATES, GATE_SOUTH, GATE_EAST, PALACE, TIMEOUT_B16, KE_SACH,
+  DYKE, REEDS, ALARM, inRect, DEPOTS, DEPOT_RULE, SQUADS, COUNTER, BANNERS, BANNER_RULE } from "../data/battle-b16.js";
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export function routeLen(route) { let L = 0; for (let i = 0; i < route.length - 1; i++) L += dist(route[i], route[i + 1]); return L; }
@@ -35,6 +37,11 @@ export function createB16({ S = 1, timeout = TIMEOUT_B16, ksWin = 1 } = {}) {
     bossDown: false, palace: { p: 0, taken: false },
     main: [false, false, false, false, false],
     allVillagesBeforeLanding: false,
+    alarmBy: null,                                                     // "de" (bước lên đê) | "thay" (lính canh thấy) | "lua" (thuyền đầu tiên cháy)
+    depots: DEPOTS.map((d) => ({ id: d.id, p: 0, burnt: false, saved: false })), torchesSent: false,
+    squadsCleared: 0,                                                  // Đoạt Giáo: số đội giữ bến đã bị tước (director báo qua noteSquadCleared)
+    counter: { state: "wait", keep: 100, spawned: false },             // phản công bến: wait → run → done | lost
+    banners: BANNERS.map((b) => ({ id: b.id, hp0: Math.round(BANNER_RULE.hp * S), hp: Math.round(BANNER_RULE.hp * S), down: false })), bannersDown: 0,
     // Kế Sách: state "khadung" → "sansang" (danhUp: đang trong cửa sổ) → "thanhcong" | "thatbai"
     ks: { danhUp: { state: "khadung", left: null, window: KE_SACH.danhUp.window * ksWin }, danBinh: { state: "khadung" } },
     // nhắc tương tác của bước vừa chạy (director đưa lên ctx.hud.prompt): { text, p } | null
@@ -81,11 +88,24 @@ export function tickB16(st, inp, dt) {
     BOATS.forEach((B, i) => {
       const b = st.boats[i];
       if (b.burnt || !h.alive || dist(h, B) > BOAT_RULE.reach) return;
-      if (st.alarmT == null) { st.alarmT = st.t; ev.push({ type: "alarm" }); }
       if (inp.foesAt(B.x, B.z, BOAT_RULE.clearR + 1.5) > 0) { st.prompt = { text: "Địch kề bên — dẹp chúng rồi châm lửa thuyền", p: b.p }; return; }
       b.p = Math.min(1, b.p + dt / BOAT_RULE.burnSec);
       st.prompt = { text: "Châm lửa thuyền neo", p: b.p };
-      if (b.p >= 1) { b.burnt = true; st.burnt++; ev.push({ type: "boatBurnt", id: B.id, n: st.burnt }); }
+      if (b.p >= 1) { b.burnt = true; st.burnt++; ev.push({ type: "boatBurnt", id: B.id, n: st.burnt }); raiseAlarm(st, "lua", ev); }
+    });
+    if (st.alarmT == null && h.alive) {
+      if (inRect(DYKE, h.x, h.z)) raiseAlarm(st, "de", ev);
+      else if (dist(h, LANDING) < ALARM.near) {
+        const reed = REEDS.some((R) => inRect(R, h.x, h.z));
+        if (inp.foesAt(h.x, h.z, reed ? ALARM.reedSeeR : ALARM.seeR) > 0) raiseAlarm(st, "thay", ev);
+      }
+    }
+    // kho quân nhu: báo động rồi thì lính cầm đuốc chạy tới; đứng sát kho đủ burnSec là cháy
+    if (st.alarmT != null && !st.torchesSent && st.t - st.alarmT >= DEPOT_RULE.torchDelay) { st.torchesSent = true; ev.push({ type: "torches" }); }
+    DEPOTS.forEach((D, i) => {
+      const d = st.depots[i];
+      if (d.burnt || !st.torchesSent) return;
+      if ((inp.torchesAt?.(i) ?? 0) > 0) { d.p = Math.min(1, d.p + dt / DEPOT_RULE.burnSec); if (d.p >= 1) { d.burnt = true; ev.push({ type: "depotBurnt", id: D.id }); } }
     });
     const K = st.ks.danhUp;
     if (st.alarmT != null && K.state === "khadung") { K.state = "sansang"; K.left = K.window; }
@@ -94,7 +114,6 @@ export function tickB16(st, inp, dt) {
       if (st.burnt >= KE_SACH.danhUp.need) ksResult(st, "danhUp", true, ev);
       else if (K.left <= 0) ksResult(st, "danhUp", false, ev);
     }
-    if (st.alarmT == null && h.alive && dist(h, LANDING) < LANDING.r + 30) { st.alarmT = st.t; ev.push({ type: "alarm" }); }
     if (st.burnt >= BOATS.length) {
       const r = holdRing(st.landing, LANDING, LANDING.r, LANDING.capSec, inp, dt);
       if (r === "blocked") st.prompt = { text: "Quân Nguyên còn trên bến — dẹp chúng để chiếm bến", p: st.landing.p };
@@ -102,6 +121,7 @@ export function tickB16(st, inp, dt) {
       else if (r === "done") {
         st.landing.taken = true; st.landing.takenT = st.t; st.main[1] = true;
         st.allVillagesBeforeLanding = st.rallied >= VILLAGES.length;
+        for (const d of st.depots) if (!d.burnt) d.saved = true;
         ev.push({ type: "landingTaken", allVillages: st.allVillagesBeforeLanding });
         ksResult(st, "danBinh", st.allVillagesBeforeLanding, ev);
         setPhase(st, 2, ev);
@@ -125,6 +145,20 @@ export function tickB16(st, inp, dt) {
     if (R.arrived && !G.open) { G.hp = Math.max(0, G.hp - RAM.dps * G.hp0 * dt); if (G.hp <= 0) openGate(st, GATE_SOUTH, ev); }
   }
   if (st.phase === 2 && st.gates[GATE_SOUTH].open) { st.main[2] = true; setPhase(st, 3, ev); }
+
+  // ---- phản công bến (từ khi chiếm bến): sức giữ bến về 0 là thua ----
+  const C = st.counter;
+  if (st.landing.taken && C.state === "wait" && st.t - st.landing.takenT >= COUNTER.at) { C.state = "run"; ev.push({ type: "counterStart" }); }
+  if (C.state === "run") {
+    if (!C.spawned) { C.spawned = true; C.t0 = st.t; }                 // director sinh lính ngay trong bước nhận counterStart
+    else if ((inp.counterLeft ?? 0) <= 0 || st.t - C.t0 >= COUNTER.dur) { C.state = "done"; ev.push({ type: "counterEnd", ok: true }); }   // dẹp hết, hoặc giữ đủ dur giây
+    if (C.state === "run") {
+      const foes = inp.foesAt(LANDING.x, LANDING.z, LANDING.r), h = inp.hero;
+      const def = (inp.landingDef ?? 0) + (h.alive && dist(h, LANDING) < LANDING.r ? 2 : 0);
+      if (foes > def) C.keep = Math.max(0, C.keep - Math.min(foes - def, COUNTER.cap) * COUNTER.drainPer * dt);
+      if (C.keep <= 0) { C.state = "lost"; ev.push({ type: "counterEnd", ok: false }); finish(st, false, "Mất bến Chương Dương: quân Nguyên chiếm lại bến.", ev); return ev; }
+    }
+  }
 
   // ---- Thoát Hoan, điện chính ----
   if (st.phase === 3 && inp.bossDown) { st.bossDown = true; st.main[3] = true; setPhase(st, 4, ev); }
@@ -160,6 +194,21 @@ export function damageGateB16(st, id, dmg, ev = []) {
   return d;
 }
 
+function raiseAlarm(st, by, ev) { if (st.alarmT != null) return; st.alarmT = st.t; st.alarmBy = by; ev.push({ type: "alarm", by }); }
+
+// Vương Kỳ: đòn của tướng vào cờ i (chỉ pha 3 — Thoát Hoan). Trả lượng đã trừ; cờ đổ → sự kiện bannerDown (+ bannersAll khi đủ 3).
+export function damageBannerB16(st, i, dmg, ev = []) {
+  const b = st.banners[i];
+  if (!b || b.down || st.phase !== 3 || st.over) return 0;
+  const d = Math.min(b.hp, dmg); b.hp -= d;
+  if (b.hp <= 0) { b.down = true; st.bannersDown++; ev.push({ type: "bannerDown", id: b.id, n: st.bannersDown }); if (st.bannersDown >= BANNERS.length) ev.push({ type: "bannersAll" }); }
+  return d;
+}
+// Thoát Hoan còn khiên vương giả (sàn Sinh lực) khi còn cờ đứng
+export const bossFloorB16 = (st) => (st.bannersDown < BANNERS.length ? BANNER_RULE.floorPct : 0);
+// Đoạt Giáo: một đội giữ bến bị hạ hết người
+export function noteSquadCleared(st) { st.squadsCleared++; return st.squadsCleared; }
+
 export function finish(st, won, why, ev = []) {
   if (st.over) return ev;
   st.over = true; st.won = won; st.why = why;
@@ -167,9 +216,9 @@ export function finish(st, won, why, ev = []) {
   return ev;
 }
 
-// Nhiệm vụ phụ (SIDE_MISSIONS): S_VILLAGES đủ 3 làng, S_EAST cổng đông mở; S_NOREVIVE director tự xét
-export function sideB16(st, { revived = false } = {}) {
-  return { S_VILLAGES: st.rallied >= VILLAGES.length, S_EAST: st.gates[GATE_EAST].open, S_NOREVIVE: !revived };
+// Nhiệm vụ phụ (SIDE_MISSIONS, canon): đủ 3 làng, tước vũ khí ≥ 10 đội giữ bến, giữ được cả hai kho (đã chiếm bến mà kho chưa cháy)
+export function sideB16(st) {
+  return { S_VILLAGES: st.rallied >= VILLAGES.length, S_DISARM: st.squadsCleared >= SQUADS.need, S_DEPOTS: st.depots.every((d) => d.saved) };
 }
 
 export const snapshotB16 = (st) => JSON.parse(JSON.stringify(st));

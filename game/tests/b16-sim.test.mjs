@@ -2,7 +2,7 @@
 // neo, chiếm bến, xe húc, cổng, Thoát Hoan, điện chính, thua theo giờ, chụp / khôi phục, xác định. Chạy trong Node:
 //   node game/tests/b16-sim.test.mjs
 import assert from "node:assert/strict";
-import { createB16, tickB16, damageGateB16, sideB16, snapshotB16, restoreB16, along, routeLen } from "../js/sim/b16.js";
+import { createB16, tickB16, damageGateB16, damageBannerB16, bossFloorB16, noteSquadCleared, sideB16, snapshotB16, restoreB16, along, routeLen } from "../js/sim/b16.js";
 import * as D from "../js/data/battle-b16.js";
 import { MAP, BASES } from "../js/data/battle-b15.js";
 import { waterDist } from "../js/battle/ground.js";
@@ -14,8 +14,8 @@ async function t(name, fn) {
 }
 
 // đầu vào giả: tướng đứng ở p, địch theo bảng foes [{ x, z }]
-const inp = (p, { foes = [], ramMoving = false, bossDown = false, alive = true } = {}) => ({
-  hero: { x: p.x, z: p.z, alive }, ramMoving, bossDown,
+const inp = (p, { foes = [], ramMoving = false, bossDown = false, alive = true, torches = [], landingDef = 0, counterLeft = 0 } = {}) => ({
+  hero: { x: p.x, z: p.z, alive }, ramMoving, bossDown, landingDef, counterLeft, torchesAt: (i) => torches[i] || 0,
   foesAt: (x, z, r) => foes.filter((f) => Math.hypot(f.x - x, f.z - z) < r).length,
 });
 // chạy n giây theo bước 1/10 s, gom sự kiện
@@ -83,13 +83,78 @@ await t("đủ 2 làng thì sang pha 1; làng thứ ba vẫn gọi được tớ
   run(st, 31, inp(D.VILLAGES[2]));
   assert.equal(st.rallied, 3);
 });
-await t("thuyền: đứng sát 2,5 s thì cháy, báo động ở lần đầu tới gần; địch kề bên thì chặn", () => {
+await t("thuyền: đứng sát 2,5 s thì cháy; địch kề bên thì chặn; thuyền đầu tiên cháy là báo động (lửa)", () => {
   const st = createB16(); toPhase(st, 1);
-  const B = D.BOATS[0];
-  let ev = run(st, 2, inp(B, { foes: [{ x: B.x + 1, z: B.z + 2 }] }));
-  assert.deepEqual(types(ev), ["alarm"]); assert.equal(st.boats[0].p, 0);
-  ev = run(st, 2.6, inp(B));
-  assert.deepEqual(types(ev), ["boatBurnt"]); assert.equal(st.burnt, 1);
+  const B = D.BOATS[0], bank = { x: B.x, z: -170 };                                       // đứng mép bờ, trong lau sậy
+  let ev = run(st, 2, inp(bank, { foes: [{ x: B.x + 4.5, z: B.z + 1 }] }));
+  assert.deepEqual(types(ev), []); assert.equal(st.boats[0].p, 0);                         // lính sát thuyền chặn châm lửa, nhưng ngoài tầm thấy trong lau sậy
+  ev = run(st, 2.6, inp(bank));
+  assert.deepEqual(types(ev), ["boatBurnt", "alarm"]); assert.equal(st.burnt, 1); assert.equal(st.alarmBy, "lua");
+});
+await t("báo động: bước lên đê; bị thấy ở 14 m ngoài lau sậy, trong lau sậy chỉ 5 m; trước pha 1 không báo động", () => {
+  const dyke = { x: (D.DYKE.x0 + D.DYKE.x1) / 2, z: (D.DYKE.z0 + D.DYKE.z1) / 2 };
+  const s0 = createB16(); run(s0, 1, inp(dyke)); assert.equal(s0.alarmT, null);
+  const s1 = createB16(); toPhase(s1, 1); const ev = run(s1, 0.1, inp(dyke));
+  assert.deepEqual(ev, [{ type: "alarm", by: "de" }]);
+  const R = D.REEDS[1], reed = { x: (R.x0 + R.x1) / 2, z: (R.z0 + R.z1) / 2 }, foe8 = [{ x: reed.x + 8, z: reed.z }];
+  assert.ok(Math.hypot(reed.x - D.LANDING.x, reed.z - D.LANDING.z) < D.ALARM.near);
+  const s2 = createB16(); toPhase(s2, 1); run(s2, 3, inp(reed, { foes: foe8 })); assert.equal(s2.alarmT, null);
+  const open = { x: D.LANDING.x, z: D.LANDING.z + 12 };
+  const s3 = createB16(); toPhase(s3, 1); run(s3, 0.2, inp(open, { foes: [{ x: open.x + 8, z: open.z }] })); assert.equal(s3.alarmBy, "thay");
+});
+await t("kho quân nhu: đuốc tới sau torchDelay giây kể từ báo động; lính đuốc sát kho burnSec giây thì cháy; chiếm bến thì kho còn lại giữ được", () => {
+  const st = createB16(); toPhase(st, 1);
+  run(st, 2.6, inp(D.BOATS[0]));
+  let ev = run(st, D.DEPOT_RULE.torchDelay + 0.2, inp({ x: 0, z: 0 }, { torches: [1, 0] }));
+  assert.ok(types(ev).includes("torches"));
+  ev = run(st, D.DEPOT_RULE.burnSec, inp({ x: 0, z: 0 }, { torches: [1, 0] }));
+  assert.ok(st.depots[0].burnt && !st.depots[1].burnt); assert.ok(ev.some((e) => e.type === "depotBurnt" && e.id === "K1"));
+  for (const B of D.BOATS.slice(1)) run(st, 2.6, inp(B));
+  run(st, D.LANDING.capSec + 0.2, inp(D.LANDING));
+  assert.deepEqual(st.depots.map((d) => d.saved), [false, true]); assert.equal(sideB16(st).S_DEPOTS, false);
+});
+await t("phản công bến: bắt đầu `at` giây sau khi chiếm; bỏ trống thì sức giữ về 0 là thua; dẹp hết lính phản công là xong", () => {
+  const st = createB16(); toPhase(st, 2);
+  let ev = run(st, D.COUNTER.at + 0.1, inp({ x: 0, z: 0 }, { counterLeft: 5 }));
+  assert.ok(types(ev).includes("counterStart")); assert.equal(st.counter.state, "run");
+  const foes = Array.from({ length: 5 }, (_, i) => ({ x: D.LANDING.x + i, z: D.LANDING.z }));
+  run(st, 100 / (D.COUNTER.drainPer * 5) - 2, inp({ x: 0, z: 0 }, { foes, counterLeft: 5 }));
+  assert.ok(!st.over && st.counter.keep > 0 && st.counter.keep < 10);                       // 5 lính, bến trống: 0,25 × 5 mỗi giây
+  run(st, 3, inp({ x: 0, z: 0 }, { foes, counterLeft: 5 }));
+  assert.ok(st.over && !st.won); assert.match(st.why, /Mất bến/); assert.equal(st.counter.state, "lost");
+  const s2 = createB16(); toPhase(s2, 2);
+  run(s2, D.COUNTER.at + 0.1, inp({ x: 0, z: 0 }, { counterLeft: 5 }));
+  run(s2, 10, inp(D.LANDING, { foes: foes.slice(0, 2), counterLeft: 2, landingDef: 6 }));
+  assert.equal(s2.counter.keep, 100);
+  ev = run(s2, 0.2, inp(D.LANDING, { counterLeft: 0 }));
+  assert.deepEqual(ev.filter((e) => e.type === "counterEnd"), [{ type: "counterEnd", ok: true }]); assert.ok(!s2.over);
+});
+await t("phản công bến: tụt tối đa drainPer × cap mỗi giây — mất bến không dưới 60 s dù đông địch", () => {
+  assert.ok(100 / (D.COUNTER.drainPer * D.COUNTER.cap) >= 60);
+  const st = createB16(); toPhase(st, 2);
+  run(st, D.COUNTER.at + 0.1, inp({ x: 0, z: 0 }, { counterLeft: 30 }));
+  const foes = Array.from({ length: 30 }, (_, i) => ({ x: D.LANDING.x + (i % 6), z: D.LANDING.z + Math.floor(i / 6) }));
+  run(st, 59, inp({ x: 0, z: 0 }, { foes, counterLeft: 30 }));
+  assert.ok(!st.over);
+});
+await t("Vương Kỳ: chỉ chém được ở pha 3; còn cờ thì Thoát Hoan có sàn 50%; đổ đủ 3 cờ thì hết sàn", () => {
+  const st = createB16({ S: 1.5 });
+  assert.equal(damageBannerB16(st, 0, 1e6), 0);
+  toPhase(st, 3);
+  assert.equal(bossFloorB16(st), D.BANNER_RULE.floorPct); assert.equal(st.banners[0].hp0, D.BANNER_RULE.hp * 1.5);
+  const ev = [];
+  damageBannerB16(st, 0, 1e6, ev); damageBannerB16(st, 1, 1e6, ev);
+  assert.equal(bossFloorB16(st), D.BANNER_RULE.floorPct);
+  damageBannerB16(st, 1, 1e6, ev);
+  damageBannerB16(st, 2, 1e6, ev);
+  assert.deepEqual(types(ev), ["bannerDown", "bannerDown", "bannerDown", "bannersAll"]); assert.equal(bossFloorB16(st), 0);
+});
+await t("Đoạt Giáo: đủ 10 đội bị tước thì nhiệm vụ phụ S_DISARM; dữ liệu đủ đội", () => {
+  assert.ok(D.SQUADS.landing + D.SQUADS.sentryPairs >= D.SQUADS.need);
+  assert.ok(D.SQUADS.landing * D.SQUADS.size <= D.LANDING.garrison);
+  const st = createB16();
+  for (let i = 0; i < 9; i++) noteSquadCleared(st);
+  assert.equal(sideB16(st).S_DISARM, false); noteSquadCleared(st); assert.equal(sideB16(st).S_DISARM, true);
 });
 await t("chưa đủ 12 thuyền thì không chiếm được bến; đủ thì đứng trong vòng capSec giây", () => {
   const st = createB16(); toPhase(st, 1);
@@ -122,12 +187,12 @@ await t("đòn tướng vào cổng chỉ từ pha 2; mở cổng nam bằng đ�
   const ev = run(st, 0.1, inp({ x: 0, z: 0 }));
   assert.ok(st.gates.B3.open); assert.equal(st.phase, 3); assert.deepEqual(types(ev), ["phase"]);
 });
-await t("cổng đông tự mòn từ pha 2 (cánh Quang Khải) — mở được thì nhiệm vụ phụ S_EAST", () => {
+await t("cổng đông tự mòn từ pha 2 (cánh Quang Khải), không thay cổng nam", () => {
   const st = createB16(); toPhase(st, 2);
   const ev = run(st, 1 / D.GATES.A3.wingDps + 1, inp({ x: 0, z: 0 }));
   assert.ok(ev.some((e) => e.type === "gateOpen" && e.id === "A3"));
   assert.equal(st.phase, 2);                                                                  // cổng đông không thay cổng nam
-  assert.ok(sideB16(st).S_EAST);
+  assert.ok(st.gates.A3.open);
 });
 await t("pha 3 → 4 khi Thoát Hoan rút; pha 4 chiếm điện thì thắng", () => {
   const st = createB16(); toPhase(st, 4);
@@ -152,7 +217,7 @@ await t("nhiệm vụ phụ: đủ 3 làng trước khi chiếm bến (allVillag
   const ev = run(st, D.LANDING.capSec + 0.2, inp(D.LANDING));
   assert.equal(ev.find((e) => e.type === "landingTaken").allVillages, true); assert.ok(st.allVillagesBeforeLanding);
   assert.equal(st.ks.danBinh.state, "thanhcong");
-  assert.deepEqual(sideB16(st, { revived: true }), { S_VILLAGES: true, S_EAST: false, S_NOREVIVE: false });
+  assert.deepEqual(sideB16(st), { S_VILLAGES: true, S_DISARM: false, S_DEPOTS: true });
 });
 await t("Kế Sách Đánh úp bến: báo động mở cửa sổ; đủ 9 thuyền trong cửa sổ thì thành công, cổng nam mất 30%", () => {
   const st = createB16({ ksWin: 0.75 }); toPhase(st, 1);
@@ -169,7 +234,7 @@ await t("Kế Sách Đánh úp bến: hết cửa sổ mà chưa đủ 9 thuyề
   run(st, 2.6, inp(D.BOATS[0]));
   assert.equal(st.ks.danhUp.state, "sansang");
   const ev = run(st, D.KE_SACH.danhUp.window, inp({ x: 0, z: 0 }));
-  assert.deepEqual(types(ev), ["keSach"]); assert.equal(st.ks.danhUp.state, "thatbai");
+  assert.deepEqual(types(ev), ["torches", "keSach"]); assert.equal(st.ks.danhUp.state, "thatbai");
   assert.equal(st.gates.B3.hp, st.gates.B3.hp0);
 });
 await t("chụp / khôi phục giữ nguyên trạng thái, khôi phục rồi chạy tiếp ra đúng như chạy thẳng", () => {
@@ -191,6 +256,26 @@ await t("along / routeLen: đầu, giữa, cuối đường xe húc", () => {
   assert.deepEqual([along(R, 0).x, along(R, 0).z], [R[0].x, R[0].z]);
   const e = along(R, L + 5); assert.ok(e.done); assert.deepEqual([e.x, e.z], [R.at(-1).x, R.at(-1).z]);
   assert.ok(!along(R, L / 2).done);
+});
+
+console.log("Nội dung Sử quán, Quiz B16");
+await t("Quiz B16 qua lintQuiz; thẻ đủ nhóm, khóa mở hợp lệ; Kế Sách nào cũng có thẻ", async () => {
+  const { CARDS, CARD_BY_ID, QUIZ_B16 } = await import("../js/data/suquan-b16.js");
+  const { lintQuiz } = await import("../js/meta/chapter.js");
+  const { CARD_GROUPS } = await import("../js/data/suquan-b15.js");
+  assert.deepEqual(lintQuiz(QUIZ_B16, { panels: {}, cards: CARD_BY_ID }), []);
+  assert.ok(CARDS.length >= 8 && QUIZ_B16.length >= 10);
+  const groups = new Set(CARD_GROUPS.map((g) => g.id)), keys = new Set(["chapterOpen", "battleStart", "bossMet", "firstWin", "firstQuiz", ...D.KS_ORDER.map((k) => "keSach:" + k)]);
+  for (const c of CARDS) { assert.ok(groups.has(c.group), c.id); assert.ok(keys.has(c.unlock), c.id + " " + c.unlock); assert.equal(c.chapter, "B16"); assert.ok(c.src.length); }
+  for (const k of D.KS_ORDER) assert.ok(CARDS.some((c) => c.unlock === "keSach:" + k), k);
+});
+await t("canon B16.sensitivity: câu thơ có chữ 'Hồ' chỉ ở thẻ Sử quán (kèm dịch nghĩa), không ở chữ trong trận", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { CARDS } = await import("../js/data/suquan-b16.js");
+  const tho = CARDS.find((c) => c.id === "B16-tho");
+  assert.ok(tho.body.some((b) => b.includes("Cầm Hồ")) && tho.body.some((b) => b.startsWith("Dịch nghĩa")));
+  for (const f of ["js/data/battle-b16.js", "js/battle/director-b16.js", "js/battles/b16.js", "js/sim/b16.js", "js/data/comic-b16.js"])
+    assert.ok(!/Cầm Hồ|擒胡/.test(readFileSync(new URL("../" + f, import.meta.url), "utf8")), f);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

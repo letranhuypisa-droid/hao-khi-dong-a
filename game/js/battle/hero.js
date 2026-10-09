@@ -396,6 +396,13 @@ export class Hero {
       ctx.fx.spark(gt.x - 1.8, heightAt(gt.x, gt.z) + 2, gt.z, true);
       hitAny = true;
     }
+    // vật chém được của trận (B16: Vương Kỳ) — director.strikeables?() → [{ x, z, r, hit(dmg) }]; B15, B20 không có móc này
+    for (const s of ctx.director.strikeables?.() ?? []) {
+      if (!inShape(s.x, s.z, s.r)) continue;
+      s.hit(this.effCong() * mv * GATE_MULT);
+      ctx.fx.spark(s.x, heightAt(s.x, s.z) + 2, s.z, true);
+      hitAny = true;
+    }
     if (hitAny) {
       // Hit-stop dài hơn bản cũ, cộng thêm theo số người trúng, chí mạng, người ngã — đòn trúng đông "khựng" rõ (IMPACT).
       // Đòn tụ lực (WC01): +30 ms mỗi cấp trên 1, cấp 3 nâng trần thêm 60 ms (ĐỀ XUẤT BẢN THỬ).

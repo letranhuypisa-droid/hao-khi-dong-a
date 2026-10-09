@@ -10,7 +10,8 @@ import { ATMO_B15 } from "../battle/atmosphere.js";
 import { DirectorB16 } from "../battle/director-b16.js";
 import { MAP } from "../data/battle-b15.js";
 import B15 from "./b15.js";
-import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, VILLAGES, BOATS, LANDING, PALACE, RAM, GATE_SOUTH, GATE_EAST, PAR_B16 } from "../data/battle-b16.js";
+import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, VILLAGES, BOATS, LANDING, PALACE, RAM, GATE_SOUTH, GATE_EAST, PAR_B16,
+  REEDS, DYKE, DEPOTS, BANNERS } from "../data/battle-b16.js";
 import { gatePct } from "../battle/gatebar.js";
 
 const COL = { land: "#cdb888", water: "#2f5d62", city: "#b39a6a", wall: "#5a4632", gold: "#f1d98a", dich: "#3d5a78", ta: "#c0392b", ink: "#1d1a17" };
@@ -24,6 +25,8 @@ function drawBase({ c, W, H, X, Z, sx }) {
   c.strokeStyle = "rgba(29,26,23,.45)"; c.lineWidth = 1; c.setLineDash([3, 3]); c.beginPath();
   RAM.route.forEach((p, i) => (i ? c.lineTo(X(p.x), Z(p.z)) : c.moveTo(X(p.x), Z(p.z)))); c.stroke(); c.setLineDash([]);
   c.fillStyle = "#7a2a1e"; c.fillRect(X(PALACE.x) - 6, Z(PALACE.z - 10) - 4, 12, 8);                   // điện chính
+  c.fillStyle = "rgba(110,128,62,.75)"; for (const R of REEDS) c.fillRect(X(R.x0), Z(R.z0), X(R.x1) - X(R.x0), Z(R.z1) - Z(R.z0));   // lau sậy: lối lẻn
+  c.fillStyle = "#8a6a42"; c.fillRect(X(DYKE.x0), Z(DYKE.z0), X(DYKE.x1) - X(DYKE.x0), Math.max(2, Z(DYKE.z1) - Z(DYKE.z0)));          // đê
   c.font = "bold 9px sans-serif"; c.textAlign = "center"; c.lineJoin = "round"; c.lineWidth = 3;
   const label = (t, x, z) => { c.strokeStyle = "rgba(255,248,230,.9)"; c.strokeText(t, X(x), Z(z)); c.fillStyle = COL.ink; c.fillText(t, X(x), Z(z)); };
   label("Thăng Long", (MAP.fortWallX + MAP.riverEastX) / 2, 120); label("Bến", LANDING.x, LANDING.z + 26);
@@ -49,6 +52,10 @@ function drawTop({ c, X, Z, t, sx }, ctx) {
     c.fillStyle = s.open ? COL.ta : COL.dich; c.fillRect(X(g.x) - 2, Z(g.z) - 6, 5, 12);
     if (!s.open && st.phase >= 2) { c.font = "bold 8px sans-serif"; c.fillStyle = COL.ink; c.fillText(`${gatePct(s.hp, s.hp0)}%`, X(g.x) - 22, Z(g.z) + 3); }
   }
+  // kho quân nhu
+  DEPOTS.forEach((D, i) => { const s = st.depots[i]; c.fillStyle = s.burnt ? "#ff7a3a" : "#e6d3a0"; c.fillRect(X(D.x) - 2.5, Z(D.z) - 2.5, 5, 5); c.strokeStyle = COL.ink; c.lineWidth = 1; c.strokeRect(X(D.x) - 2.5, Z(D.z) - 2.5, 5, 5); });
+  // Vương Kỳ
+  if (st.phase === 3) BANNERS.forEach((B, i) => { if (st.banners[i].down) return; c.fillStyle = "#ffd23a"; c.beginPath(); c.moveTo(X(B.x), Z(B.z) - 5); c.lineTo(X(B.x) + 4, Z(B.z) + 3); c.lineTo(X(B.x) - 4, Z(B.z) + 3); c.fill(); });
   // xe húc
   if (st.phase === 2) { const p = d.ramPos(); c.fillStyle = d.ramState === "bị chặn" && blink ? "#ff5a3a" : COL.gold; c.fillRect(X(p.x) - 3.5, Z(p.z) - 2.5, 7, 5); }
   // Thoát Hoan
@@ -63,6 +70,7 @@ function frontsHTML(ctx) {
   const d = ctx.director, st = d.st;
   const rows = [`<div class="front here"><b>Dân binh</b><span class="ta">${d.militiaUp()}</span><span class="vs">theo tướng · ${st.rallied}/3 làng</span></div>`,
     `<div class="front reinf">Gọi tiếp viện: ${d.reinf.charges} lượt${d.reinf.cd > 0 ? ` · hồi ${Math.ceil(d.reinf.cd)}s` : ""}</div>`];
+  if (st.counter.state === "run") rows.push(`<div class="front"><b>Bến</b><span class="vs">phản công · sức giữ ${Math.ceil(st.counter.keep)}%</span></div>`);
   if (st.phase === 2) rows.push(`<div class="front"><b>Xe húc</b><span class="vs">${d.ramState || ""} · ${Math.round((st.ram.s / st.ram.len) * 100)}% đường</span></div>`);
   if (st.phase >= 2) { const E = st.gates[GATE_EAST]; rows.push(`<div class="front"><b>Cổng đông</b><span class="vs">${E.open ? "cánh Trần Quang Khải đã phá" : `cánh Trần Quang Khải đang đánh · ${gatePct(E.hp, E.hp0)}%`}</span></div>`); }
   return rows.join("");
@@ -92,7 +100,11 @@ export const B16 = {
   par: { nhanh: PAR_B16, chuan: PAR_B16 },
   rigs: ["tuong"],                                    // Thoát Hoan (mô hình tướng Nguyên chung) ra ở pha 4
   // bot (debug.js __objective): lính còn chặn vòng chiếm trước, rồi mục tiêu của pha
-  debug: { objective: (ctx) => { const b = ctx.director.blockers()[0]; return b ? { x: b.x, z: b.z, ref: b.ref } : ctx.director.objectivePoint() || { x: ctx.hero.x, z: ctx.hero.z }; }, state: (ctx) => ({ ...ctx.director.st, hero: { x: ctx.hero.x, z: ctx.hero.z, hp: ctx.hero.hp } }) },
+  debug: { objective: (ctx) => {
+    const d = ctx.director, b = d.blockers()[0]; if (b) return { x: b.x, z: b.z, ref: b.ref };
+    const o = d.objectives()[0]; if (!o) return { x: ctx.hero.x, z: ctx.hero.z };
+    return o.label === "Vương Kỳ" ? { x: o.x, z: o.z, strike: true } : { x: o.x, z: o.z };
+  }, state: (ctx) => ({ ...ctx.director.st, hero: { x: ctx.hero.x, z: ctx.hero.z, hp: ctx.hero.hp } }) },
   dispose: (ctx) => ctx.director?.dispose?.(),
 };
 export default B16;

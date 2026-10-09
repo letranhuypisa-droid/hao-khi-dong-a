@@ -356,8 +356,8 @@ function smartBot(getTarget, opts) {
         if (adj.length >= 3) { tgt = adj[0].a; why = "cận chiến"; }
         else if (rt) { tgt = rt.a; why = "săn cung"; }
       }
-      else if (offNear) { tgt = offNear.u; why = "đấu sĩ quan"; }
-      else if (adj.length) { tgt = adj[0].a; why = "cận chiến"; }
+      else if (offNear && !obj.strike) { tgt = offNear.u; why = "đấu sĩ quan"; }      // B16 Vương Kỳ: chém cờ trước, chỉ quay ra khi bị vây
+      else if (adj.length && (!obj.strike || adj.length >= 3)) { tgt = adj[0].a; why = "cận chiến"; }
       else if (rangedTok.length) { tgt = rangedTok[0].a; why = "săn cung"; }
       else if (ksRef) { tgt = ksRef; why = ksRef.isBig ? "Kế Sách: sĩ quan giữ bờ" : "Kế Sách: dọn bờ"; }
       else if (kAlive && (keeper.awake || dist(keeper) < 35)) { tgt = keeper; why = "trấn thủ"; }
@@ -414,6 +414,11 @@ function smartBot(getTarget, opts) {
       const cd = Math.hypot(bp.x - h.x, bp.z - h.z);
       if (cd > bp.r * 0.45) { travel(bp.x, bp.z, cd, cd > 10); mode("vào vòng chiếm"); return; }
       inp.setStick(0, 0); if (on("block") && count(9) > 0) inp.touchHeld.block = true; mode("giữ vòng chiếm"); return;
+    }
+    // vật chém được (B16: Vương Kỳ — obj.strike): tới sát rồi chém; B15, B20 không đặt obj.strike
+    if (obj.strike) {
+      if (L0 < 2.4) { stick(obj.x - h.x, obj.z - h.z, 0.2); strike(null, true); mode("chém vật"); return; }
+      travel(obj.x, obj.z, L0, L0 > 14); mode("tới vật"); return;
     }
     if (L0 > 1.2) { travel(obj.x, obj.z, L0, L0 > 14); mode(B ? "tới Cứ Điểm" : "tới mục tiêu"); return; }
     inp.setStick(0, 0); mode("chờ");

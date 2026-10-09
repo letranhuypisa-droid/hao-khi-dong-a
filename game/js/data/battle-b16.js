@@ -19,9 +19,37 @@ export const VILLAGES_TO_ADVANCE = 2;          // canon: pha 2 mở khi đã có
 
 // Bến Chương Dương (pha 2): 12 thuyền Nguyên neo sát bờ bắc. Đứng sát thuyền `burnSec` giây (không địch trong `clearR`) thì châm lửa.
 // Bến chiếm được khi đủ 12 thuyền đã vô hiệu và đứng trong vòng bến `capSec` giây không có địch.
-export const LANDING = { x: 345, z: -146, r: 16, capSec: 6, garrison: 26, officers: ["photuong", "photuong"] };
+export const LANDING = { x: 345, z: -146, r: 16, capSec: 6, garrison: 28, officers: ["photuong", "photuong"] };
 export const BOATS = Array.from({ length: 12 }, (_, i) => ({ id: `T${i + 1}`, x: 262 + i * 15, z: -173.5, yaw: Math.PI / 2 + (i % 2 ? 0.12 : -0.1) }));
 export const BOAT_RULE = { burnSec: 2.5, reach: 6, clearR: 4.5, hk: 1 };
+
+// Lối tiếp cận bến (đợt 2, canon Kế Sách "tiếp cận bến từ hướng lau sậy, không qua đê"). Hình chữ nhật [x0, x1] × [z0, z1].
+// Báo động khi: tướng bước lên đê; hoặc lính Nguyên thấy tướng ở gần bến (seeR m — trong lau sậy chỉ reedSeeR m); hoặc thuyền đầu tiên bốc cháy.
+// near: chỉ xét "bị thấy" khi tướng trong near m quanh bến (toán lùng ở làng không báo động bến).
+export const REEDS = [{ x0: 232, x1: 330, z0: -172, z1: -155 }, { x0: 362, x1: 446, z0: -172, z1: -155 }];   // dải bờ hai bên cầu bến (chỗ thuyền neo)
+export const DYKE = { x0: 300, x1: 396, z0: -126, z1: -118, h: 1.1 };
+export const ALARM = { seeR: 14, reedSeeR: 3.5, near: 100 };
+export const inRect = (R, x, z) => x >= R.x0 && x <= R.x1 && z >= R.z0 && z <= R.z1;
+
+// Hai kho quân nhu trên bến (nhiệm vụ phụ canon "không để kho quân nhu trên bến bị địch tự đốt"): torchDelay giây sau báo động, mỗi kho
+// `torches` lính cầm đuốc chạy tới; đứng sát kho (r) đủ burnSec giây thì kho cháy. Hạ lính cầm đuốc là giữ được kho.
+export const DEPOTS = [{ id: "K1", name: "Kho quân nhu tây", x: 316, z: -134 }, { id: "K2", name: "Kho quân nhu đông", x: 376, z: -134 }];
+export const DEPOT_RULE = { torchDelay: 12, torches: 2, r: 3, burnSec: 10 };
+
+// Đoạt Giáo (nhiệm vụ phụ canon "tước vũ khí 10 đội lính giữ bến"): quân giữ bến chia đội; đội nào bị hạ hết người là bị tước (bản thử —
+// kỹ năng "Đoạt Giáo Chương Dương" của Trần Quang Khải chưa có).
+export const SQUADS = { landing: 7, size: 4, sentryPairs: 4, need: 10 };
+
+// Phản công vào bến (pha 3, canon "Mất bến Chương Dương sau khi đã chiếm" là thua): `at` giây sau khi chiếm bến, n lính Nguyên đổ bộ.
+// Sức giữ bến 100 → 0: mỗi giây trừ drainPer × min(địch trong vòng − người giữ, cap) (người giữ: lính ta trong vòng, tướng tính 2; bến trống
+// cũng theo công thức này) — tối đa drainPer × cap mỗi giây, tức ≥ 100 / (drainPer × cap) giây để mất bến (đủ thời gian quay về).
+// keepMilitia dân binh tự ở lại giữ bến lúc chiếm. Đo bot lần đầu (0,9 / s mỗi lính, không trần): mất bến sau 24 s khi đang hộ tống xe húc.
+export const COUNTER = { at: 60, n: 12, dur: 90, from: { x: 345, z: -171 }, drainPer: 0.25, cap: 6, keepMilitia: 8, hk: 6 };   // dur: giữ được bến chừng ấy giây thì quân phản công rút
+
+// Vương Kỳ Trấn Nam (đợt 3, canon X18): 3 cờ quanh sân điện. Còn cờ đứng thì Thoát Hoan không xuống dưới floorPct% Sinh lực (khiên
+// vương giả); phá đủ 3 cờ thì đánh lui được. Cờ bị chém bằng đòn của tướng (hp gốc × S(R)). Lần đầu chạm sàn: gọi hộ vệ (Hộ Vệ Hoàng Tử).
+export const BANNERS = [{ id: "VK1", x: 486, z: -70 }, { id: "VK2", x: 566, z: -62 }, { id: "VK3", x: 500, z: 6 }];   // rìa sân, 39–58 m quanh Thoát Hoan
+export const BANNER_RULE = { hp: 1500, r: 1.6, floorPct: 50, guards: 8, hk: 3 };
 
 // Xe húc (pha 3): theo đường từ bến tới cổng nam. Chạy khi người đẩy còn sống, không có địch trong `stopR`; tới cổng thì húc `dps`
 // độ bền cổng mỗi giây. Địch phục kích theo quãng đã đi (`ambush` atU 0..1).
@@ -53,11 +81,11 @@ export const PHASES = [
   { id: "P1", name: "Hiệu triệu dân binh", goal: "Gọi dân binh ở 2 làng", par: 150, target: { villages: true },
     tip: "Tới làng có vòng vàng, dẹp toán lính Nguyên đi lùng rồi đứng trong vòng 30 giây để dân binh tập hợp. Có 2 làng là đủ đánh bến; gọi cả 3 làng trước khi chiếm bến thì có thêm dân binh." },
   { id: "P2", name: "Đánh úp bến", goal: "Đốt 12 thuyền neo, chiếm bến Chương Dương", par: 210, target: { boats: true },
-    tip: "Men theo bờ sông tới bến. Đứng sát thuyền neo (không có địch kề bên) để châm lửa. Đủ 12 thuyền thì đứng trong vòng bến để chiếm." },
+    tip: "Đi trong lau sậy ven sông để lính canh khó thấy; bước lên đê là bến báo động. Đứng sát thuyền neo (không có địch kề bên) để châm lửa. Báo động rồi thì quân Nguyên chạy đi đốt kho: hạ lính cầm đuốc. Đủ 12 thuyền thì đứng trong vòng bến để chiếm." },
   { id: "P3", name: "Cổng nam", goal: "Hộ tống xe húc, phá Cổng nam", par: 180, target: { gate: "B3" },
-    tip: "Xe húc chỉ chạy khi không có địch kề bên. Tới cổng xe tự húc; đòn của bạn cũng phá được cổng. Cánh Trần Quang Khải đánh cổng đông." },
+    tip: "Xe húc chỉ chạy khi không có địch kề bên. Tới cổng xe tự húc; đòn của bạn cũng phá được cổng. Quân Nguyên sẽ phản công bến: sức giữ bến về 0 là thua. Cánh Trần Quang Khải đánh cổng đông." },
   { id: "P4", name: "Trấn Nam vương", goal: "Đánh lui Thoát Hoan", par: 120, target: { boss: true },
-    tip: "Thoát Hoan đứng ở sân trước điện chính. Đánh cạn Phá Thế rồi ra Đòn Quyết; Hào Khí đầy thì kích Tổng Phản Công." },
+    tip: "Ba lá Vương Kỳ quanh sân điện giữ khiên cho Thoát Hoan: còn cờ đứng thì ông không núng quá nửa Sinh lực. Chém đổ cả ba cờ rồi đánh lui ông." },
   { id: "P5", name: "Tụng giá hoàn kinh", goal: "Chiếm điện chính", par: 60, target: { palace: true },
     tip: "Dẹp quân giữ điện, đứng trong vòng điện chính để cắm cờ." },
 ];
@@ -80,10 +108,10 @@ export const REINF = { charges: 1, n: 10, cd: 60 };             // Gọi tiếp 
 
 export const SIDE_MISSIONS = [
   { id: "S_VILLAGES", name: "Gọi dân binh đủ 3 làng" },
-  { id: "S_EAST", name: "Cổng đông cũng mở" },
-  { id: "S_NOREVIVE", name: "Không gục lần nào" },
+  { id: "S_DISARM", name: "Tước vũ khí 10 đội lính giữ bến" },
+  { id: "S_DEPOTS", name: "Giữ được cả hai kho quân nhu trên bến" },
 ];
-export const EVENTS = {};
+export const EVENTS = { counter: { name: "Quân Nguyên phản công bến" } };
 export const FRONTS = {};
 export const STORY_INSERTS = {};
 

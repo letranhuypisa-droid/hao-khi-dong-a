@@ -387,6 +387,8 @@ export class BigUnit {
     if (this.markT > ctx.clock) mult *= this.markMult;       // dấu Binh Thư Yếu Lược (hero-skills.js): +40% tới giờ markT
     const wasBroken = this.broken > 0;
     this.hp -= dmg * mult; this.flash = 0.12; this.noHit = 0; this.awake = true;
+    // Sàn Sinh lực (B16: Thoát Hoan còn Vương Kỳ đứng thì không xuống dưới floorPct%) — trận khác không đặt floorPct nên nhánh này không chạy
+    if (this.floorPct > 0) { const f = this.maxHp * this.floorPct / 100; if (this.hp < f) this.hp = f; this.hpLocked = this.hp <= f + 1e-6; }
     if (this.defeatMeans === "bị bắt") {                 // bắt sống (B20): khóa Sinh lực, Đòn Quyết lúc Vỡ Thế thì bị bắt
       const lock = this.maxHp * this.hpLockPct / 100;
       if (lock > 0 && this.hp < lock) this.hp = lock;
