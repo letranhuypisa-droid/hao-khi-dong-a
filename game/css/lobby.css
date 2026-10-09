@@ -8,6 +8,9 @@
 .lobby.b-B15 .lb-img, .ttl .lb-img { background-image: url(../assets/comic/B15/K6.webp); background-image: image-set(url(../assets/comic/B15/K6.avif) type("image/avif"), url(../assets/comic/B15/K6.webp) type("image/webp")); --pos: 67% 60%; }
 .lobby.b-B20 .lb-img { background-image: url(../assets/comic/B20/O3.webp); background-image: image-set(url(../assets/comic/B20/O3.avif) type("image/avif"), url(../assets/comic/B20/O3.webp) type("image/webp")); --pos: 70% 35%; }
 .s-B15 .st-art, .bi-art.s-B15, .ld-art.b-B15 .ld-img { background-image: url(../assets/comic/B15/D3.webp); background-image: image-set(url(../assets/comic/B15/D3.avif) type("image/avif"), url(../assets/comic/B15/D3.webp) type("image/webp")); }
+/* B16 chưa có comic: tạm dùng khung của Hàm Tử (cùng Quốc Toản, cùng năm 1285) */
+.lobby.b-B16 .lb-img { background-image: url(../assets/comic/B15/K4.webp); background-image: image-set(url(../assets/comic/B15/K4.avif) type("image/avif"), url(../assets/comic/B15/K4.webp) type("image/webp")); --pos: 60% 45%; }
+.s-B16 .st-art, .bi-art.s-B16, .ld-art.b-B16 .ld-img { background-image: url(../assets/comic/B15/K2.webp); background-image: image-set(url(../assets/comic/B15/K2.avif) type("image/avif"), url(../assets/comic/B15/K2.webp) type("image/webp")); }
 .s-B20 .st-art, .bi-art.s-B20, .ld-art.b-B20 .ld-img { background-image: url(../assets/comic/B20/K1.webp); background-image: image-set(url(../assets/comic/B20/K1.avif) type("image/avif"), url(../assets/comic/B20/K1.webp) type("image/webp")); }
 
 /* ---- khung: sảnh chiếm trọn chiều cao màn, dải đầu nằm trên tranh ---- */

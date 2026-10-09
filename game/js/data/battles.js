@@ -13,7 +13,8 @@
 // ra giữa trận (main.js loadModels); rig của chúng làm nóng ở BattleDef.rigs.
 // keSach: số Kế Sách theo chế độ (nhãn nút chế độ ở Xuất trận). Đợt 9 D5 (tùy chọn): result.cLabel (tên dòng thứ tư của
 // bảng điểm — B15 "Cứ Điểm"), resultUI() → module dựng phần riêng của màn kết quả (ui/result-b20.js), marks() → tên các
-// Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau).
+// Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau). ownHero (B16): trận R cố định mà tướng dùng chỉ số, cây kỹ năng của
+// người chơi (không có preset) — chữ ở sảnh nói đúng như vậy.
 
 export const BATTLES = {
   B15: {
@@ -26,6 +27,21 @@ export const BATTLES = {
       eventNames: { counterA1: "Cứ Điểm bị phản công", surrounded: "Tướng ta bị vây" } },
     load: () => import("../battles/b15.js"), comic: () => import("./comic-b15.js"), suquan: () => import("./suquan-b15.js"),
     notes: () => import("./battle-b15.js").then((m) => m.HISTORY_NOTES),
+  },
+  // B16 (bản thử đợt 1, greybox trên đất Hàm Tử): H35 Trần Quốc Toản dùng chỉ số của chính người chơi (heroStats nâng tối thiểu R − 2), R 13
+  // cố định (+3 sau B15 như thang R1), Trận nhanh. H32 Trần Quang Khải "sắp có" (chưa có mô hình, lớp cung WC09). Chưa comic / thẻ / Quiz.
+  B16: {
+    id: "B16", chapter: "B16", name: "Chương Dương", title: "Trận Chương Dương", date: "1285",
+    sub: "Tháng 5 năm Ất Dậu · khoảng tháng 6/1285 · bến Chương Dương, kinh thành Thăng Long",
+    heroes: ["H32", "H35"], playable: ["H35"], fixedR: 13, modes: ["nhanh"], wip: true, ownHero: true,
+    models: [],                                           // Thoát Hoan mượn mô hình tướng Nguyên chung (OFF_tuong, luôn nạp)
+    keSach: { nhanh: 2, chuan: 2 },                       // Đánh úp bến thuyền (Lớn), Dân binh các lộ (Nhỏ)
+    par: { nhanh: 720 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha; ĐỀ XUẤT BẢN THỬ, chưa đo bot)
+    loading: { title: "Bến Chương Dương · 1285" },
+    result: { title: "Giải phóng Thăng Long", missionsTotal: 5, sideTotal: 3, eventNames: {}, cLabel: "Bến, cổng, điện" },
+    marks: () => import("./battle-b16.js").then((m) => m.KS_ORDER.map((id) => m.KE_SACH[id].name)),
+    load: () => import("../battles/b16.js"), comic: () => import("./comic-b16.js"), suquan: () => import("./suquan-b16.js"),
+    notes: () => import("./battle-b16.js").then((m) => m.HISTORY_NOTES),
   },
   B20: {
     id: "B20", chapter: "B20", name: "Bạch Đằng", title: "Trận Bạch Đằng", date: "9/4/1288",
@@ -42,7 +58,7 @@ export const BATTLES = {
     notes: () => import("./battle-b20.js").then((m) => m.HISTORY_NOTES),
   },
 };
-export const BATTLE_ORDER = ["B15", "B20"];
+export const BATTLE_ORDER = ["B15", "B16", "B20"];
 
 // BattleDef của trận (default của module, không có thì export trùng id).
 export async function loadBattleDef(id) {

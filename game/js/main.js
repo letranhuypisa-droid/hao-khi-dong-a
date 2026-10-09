@@ -420,6 +420,7 @@ function openSheet(cls, label, draw) {
 // Sử liệu của một trận: những gì trước đây in thẳng trên thẻ Xuất trận.
 const LEAD = {
   B15: () => `Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.`,
+  B16: () => "Gọi dân binh ở các làng ven sông, đánh úp bến Chương Dương đốt 12 thuyền neo, hộ tống xe húc phá cổng nam kinh thành, đánh lui Thoát Hoan rồi chiếm điện chính. Bản thử: dựng tạm trên đất Hàm Tử.",
   B20: () => "Dụ hạm đội Nguyên vào khúc sông đã đóng cọc lúc triều lên, giữ chân chúng tới khi nước ròng, rồi lên boong chiến thuyền mắc cạn. Sáu pha theo con nước.",
 };
 async function openBattleInfo(id) {
@@ -430,7 +431,7 @@ async function openBattleInfo(id) {
   openSheet("binfo", `Sử liệu · ${B.title}`, (sh, close) => {
     const seen = chapterState(save, B.chapter).openSeen;
     const facts = B.ladder ? [`Cấp trận R ${pick.R}`, `${B.modes.length} chế độ`]
-      : [`R ${B.fixedR} cố định`, `Tướng dựng sẵn cấp ${B.preset?.level}`, B.modes.length === 1 ? MODES[B.modes[0]].name : "Mọi chế độ", ...(B.keSach?.[B.modes[0]] ? [`${B.keSach[B.modes[0]]} Kế Sách Lớn`] : [])];
+      : [`R ${B.fixedR} cố định`, B.ownHero ? "Tướng của bạn" : `Tướng dựng sẵn cấp ${B.preset?.level}`, B.modes.length === 1 ? MODES[B.modes[0]].name : "Mọi chế độ", ...(B.keSach?.[B.modes[0]] ? [`${B.keSach[B.modes[0]]} Kế Sách${B.ownHero ? "" : " Lớn"}`] : [])];
     sh.innerHTML = `
       <div class="bi-art s-${id}"><button data-close aria-label="Đóng">✕</button><span class="st-seal">${id}</span>
         <div><h3>${esc(B.title)}${B.wip ? ` <em class="wiptag">đang dựng — chơi thử</em>` : ""}</h3><p>${esc(B.sub)}</p></div></div>
@@ -465,7 +466,7 @@ function openPrep() {
       ${B.ladder ? `<h4>Cấp trận ${q("R")}</h4>${why("R", "Thắng một cấp thì mở cấp kế (+3, như R1: B12 = 1 … B20 = 25). Địch mạnh theo R; tướng được nâng tối thiểu lên cấp R − 2 và binh khí tối thiểu E(R) − 0,10 khi vào trận (12.1, 12.7).")}
         <div class="seg rgrid">${R_LADDER.map((r) => { const open = save.ladder.unlocked.includes(r), best = save.ladder.best[r];
           return `<button data-r="${r}" class="${pick.R === r ? "on" : ""}" ${open ? "" : `disabled aria-label="R ${r} · khóa"`}>R ${r}${best ? `<em class="rank r${best}">${best}</em>` : ""}${open ? "" : `<i class="lk">${LOCK}</i>`}</button>`; }).join("")}</div>`
-      : `<h4>Cấp trận · R ${R} cố định ${q("R")}</h4>${why("R", `${esc(B.title)}: tướng dựng sẵn cấp ${B.preset?.level ?? R}, binh khí E(R), không dùng cây kỹ năng và Lò rèn của Trần Quốc Toản (bản VS).`)}`}
+      : `<h4>Cấp trận · R ${R} cố định ${q("R")}</h4>${why("R", B.ownHero ? `${esc(B.title)}: địch theo R ${R}; tướng là Trần Quốc Toản của bạn (cấp, cây kỹ năng, Lò rèn), nâng tối thiểu lên cấp R − 2 và binh khí E(R) − 0,10 khi vào trận như thang R.` : `${esc(B.title)}: tướng dựng sẵn cấp ${B.preset?.level ?? R}, binh khí E(R), không dùng cây kỹ năng và Lò rèn của Trần Quốc Toản (bản VS).`)}`}
       <h4>Chế độ</h4>
       <div class="seg">${modes.map((m) => `<button data-mode="${m.id}" class="${curMode === m.id ? "on" : ""}"><b>${m.name}</b><small>${Math.round((B.par?.[m.id] ?? m.par) / 60)} phút</small></button>`).join("")}</div>
       <p class="seg-note">${curMode === "nhanh" ? `Hào Khí ×1,3 · thưởng ×0,6 · ${B.keSach?.nhanh ?? 1} Kế Sách` : `Thưởng ×1 · ${B.keSach?.chuan ?? 2} Kế Sách`}</p>
@@ -535,6 +536,7 @@ const TITLES = [
 const EMPTY_CH = { opened: false, openSeen: false, closeSeen: false, insertSeen: false, seen: [], cleared: false };
 const COMIC_INFO = {
   B15: { open: "Tình thế, Chủ soái quyết", insert: "Áo Tống trên bến", insertLock: "Mở khi thuyền quân Triệu Trung cập bến" },
+  B16: { open: "Chưa có (bản thử)", close: "Chưa có (bản thử)" },
   B20: { open: "Tình thế, hội quân", decree: "Chủ soái quyết", close: "Triều rút, bắt sống Ô Mã Nhi" },
 };
 function suquan() {
@@ -619,6 +621,7 @@ function showCard(id, onClose = render) {
 async function playComic(part, { title, ch: chId = CH, comic = null } = {}) {
   const M = await ensureMeta(chId), C = comic || M.comic, B = battleOfChapter(chId);
   const ids = C[part];
+  if (!ids?.length) return { skipped: false, seen: [], empty: true };        // Chương chưa có comic (B16 bản thử): bỏ qua, không đánh dấu đã xem
   const names = { open: "Mở chương", decree: "Chủ soái quyết", insert: "Giữa trận", close: "Kết chương" };
   const r = await readComic(C, {
     ids, title: title || `Quyển VI · Chương ${B.name} · ${names[part]}`, settings: save.settings, onSettings: persist,
@@ -1075,7 +1078,7 @@ function showResults(res, { cards = [], firstClear = false, ui = null, council =
     <div class="grid2">
       <div class="card"><h3>Phần thưởng</h3><table class="stat">
         ${B.ladder ? `<tr><td>EXP</td><td>+${n(rw.exp)}${applied.levelsGained ? ` · <b>lên cấp ${save.hero.level}</b> (từ ${lvBefore})` : ""}</td></tr>`
-          : `<tr><td>EXP</td><td>— <small class="small">tướng dựng sẵn cấp ${B.preset?.level ?? res.R}</small></td></tr>`}
+          : `<tr><td>EXP</td><td>— <small class="small">${B.ownHero ? "trận thử ngoài thang R: chưa tính EXP" : `tướng dựng sẵn cấp ${B.preset?.level ?? res.R}`}</small></td></tr>`}
         <tr><td>Tiền</td><td>+${n(rw.tien)}${res.chestCoins ? ` (gồm ${n(res.chestCoins)} từ rương)` : ""}</td></tr>
         <tr><td>Tinh thiết</td><td>+${n(rw.tt)}</td></tr><tr><td>Quân công</td><td>+${n(rw.qc)}</td></tr>
         ${rw.drops.map((d) => `<tr><td>Binh khí</td><td><b>${WEAPON_NAMES[d.tier]}</b> · ${esc(d.why)}</td></tr>`).join("")}

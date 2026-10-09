@@ -75,7 +75,7 @@ await t("collide trên địa hình khác: kẹp theo T.clamp, collideExtra nh�
 
 console.log("\nDanh mục trận, thẻ theo Chương, trời theo pha");
 await t("danh mục: B15 (thang R, H35) và B20 (R 25 cố định, H31 chơi được, H34/H38 sắp có, chỉ Trận nhanh, đang dựng)", () => {
-  assert.deepEqual(BATTLE_ORDER, ["B15", "B20"]);
+  assert.deepEqual(BATTLE_ORDER, ["B15", "B16", "B20"]);
   const A = BATTLES.B15, B = BATTLES.B20;
   assert.equal(A.ladder, true); assert.deepEqual(A.heroes, ["H35"]);
   assert.equal(A.result.missionsTotal, 4); assert.equal(A.result.sideTotal, 2);
@@ -83,10 +83,23 @@ await t("danh mục: B15 (thang R, H35) và B20 (R 25 cố định, H31 chơi đ
   assert.deepEqual(B.heroes, ["H31", "H34", "H38"]); assert.deepEqual(B.playable, ["H31"]); assert.equal(B.wip, true);
   for (const id of BATTLE_ORDER) for (const k of ["load", "comic", "suquan", "notes"]) assert.equal(typeof BATTLES[id][k], "function", id + "." + k);
 });
+await t("danh mục: B16 bản thử (R 13 cố định, H35 của người chơi, H32 sắp có, chỉ Trận nhanh, par = tổng par pha)", async () => {
+  const B = BATTLES.B16, D = await import("../js/data/battle-b16.js");
+  assert.equal(B.fixedR, 13); assert.equal(B.preset, undefined); assert.equal(B.ownHero, true); assert.equal(B.wip, true);
+  assert.deepEqual(B.heroes, ["H32", "H35"]); assert.deepEqual(B.playable, ["H35"]); assert.deepEqual(B.modes, ["nhanh"]);
+  assert.equal(B.par.nhanh, D.PAR_B16);
+  assert.equal(B.result.missionsTotal, D.PHASES.length); assert.equal(B.result.sideTotal, D.SIDE_MISSIONS.length);
+  assert.deepEqual(await B.marks(), ["Đánh úp bến thuyền", "Dân binh các lộ"]);
+});
 await t("nội dung Chương nạp lười: comic, thẻ, Quiz của B15 và B20; ghi chú màn nạp trận", async () => {
   for (const id of BATTLE_ORDER) {
     const M = await loadChapterMeta(id);
     assert.equal(M.comic.chapter.id, id);
+    if (BATTLES[id].wip && !M.cards.length) {            // Chương đang dựng chưa có nội dung (B16 bản thử): chỉ cần rỗng đúng dạng + ghi chú màn nạp
+      assert.deepEqual([M.comic.open, M.comic.close, M.quiz], [[], [], []], id);
+      assert.ok((await BATTLES[id].notes()).length >= 3, id + " ghi chú");
+      continue;
+    }
     assert.ok(M.cards.length >= 8 && M.cards.every((c) => c.chapter === id), id + " thẻ");
     assert.ok(M.quiz.length >= 10 && M.quiz.every((q) => q.chapter === id), id + " quiz");
     assert.ok(M.groups.length >= 6, id + " nhóm thẻ");
