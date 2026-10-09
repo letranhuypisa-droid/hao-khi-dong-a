@@ -7,3 +7,5 @@ design/tools/node_modules/
 game/anim-src/
 # GLB rời ở gốc design/ (ENV_*, PROP_*, DAN_*...: file thô mới tải về, mỗi file ~40 MB) — chưa xử lý, ngoài git
 /design/*.glb
+# worktree của Claude Code (git worktree), mỗi cái là một bản làm việc riêng
+.claude/worktrees/
