@@ -20,6 +20,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const q = new URLSearchParams(location.search);
 const dir = q.get("dir") || "design", from = +(q.get("from") || 0), n = +(q.get("n") || 30), cols = +(q.get("cols") || 6), cell = +(q.get("cell") || 256), view = q.get("view") || "front";
 const only = q.get("only"), all = await (await fetch(`/__list?dir=${encodeURIComponent(dir)}`)).json();
+if (!Array.isArray(all)) { document.getElementById("log").textContent = `không đọc được thư mục ${dir}: ${all.error}`; throw new Error(all.error); }
 const names = (only ? only.split(",").map((s) => s + ".glb").filter((s) => all.includes(s)) : all).slice(from, from + n);
 const rows = Math.ceil(names.length / cols), sheet = document.createElement("canvas");
 sheet.width = cols * cell; sheet.height = rows * (cell + 18);
