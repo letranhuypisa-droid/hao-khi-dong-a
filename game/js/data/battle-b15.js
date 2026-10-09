@@ -56,9 +56,10 @@ export const BASES = [
   { id: "B3", name: "Cổng nam Hàm Tử quan", type: "cong", owner: "dich", front: "B", lineX: 0.80, gate: 11000, G: 45, hk: [5, 0] },
 ];
 export const BASE_RING = { don: 10, doanh_trai: 13, cong: 7, ban_doanh: 16 };
-// Đồn có tường (battle/fort.js; chỉ Cứ Điểm loại "don": đồn A1, B1): hw, hh nửa bề rộng bên trong theo x (đường tim) và z — vòng chiếm bán kính 10 lọt vào —, wall nửa dày tường,
-// gate bề rộng hai cổng (cổng trước phía tây, quân ta tới; cổng sau phía đông; cả hai trên tim đường). Doanh trại giữ vòng cọc cũ.
-export const FORT = { don: { hw: 12.5, hh: 11, wall: 0.9, gate: 7 } };
+// Đồn / doanh trại có tường (battle/fort.js; Cứ Điểm loại "don": đồn A1, B1; loại "doanh_trai": doanh trại A2, B2): hw, hh nửa bề rộng bên trong theo x (đường tim) và z — vòng chiếm
+// (BASE_RING: 10 đồn, 13 doanh trại) lọt vào —, wall nửa dày tường, gate bề rộng hai cổng (cổng trước phía tây, quân ta tới; cổng sau phía đông; cả hai trên tim đường).
+// Doanh trại rộng hơn đồn (dãy nhà lính, chuồng ngựa, nhà chỉ huy) nhưng cùng loại tường, cổng: mọi luật đường đi qua cổng giữ nguyên.
+export const FORT = { don: { hw: 12.5, hh: 11, wall: 0.9, gate: 7 }, doanh_trai: { hw: 16, hh: 14, wall: 0.9, gate: 7 } };
 
 // Pha (21.2). Par tính bằng phút (đề xuất trong GDD).
 // target (đợt 10): mục tiêu chính của pha để HUD chỉ đường — base: id Cứ Điểm (nhiều id = làm cái nào cũng được, HUD chỉ cái gần
@@ -68,7 +69,7 @@ export const PHASES = [
   { id: "P1", name: "Chiếm bến trên", goal: "Chiếm Đồn bến trên (A1)", par: 2, target: { base: "A1" },
     tip: "Đi theo mặt trận A về phía đông, vào đồn bằng cổng trước (tường chặn mọi lối khác). Hạ quân đồn trú và Đội trưởng, rồi đứng trong vòng để chiếm." },
   { id: "P2", name: "Hai cánh", goal: "Chiếm Doanh trại trên bãi (A2)", par: 3, target: { base: "A2" },
-    tip: "Doanh trại là cửa ngõ viện binh: chiếm nó thì cánh đó hết quân bù. {Act:cmd} giao việc cho quân." },
+    tip: "Doanh trại là cửa ngõ viện binh: chiếm nó thì cánh đó hết quân bù. Cũng có tường: vào bằng cổng trước (phía tây), hạ quân đồn trú và Phó tướng rồi đứng trong vòng. {Act:cmd} giao việc cho quân." },
   { id: "P3", name: "Hàm Tử quan", goal: "Phá Cổng bắc (A3) hoặc Cổng nam (B3)", par: 3, target: { base: ["A3", "B3"] },
     tip: "Cổng bắc gần hơn. Cổng nam xa hơn, nhưng mở được thì cánh B +15 Sĩ Khí." },
   // hkFloor: kịch bản đảm bảo Hào Khí ≥ 90 ở pha boss (canon VS, systems.md §12 "dạy Tổng Phản Công") — đặt thẳng lúc vào

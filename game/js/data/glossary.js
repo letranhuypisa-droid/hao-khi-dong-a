@@ -29,7 +29,7 @@ export const GLOSS = {
   hk: { icon: "tpc", name: "Hào Khí",
     long: "Thanh trên đỉnh màn. Tăng khi chiếm Cứ Điểm, hạ sĩ quan, làm nhiệm vụ, Kế Sách; giảm khi mất đồn, phải Gượng dậy. Đủ 100 thì kích Tổng Phản Công." },
   cuDiem: { icon: "giuvung", name: "Cứ Điểm",
-    long: "Đồn, doanh trại có vòng tròn dưới đất. Đồn có tường cọc và hai cổng (trước phía tây, sau phía đông): lính và tướng chỉ ra vào bằng cổng. Hạ hết quân đồn trú và sĩ quan trấn thủ, rồi đứng trong vòng cho tới khi chiếm xong." },
+    long: "Đồn, doanh trại có vòng tròn dưới đất. Cả đồn lẫn doanh trại có tường cọc và hai cổng (trước phía tây, sau phía đông): lính và tướng chỉ ra vào bằng cổng. Hạ hết quân đồn trú và sĩ quan trấn thủ, rồi đứng trong vòng cho tới khi chiếm xong." },
   matTran: { icon: "tiencong", name: "Mặt trận",
     long: "Hai tuyến A (bến trên) và B (bến dưới) tự đánh nhau kể cả khi bạn ở xa. Bản đồ nhỏ góc phải cho biết quân hai bên và Sĩ Khí." },
   siKhi: { icon: "theota", name: "Sĩ Khí",

@@ -11,7 +11,7 @@ import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone, rais
 import { BigUnit } from "./units.js";
 import { pickPromotions } from "./promotion.js";
 import { classifyGarrison, garrisonHint, nearestBlocker, isLast } from "./garrison.js";
-import { nudgeOut } from "./fort.js";
+import { nudgeOut, westApproachX } from "./fort.js";
 import { doorSpawnPoint, planRefill, transitCap, tickCap, lineWant } from "./supply.js";
 import { heightAt } from "./world.js";
 import { pickupMesh, flagTexture } from "./models.js";
@@ -339,8 +339,8 @@ export class Director {
       const have = crowd.agents.filter((a) => a.role === "garrison" && a.src === id && a.state !== "dead").length;
       const want = Math.min(Math.floor(b.G), ZONE.enemies) - have;
       for (let i = 0; i < want && enemies < ZONE.enemies + 6; i++) {
-        // đồn có tường (fort.js): sinh trong tường (bán kính ≤ 9,5 lọt hình chữ nhật 12,5 × 11), không phải r + 3 = 13 m như vòng cọc cũ — ra ngoài tường là ngoài đồn
-        const ang = rng.range(0, Math.PI * 2), rr = ctx.world.fortById?.[id] ? rng.range(2, 9.5) : rng.range(2, p.r + 3);
+        // đồn / doanh trại có tường (fort.js): sinh trong tường (bán kính ≤ spawnR: đồn 9,5 lọt hình chữ nhật 12,5 × 11, doanh trại 12,5 lọt 16 × 14), không phải r + 3 như vòng cọc cũ — ra ngoài tường là ngoài đồn
+        const F = ctx.world.fortById?.[id], ang = rng.range(0, Math.PI * 2), rr = F ? rng.range(2, F.spawnR) : rng.range(2, p.r + 3);
         crowd.spawn({ side: "dich", unit: rng.next() < 0.7 ? "KHIEN_NG" : "CUNGKY_NG", tier: rng.next() < 0.15 ? "tinhnhue" : "thuong",
           role: "garrison", src: id, front: null, x: p.x + Math.cos(ang) * rr, z: p.z + Math.sin(ang) * rr, anchor: { x: p.x, z: p.z, r: p.r, hard: p.r + GARRISON.hardLeash } });
         enemies++;
@@ -597,7 +597,8 @@ export class Director {
     const ctx = this.ctx, E = EVENTS.surrounded, ev = this.events.surrounded, gen = this.generals.H40;
     if (!gen || !gen.alive || gen.dead) { ev.state = "skip"; return; }
     ev.state = "run"; ev.left = E.limit * this.M.eventMult;
-    const p = this.basePos("B2"), gx = p.x - 16, gz = p.z + 6;
+    // doanh trại B2 có tường (fort.js): tướng bị vây đứng ngoài cổng tây — toán vây (bán kính ≤ 10) không sinh lẫn vào tường — 12 m cách mép ngoài tường
+    const p = this.basePos("B2"), F = ctx.world.fortById?.B2, gx = F ? westApproachX(F, 12) : p.x - 16, gz = p.z + 6;
     gen.x = gx; gen.z = gz; gen.post = { x: gx, z: gz }; gen.inEvent = true;
     for (let i = 0; i < E.squad; i++) {
       const a = (i / E.squad) * Math.PI * 2, r = ctx.rng.range(5, 10);

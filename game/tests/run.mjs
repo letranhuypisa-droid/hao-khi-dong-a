@@ -429,8 +429,8 @@ console.log("Luật địa hình (sim/terrain-rules.js)");
     assert.equal(T.rangeMult(-3), 1); assert.equal(T.rangeMult(HT.dead), 1); assert.equal(T.rangeMult(50), 1 + HT.rangeCap);
     near(T.rangeMult(HT.dead + 1), 1 + HT.rangePerM, 1e-12);
   });
-  t("trên bản đồ có làn đánh: đứng gò Nguyên (320, −93) đánh xuống lính ở làn +10–15%, lính đánh lên −10–15%", () => withF(true, () => {
-    const top = { x: 320, z: -93 }, below = { x: 320, z: -84 };
+  t("trên bản đồ có làn đánh: đứng gò Nguyên (311, −101) đánh xuống lính ở làn +10–15%, lính đánh lên −10–15%", () => withF(true, () => {
+    const top = { x: 311, z: -101 }, below = { x: 311, z: -92 };
     const up = T.hitMult(top, below), down = T.hitMult(below, top);
     assert.ok(up > 1.1 && up < 1.15, "trên gò " + up); assert.ok(down < 0.9 && down > 0.85, "dưới gò " + down);
     assert.equal(withF(false, () => T.hitMult({ x: 100, z: -75 }, { x: 103, z: -75 })), 1, "làn phẳng");
@@ -496,11 +496,11 @@ console.log("Luật địa hình (sim/terrain-rules.js)");
     assert.ok(on < off * 1.5, `không được kẹt tuyến: có ${on} s, không ${off} s`);
   });
   t("cung thủ tìm gò: gò trong 14 m, đỉnh cách tướng 7 m tới 0,9 tầm; tắt công trình thì không", () => withF(true, () => {
-    assert.equal(T.perchNear(322, -80, 314, -82, 16)?.x, 320);
-    assert.equal(T.perchNear(322, -80, 300, -75, 16), null, "đỉnh gò ngoài tầm bắn tới tướng");
-    assert.equal(T.perchNear(322, -80, 320, -90, 16), null, "tướng đứng ngay trên gò");
+    assert.equal(T.perchNear(313, -89, 305, -91, 16)?.x, 311);
+    assert.equal(T.perchNear(313, -89, 300, -75, 16), null, "đỉnh gò ngoài tầm bắn tới tướng");
+    assert.equal(T.perchNear(313, -89, 311, -98, 16), null, "tướng đứng ngay trên gò");
     assert.equal(T.perchNear(200, -75, 214, -80, 16), null, "không có gò gần");
-    assert.equal(withF(false, () => T.perchNear(322, -80, 314, -82, 16)), null);
+    assert.equal(withF(false, () => T.perchNear(313, -89, 305, -91, 16)), null);
   }));
 }
 // ==== Luật địa hình — HẾT =======================================================================================

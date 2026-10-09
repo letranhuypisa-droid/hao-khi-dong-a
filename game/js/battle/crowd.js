@@ -605,8 +605,12 @@ export class Crowd {
     if (a.march && d <= SUPPLY.arrive) a.march = false;                   // tới chỗ đứng: hết hành quân, đi bộ như thường
     if (d > 0.3) {
       const sp = Math.min(Math.min(a.speed * (a.march ? SUPPLY.marchMult : 1), a.march ? SUPPLY.marchMax : 1e9) * (d > 3 ? 1 : 0.8), d * 2);
-      a.x += dx / d * sp * dt; a.z += dz / d * sp * dt;
-      a.yaw = turn(a.yaw, P && d < 2 ? Math.atan2(P.x - a.x, P.z - a.z) : Math.atan2(dx, dz), dt * 5);
+      // đồn, doanh trại có tường (fort.js): lính diễn không va chạm nên tự đi vòng — tuyến dời ngang đồn, lính bù từ doanh trại ra tuyến đều không xuyên tường
+      let mx = dx, mz = dz, md = d;
+      const forts = this.ctx.world?.forts, w = forts && fortRoute(forts, a.x, a.z, a.sx, a.sz);
+      if (w) { mx = w.x - a.x; mz = w.z - a.z; md = Math.hypot(mx, mz) || 1e-6; }
+      a.x += mx / md * sp * dt; a.z += mz / md * sp * dt;
+      a.yaw = turn(a.yaw, P && d < 2 ? Math.atan2(P.x - a.x, P.z - a.z) : Math.atan2(mx, mz), dt * 5);
     } else {
       a.yaw = turn(a.yaw, P ? Math.atan2(P.x - a.x, P.z - a.z) : face, dt * 4);
       a.fakeCd -= dt;

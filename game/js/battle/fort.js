@@ -1,4 +1,4 @@
-// battle/fort.js — đồn có tường và hai cổng (Cứ Điểm loại "don" ở B15): bố cục, vật va chạm, đường đi qua cổng. THUẦN: không three, không DOM, không rng;
+// battle/fort.js — đồn / doanh trại có tường và hai cổng (Cứ Điểm loại "don" và "doanh_trai" ở B15): bố cục, vật va chạm, đường đi qua cổng. THUẦN: không three, không DOM, không rng;
 // tests/fort.test.mjs. Số ở data/battle-b15.js FORT.
 //
 // Vì sao: vòng cọc cũ của đồn (world.js palisade) chỉ để nhìn — không có vật va chạm, lính đồn trú chạy xuyên qua cọc ra ngoài vòng, tản khắp bãi nên rất khó hạ hết
@@ -16,7 +16,7 @@ export const FORT_DEFAULT = { hw: 12.5, hh: 11, wall: 0.9, gate: 7 };
 const GATE_IN = 3.2, GATE_OUT = 3.2, FRONT = 7, CORR = 2.4, ALONG_IN = 5.5, ALONG_OUT = 8, INNER = 4;
 
 // { id, cx, cz, hw, hh, wall, gate, wx, wz, gates: [{ id, x, z, side }] (side −1 cổng trước phía tây, +1 cổng sau phía đông), segs (đoạn tường), corners (chân tháp góc),
-//   bound (hộp ngoài của tường) }.
+//   bound (hộp ngoài của tường), spawnR (bán kính quanh tâm lính đồn trú sinh ra: lọt trong tường, chừa 1,5 m) }.
 export function fortLayout(id, cx, cz, cfg = FORT_DEFAULT) {
   const { hw, hh, wall, gate } = { ...FORT_DEFAULT, ...cfg }, wx = hw + wall, wz = hh + wall, g2 = gate / 2;
   const gates = [{ id: id + ":W", x: cx - wx, z: cz, side: -1 }, { id: id + ":E", x: cx + wx, z: cz, side: 1 }];
@@ -26,7 +26,7 @@ export function fortLayout(id, cx, cz, cfg = FORT_DEFAULT) {
     { x0: cx + wx, z0: cz - wz, x1: cx + wx, z1: cz - g2, side: "E" }, { x0: cx + wx, z0: cz + g2, x1: cx + wx, z1: cz + wz, side: "E" },
   ];
   const corners = [[cx - wx, cz - wz], [cx + wx, cz - wz], [cx - wx, cz + wz], [cx + wx, cz + wz]];
-  return { id, cx, cz, hw, hh, wall, gate: gate, wx, wz, gates, segs, corners, bound: { x0: cx - wx - wall, x1: cx + wx + wall, z0: cz - wz - wall, z1: cz + wz + wall } };
+  return { id, cx, cz, hw, hh, wall, gate: gate, wx, wz, gates, segs, corners, bound: { x0: cx - wx - wall, x1: cx + wx + wall, z0: cz - wz - wall, z1: cz + wz + wall }, spawnR: Math.min(hw, hh) - 1.5 };
 }
 
 // Vật va chạm cho world.colliders (đoạn thẳng dày r như ground.js pushOut): sáu đoạn tường (đầu tròn bán kính tường chặn luôn trụ cổng), bốn chân tháp góc (đoạn rất ngắn).
@@ -65,6 +65,8 @@ function segHitsRect(ax, az, bx, bz, x0, z0, x1, z1) {
 }
 
 // Điểm ngoài tường, đi từ A (ngoài) tới W (ngoài): thẳng được thì W, không thì ra một góc (bốn góc lệch ra ngoài), góc cho đường ngắn nhất không cắt tường.
+// Ưu tiên góc ĐI TỚI ĐƯỢC từ A (free1) hơn góc nhìn thấy đích (free2): điểm trung gian được tính lại mỗi khung, nên đi tới góc gần rồi tính tiếp; chọn góc cắt tường ngay chặng đầu thì lính
+// không va chạm (lính diễn ở tuyến, crowd.js updateActor) đi xuyên tường — lính có va chạm thì trượt dọc tường ra góc như cũ.
 function avoid(L, ax, az, wx, wz) {
   const b = L.bound;
   if (!segHitsRect(ax, az, wx, wz, b.x0, b.z0, b.x1, b.z1)) return [wx, wz];
@@ -72,7 +74,7 @@ function avoid(L, ax, az, wx, wz) {
   let best = null, bd = Infinity;
   for (const [x, z] of cs) {
     const free1 = !segHitsRect(ax, az, x, z, b.x0, b.z0, b.x1, b.z1), free2 = !segHitsRect(x, z, wx, wz, b.x0, b.z0, b.x1, b.z1);
-    const d = Math.hypot(x - ax, z - az) + Math.hypot(x - wx, z - wz) + (free1 ? 0 : 80) + (free2 ? 0 : 80);
+    const d = Math.hypot(x - ax, z - az) + Math.hypot(x - wx, z - wz) + (free1 ? 0 : 160) + (free2 ? 0 : 80);
     if (d < bd) { bd = d; best = [x, z]; }
   }
   return best;
@@ -113,6 +115,9 @@ export function fortRoute(forts, ax, az, bx, bz) {
   }
   return null;
 }
+
+// x của chỗ đứng phía ngoài tường tây, cách mép ngoài tường d m (tướng bị vây ở doanh trại B2: director.js startSurrounded).
+export const westApproachX = (L, d) => L.cx - L.wx - L.wall - d;
 
 // Đồn nào (nếu có) chứa điểm (x, z), nới pad m.
 export function fortAt(forts, x, z, pad = 0) {

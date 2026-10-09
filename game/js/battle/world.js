@@ -44,8 +44,21 @@ function addFader(world) {
   };
 }
 
-// forts: đồn (Cứ Điểm "don") dựng có tường, hai cổng, tháp góc và vật va chạm (fort.js) thay vòng cọc; chỉ B15 chiến dịch bật (battles/b15.js) — nhiệm vụ Tự do (td.js) dùng chung bản đồ
-// nhưng đặt lính theo toạ độ riêng nên giữ vòng cọc.
+// Mái hai dốc: lăng trụ tam giác rộng w, cao h, dài len (dọc trục z), chân mái ở y = 0, đáy hở (mặt ngoài quay đúng chiều cho flat shading).
+function gable(w, h, len) {
+  const a = w / 2, b = len / 2, v = [];
+  const tri = (...p) => { for (const q of p) v.push(...q); };
+  tri([-a, 0, -b], [0, h, b], [0, h, -b]); tri([-a, 0, -b], [-a, 0, b], [0, h, b]);        // dốc tây
+  tri([0, h, -b], [0, h, b], [a, 0, -b]); tri([0, h, b], [a, 0, b], [a, 0, -b]);           // dốc đông
+  tri([-a, 0, b], [a, 0, b], [0, h, b]); tri([a, 0, -b], [-a, 0, -b], [0, h, -b]);         // hai đầu hồi
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// forts: đồn và doanh trại (Cứ Điểm "don", "doanh_trai") dựng có tường, hai cổng, tháp góc và vật va chạm (fort.js) thay vòng cọc; B15 chiến dịch (battles/b15.js) và nhiệm vụ Tự do
+// (td.js) đều bật; tắt thì vòng cọc cũ (không có vật va chạm).
 export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   setTerrain("map");
   // Lũy, hào, hố, gò trên hai làn bật mặc định; URL có "nolanes" thì tắt (so sánh, máy yếu). Phải đặt
@@ -233,8 +246,67 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   // ---- đồn có tường: tường cọc trên nền đất đắp, cổng trước (tây) và cổng sau (đông) trên tim đường, bốn tháp canh góc, lều trại bên trong ----------------------------------
   // Vật va chạm đẩy vào world.colliders (cùng ground.js collide với tường Hàm Tử quan): lính, sĩ quan, tướng không xuyên tường; cổng luôn mở. Tường thấp (cọc cao ~2,9 m) để camera thứ ba
   // sau lưng tướng nhìn qua được; tháp và mái cổng là lưới riêng làm mờ khi chắn camera (world.addFadeable).
-  const buildFort = (id, cx, cz) => {
-    const L = fortLayout(id, cx, cz, FORT.don);
+  // Bên trong doanh trại (không va chạm, như lều đồn): hai dãy nhà lính dọc tường bắc, chuồng ngựa và nhà chỉ huy dọc tường nam, sân tập có cọc đâm và giá giáo ở giữa, thùng kho ở góc đông;
+  // dải |z − cz| < 3,5 giữa hai cổng bỏ trống cho lính ra vào. Toạ độ dx, dz tính từ tâm (cột cờ chiếm ở giữa, vòng chiếm bán kính 13).
+  const barracksYard = (L) => {
+    const { cx, cz } = L, WALL = 0xa08560, THATCH = 0x8f7a4a, TIMBER = 0x5a3b22, DARK = 0x33261a, HAY = 0xc2a868, ROOF = 0x4a3524, RAIL = 0x4f361f;
+    const box = (w, h, d, color, x, y, z, ry = 0) => P(new THREE.BoxGeometry(w, h, d), color, { x, y, z, ry });
+    const gy = (dx, dz) => heightAt(cx + dx, cz + dz);
+    // nhà dài dọc trục x: s = +1 cửa quay về phía nam, −1 về phía bắc; wallH cao tường; open: chuồng hở mặt trước (chỉ cột, không tường trước)
+    const longHouse = (dx, dz, len, depth, s, { roof = THATCH, wallH = 1.9, open = false } = {}) => {
+      const x = cx + dx, z = cz + dz, y = Math.min(gy(dx - len / 2, dz), gy(dx + len / 2, dz), gy(dx, dz));
+      if (open) {
+        staticParts.push(box(len, wallH + 0.5, 0.22, WALL, x, y + (wallH - 0.5) / 2, z - s * (depth / 2 - 0.11)));            // vách sau
+        for (let i = 0; i <= 4; i++) staticParts.push(box(0.26, wallH + 0.2, 0.26, TIMBER, x - len / 2 + len * i / 4, y + wallH / 2 + 0.05, z + s * (depth / 2 - 0.2)));
+        for (let i = 1; i < 4; i++) staticParts.push(box(0.12, 1.15, depth * 0.62, RAIL, x - len / 2 + len * i / 4, y + 0.58, z - s * depth * 0.14));   // vách ngăn ô ngựa
+        staticParts.push(box(len - 0.4, 0.4, 0.5, TIMBER, x, y + 0.6, z - s * (depth / 2 - 0.55)));                              // máng ăn dọc vách sau
+        staticParts.push(box(len - 0.3, 0.1, 0.12, RAIL, x, y + 1.25, z + s * (depth / 2 - 0.25)));                              // xà buộc ngựa
+      } else {
+        staticParts.push(box(len, wallH + 0.5, depth, WALL, x, y + (wallH - 0.5) / 2, z));
+        for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) staticParts.push(box(0.3, wallH + 0.15, 0.3, TIMBER, x + a * len / 2, y + wallH / 2 + 0.05, z + b * depth / 2));
+        for (let i = 0; i < 3; i++) staticParts.push(box(0.95, 1.55, 0.1, DARK, x + (i - 1) * len / 3.2, y + 0.78, z + s * (depth / 2 + 0.04)));
+        for (let i = 0; i < 3; i++) staticParts.push(box(0.5, 0.45, 0.1, DARK, x + (i - 1) * len / 3.2 + len / 6.4, y + 1.35, z + s * (depth / 2 + 0.04)));
+      }
+      staticParts.push(P(gable(depth + 1.5, 1.7, len + 1.3), roof, { x, y: y + wallH, z, ry: Math.PI / 2 }), box(len + 1.4, 0.14, 0.22, TIMBER, x, y + wallH + 1.72, z));
+      return { x, z, y };
+    };
+    const dummy = (dx, dz) => {
+      const x = cx + dx, z = cz + dz, y = heightAt(x, z);
+      staticParts.push(box(0.2, 1.8, 0.2, TIMBER, x, y + 0.9, z), box(0.95, 0.12, 0.12, TIMBER, x, y + 1.4, z), box(0.7, 0.1, 0.7, TIMBER, x, y + 0.05, z),
+        P(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 7), HAY, { x, y: y + 1.7, z }), P(new THREE.CylinderGeometry(0.17, 0.2, 0.7, 7), HAY, { x, y: y + 0.95, z, sx: 1.25 }));
+    };
+    const rack = (dx, dz) => {
+      const x = cx + dx, z = cz + dz, y = heightAt(x, z);
+      staticParts.push(box(0.14, 1.5, 0.14, PAL.go, x - 1.2, y + 0.75, z), box(0.14, 1.5, 0.14, PAL.go, x + 1.2, y + 0.75, z), box(2.6, 0.12, 0.12, PAL.go, x, y + 1.35, z));
+      for (let i = 0; i < 5; i++) staticParts.push(P(new THREE.CylinderGeometry(0.03, 0.03, 2.5, 4), PAL.go, { x: x - 1 + i * 0.5, y: y + 1.2, z: z + 0.18, rx: 0.2 }), P(new THREE.ConeGeometry(0.06, 0.28, 4), PAL.sat, { x: x - 1 + i * 0.5, y: y + 2.45, z: z + 0.35, rx: 0.2 }));
+    };
+    const banner = (dx, dz, color) => {
+      const x = cx + dx, z = cz + dz, y = heightAt(x, z);
+      staticParts.push(box(0.12, 4.2, 0.12, TIMBER, x, y + 2.1, z), box(0.62, 1.7, 0.05, color, x + 0.38, y + 3.4, z));
+    };
+    // dãy nhà lính phía bắc (cửa nhìn ra sân), chuồng ngựa tây nam, nhà chỉ huy đông nam trên nền cao
+    longHouse(-9.2, -10.6, 10.6, 3.5, 1); longHouse(9.2, -10.6, 10.6, 3.5, 1);
+    longHouse(-9.4, 10.5, 10.4, 3.7, -1, { open: true, wallH: 2.0 });
+    const hall = longHouse(8.8, 10.2, 12, 4.6, -1, { roof: ROOF, wallH: 2.4 });
+    staticParts.push(box(13, 0.5, 5.6, 0x8a7656, hall.x, hall.y + 0.0, hall.z - 0.25), box(4.4, 0.18, 0.7, 0x7a6848, hall.x, hall.y + 0.04, hall.z - 3.2), box(4.4, 0.18, 0.7, 0x8a7656, hall.x, hall.y - 0.2, hall.z - 3.8));
+    banner(2.4, 6.6, PAL.son); banner(15.2, 6.6, PAL.son);
+    // sân tập: ba cọc đâm phía tây, hai giá giáo phía đông, bếp lửa giữa sân phía nam
+    dummy(-12.2, -5.4); dummy(-9, -5.9); dummy(-5.8, -5.4); rack(6.6, -5.8); rack(11.6, -5.4);
+    { const fx = -3.5, fz = 6.2, y = gy(fx, fz);
+      for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; staticParts.push(P(new THREE.DodecahedronGeometry(0.22, 0), 0x857d6c, { x: cx + fx + Math.cos(a) * 0.62, y: y + 0.12, z: cz + fz + Math.sin(a) * 0.62 })); }
+      staticParts.push(P(new THREE.ConeGeometry(0.4, 0.5, 5), 0x2a221a, { x: cx + fx, y: y + 0.28, z: cz + fz })); }
+    // kho: thùng, bao và đống rơm sát tường đông; rơm cho ngựa cạnh chuồng
+    for (const [dx, dz, k] of [[14.2, -7.4, 0], [14.7, -6.4, 1], [13.4, -6.6, 0], [14.6, -4.9, 1], [14.3, 5.4, 1], [13.5, 5.9, 0]]) {
+      const x = cx + dx, z = cz + dz, y = heightAt(x, z);
+      staticParts.push(k ? P(new THREE.CylinderGeometry(0.42, 0.42, 0.9, 7), PAL.nau, { x, y: y + 0.45, z }) : box(0.9, 0.75, 0.9, PAL.go, x, y + 0.38, z, dx));
+    }
+    for (const [dx, dz, ry] of [[-14.4, 6.2, 0.2], [-13.2, 6.6, -0.3], [-14.1, 4.9, 0.1]]) staticParts.push(box(1.1, 0.6, 0.6, HAY, cx + dx, heightAt(cx + dx, cz + dz) + 0.3, cz + dz, ry));
+    tent(cx + 0.2, cz - 7.2, 0.1, PAL.xam, 0.9);
+  };
+
+  // kind: "don" (đồn, lều lính) hoặc "doanh_trai" (doanh trại: dãy nhà lính, chuồng ngựa, nhà chỉ huy, sân tập); cùng tường, cổng, tháp góc.
+  const buildFort = (id, cx, cz, kind = "don") => {
+    const L = fortLayout(id, cx, cz, FORT[kind]);
     (world.forts ||= []).push(L); (world.fortById ||= {})[id] = L;
     for (const c of fortColliders(L)) world.colliders.push(c);
     const EARTH = 0x7a6a50, LOG = 0x6b4a2b, LOG2 = 0x5a3b22, ROOF = 0x4a3524, RAIL = 0x4f361f;
@@ -273,6 +345,7 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       for (let r = 0; r < 9; r++) parts.push(box(0.6, 0.06, 0.06, RAIL, lx, y + 0.5 + r * 0.58, lz));
       const m = new THREE.Mesh(merge(parts), mat); m.castShadow = shadows; scene.add(m); world.addFadeable(m, 3.4);
     }
+    if (kind === "doanh_trai") { barracksYard(L); return L; }
     // bên trong: lều lính hai dãy chừa lối đi giữa tim đường, lều chỉ huy, kho thùng, đống rơm, bếp lửa, giá giáo (không va chạm, như lều khác)
     tent(cx - 8, cz - 7.2, 0.1, PAL.vai, 1.0); tent(cx, cz - 8.2, -0.1, PAL.vai, 1.05); tent(cx + 8, cz - 7.2, 0.2, PAL.xam, 1.0);
     tent(cx - 8.5, cz + 7.4, -0.2, PAL.xam, 1.0); tent(cx + 2.5, cz + 7.8, 0.15, PAL.son, 1.65); tent(cx + 9, cz + 7.2, 0.3, PAL.vai, 0.95);
@@ -300,8 +373,8 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       else { palisade(x, z, 10, Math.PI); tower(x + 11, z - 12); }   // tháp ngoài rào để không che camera tent(x - 3, z + 3, 0.5, PAL.vai, 0.8);
       vis.flag = flagPole(x - 5, z - 5, 8);
     } else if (b.type === "doanh_trai") {
-      palisade(x, z, 13, Math.PI); tent(x - 4, z - 5, 0.3, PAL.vai); tent(x + 5, z - 4, -0.4, PAL.vai); tent(x - 3, z + 6, 0.1, PAL.xam); tent(x + 4, z + 5, 0.6, PAL.xam);
-      tower(x + 14, z + 14, 7);
+      if (forts) vis.fort = buildFort(b.id, x, z, "doanh_trai");
+      else { palisade(x, z, 13, Math.PI); tent(x - 4, z - 5, 0.3, PAL.vai); tent(x + 5, z - 4, -0.4, PAL.vai); tent(x - 3, z + 6, 0.1, PAL.xam); tent(x + 4, z + 5, 0.6, PAL.xam); tower(x + 14, z + 14, 7); }
       vis.flag = flagPole(x, z, 10);
     } else if (b.type === "cong") {
       vis.x = MAP.fortWallX; vis.z = z;

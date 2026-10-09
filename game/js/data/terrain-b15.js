@@ -43,9 +43,10 @@ export const LANE_TERRAIN = {
     { x: 283, z: 92, r: 3.3, d: 1.2, kind: "dat" }, { x: 268, z: 99, r: 2.4, d: 0.9, kind: "chong" }, { x: 281, z: 78, r: 2.2, d: 0.8, kind: "ngap" },
   ],
   // gò cao hai bên làn: phía ta trước lũy, phía Nguyên sau lũy (cung thủ Nguyên đứng trên gò bắn xuống)
+  // Hai gò sau lũy dời ra tây bắc / tây nam khỏi doanh trại A2, B2 (có tường, tâm x 335, z ∓75; tường tây cách tâm 17,8 m): gò cũ (320, −93) / (322, 93) nằm ngay chân tháp góc.
   mounds: [
-    { x: 262, z: -59, r: 9, h: 1.8 }, { x: 320, z: -93, r: 8, h: 2.0 }, { x: 186, z: -97, r: 7, h: 1.4 },
-    { x: 256, z: 58, r: 9, h: 1.6 }, { x: 322, z: 93, r: 8, h: 2.2 }, { x: 190, z: 98, r: 7, h: 1.3 },
+    { x: 262, z: -59, r: 9, h: 1.8 }, { x: 311, z: -101, r: 7, h: 2.0 }, { x: 186, z: -97, r: 7, h: 1.4 },
+    { x: 256, z: 58, r: 9, h: 1.6 }, { x: 311, z: 101, r: 7, h: 2.2 }, { x: 190, z: 98, r: 7, h: 1.3 },
   ],
   // rào: "rao_ruong" rào tre ruộng vườn ven đường (gãy nhiều đoạn), "cu_ma" ngựa gỗ chông của quân Nguyên.
   // Cọc nhọn trên đỉnh lũy Nguyên lấy theo berms (kind "luy_nguyen"), không liệt kê ở đây.
@@ -72,6 +73,6 @@ export const LANE_TERRAIN = {
     { x: 232, z: -70, ry: 0.4 }, { x: 251, z: -90, ry: 2.1 }, { x: 266, z: -77, ry: -1.0 }, { x: 284, z: -84, ry: 1.3, rider: true },
     { x: 292, z: -62, ry: 2.8 }, { x: 207, z: -94, ry: 0.2 }, { x: 428, z: -68, ry: -0.6 }, { x: 435.5, z: -87, ry: 1.9, rider: true },
     { x: 245, z: 79, ry: 1.1 }, { x: 258, z: 93, ry: -0.5 }, { x: 271, z: 58, ry: 2.4 }, { x: 286, z: 70, ry: 0.9, rider: true },
-    { x: 291, z: 97, ry: -2.0 }, { x: 318, z: 64, ry: 1.6 }, { x: 430, z: 82, ry: 0.7 }, { x: 444, z: 64, ry: -1.4, rider: true },
+    { x: 291, z: 97, ry: -2.0 }, { x: 309, z: 52, ry: 1.6 }, { x: 430, z: 82, ry: 0.7 }, { x: 444, z: 64, ry: -1.4, rider: true },
   ],
 };

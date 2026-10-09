@@ -1,5 +1,5 @@
 // battles/td.js — BattleDef của giao tranh chế độ Tự do (đợt 14b), dựng theo một giao tranh (data/skirmish.js makeSkirmish) và người lính
-// (meta/career.js). Dùng lại đất, đồn, doanh trại, làng, Hàm Tử quan của B15 (world.js buildWorld) nhưng tắt vòng Cứ Điểm, cờ tuyến; luật
+// (meta/career.js). Dùng lại đất, đồn, doanh trại (có tường, hai cổng như B15), làng, Hàm Tử quan của B15 (world.js buildWorld) nhưng tắt vòng Cứ Điểm, cờ tuyến; luật
 // trận ở battle/director-td.js, người lính ở battle/soldier.js (def.Hero). Danh sách móc BattleDef: đầu battles/b15.js.
 
 import { buildWorld } from "../battle/world.js";
@@ -83,7 +83,7 @@ export function makeTD(sk, career) {
     heroSpawn: { x: sk.spawn.x, z: sk.spawn.z, yaw: facing },
     camYaw: facing,
     buildWorld(scene, opts) {
-      const w = buildWorld(scene, { shadows: opts.shadows });
+      const w = buildWorld(scene, { shadows: opts.shadows, forts: true });     // đồn, doanh trại có tường và hai cổng như B15 (fort.js): Giữ đồn, Đánh úp trại diễn ra trong tường thật
       for (const v of Object.values(w.bases)) { if (v.ring) v.ring.visible = false; if (v.prog) v.prog.visible = false; }   // vòng Cứ Điểm của B15
       for (const f of Object.values(w.lineFlags)) { f.ta.group.visible = false; f.dich.group.visible = false; }           // cờ tuyến mặt trận
       return w;
