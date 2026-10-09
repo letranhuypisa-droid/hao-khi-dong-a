@@ -75,18 +75,19 @@ export const BOSS_B16 = {
   intro: "Trấn Nam vương Thoát Hoan, con Hốt Tất Liệt, tổng chỉ huy quân Nguyên đang đóng ở kinh thành.",
 };
 
-// Pha. target: mục tiêu cho HUD chỉ đường (director-b16.js objectives). par: giây (ĐỀ XUẤT BẢN THỬ, chưa đo bot).
+// Pha. target: mục tiêu cho HUD chỉ đường (director-b16.js objectives). par: giây — ĐỀ XUẤT BẢN THỬ theo đo bot 2026-10-10 (Quân sĩ seed 1001 / 2002:
+// 554 / 594 s, Tướng quân 3003: 622 s + 2 lần tải lại; pha 3 tốn nhất 190–295 s, pha 5 chỉ 4–9 s vì quân giữ điện đã bị dọn lúc đánh Thoát Hoan).
 // Câu tip viết {Act:cmd}… để data/controls.js đổi sang phím của thiết bị.
 export const PHASES = [
   { id: "P1", name: "Hiệu triệu dân binh", goal: "Gọi dân binh ở 2 làng", par: 150, target: { villages: true },
     tip: "Tới làng có vòng vàng, dẹp toán lính Nguyên đi lùng rồi đứng trong vòng 30 giây để dân binh tập hợp. Có 2 làng là đủ đánh bến; gọi cả 3 làng trước khi chiếm bến thì có thêm dân binh." },
   { id: "P2", name: "Đánh úp bến", goal: "Đốt 12 thuyền neo, chiếm bến Chương Dương", par: 210, target: { boats: true },
     tip: "Đi trong lau sậy ven sông để lính canh khó thấy; bước lên đê là bến báo động. Đứng sát thuyền neo (không có địch kề bên) để châm lửa. Báo động rồi thì quân Nguyên chạy đi đốt kho: hạ lính cầm đuốc. Đủ 12 thuyền thì đứng trong vòng bến để chiếm." },
-  { id: "P3", name: "Cổng nam", goal: "Hộ tống xe húc, phá Cổng nam", par: 180, target: { gate: "B3" },
+  { id: "P3", name: "Cổng nam", goal: "Hộ tống xe húc, phá Cổng nam", par: 240, target: { gate: "B3" },
     tip: "Xe húc chỉ chạy khi không có địch kề bên. Tới cổng xe tự húc; đòn của bạn cũng phá được cổng. Quân Nguyên sẽ phản công bến: sức giữ bến về 0 là thua. Cánh Trần Quang Khải đánh cổng đông." },
-  { id: "P4", name: "Trấn Nam vương", goal: "Đánh lui Thoát Hoan", par: 120, target: { boss: true },
+  { id: "P4", name: "Trấn Nam vương", goal: "Đánh lui Thoát Hoan", par: 90, target: { boss: true },
     tip: "Ba lá Vương Kỳ quanh sân điện giữ khiên cho Thoát Hoan: còn cờ đứng thì ông không núng quá nửa Sinh lực. Chém đổ cả ba cờ rồi đánh lui ông." },
-  { id: "P5", name: "Tụng giá hoàn kinh", goal: "Chiếm điện chính", par: 60, target: { palace: true },
+  { id: "P5", name: "Tụng giá hoàn kinh", goal: "Chiếm điện chính", par: 30, target: { palace: true },
     tip: "Dẹp quân giữ điện, đứng trong vòng điện chính để cắm cờ." },
 ];
 export const PAR_B16 = PHASES.reduce((s, p) => s + p.par, 0);
