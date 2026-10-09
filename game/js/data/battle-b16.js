@@ -93,7 +93,7 @@ export const PHASES = [
 export const PAR_B16 = PHASES.reduce((s, p) => s + p.par, 0);
 export const TIMEOUT_B16 = 1800;               // canon: 30 phút chưa mở cổng nam thì thua
 
-// Kế Sách (canon B16). Trận nhanh: cửa sổ ×0,75 như B15 (kesach.js). Bản thử đợt 1: báo động khi tướng tới gần bến (chưa tách lối lau sậy /
+// Kế Sách (canon B16). Trận nhanh: cửa sổ ×0,75 như B15 (kesach.js). Báo động bến: xem ALARM, REEDS, DYKE ở trên (đợt 2: lối lau sậy /
 // đường đê). danhUp: vô hiệu ≥ need thuyền trong `window` giây kể từ báo động → +hk, cổng nam mất gateCut độ bền. danBinh: đủ 3 làng trước
 // khi chiếm bến → +hk, thêm `charges` lượt Gọi tiếp viện dân binh.
 export const KE_SACH = {

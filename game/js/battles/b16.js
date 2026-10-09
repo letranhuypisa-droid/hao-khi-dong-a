@@ -101,8 +101,11 @@ export const B16 = {
   rigs: ["tuong"],                                    // Thoát Hoan (mô hình tướng Nguyên chung) ra ở pha 4
   // bot (debug.js __objective): lính còn chặn vòng chiếm trước, rồi mục tiêu của pha
   debug: { objective: (ctx) => {
-    const d = ctx.director, b = d.blockers()[0]; if (b) return { x: b.x, z: b.z, ref: b.ref };
-    const o = d.objectives()[0]; if (!o) return { x: ctx.hero.x, z: ctx.hero.z };
+    const d = ctx.director, h = ctx.hero, b = d.blockers()[0]; if (b) return { x: b.x, z: b.z, ref: b.ref };
+    const o = d.objectives()[0]; if (!o) return { x: h.x, z: h.z };
+    // bot không tìm đường: đứng sau (phía bắc) thân điện chính mà mục tiêu ở trước điện thì đi vòng qua góc điện (đo: kẹt sau điện 240 s sau khi tải lại P5)
+    const bz = PALACE.z - 10;                                      // tim thân điện (director-b16.js buildProps), dày 10 m, rộng 18 m
+    if (h.z < bz + 6 && o.z > bz + 5 && Math.abs(h.x - PALACE.x) < 15 && h.x > MAP.fortWallX) return { x: PALACE.x + (h.x >= PALACE.x ? 16 : -16), z: bz + 7 };
     return o.label === "Vương Kỳ" ? { x: o.x, z: o.z, strike: true } : { x: o.x, z: o.z };
   }, state: (ctx) => ({ ...ctx.director.st, hero: { x: ctx.hero.x, z: ctx.hero.z, hp: ctx.hero.hp } }) },
   dispose: (ctx) => ctx.director?.dispose?.(),

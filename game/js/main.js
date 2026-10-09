@@ -371,7 +371,7 @@ function xuattran() {
   const B = BATTLES[pick.battle] || BATTLES.B15, heroId = heroFor(B);
   const R = B.fixedR ?? pick.R, diff = DIFFICULTY.find((d) => d.id === pick.difficulty), curMode = modeFor(B);
   const fresh = lastArt !== B.id; lastArt = B.id;
-  const tutNew = !save.tutorial?.done, seen = chapterState(save, B.chapter).openSeen;
+  const tutNew = !save.tutorial?.done, seen = chapterState(save, B.chapter).openSeen && !B.noComic;
   return `<section class="lobby b-${B.id}">
     <div class="lb-art${fresh ? " fresh" : ""}" aria-hidden="true"><i class="lb-img"></i>${EMBERS}</div>
     <nav class="lb-rail" aria-label="Lối tắt">
@@ -440,8 +440,9 @@ async function openBattleInfo(id) {
       ${B.wip ? `<p class="small">Bản thử, còn đang dựng: có thể còn thô, thiếu phần.</p>` : ""}
       ${notes.length ? `<h4>Ghi chú sử liệu · ${notes.length}</h4><ul class="notes">${notes.map((x) => `<li><span class="label ${labelCls(x.label)}">${x.label}</span>${esc(x.text)}</li>`).join("")}</ul>` : ""}
       <h4>Comic mở chương</h4>
-      ${seen ? `<div class="row"><button data-bi-comic>Xem lại comic</button><span class="small">Đọc lại mọi lúc ở Sử quán.</span></div>`
+      ${seen && !B.noComic ? `<div class="row"><button data-bi-comic>Xem lại comic</button><span class="small">Đọc lại mọi lúc ở Sử quán.</span></div>`
         : `<p class="small">${B.ladder ? "Tự phát trước trận đầu tiên (6 khung, chừng 40 giây, bỏ qua được)."
+          : B.noComic ? "Chương này chưa có comic, không có Hiến kế (bản thử)."
           : `Trước trận đầu tiên: comic mở chương (${metaOf(B.chapter)?.comic?.open?.length ?? 4} khung), Hiến kế ba thẻ, lệnh Chủ soái quyết — bỏ qua được comic, không bỏ qua được Hiến kế.`}</p>`}`;
     sh.querySelector("[data-bi-comic]")?.addEventListener("click", async () => { close(); await playComic("open", { ch: B.chapter }); render(); });
   });
@@ -479,7 +480,7 @@ function openPrep() {
         ${tile("Công", n(st.cong))}${tile("Sinh lực", n(st.hp))}${tile("Giáp", n(st.giap))}${tile("Chí mạng", `${Math.round(st.crit * 100)}%`)}
         ${tile("Binh khí", `×${st.weaponMult.toFixed(2).replace(".", ",")}`)}
       </div>
-      <p class="seg-note">${B.ladder ? `Đòn mạnh C1–C4${save.hero.level >= MOVES.C5.unlockLv || st.level >= 5 ? ", C5" : ""}${st.level >= MOVES.C6.unlockLv ? ", C6" : ""}${st.weaponFloor ? " · binh khí: Quân giới cấp phát" : ""}`
+      <p class="seg-note">${B.ladder || B.ownHero ? `Đòn mạnh C1–C4${save.hero.level >= MOVES.C5.unlockLv || st.level >= 5 ? ", C5" : ""}${st.level >= MOVES.C6.unlockLv ? ", C6" : ""}${st.weaponFloor ? " · binh khí: Quân giới cấp phát" : ""}`
         : `${esc(HEROES[heroId].weaponName || "")} <span class="label hc">${HEROES[heroId].weaponLabel || "Hư cấu"}</span> · Khí Lực ${st.kiBars ?? HEROES[heroId].kiLucBars} vạch`}</p>
       <button class="lb-go" data-prep-go><span class="gi"><i>${NAV_ICON.xuattran}</i><span><b>Xuất chinh</b><small>${esc(B.name)} · ${MODES[curMode].name} · ${diff.name}</small></span></span></button>`;
     const upd = (fn) => () => { fn(); persist(); render(); redraw(); };
@@ -563,7 +564,9 @@ function chapterBlock(B) {
   const cardBtn = (c) => cards[c.id]
     ? `<button class="sq-card ${read.includes(c.id) ? "" : "new"}" data-card="${c.id}"><b>${esc(c.title)}</b><small><span class="label ${LCLS[c.label]}">${c.label}</span>${read.includes(c.id) ? "" : "Mới mở"}</small></button>`
     : `<div class="sq-card lock"><b>Thẻ chưa mở</b><small>${esc(c.hint)}</small></div>`;
-  const btn = (part, ok, title, sub) => `<button data-comic="${part}" data-ch="${id}" ${ok ? "" : "disabled"}><b>${title}</b><small>${sub}</small></button>`;
+  const btn = (part, ok, title, sub) => (C[part] && !C[part].length
+    ? `<button disabled><b>${title}</b><small>Chưa có (bản thử)</small></button>`                  // Chương chưa có comic (B16)
+    : `<button data-comic="${part}" data-ch="${id}" ${ok ? "" : "disabled"}><b>${title}</b><small>${sub}</small></button>`);
   const got = M.cards.filter((c) => cards[c.id]).length;
   return `<section class="card sq-chapter">${head}
   <div class="grid2">
@@ -621,7 +624,13 @@ function showCard(id, onClose = render) {
 async function playComic(part, { title, ch: chId = CH, comic = null } = {}) {
   const M = await ensureMeta(chId), C = comic || M.comic, B = battleOfChapter(chId);
   const ids = C[part];
-  if (!ids?.length) return { skipped: false, seen: [], empty: true };        // Chương chưa có comic (B16 bản thử): bỏ qua, không đánh dấu đã xem
+  if (!ids?.length) {                                                        // Chương chưa có comic (B16 bản thử): bỏ qua, nhưng vẫn ghi đã qua
+    const ch0 = chapterState(save, chId);                                    // phần đó (không thì lần thắng nào cũng là "thắng lần đầu", kết chương lặp lại)
+    if (part === "open") ch0.openSeen = true;
+    if (part === "close") ch0.closeSeen = true;
+    persist();
+    return { skipped: false, seen: [], empty: true };
+  }
   const names = { open: "Mở chương", decree: "Chủ soái quyết", insert: "Giữa trận", close: "Kết chương" };
   const r = await readComic(C, {
     ids, title: title || `Quyển VI · Chương ${B.name} · ${names[part]}`, settings: save.settings, onSettings: persist,

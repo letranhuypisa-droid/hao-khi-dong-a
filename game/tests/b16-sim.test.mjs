@@ -153,8 +153,11 @@ await t("Đoạt Giáo: đủ 10 đội bị tước thì nhiệm vụ phụ S_D
   assert.ok(D.SQUADS.landing + D.SQUADS.sentryPairs >= D.SQUADS.need);
   assert.ok(D.SQUADS.landing * D.SQUADS.size <= D.LANDING.garrison);
   const st = createB16();
-  for (let i = 0; i < 9; i++) noteSquadCleared(st);
-  assert.equal(sideB16(st).S_DISARM, false); noteSquadCleared(st); assert.equal(sideB16(st).S_DISARM, true);
+  for (let i = 0; i < 9; i++) noteSquadCleared(st, i);
+  noteSquadCleared(st, 3);                                                                   // ô đã tước (vd sau khi tải lại điểm lưu): không tính lại
+  assert.equal(st.squadsCleared, 9); assert.deepEqual(st.squadsDone, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(sideB16(st).S_DISARM, false); noteSquadCleared(st, 9); assert.equal(sideB16(st).S_DISARM, true);
+  const snap = snapshotB16(st), s2 = createB16(); restoreB16(s2, snap); assert.deepEqual(s2.squadsDone, st.squadsDone);
 });
 await t("chưa đủ 12 thuyền thì không chiếm được bến; đủ thì đứng trong vòng capSec giây", () => {
   const st = createB16(); toPhase(st, 1);

@@ -21,7 +21,7 @@ export const CARDS = [
     title: "Trận Chương Dương", unlock: "chapterOpen", hint: "Mở Chương Chương Dương.",
     body: [
       "Tháng 5 năm Ất Dậu (khoảng tháng 6/1285), sau trận Hàm Tử, quân Trần đánh bại quân Nguyên ở bến Chương Dương (nay thuộc Thường Tín, Hà Nội) rồi đánh vào kinh thành.",
-      "Bến Chương Dương nằm trên sông Hồng, phía nam Thăng Long: giữ được bến là chặn đường thủy nối quân Nguyên trong kinh thành với các cánh quân phía nam.",
+      "Bến Chương Dương nằm trên sông Hồng, phía nam kinh thành Thăng Long.",
       "Bố cục trận trong game (ba làng, mười hai thuyền neo, xe húc, cổng nam, điện chính) là Hư cấu, dựng để chơi; bản thử còn đặt trên đất Hàm Tử.",
     ],
     src: [TT, WIKI, CANON("B16")], panels: [],
@@ -30,7 +30,7 @@ export const CARDS = [
     id: "H32", chapter: "B16", group: "tuongta", label: "Chính sử", review: "draft",
     title: "Chiêu Minh vương Trần Quang Khải", unlock: "battleStart", hint: "Ra trận Chương Dương lần đầu.",
     body: [
-      "Con thứ ba của vua Trần Thái Tông, giữ chức Thượng tướng Thái sư (1241–1294).",
+      "Trần Quang Khải (1241–1294), con thứ ba của vua Trần Thái Tông, giữ chức Thượng tướng Thái sư.",
       "Đầu năm 1285 ông trấn giữ Nghệ An chặn cánh quân Toa Đô từ phía nam; tháng 5 năm ấy cùng Hoài Văn hầu Trần Quốc Toản và dân binh các lộ phá quân Nguyên ở Chương Dương và ở kinh thành.",
       "Sử chép ông thông hiểu tiếng nói các nước. Ông là tác giả bài \"Tụng giá hoàn kinh sư\" mừng xa giá trở về kinh.",
       "Cây cung Chiêu Minh và các kỹ năng của ông trong game là Hư cấu; bản thử chưa cho chơi ông.",
@@ -48,7 +48,7 @@ export const CARDS = [
     src: [TT, CANON("H35")], panels: [],
   },
   {
-    id: "X18", chapter: "B16", group: "tuongdich", label: "Chính sử", review: "draft",
+    id: "X18-b16", chapter: "B16", group: "tuongdich", label: "Chính sử", review: "draft",
     title: "Trấn Nam vương Thoát Hoan", unlock: "bossMet", hint: "Gặp Thoát Hoan ở sân điện.",
     body: [
       "Hoàng tử nhà Nguyên (脫歡, Toghon), con Hốt Tất Liệt, được phong Trấn Nam vương; tổng chỉ huy các cuộc tiến quân năm 1285 và 1287–1288.",
@@ -63,8 +63,7 @@ export const CARDS = [
     title: "Đánh úp bến thuyền", unlock: "keSach:danhUp", hint: "Thành công Kế Sách \"Đánh úp bến thuyền\".",
     body: [
       "Toàn thư chép phần lớn thuyền Nguyên ở bến Chương Dương bị đốt hoặc đánh chìm.",
-      "Mất thuyền ở bến, quân Nguyên trong kinh thành mất đường rút và đường tiếp tế bằng sông.",
-      "Cách tiếp cận qua lau sậy, đê, lính cầm đuốc đốt kho trong game là Hư cấu.",
+      "Trong game, Kế Sách thành thì quân Nguyên trong thành mất đường rút thủy và cổng nam núng thế; cách tiếp cận qua lau sậy, đê, lính cầm đuốc đốt kho cũng là Hư cấu.",
     ],
     src: [TT, CANON("B16")], panels: [],
   },
@@ -73,7 +72,6 @@ export const CARDS = [
     title: "Dân binh các lộ", unlock: "keSach:danBinh", hint: "Thành công Kế Sách \"Dân binh các lộ\".",
     body: [
       "Toàn thư chép Trần Quang Khải cùng Trần Quốc Toản, Trần Thông, Nguyễn Khả Lạp và em là Nguyễn Truyền đem dân binh các lộ đánh ở Chương Dương và kinh thành.",
-      "Dân binh là quân do các lộ, các làng tự tập hợp, đánh cùng quân triều đình.",
       "Tên ba làng và việc gọi dân binh từng làng trong game là Hư cấu.",
     ],
     src: [TT, CANON("B16")], panels: [],
@@ -84,8 +82,8 @@ export const CARDS = [
     body: [
       "Bài thơ ngũ ngôn của Trần Quang Khải, làm khi theo xa giá trở về kinh sau chiến thắng năm 1285:",
       "\"Đoạt sáo Chương Dương độ, Cầm Hồ Hàm Tử quan. Thái bình tu trí lực, Vạn cổ thử giang san.\"",
-      "Dịch nghĩa: Cướp giáo giặc ở bến Chương Dương, bắt quân giặc ở cửa Hàm Tử. Thái bình rồi nên dốc sức, non sông này còn mãi muôn đời.",
-      "Chữ \"Hồ\" trong nguyên văn là cách gọi quân phương Bắc thời ấy; game dịch nghĩa là \"quân giặc\" và không đọc bài thơ trong trận. Các bản chép có chỗ khác chữ (câu ba có bản ghi \"Thái bình nghi nỗ lực\").",
+      "Dịch nghĩa: Đoạt giáo ở bến Chương Dương, bắt quân Nguyên ở cửa Hàm Tử. Thái bình rồi nên dốc sức, non sông này còn mãi muôn đời.",
+      "Chữ \"Hồ\" trong nguyên văn là cách gọi người phương Bắc thời ấy; bản dịch nghĩa ở đây viết \"quân Nguyên\", và game không đọc bài thơ trong trận.",
     ],
     src: [TT, CANON("B16"), CANON("H32")], panels: [],
   },
@@ -148,13 +146,13 @@ const Q = [
     why: vi("Hội nghị Bình Than năm 1282; trận Hàm Tử tháng 4 và Chương Dương tháng 5 năm Ất Dậu (1285); sau thất bại ở Vạn Kiếp, Thoát Hoan rút về Tư Minh."),
   },
   {
-    id: "B16-Q06", type: "mcq4", label: "Chính sử", seenRef: ["card:X18"], src: [TT, NS],
+    id: "B16-Q06", type: "mcq4", label: "Chính sử", seenRef: ["card:X18-b16"], src: [TT, NS],
     q: vi("Thoát Hoan, người chỉ huy quân Nguyên năm 1285, là ai?"),
     options: ["Hoàng tử nhà Nguyên, con Hốt Tất Liệt, Trấn Nam vương", "Tướng thủy quân người Sắc mục", "Tướng nhà Tống lưu vong", "Vua Chiêm Thành"],
     why: vi("Thoát Hoan (Toghon) là con Hốt Tất Liệt, được phong Trấn Nam vương, tổng chỉ huy các cuộc tiến quân năm 1285 và 1287–1288."),
   },
   {
-    id: "B16-Q07", type: "truefalse", label: "Hư cấu", seenRef: ["card:X18"], src: [TT, CANON("B16")],
+    id: "B16-Q07", type: "truefalse", label: "Hư cấu", seenRef: ["card:X18-b16"], src: [TT, CANON("B16")],
     q: vi("Sử chép Thoát Hoan đích thân cầm quân đánh ở sân điện Thăng Long trong trận Chương Dương."),
     options: ["Đúng", "Sai"], answer: 1,
     why: vi("Sai. Đó là Hư cấu của game: Thoát Hoan đóng ở Thăng Long và rút ra sau đó; sử không chép ông đánh ở Chương Dương."),
@@ -167,9 +165,9 @@ const Q = [
   },
   {
     id: "B16-Q09", type: "truefalse", label: "Chính sử", seenRef: ["card:B16-tho"], src: [TT],
-    q: vi("Câu thơ \"Đoạt sáo Chương Dương độ\" nói về việc cướp giáo giặc ở bến Chương Dương."),
+    q: vi("Câu thơ \"Đoạt sáo Chương Dương độ\" nói về việc đoạt giáo của quân Nguyên ở bến Chương Dương."),
     options: ["Đúng", "Sai"], answer: 0,
-    why: vi("Đúng. \"Đoạt sáo\" là cướp giáo; \"Chương Dương độ\" là bến Chương Dương."),
+    why: vi("Đúng. \"Đoạt sáo\" là đoạt giáo (của quân Nguyên); \"Chương Dương độ\" là bến Chương Dương."),
   },
   {
     id: "B16-Q10", type: "mcq4", label: "Chính sử", seenRef: ["card:B16-thanglong", "card:B16-tran"], src: [TT, CANON("B16")],

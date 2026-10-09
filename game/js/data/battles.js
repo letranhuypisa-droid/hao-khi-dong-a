@@ -14,7 +14,7 @@
 // keSach: số Kế Sách theo chế độ (nhãn nút chế độ ở Xuất trận). Đợt 9 D5 (tùy chọn): result.cLabel (tên dòng thứ tư của
 // bảng điểm — B15 "Cứ Điểm"), resultUI() → module dựng phần riêng của màn kết quả (ui/result-b20.js), marks() → tên các
 // Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau). ownHero (B16): trận R cố định mà tướng dùng chỉ số, cây kỹ năng của
-// người chơi (không có preset) — chữ ở sảnh nói đúng như vậy.
+// người chơi (không có preset) — chữ ở sảnh nói đúng như vậy. noComic (B16): Chương chưa có comic.
 
 export const BATTLES = {
   B15: {
@@ -28,17 +28,18 @@ export const BATTLES = {
     load: () => import("../battles/b15.js"), comic: () => import("./comic-b15.js"), suquan: () => import("./suquan-b15.js"),
     notes: () => import("./battle-b15.js").then((m) => m.HISTORY_NOTES),
   },
-  // B16 (bản thử đợt 1, greybox trên đất Hàm Tử): H35 Trần Quốc Toản dùng chỉ số của chính người chơi (heroStats nâng tối thiểu R − 2), R 13
-  // cố định (+3 sau B15 như thang R1), Trận nhanh. H32 Trần Quang Khải "sắp có" (chưa có mô hình, lớp cung WC09). Chưa comic / thẻ / Quiz.
+  // B16 (bản thử, dựng trên đất Hàm Tử): H35 Trần Quốc Toản dùng chỉ số của chính người chơi (heroStats nâng tối thiểu R − 2), R 13 cố định
+  // (+3 sau B15 như thang R1), Trận nhanh. H32 Trần Quang Khải "sắp có" (chưa có mô hình, lớp cung WC09). Có thẻ Sử quán, Quiz; noComic: chưa có
+  // comic (sảnh ẩn nút Comic, bảng Sử liệu nói đúng như vậy) — bỏ cờ này khi bake comic-b16.js.
   B16: {
     id: "B16", chapter: "B16", name: "Chương Dương", title: "Trận Chương Dương", date: "1285",
     sub: "Tháng 5 năm Ất Dậu · khoảng tháng 6/1285 · bến Chương Dương, kinh thành Thăng Long",
-    heroes: ["H32", "H35"], playable: ["H35"], fixedR: 13, modes: ["nhanh"], wip: true, ownHero: true,
+    heroes: ["H32", "H35"], playable: ["H35"], fixedR: 13, modes: ["nhanh"], wip: true, ownHero: true, noComic: true,
     models: [],                                           // Thoát Hoan mượn mô hình tướng Nguyên chung (OFF_tuong, luôn nạp)
     keSach: { nhanh: 2, chuan: 2 },                       // Đánh úp bến thuyền (Lớn), Dân binh các lộ (Nhỏ)
-    par: { nhanh: 720 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha; ĐỀ XUẤT BẢN THỬ, chưa đo bot)
+    par: { nhanh: 720 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha, theo đo bot 2026-10-10)
     loading: { title: "Bến Chương Dương · 1285" },
-    result: { title: "Giải phóng Thăng Long", missionsTotal: 5, sideTotal: 3, eventNames: {}, cLabel: "Bến, cổng, điện" },
+    result: { title: "Giải phóng Thăng Long", missionsTotal: 5, sideTotal: 3, eventNames: {}, cLabel: "Thuyền, bến, cổng, điện" },
     marks: () => import("./battle-b16.js").then((m) => m.KS_ORDER.map((id) => m.KE_SACH[id].name)),
     load: () => import("../battles/b16.js"), comic: () => import("./comic-b16.js"), suquan: () => import("./suquan-b16.js"),
     notes: () => import("./battle-b16.js").then((m) => m.HISTORY_NOTES),

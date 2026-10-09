@@ -11,7 +11,7 @@ import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 import { BannerQueue } from "./banner-queue.js";
 import { flagTexture } from "./models.js";
-import { gateTarget as pickGate, gateGoal, gateGoalShort } from "./gatebar.js";
+import { gateTarget as pickGate, gatePct } from "./gatebar.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
 import { HAO_KHI, TIERS, MODES, HERO, S } from "../data/tuning.js";
 import { createB16, tickB16, damageGateB16, damageBannerB16, bossFloorB16, noteSquadCleared, sideB16, snapshotB16, restoreB16, along, finish as simFinish } from "../sim/b16.js";
@@ -42,8 +42,11 @@ export class DirectorB16 {
     this.keSach = { list: [], hud: () => this.ksHud(), trigger: () => this.say("Kế Sách của trận này tự xét theo việc bạn làm — xem bảng Kế Sách.", 3) };
     this.reinf = { charges: REINF.charges, cd: 0 };
     ctx.sim.reinf = { charges: this.reinf.charges, pending: [] }; ctx.sim.cooldowns = {};
-    this.militia = []; this.ringTarget = "all"; this.militiaOrder = "theota";
-    this.squads = new Map(); this.torches = []; this.counterUnits = []; this.landGuard = []; this.squadSeq = 0;
+    this.ringTarget = "all"; this.militiaOrder = "theota";
+    this.resetLists();
+    // đầu vào luật mỗi bước (sim/b16.js tickB16): một đối tượng dùng lại, hàm gắn một lần
+    this.inp = { hero: { x: 0, z: 0, alive: true }, ramMoving: false, bossDown: false, landingDef: 0, counterLeft: 0,
+      foesAt: (x, z, r) => this.foesAt(x, z, r), torchesAt: (i) => this.torchesAt(i) };
     this.props = new THREE.Group(); ctx.scene.add(this.props);
     this.buildProps();
     this.spawnPhase(0);
@@ -59,6 +62,15 @@ export class DirectorB16 {
   get hero() { return this.ctx.hero; }
   hk(v, src, optional = false) { const g = gain(this.ctx.hk, v, src, { optional }); if (g && Math.abs(g) >= 0.5) this.ctx.hud?.hkPulse?.(g); return g; }
   alive(a) { return this.ctx.crowd.hittable(a); }
+  // Crowd dùng lại đối tượng lính đã chết (crowd.js spawn / release: bể free) và không xoá trường của director. Mọi danh sách lính của B16
+  // vì thế giữ { a, id } (id cấp mới mỗi lần spawn): live(r) chỉ đúng khi đối tượng vẫn là con lính lúc thêm vào và còn đánh được.
+  ref(a, extra) { return { a, id: a.id, ...extra }; }
+  live(r) { return r.a.id === r.id && this.alive(r.a); }
+  liveCount(list) { let n = 0; for (const r of list) if (this.live(r)) n++; return n; }
+  resetLists() {
+    this.militia = []; this.pushers = []; this.torches = []; this.counterUnits = []; this.landGuard = []; this.hunters = [];
+    this.squads = new Map(); this.squadOf = new Map();                   // ô đội (slot) → [ref]; id lính → ô đội
+  }
   dist(a, b) { return Math.hypot(a.x - b.x, a.z - b.z); }
   foesAt(x, z, r) {
     let n = 0;
@@ -78,18 +90,18 @@ export class DirectorB16 {
     for (let i = 0; i < n; i++) { const a = rng.range(0, Math.PI * 2), d = rng.range(1, r); out.push(this.spawnEnemy(c.x + Math.cos(a) * d, c.z + Math.sin(a) * d, { anchor: { x: c.x, z: c.z, r: r + pad }, elite })); }
     return out;
   }
-  // một đội giữ bến (Đoạt Giáo): hạ hết người của đội là tước được đội đó
-  spawnSquad(c, n, r, opts) {
-    const id = ++this.squadSeq, list = this.spawnHold(c, n, r, opts);
-    for (const a of list) a.squadId = id;
-    this.squads.set(id, list);
+  // một đội giữ bến ở ô `slot` (Đoạt Giáo): hạ hết người của đội là tước được đội đó; ô đã tước (st.squadsDone) không sinh lại khi tải lại điểm lưu
+  spawnSquad(slot, c, n, r, opts) {
+    const list = this.spawnHold(c, n, r, opts).map((a) => this.ref(a));
+    for (const x of list) this.squadOf.set(x.id, slot);
+    this.squads.set(slot, list);
     return list;
   }
   spawnMilitia(x, z, n, role = this.militiaRole()) {
-    const ctx = this.ctx, rng = ctx.rng, out = [];
+    const ctx = this.ctx, rng = ctx.rng, out = [], o = this.militiaOrder === "xungtran" ? this.objectivePoint() || this.hero : null;
     for (let i = 0; i < n; i++) {
       const a = ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role, front: null, x: x + rng.range(-3, 3), z: z + rng.range(-3, 3), legionMult: ctx.stats.legionMult ?? 1 });
-      this.aimMilitia(a); this.militia.push(a); out.push(a);
+      this.aimMilitia(a, o); this.militia.push(this.ref(a)); out.push(a);
     }
     return out;
   }
@@ -236,20 +248,22 @@ export class DirectorB16 {
       if (!st.landing.taken) {
         // quân giữ bến chia SQUADS.landing đội (Đoạt Giáo), mỗi đội đứng một chỗ trên bãi; lính canh từng cặp dọc bờ giữa các thuyền
         const per = SQUADS.size, nSq = SQUADS.landing;
+        const done = new Set(st.squadsDone);
         for (let k = 0; k < nSq; k++) {
+          if (done.has(k)) continue;
           const a = (k / nSq) * Math.PI * 2, c = { x: LANDING.x + Math.cos(a) * 10, z: LANDING.z + Math.sin(a) * 7 };
-          this.spawnSquad(c, k === nSq - 1 ? LANDING.garrison - per * (nSq - 1) : per, 3, { pad: 16, elite: 0.12 });
+          this.spawnSquad(k, c, k === nSq - 1 ? LANDING.garrison - per * (nSq - 1) : per, 3, { pad: 16, elite: 0.12 });
         }
-        for (let k = 0; k < SQUADS.sentryPairs; k++) { const B = BOATS[k * 3]; this.spawnSquad({ x: B.x + 4, z: B.z + 8 }, 2, 2, { pad: 8 }); }
+        for (let k = 0; k < SQUADS.sentryPairs; k++) { if (done.has(nSq + k)) continue; const B = BOATS[k * 3]; this.spawnSquad(nSq + k, { x: B.x + 4, z: B.z + 8 }, 2, 2, { pad: 8 }); }
         this.landOfficers = LANDING.officers.map((t, k) => this.spawnOfficer(t, LANDING.x - 6 + k * 12, LANDING.z + 2, { aggro: 26, name: `${TIERS[t].name} giữ bến` }));
       }
     }
-    if (i >= 2 && st.landing.taken && (st.counter.state === "wait" || st.counter.state === "run") && !this.landGuard.some((a) => this.alive(a))) {
+    if (i >= 2 && st.landing.taken && (st.counter.state === "wait" || st.counter.state === "run") && !this.liveCount(this.landGuard)) {
       this.landGuard = [];
-      for (let k = 0; k < COUNTER.keepMilitia; k++) this.landGuard.push(ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "squad", front: null,
-        x: LANDING.x - 5 + (k % 3) * 5, z: LANDING.z + 3 + Math.floor(k / 3) * 4, sx: LANDING.x - 5 + (k % 3) * 5, sz: LANDING.z + 3 + Math.floor(k / 3) * 4, legionMult: ctx.stats.legionMult ?? 1 }));
+      for (let k = 0; k < COUNTER.keepMilitia; k++) this.landGuard.push(this.ref(ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "squad", front: null,
+        x: LANDING.x - 5 + (k % 3) * 5, z: LANDING.z + 3 + Math.floor(k / 3) * 4, sx: LANDING.x - 5 + (k % 3) * 5, sz: LANDING.z + 3 + Math.floor(k / 3) * 4, legionMult: ctx.stats.legionMult ?? 1 })));
     }
-    if (st.counter.state === "run" && !this.counterUnits.some((a) => this.alive(a))) this.spawnCounter();
+    if (st.counter.state === "run" && !this.liveCount(this.counterUnits)) this.spawnCounter();
     if (i === 2) {
       const G = ctx.world.gates[GATE_SOUTH];
       this.spawnHold({ x: G.x - 14, z: G.z }, GATES[GATE_SOUTH].guards, 8, { pad: 10, elite: 0.12 });
@@ -277,7 +291,7 @@ export class DirectorB16 {
     this.counterUnits = [];
     for (let k = 0; k < COUNTER.n; k++) {
       const a = this.spawnEnemy(F.x + rng.range(-14, 14), F.z + rng.range(-1, 2), { role: "squad", tx: LANDING.x + rng.range(-6, 6), tz: LANDING.z + rng.range(-5, 5), elite: 0.12 });
-      this.counterUnits.push(a);
+      this.counterUnits.push(this.ref(a));
     }
   }
   // Vương Kỳ chém được (hero.js gọi strikeables mỗi đòn): chỉ pha Thoát Hoan, cờ còn đứng
@@ -301,11 +315,11 @@ export class DirectorB16 {
     if (k === "tiepvien") return `${this.reinf.charges} lượt${this.reinf.cd > 0 ? " · " + Math.ceil(this.reinf.cd) + "s" : ""}`;
     return this.militiaOrder === k && this.militiaUp() ? "đang theo" : "";
   }
-  militiaUp() { return this.militia.filter((a) => this.alive(a)).length; }
+  militiaUp() { return this.liveCount(this.militia); }
   militiaRole() { return this.militiaOrder === "theota" ? "follow" : this.militiaOrder === "giucho" ? "squad" : "zone"; }
-  aimMilitia(a) {
-    const o = this.objectivePoint() || this.hero;
-    if (this.militiaOrder === "xungtran") { a.sx = o.x; a.sz = o.z; }
+  // o: điểm mục tiêu hiện tại (tính một lần cho cả đoàn — objectives() lọc, sắp xếp mỗi lần gọi)
+  aimMilitia(a, o = null) {
+    if (this.militiaOrder === "xungtran") { o ||= this.objectivePoint() || this.hero; a.sx = o.x; a.sz = o.z; }
     else if (this.militiaOrder === "giucho") { a.sx = a.x; a.sz = a.z; }
   }
   order(target, k) {
@@ -321,7 +335,8 @@ export class DirectorB16 {
     if (!this.militiaUp()) { this.say("Chưa có dân binh — tới làng để gọi họ.", 3); return { ok: false }; }
     this.militiaOrder = k;
     const role = this.militiaRole();
-    for (const a of this.militia) if (this.alive(a)) { a.role = role; a.foe = null; this.aimMilitia(a); }
+    const o = k === "xungtran" ? this.objectivePoint() || this.hero : null;
+    for (const r of this.militia) if (this.live(r)) { r.a.role = role; r.a.foe = null; this.aimMilitia(r.a, o); }
     this.say(`Dân binh: ${RING_ITEMS.find((o) => o.k === k).name}.`, 2.5, "good"); ctx.audio.play("drum"); this.orders++;
     return { ok: true };
   }
@@ -352,8 +367,13 @@ export class DirectorB16 {
     this.ctx.fx.ring(x, z, r, COL.gold, 0.8);
     if (!quiet) { this.ctx.audio.play("drum"); this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good"); }
   }
+  // cờ cắm (Tổng Phản Công, Tuyệt Kỹ) tạo hình, vật liệu, texture mới mỗi lần: gỡ thì giải phóng luôn (trước đây chỉ remove → rò GPU cả trận)
+  dropProp(g) {
+    this.props.remove(g);
+    g.traverse((m) => { m.geometry?.dispose(); const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : []; for (const x of mats) { x.map?.dispose(); x.dispose(); } });
+  }
   updateFlags(dt) {
-    for (const f of this.flags) { f.t -= dt; if (f.t <= 0) this.props.remove(f.g); }
+    for (const f of this.flags) { f.t -= dt; if (f.t <= 0) this.dropProp(f.g); }
     this.flags = this.flags.filter((f) => f.t > 0);
     const h = this.hero; h.buffs.flag = this.flags.find((f) => this.dist(h, f) < f.r)?.atk ?? 0;
   }
@@ -371,7 +391,7 @@ export class DirectorB16 {
     // việc gấp trước mục tiêu của pha: bến bị phản công (sức giữ < 85%), lính cầm đuốc đang chạy tới kho còn nguyên
     if (st.counter.state === "run" && st.counter.keep < 85) return [P("ben", `Bến bị phản công · ${Math.ceil(st.counter.keep)}%`, LANDING, LANDING.r * 0.6)];
     if (st.phase === 1) {
-      const torch = near(this.torches.filter((a) => this.alive(a) && !st.depots[a.torch].burnt).map((a) => P("duoc", "Lính cầm đuốc", a, 1.5)))[0];
+      const torch = near(this.torches.filter((r) => this.live(r) && !st.depots[r.i].burnt).map((r) => P("duoc", "Lính cầm đuốc", r.a, 1.5)))[0];
       if (torch) return [torch];
     }
     if (st.phase === 1) {
@@ -406,9 +426,11 @@ export class DirectorB16 {
     const R = this.heldRing(); if (!R) return [];
     const crowd = this.ctx.crowd, h = this.hero, list = [];
     for (const a of crowd.agents) if (a.side === "dich" && crowd.hittable(a) && this.dist(a, R.c) < R.r) list.push(a);
+    for (const u of this.ctx.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating && this.dist(u, R.c) < R.r + u.radius) list.push(u);   // sĩ quan cũng chặn (foesAt tính cả)
     if (!list.length || list.length > 4) return [];
     const a = list.sort((p, q) => this.dist(p, h) - this.dist(q, h))[0];
-    return [{ id: "chan", label: a.unit === "CUNGKY_NG" ? "Cung kỵ còn chặn" : "Lính Nguyên còn chặn", x: a.x, y: heightAt(a.x, a.z), z: a.z, r: 2, ref: a }];
+    const label = a.isBig ? `${a.name} còn chặn` : a.unit === "CUNGKY_NG" ? "Cung kỵ còn chặn" : "Lính Nguyên còn chặn";
+    return [{ id: "chan", label, x: a.x, y: heightAt(a.x, a.z), z: a.z, r: 2, ref: a }];
   }
 
   // ---- cổng --------------------------------------------------------------------------------------------------------------------
@@ -427,7 +449,7 @@ export class DirectorB16 {
     const out = [];
     for (const id of [GATE_SOUTH, GATE_EAST]) {
       const g = this.ctx.world.gates[id], s = this.st.gates[id];
-      out.push({ id, name: `${GATES[id].name} (${id})`, x: g.x, z: g.z, hp: s.hp, max: s.hp0, open: s.open });
+      out.push({ id, name: GATES[id].name, x: g.x, z: g.z, hp: s.hp, max: s.hp0, open: s.open });
     }
     return out;
   }
@@ -438,8 +460,8 @@ export class DirectorB16 {
   }
   goalText(short = false) {
     if (this.st.phase !== 2) return null;
-    const gs = this.gateList().filter((g) => g.id === GATE_SOUTH);
-    return (short && gateGoalShort(gs)) || gateGoal("Hộ tống xe húc, phá Cổng nam (B3)", gs);
+    const G = this.st.gates[GATE_SOUTH], pct = gatePct(G.hp, G.hp0);         // không lộ id nội bộ B3 (cổng của đất Hàm Tử) ra HUD
+    return short ? `Phá cổng nam ${pct}%` : `Hộ tống xe húc, phá Cổng nam ${pct}%`;
   }
   openGateVisual(id, quiet = false) {
     const ctx = this.ctx, g = ctx.world.gates[id];
@@ -466,9 +488,10 @@ export class DirectorB16 {
 
     const ramMoving = st.phase === 2 && this.stepRam(dt);
     this.stepTorches();
-    const ev = tickB16(st, { hero: { x: h.x, z: h.z, alive: h.alive }, foesAt: (x, z, r) => this.foesAt(x, z, r), ramMoving, bossDown: !!this.bossDown,
-      torchesAt: (i) => this.torches.filter((a) => a.torch === i && this.alive(a) && this.dist(a, DEPOTS[i]) < DEPOT_RULE.r).length,
-      landingDef: this.allyIn(LANDING, LANDING.r), counterLeft: this.counterUnits.filter((a) => this.alive(a)).length }, dt);
+    const I = this.inp, run = st.counter.state === "run";
+    I.hero.x = h.x; I.hero.z = h.z; I.hero.alive = h.alive; I.ramMoving = ramMoving; I.bossDown = !!this.bossDown;
+    I.landingDef = run ? this.allyIn(LANDING, LANDING.r) : 0; I.counterLeft = run ? this.liveCount(this.counterUnits) : 0;   // luật chỉ đọc khi đang phản công
+    const ev = tickB16(st, I, dt);
     this.stepBoss();
     this.phase = st.phase;
     this.onEvents(ev);
@@ -480,8 +503,8 @@ export class DirectorB16 {
     this.baseHint = this.hint();
     this.syncProps();
     // dân binh "Xung trận" bám theo mục tiêu hiện tại
-    if (this.militiaOrder === "xungtran" && (this.aimT = (this.aimT || 0) - dt) <= 0) { this.aimT = 1; for (const a of this.militia) if (this.alive(a)) this.aimMilitia(a); }
-    if (this.militia.length > 80) this.militia = this.militia.filter((a) => this.alive(a));
+    if (this.militiaOrder === "xungtran" && (this.aimT = (this.aimT || 0) - dt) <= 0) { this.aimT = 1; const o = this.objectivePoint() || this.hero; for (const r of this.militia) if (this.live(r)) this.aimMilitia(r.a, o); }
+    if (this.militia.length > 80) this.militia = this.militia.filter((r) => this.live(r));
   }
   hint() {
     const st = this.st;
@@ -495,8 +518,9 @@ export class DirectorB16 {
   allyIn(c, r) { let n = 0; for (const a of this.ctx.crowd.agents) if (a.side === "ta" && this.alive(a) && this.dist(a, c) < r) n++; return n; }
   // lính cầm đuốc: chạy thẳng tới kho của mình (đánh trả nếu bị đánh)
   stepTorches() {
-    for (const a of this.torches) if (this.alive(a)) { const D = DEPOTS[a.torch]; a.sx = D.x; a.sz = D.z; }
+    for (const r of this.torches) if (this.live(r)) { const D = DEPOTS[r.i]; r.a.sx = D.x; r.a.sz = D.z; }
   }
+  torchesAt(i) { let n = 0; for (const r of this.torches) if (r.i === i && this.live(r) && this.dist(r.a, DEPOTS[i]) < DEPOT_RULE.r) n++; return n; }
   // Thoát Hoan: sàn Sinh lực khi còn Vương Kỳ; lần đầu chạm sàn gọi hộ vệ (Hộ Vệ Hoàng Tử, canon X18)
   stepBoss() {
     const u = this.boss;
@@ -513,17 +537,17 @@ export class DirectorB16 {
   // xe húc: người đẩy (dân binh), chạy khi có người đẩy sát xe và không địch trong stopR
   stepRam(dt) {
     const ctx = this.ctx, st = this.st, p = this.ramPos();
-    this.pushers = (this.pushers || []).filter((a) => this.alive(a));
+    this.pushers = this.pushers.filter((r) => this.live(r));
     if (this.pushers.length < RAM.pushers && !st.ram.arrived) {
       this.pushT = (this.pushT || 0) + dt;
       if (this.pushers.length === 0 || this.pushT > PUSH.respawn) {
         this.pushT = 0;
         const n = this.pushers.length === 0 ? RAM.pushers : 1, back = { x: p.x - Math.sin(p.yaw) * 4, z: p.z - Math.cos(p.yaw) * 4 };
-        for (let i = 0; i < n; i++) this.pushers.push(ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "squad", front: null, x: back.x + (i - 1.5) * 1.2, z: back.z, yaw: p.yaw, legionMult: ctx.stats.legionMult ?? 1 }));
+        for (let i = 0; i < n; i++) this.pushers.push(this.ref(ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "squad", front: null, x: back.x + (i - 1.5) * 1.2, z: back.z, yaw: p.yaw, legionMult: ctx.stats.legionMult ?? 1 })));
       }
     }
     let pushing = 0;
-    this.pushers.forEach((a, i) => {
+    this.pushers.forEach(({ a }, i) => {
       const off = (i - (this.pushers.length - 1) / 2) * PUSH.gap;
       a.sx = p.x - Math.sin(p.yaw) * PUSH.back + Math.cos(p.yaw) * off; a.sz = p.z - Math.cos(p.yaw) * PUSH.back - Math.sin(p.yaw) * off;
       if (Math.hypot(a.x - a.sx, a.z - a.sz) < PUSH.pullR && !a.foe) pushing++;
@@ -572,7 +596,7 @@ export class DirectorB16 {
         for (const u of this.landOfficers || []) if (u.alive) u.awake = true;
       } else if (e.type === "torches") {
         const rng = ctx.rng;
-        DEPOTS.forEach((D, i) => { for (let k = 0; k < DEPOT_RULE.torches; k++) { const a = this.spawnEnemy(D.x + rng.range(-10, 10), D.z - 22 + rng.range(-3, 3), { role: "squad", tx: D.x, tz: D.z }); a.torch = i; this.torches.push(a); } });
+        DEPOTS.forEach((D, i) => { for (let k = 0; k < DEPOT_RULE.torches; k++) { const a = this.spawnEnemy(D.x + rng.range(-10, 10), D.z - 22 + rng.range(-3, 3), { role: "squad", tx: D.x, tz: D.z }); this.torches.push(this.ref(a, { i })); } });
         this.say("Quân Nguyên cầm đuốc chạy tới kho quân nhu — hạ chúng để giữ kho!", 5, "bad"); ctx.audio.play("horn");
       } else if (e.type === "depotBurnt") {
         const D = DEPOTS.find((d) => d.id === e.id);
@@ -585,15 +609,16 @@ export class DirectorB16 {
       } else if (e.type === "counterEnd") {
         if (e.ok) {
           this.hk(COUNTER.hk, "giữ bến"); this.banner("GIỮ ĐƯỢC BẾN", "#dff0c8", 1.4); ctx.audio.play("cheer");
-          for (const a of this.counterUnits) if (this.alive(a)) { a.role = "squad"; a.sx = COUNTER.from.x; a.sz = COUNTER.from.z - 6; }   // còn sống thì lui xuống thuyền
-          ctx.crowd.rout(LANDING.x, LANDING.z, LANDING.r + 10, (a) => this.counterUnits.includes(a));
+          const ids = new Set();
+          for (const r of this.counterUnits) if (this.live(r)) { ids.add(r.id); r.a.role = "squad"; r.a.sx = COUNTER.from.x; r.a.sz = COUNTER.from.z - 6; }   // còn sống thì lui xuống thuyền
+          ctx.crowd.rout(LANDING.x, LANDING.z, LANDING.r + 10, (a) => ids.has(a.id));
         }
       } else if (e.type === "bannerDown") {
         const B = BANNERS.find((b) => b.id === e.id);
         ctx.fx.dust(B.x, B.z, 1.5); ctx.audio.play("gateBreak"); this.hk(BANNER_RULE.hk, "Vương Kỳ");
         this.banner(`VƯƠNG KỲ ĐỔ ${e.n}/3`, "#f1d98a", 1.1);
       } else if (e.type === "bannersAll") {
-        if (this.boss) this.boss.floorPct = 0;
+        if (this.boss) { this.boss.floorPct = 0; this.boss.hpLocked = false; }
         this.say("Ba Vương Kỳ đã đổ: Thoát Hoan mất khiên vương giả!", 5, "good");
       } else if (e.type === "boatBurnt") {
         const B = BOATS.find((b) => b.id === e.id);
@@ -610,7 +635,7 @@ export class DirectorB16 {
         } else this.say(`Kế Sách ${K.name}: không thành.`, 4, "bad");
       } else if (e.type === "ambush") {
         const A = RAM.ambush[e.i];
-        for (let k = 0; k < A.n; k++) { const p = this.ramPos(); this.spawnEnemy(A.from.x + this.ctx.rng.range(-5, 5), A.from.z + this.ctx.rng.range(-5, 5), { role: "squad", tx: p.x, tz: p.z, elite: 0.12 }).huntRam = true; }
+        for (let k = 0; k < A.n; k++) { const p = this.ramPos(); this.hunters.push(this.ref(this.spawnEnemy(A.from.x + this.ctx.rng.range(-5, 5), A.from.z + this.ctx.rng.range(-5, 5), { role: "squad", tx: p.x, tz: p.z, elite: 0.12 }))); }
         this.say("Phục kích! Quân Nguyên lao ra chặn xe húc.", 4, "bad"); ctx.audio.play("horn");
       } else if (e.type === "ramArrived") {
         this.banner("XE HÚC TỚI CỔNG NAM", "#e6dcc3", 1.2);
@@ -620,19 +645,20 @@ export class DirectorB16 {
         this.hk(5, "cổng " + e.id, e.id === GATE_EAST);
         if (e.id === GATE_EAST) this.say("Cánh Trần Quang Khải đã phá cổng đông.", 4, "good");
       } else if (e.type === "win") this.win(e.why);
-      else if (e.type === "lose") this.lose(e.why, false);
+      else if (e.type === "lose") this.lose(e.why, true);                // mất bến, quá giờ: tải lại đầu pha được (như B15)
     }
     // lính phục kích bám theo xe húc
-    if (st.phase === 2) { const p = this.ramPos(); for (const a of ctx.crowd.agents) if (a.huntRam && this.alive(a)) { a.sx = p.x; a.sz = p.z; } }
+    if (st.phase === 2 && this.hunters.length) { const p = this.ramPos(); for (const r of this.hunters) if (this.live(r)) { r.a.sx = p.x; r.a.sz = p.z; } }
   }
 
   // ---- móc từ lính, sĩ quan, tướng ---------------------------------------------------------------------------------------------
   onSoldierKilled(a, opt) {
-    if (a.side === "dich" && a.squadId && this.squads.has(a.squadId)) {           // Đoạt Giáo: đội giữ bến hết người
-      const list = this.squads.get(a.squadId);
-      if (list.every((m) => m === a || !this.alive(m))) {
-        this.squads.delete(a.squadId);
-        const n = noteSquadCleared(this.st);
+    const slot = a.side === "dich" ? this.squadOf.get(a.id) : undefined;
+    if (slot !== undefined && this.squads.has(slot)) {                                // Đoạt Giáo: đội giữ bến hết người
+      const list = this.squads.get(slot);
+      if (list.every((r) => r.id === a.id || !this.live(r))) {
+        this.squads.delete(slot);
+        const n = noteSquadCleared(this.st, slot);
         if (n <= SQUADS.need) { this.banner(`ĐOẠT GIÁO ${n}/${SQUADS.need}`, "#e6dcc3", 0.9); this.hk(1, "Đoạt Giáo", true); }
       }
     }
@@ -669,17 +695,18 @@ export class DirectorB16 {
   // ---- điểm lưu đầu pha, thắng thua --------------------------------------------------------------------------------------------
   saveCheckpoint() {
     const ctx = this.ctx, h = this.hero;
-    this.checkpoint = { st: snapshotB16(this.st), time: this.time, hk: clone(ctx.hk), ko: this.ko, koMs: this.koMs, revived: this.revived,
+    this.checkpoint = { st: snapshotB16(this.st), time: this.time, hk: clone(ctx.hk), ko: this.ko, koMs: this.koMs, revived: this.revived, counterBoss: this.counterBoss,
       reinf: { ...this.reinf }, hero: { hp: h.hp, ki: h.ki, revives: h.revives, x: h.x, z: h.z } };
   }
   restoreCheckpoint() {
     const ctx = this.ctx, c = this.checkpoint, h = this.hero;
     for (const a of [...ctx.crowd.agents]) ctx.crowd.release(a);
     for (const u of ctx.units) if (u.alive) u.dispose();
-    ctx.units.length = 0; this.militia = []; this.pushers = []; this.boss = null; this.landOfficers = []; this.bossDown = false;
-    this.squads = new Map(); this.torches = []; this.counterUnits = []; this.landGuard = []; this.strk = null;
-    for (const f of this.flags) this.props.remove(f.g); this.flags = [];
+    ctx.units.length = 0; this.boss = null; this.landOfficers = []; this.strk = null; this.resetLists();
+    this.militiaOrder = "theota";                                          // dân binh sinh lại đều "Theo ta"
+    for (const f of this.flags) this.dropProp(f.g); this.flags = [];
     restoreB16(this.st, c.st); Object.assign(ctx.hk, clone(c.hk));
+    this.bossDown = this.st.bossDown; this.bossMet ||= this.st.phase >= 3; this.counterBoss = c.counterBoss ?? 0;   // P5: Thoát Hoan đã rút (thưởng hạ boss giữ nguyên)
     this.phase = this.st.phase; this.time = c.time; this.ko = c.ko; this.koMs = c.koMs; this.revived = c.revived; this.reinf = { ...c.reinf };
     ctx.sim.reinf.charges = this.reinf.charges;
     for (const id of [GATE_SOUTH, GATE_EAST]) { const open = this.st.gates[id].open; ctx.openGates[id] = open; ctx.world.gates[id].broken = open; }
@@ -706,7 +733,7 @@ export class DirectorB16 {
     const ctx = this.ctx, st = this.st, side = sideB16(st);
     const mainDone = st.main.filter(Boolean).length, sideDone = Object.values(side).filter(Boolean).length;
     const ks = this.ksHud(), ksOk = ks.filter((k) => k.state === "thanhcong").length;
-    const alliesUp = this.militia.filter((a) => this.alive(a)).length, alliesAll = Math.max(1, this.militia.length);
+    const alliesUp = this.liveCount(this.militia), alliesAll = Math.max(1, this.militia.length);
     return {
       battle: "B16", won, why, R: ctx.R, difficulty: ctx.diff.id, timeSec: this.time, mode: this.mode, parSec: PAR_B16,
       missions: (mainDone / 5) * 0.8 + (sideDone / 3) * 0.2, mainDone, sideDone, missionsTotal: 5, sideTotal: 3,
@@ -724,5 +751,6 @@ export class DirectorB16 {
     for (const a of this.ctx.crowd.agents) if (a.side === "dich" && this.alive(a)) d = Math.min(d, Math.hypot(a.x - h.x, a.z - h.z));
     return d;
   }
-  dispose() { this.ctx.scene.remove(this.props); }
+  // Vật của trận để lại trong scene: battle.js releaseGpu duyệt scene và giải phóng (trước đây gỡ khỏi scene trước nên không ai giải phóng).
+  dispose() {}
 }

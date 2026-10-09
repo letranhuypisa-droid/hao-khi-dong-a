@@ -39,7 +39,7 @@ export function createB16({ S = 1, timeout = TIMEOUT_B16, ksWin = 1 } = {}) {
     allVillagesBeforeLanding: false,
     alarmBy: null,                                                     // "de" (bước lên đê) | "thay" (lính canh thấy) | "lua" (thuyền đầu tiên cháy)
     depots: DEPOTS.map((d) => ({ id: d.id, p: 0, burnt: false, saved: false })), torchesSent: false,
-    squadsCleared: 0,                                                  // Đoạt Giáo: số đội giữ bến đã bị tước (director báo qua noteSquadCleared)
+    squadsCleared: 0, squadsDone: [],                                  // Đoạt Giáo: số đội đã bị tước, ô đội đã tước (director báo qua noteSquadCleared; tải lại không sinh lại ô đã tước)
     counter: { state: "wait", keep: 100, spawned: false },             // phản công bến: wait → run → done | lost
     banners: BANNERS.map((b) => ({ id: b.id, hp0: Math.round(BANNER_RULE.hp * S), hp: Math.round(BANNER_RULE.hp * S), down: false })), bannersDown: 0,
     // Kế Sách: state "khadung" → "sansang" (danhUp: đang trong cửa sổ) → "thanhcong" | "thatbai"
@@ -206,8 +206,12 @@ export function damageBannerB16(st, i, dmg, ev = []) {
 }
 // Thoát Hoan còn khiên vương giả (sàn Sinh lực) khi còn cờ đứng
 export const bossFloorB16 = (st) => (st.bannersDown < BANNERS.length ? BANNER_RULE.floorPct : 0);
-// Đoạt Giáo: một đội giữ bến bị hạ hết người
-export function noteSquadCleared(st) { st.squadsCleared++; return st.squadsCleared; }
+// Đoạt Giáo: đội ở ô `slot` bị hạ hết người (ô đã tính rồi thì không tính lại). Trả số đội đã tước.
+export function noteSquadCleared(st, slot) {
+  if (slot !== undefined && st.squadsDone.includes(slot)) return st.squadsCleared;
+  if (slot !== undefined) st.squadsDone.push(slot);
+  return ++st.squadsCleared;
+}
 
 export function finish(st, won, why, ev = []) {
   if (st.over) return ev;
