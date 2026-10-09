@@ -111,6 +111,13 @@
   "tris": 8996,
   "bytes": 436602
  },
+ "char/H38h": {
+  "kind": "char",
+  "file": "char/H38h.hkm",
+  "tex": "char/H38h.webp",
+  "tris": 5976,
+  "bytes": 210598
+ },
  "char/H40": {
   "kind": "char",
   "file": "char/H40.hkm",
@@ -188,6 +195,13 @@
   "tris": 5985,
   "bytes": 279932
  },
+ "char/TTh": {
+  "kind": "char",
+  "file": "char/TTh.hkm",
+  "tex": "char/TTh.webp",
+  "tris": 5964,
+  "bytes": 230404
+ },
  "char/X19": {
   "kind": "char",
   "file": "char/X19.hkm",
@@ -215,6 +229,54 @@
   "tex": "char/X24.webp",
   "tris": 7498,
   "bytes": 281550
+ },
+ "kit/DAN_NAMh": {
+  "kind": "kit",
+  "file": "kit/DAN_NAMh.hkm",
+  "tex": "kit/DAN_NAMh.webp",
+  "tris": 466,
+  "lods": [
+   466,
+   220,
+   90
+  ],
+  "bytes": 52012
+ },
+ "kit/DAN_NUh": {
+  "kind": "kit",
+  "file": "kit/DAN_NUh.hkm",
+  "tex": "kit/DAN_NUh.webp",
+  "tris": 466,
+  "lods": [
+   466,
+   216,
+   86
+  ],
+  "bytes": 54232
+ },
+ "kit/DAN_TREh": {
+  "kind": "kit",
+  "file": "kit/DAN_TREh.hkm",
+  "tex": "kit/DAN_TREh.webp",
+  "tris": 396,
+  "lods": [
+   396,
+   190,
+   80
+  ],
+  "bytes": 47254
+ },
+ "kit/DV_AOTONGh": {
+  "kind": "kit",
+  "file": "kit/DV_AOTONGh.hkm",
+  "tex": "kit/DV_AOTONGh.webp",
+  "tris": 538,
+  "lods": [
+   538,
+   252,
+   110
+  ],
+  "bytes": 60970
  },
  "kit/DV_DAO": {
   "kind": "kit",

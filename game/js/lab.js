@@ -121,7 +121,7 @@ const meshCache = {};
 const _mc = new Float64Array(BONE_FLOATS), _m4 = new THREE.Matrix4();     // ma trận khớp một lính (affine 3 × 4)
 function kitMeshes(kit) {
   if (meshCache[kit]) return meshCache[kit];
-  const G = model("kit/" + kitOf(kit));
+  const G = model("kit/" + (params.get("kitfile") || kitOf(kit)));          // &kitfile=DV_AOTONGh: xem tệp nướng chưa có trong game (kèm &kit=DV_NO cho bộ tư thế)
   if (G) { const S = glbKit(kit, G, 64); S.meshes.forEach((m) => scene.add(m)); return (meshCache[kit] = { glb: S, skel: S.skel }); }
   const g = kitGeometry(kit), parts = {};
   for (const j of JOINT_NAMES) { const m = new THREE.InstancedMesh(g.parts[j], mats, 32); m.count = 0; m.frustumCulled = false; scene.add(m); parts[j] = m; }

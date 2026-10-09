@@ -481,6 +481,12 @@ export const RIGS = {
   H31:       { model: "H31h", scale: 1.23, cloth: PAL.sonDam, armor: PAL.then, trim: PAL.vang, skirt: PAL.then, hat: "tietche", beard: 0xc9c3b6,
     heavy: true, weapon: "daikiem", cape: PAL.son, capeScale: [0.62, 0.72] },
 };
+// Đợt ba (GLB Hunyuan3D 2026-10-09, design/glb-prompts.md): Triệu Trung (TT: gia tướng người Tống của Chiêu Văn vương, thuyền quân Cờ áo Tống; cung Việt) và Yết Kiêu (H38: gia tướng Hưng Đạo
+// vương, B20 "sắp có"; cởi trần, đoản đao). Chưa có trận dùng họ trên sân: xem trong lab (lab.html?view=rigs&rigs=TT,H38). Màu, mũ chỉ dùng khi chưa nạp được mô hình (như mọi rig có model);
+// hat "khan" (không phải "tocbui"): khăn quấn đầu đã nằm trong lưới, đừng thêm hai dải khăn đỏ của code. Cỡ: chuẩn hoá theo độ cao vai (1,385 m ở cỡ 1) nên cỡ tính từ chiều cao thiết kế
+// (design/glb-prompts.md: TT 1,76, H38 1,72 m) theo tỉ lệ với H40 (1,80 m, cỡ 1,23, khớp đầu cao 1,871): TT 1,175, H38 1,135.
+RIGS.TT = { model: "TTh", scale: 1.175, cloth: 0x9a7a2a, armor: PAL.then, trim: PAL.vang, hat: "khan", weapon: "cung" };
+RIGS.H38 = { model: "H38h", scale: 1.135, cloth: PAL.cham, armor: PAL.then, trim: PAL.vang, hat: "khan", weapon: "dao" };
 // Toa Đô (X19, boss B15): cùng rig "Tướng Nguyên" (đại đao, áo choàng) nhưng mô hình riêng (râu điểm bạc, giáp trầy); cỡ 1,38 của Meshy thành 1,48 (xem MESHY bên dưới).
 RIGS.X19 = { ...RIGS.tuong, model: "X19h", scale: 1.48 };
 // Năm tướng (H35, H31, H33, H40, Toa Đô) dùng mô hình Hunyuan3D (design/hunyuan-prompts.md, mã nướng <mã>h: nắm đấm bao chuôi vũ khí, giáp chi tiết). Chuẩn hoá theo độ

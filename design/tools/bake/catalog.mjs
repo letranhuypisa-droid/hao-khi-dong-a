@@ -143,6 +143,38 @@ const FIX_NG_KYH = {
   shR: [0.254, 1.433, -0.010], elR: [0.338, 1.192, -0.002], handR: [0.470, 0.985, 0.067],
   neck: 1.540,
 };
+// Đợt ba (2026-10-09, 90 GLB Hunyuan3D thả vào design/, xử lý trước sáu người): Triệu Trung TT, Yết Kiêu H38 (nhân vật rig, chưa có trận dùng), dân làng DAN_NAM / DAN_NU / DAN_TRE và quân
+// áo Tống DV_AOTONG (lính bộ, KIT_LIST ở dưới). Khớp tay do design/tools/fit-arms.mjs đo (A-pose nắm đấm, hai tay đối xứng); tay áo giáp TT, DV_AOTONG có ống tên đeo hông (xem ghi chú ở mục).
+const FIX_TTH = {
+  shL: [-0.295, 1.450, -0.019], elL: [-0.386, 1.212, -0.009], handL: [-0.524, 1.015, 0.075],
+  shR: [0.295, 1.450, -0.019], elR: [0.386, 1.212, -0.009], handR: [0.524, 1.015, 0.075],
+  neck: 1.610,
+};
+const FIX_H38H = {
+  shL: [-0.289, 1.407, -0.002], elL: [-0.369, 1.165, 0.006], handL: [-0.496, 0.955, 0.076],
+  shR: [0.289, 1.407, -0.002], elR: [0.369, 1.165, 0.006], handR: [0.496, 0.955, 0.076],
+  neck: 1.580,
+};
+const FIX_DV_AOTONGH = {
+  shL: [-0.276, 1.489, 0.009], elL: [-0.368, 1.251, 0.024], handL: [-0.500, 1.065, 0.138],
+  shR: [0.276, 1.489, 0.009], elR: [0.368, 1.251, 0.024], handR: [0.500, 1.065, 0.138],
+  neck: 1.630,
+};
+const FIX_DAN_NAMH = {
+  shL: [-0.290, 1.457, 0.002], elL: [-0.381, 1.219, 0.014], handL: [-0.516, 1.025, 0.110],
+  shR: [0.290, 1.457, 0.002], elR: [0.381, 1.219, 0.014], handR: [0.516, 1.025, 0.110],
+  neck: 1.640,
+};
+const FIX_DAN_NUH = {
+  shL: [-0.264, 1.460, 0.033], elL: [-0.368, 1.227, 0.040], handL: [-0.523, 1.035, 0.103],
+  shR: [0.264, 1.460, 0.033], elR: [0.368, 1.227, 0.040], handR: [0.523, 1.035, 0.103],
+  neck: 1.610,
+};
+const FIX_DAN_TREH = {
+  shL: [-0.278, 1.383, 0.000], elL: [-0.378, 1.148, 0.014], handL: [-0.519, 0.965, 0.121],
+  shR: [0.278, 1.383, 0.000], elR: [0.378, 1.148, 0.014], handR: [0.519, 0.965, 0.121],
+  neck: 1.540,
+};
 // Bán kính ống quanh chuỗi tay ghi tay (human.mjs fitHuman rad, radOut; đơn vị H, mặc định [0,05, 0,04, 0,045] / [0,07, 0,07, 0,065]): tay giáp dày của
 // Hunyuan3D (cẳng tay hộ tay, cánh tay trên giáp) lòi mặt trong ra ngoài ống mặc định 0,087–0,106 (khung thô) → đỉnh mặt trong theo thân, nách thành tam giác
 // cầu: 17–27 tam giác tách, đường tách hở 0,6 m khi giơ tay (H31h, H33h, H40h, X19h). Mức nhỏ nhất làm hết cầu ở H31h, H33h, X19h (cầu 0); H40h còn 4 tam giác ở gáy.
@@ -186,6 +218,9 @@ export const CHARS = {
   CV_cungh: { src: "design/glb/_raw/CV_cung_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_CUNGH, ...ARM_TUBE, zs: 0.06, simp: { w: 2, hi: 4 } },
   CV_songdaoh: { src: "design/glb/_raw/CV_songdao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_SONGDAOH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
   CV_daidaoh: { src: "design/glb/_raw/CV_daidao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_DAIDAOH, ...ARM_TUBE },
+  // Đợt ba: tướng khác nên 6000 / 512². TT giáp tay (hộ tay) như tướng Hunyuan khác → ARM_TUBE; H38 cởi trần, tay trần: ống mặc định.
+  TTh: { src: "design/glb/_raw/TT_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_TTH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
+  H38h: { src: "design/glb/_raw/H38_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H38H, simp: { w: 2, hi: 4 } },
   H35: { tris: 9000, tex: 1024, shoulder: 1.441, w: { so: -0.09, ky: 0.12 } },
   H31: { tris: 9000, tex: 1024, shoulder: 1.303, w: { seam: 1 } },
   LINH_r01: { tris: 9000, tex: 1024, shoulder: 1.379 },
@@ -258,3 +293,10 @@ for (const [k, [fix, over]] of Object.entries(HUN_KITS)) {
   const { shoulder, cut, keep, fix: oldFix, ...rest } = KIT_LIST[k];                // khớp, hộp cắt, mẫu giữ của Meshy không áp cho mẫu mới
   KIT_LIST[k + "h"] = { ...rest, src: `design/glb/_raw/${k}_hunyuan.glb`, fix, ...over };
 }
+
+// Đợt ba: dân làng và quân áo Tống (lính bộ, cùng bảng mức chi tiết như lính đám đông Hunyuan3D ở trên). Chưa có mã Meshy song song nên không đi qua HUN_KITS. Không vũ khí trong tay, trừ
+// DV_AOTONG cầm cung Việt ở tay trái như NG_CUNG (design/glb-prompts.md: DV_AOTONG ↔ WPN_cung_viet); quang gánh, tay nải của dân là đạo cụ riêng (PROP_quang_ganh, PROP_tay_nai), chưa gắn.
+KIT_LIST.DV_AOTONGh = { src: "design/glb/_raw/DV_AOTONG_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DV_AOTONGH, weapons: [{ id: "cung_viet", bone: "faL", p: [0, HAND, 0], wl: [80, 40, 24] }] };
+KIT_LIST.DAN_NAMh = { src: "design/glb/_raw/DAN_NAM_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NAMH, weapons: [] };
+KIT_LIST.DAN_NUh = { src: "design/glb/_raw/DAN_NU_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NUH, weapons: [] };
+KIT_LIST.DAN_TREh = { src: "design/glb/_raw/DAN_TRE_hunyuan.glb", lods: [400, 190, 80], fix: FIX_DAN_TREH, weapons: [] };
