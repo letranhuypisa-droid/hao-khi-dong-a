@@ -1,0 +1,204 @@
+/* hud.css — HUD gọn trong trận (đợt 13c). Bật khi khung trận mang .compact (battle.js syncCompact: lớp cảm ứng đang hiện, hoặc khung
+   ≤ 900 px rộng / ≤ 500 px cao). Máy tính màn rộng giữ bố cục game.css / b20.css.
+   Bố cục điện thoại ngang (844 × 390):
+     trên trái  Hào Khí + giờ (+ Con nước B20)        trên giữa  thẻ nhiệm vụ một dòng (chạm: mở đủ 5 s), dưới nó một tin ≤ 5 s
+     trên phải  bản đồ nhỏ (chạm: mở to + bảng mặt trận), nút Tình hình có số báo (Kế Sách, bảng của trận)
+     dưới trái  thanh máu, trên nó cần điều khiển, trên nữa nút ☰ (Kế Sách, Lệnh, Phản Công, Khóa, tạm dừng)
+     dưới phải  cụm nút hình cung quanh N (ui/layout.js touchArc, cỡ theo --u)
+   Mọi bộ chọn mở đầu bằng .stage.compact để thắng các luật cũ (.b20.touchmode …, .hud-b20 …) mà không cần !important
+   (trừ cỡ canvas bản đồ: B20 đặt cỡ bằng style nội dòng). */
+
+.hud-kos, .hud-sit { display: none; }
+.stage { --hkw: 168px; --mapw: 110px; --lefty: 48px; }
+.stage.b20 { --hkw: 228px; --mapw: 150px; --lefty: 78px; }
+
+/* ---- trên trái: Hào Khí + giờ ---- */
+.stage.compact .hud-top, .stage.compact .hud-left { display: contents; }
+.stage.compact .hk { position: absolute; left: calc(8px + var(--sl)); top: calc(6px + var(--st)); width: var(--hkw); padding: 4px 8px 4px 32px; border-radius: 10px;
+  background: var(--panel); border-color: var(--line2); }
+.stage.compact .hk::before { left: 5px; width: 24px; height: 24px; top: 15px; }
+.stage.compact .hk-label { position: absolute; right: 8px; top: 2px; }
+.stage.compact .hk-label span { display: none; }
+.stage.compact .hk-label b { font-size: .86rem; }
+.stage.compact .hk-bar { height: 9px; margin: 4px 30px 0 0; }
+.stage.compact .hk-state { font-size: .6rem; min-height: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage.compact .hud-time { position: absolute; left: calc(var(--hkw) + 14px + var(--sl)); top: calc(6px + var(--st)); padding: 3px 9px; border-radius: 10px; background: var(--panel); border-color: var(--line2); }
+.stage.compact .hud-time b { font-size: .98rem; } .stage.compact .hud-time span { display: none; }
+.stage.compact .hud-kos { display: block; font-size: .6rem; color: var(--muted); line-height: 1.1; }
+.stage.compact .b20-tide { margin-top: 3px; padding: 2px 5px 3px; }
+.stage.compact .b20-tide .bt-l { gap: 4px; }
+.stage.compact .b20-tide .bt-l b { font-size: 0; letter-spacing: 0; } .stage.compact .b20-tide .bt-l b::before { content: "Nước"; font-size: .58rem; letter-spacing: .02em; }
+.stage.compact .b20-tide .bt-v { font-size: .76rem; } .stage.compact .b20-tide .bt-n { font-size: .56rem; }
+
+/* ---- trên giữa: thẻ nhiệm vụ một dòng, tin ≤ 5 s ---- */
+.stage.compact .hud-phase { position: absolute; z-index: 2; top: calc(6px + var(--st)); left: 50%; transform: translateX(-50%); width: max-content;
+  max-width: max(150px, calc(100vw - 2 * (var(--hkw) + 84px))); padding: 5px 12px 5px 10px; border-radius: 15px; background: var(--panel); border: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; cursor: pointer; display: block; }
+.stage.compact .hud-phase::before { content: "◆ "; color: var(--vang); font-size: .7rem; }
+.stage.compact .hud-phase b, .stage.compact .hud-phase span, .stage.compact .hud-b20 .hud-phase span { display: inline; font-size: .78rem; margin: 0; }
+.stage.compact .hud-phase b { font-size: .74rem; color: var(--vang2); }
+.stage.compact .hud-phase span { color: #f4ead2; font-weight: 700; }
+.stage.compact .hud-phase b::after { content: " · "; color: var(--muted); }
+.stage.compact .hud-phase small { display: none; }
+.stage.compact .hud-phase.open { white-space: normal; width: min(460px, 70vw); max-width: none; border-radius: 12px; background: var(--panel2); border-color: var(--vang); padding: 7px 12px 8px; }
+.stage.compact .hud-phase.open b, .stage.compact .hud-phase.open span { display: block; }
+.stage.compact .hud-phase.open b::after, .stage.compact .hud-phase.open::before { content: none; }
+.stage.compact .hud-phase.open small { display: block; -webkit-line-clamp: unset; font-size: .76rem; margin-top: 4px; }
+.stage.compact .hud-phase.flash { animation: phaseFlash 2.2s ease-out; }
+.stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs { position: absolute; z-index: 1; top: calc(48px + var(--st)); left: 50%; transform: translateX(-50%); width: min(54vw, 460px); gap: 0; align-items: center; }
+/* hai dòng: đệm dưới là viền trong suốt (ngoài vùng cắt) nên dòng thứ ba không lòi một vệt xuống phần đệm */
+.stage.compact .msg { font-size: .76rem; line-height: 1.32; padding: 4px 11px 0; border-bottom: 4px solid transparent; border-radius: 9px; border-left-width: 3px; background: rgba(21,18,16,.84);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stage.compact .msg.bad, .stage.compact .msg.good, .stage.compact .msg.tip { border-bottom-color: transparent; }   /* .msg.bad… đặt màu cả bốn viền */
+.stage.compact .msg.tip::before { display: inline; content: "Gợi ý · "; font-size: .66rem; letter-spacing: .04em; }
+.stage.compact.b20 .hud-msgs { top: calc(72px + var(--st)); width: min(42vw, 360px); }      /* B20: dải Hào Khí + Con nước cao hơn, bảng Nghi binh ở phải */
+.stage.compact .hud.b20-bossing .hud-msgs { top: calc(112px + var(--st)); }
+.stage.compact .hud-events { left: calc(8px + var(--sl)); right: auto; top: calc(var(--lefty) + var(--st)); }
+.stage.compact .ev { font-size: .7rem; padding: 3px 8px; }
+
+/* ---- trên phải: bản đồ nhỏ, nút Tình hình ---- */
+.stage.compact .hud-map { right: calc(8px + var(--sr)); top: calc(6px + var(--st)); width: auto; transform: none; pointer-events: auto; cursor: pointer; }
+.stage.compact .hud-map canvas { width: var(--mapw) !important; height: auto !important; border-width: 1px; border-color: var(--line); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.45); }
+.stage.compact .fronts { display: none; }
+.stage.compact .hud.bigmap .hud-map { right: 50%; top: 50%; transform: translate(50%, -50%); z-index: 8; padding: 8px; border-radius: 14px; background: var(--panel2); border: 1px solid var(--vang); box-shadow: 0 16px 40px rgba(0,0,0,.6); }
+.stage.compact .hud.bigmap .hud-map canvas { width: min(76vw, calc((100vh - 120px) * 1.5)) !important; }
+.stage.compact.b20 .hud.bigmap .hud-map canvas { width: min(88vw, calc((100vh - 120px) * 2.8)) !important; }
+.stage.compact .hud.bigmap .fronts:not(:empty) { display: block; font-size: .8rem; }
+.stage.compact .hud.bigmap .hud-map::after { content: "Chạm để đóng"; display: block; text-align: center; font-size: .66rem; color: var(--muted); margin-top: 4px; }
+.stage.compact .hud-sit:not([hidden]) { display: grid; place-items: center; position: absolute; top: calc(6px + var(--st)); right: calc(var(--mapw) + 16px + var(--sr)); width: 40px; height: 40px; padding: 0;
+  border-radius: 50%; pointer-events: auto; background: var(--panel2); border: 1px solid var(--line); color: var(--vang2); }
+.hud-sit svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.hud-sit em { position: absolute; top: -4px; right: -4px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--son2); color: #fff; font: 700 .64rem/18px var(--sans); text-align: center; }
+.hud-sit em:empty { display: none; }
+.stage.compact .hud-sit.hot { border-color: #ffd27a; } .stage.compact .hud-sit.hot::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .7s infinite alternate; pointer-events: none; }
+.stage.compact .hud.sit-open .hud-sit { border-color: var(--vang); background: rgba(155,45,32,.85); }
+
+/* Kế Sách + bảng của trận: gập thì chỉ còn đồng hồ sống còn của pha (B20 Nghi binh, Thoát vây, Hào Khí khóa; Kế Sách sẵn sàng) ở dưới
+   bản đồ, gọn; mở (nút Tình hình) thì thành ngăn bên phải đủ mọi bảng, cuộn được, đè lên cụm nút tới khi gập lại. */
+.stage.compact .hud-ks { top: calc(var(--mapw) / 1.5 + 14px + var(--st)); right: calc(8px + var(--sr)); width: min(230px, 30vw); transform: none; gap: 4px; }
+.stage.compact.b20 .hud-ks { top: calc(72px + var(--st)); }
+.stage.compact .hud:not(.sit-open) .hud-ks > .ks:not(.sansang),
+.stage.compact .hud:not(.sit-open) .hud-ks > .hud-panel:not([data-panel=b20]),
+.stage.compact .hud:not(.sit-open) .hud-ks .b20-sec:not(.lure):not(.escape):not(.rally),
+.stage.compact .hud:not(.sit-open) .hud-ks .b20-sec .sub:not(.warn),
+.stage.compact .hud:not(.sit-open) .hud-ks .b20-sec .row:not(:first-of-type),
+.stage.compact .hud:not(.sit-open) .hud-ks .gapbar s { display: none; }
+.stage.compact .hud:not(.sit-open) .hud-ks .b20-sec, .stage.compact .hud:not(.sit-open) .hud-ks .ks { padding: 3px 7px 4px; font-size: .66rem; }
+.stage.compact .hud:not(.sit-open) .hud-ks .gapbar { margin: 3px 0 2px; height: 8px; }
+.stage.compact .hud:not(.sit-open) .hud-ks .ks i { display: none; }
+.stage.compact .hud.sit-open .hud-ks { z-index: 7; top: calc(52px + var(--st)); width: min(320px, 46vw); max-height: calc(100vh - 62px - var(--st) - var(--sb)); overflow-y: auto;
+  padding: 6px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--vang); box-shadow: 0 16px 40px rgba(0,0,0,.6); pointer-events: auto; }
+.stage.compact .hud.sit-open .hud-ks .ks.mini { display: flex; }
+.stage.compact .hud.sit-open .hud-ks .ks i { display: block; }
+
+/* ---- dưới: thanh máu, mục tiêu, nhắc tương tác ---- */
+.stage.compact .hud-hero { left: calc(8px + var(--sl)); bottom: calc(6px + var(--sb)); gap: 6px; }
+.stage.compact .portrait { display: none; }
+.stage.compact .bars { width: min(220px, 28vw); }
+.stage.compact .bars .name { font-size: .7rem; line-height: 1.2; }
+.stage.compact .bar.hp { height: 11px; margin-top: 2px; } .stage.compact .bar.hp span { font-size: .6rem; line-height: 11px; }
+.stage.compact .ki .kb { height: 6px; margin-top: 3px; }
+.stage.compact .buffs { position: absolute; left: calc(100% + 8px); bottom: 0; white-space: nowrap; font-size: .62rem; margin: 0; }
+.stage.compact .ttags { top: auto; bottom: 16px; left: calc(100% + 8px); }
+.stage.compact .hud-target { bottom: calc(8px + var(--sb)); width: min(30vw, 300px); }
+.stage.compact .tname { font-size: .74rem; }
+.stage.compact .hud-target .bar.thp { height: 8px; } .stage.compact .hud-target .bar.tpo { height: 4px; margin-top: 11px; }
+.stage.compact .hud-target .bar.tpo::before { font-size: .5rem; top: -9px; }
+/* khung cận vệ gọn: cột trái trên cần điều khiển, chỉ tên + thanh máu + chiêu (bỏ chữ lệnh) */
+.stage.compact .hud-guards { left: calc(8px + var(--sl)); bottom: calc(66px + var(--u) * 2.2 + var(--sb)); width: min(170px, 24vw); gap: 2px; }
+.stage.compact .hud-guards .gd { grid-template-columns: minmax(0, 62px) 1fr auto; gap: 4px; padding: 1px 5px; font-size: .58rem; }
+.stage.compact .hud-guards em { display: none; } .stage.compact .hud-guards .gh { height: 5px; }
+.stage.compact .hud-prompt { bottom: calc(52px + var(--sb)); font-size: .78rem; }
+.stage.compact .hud-prompt.quiet { bottom: calc(52px + var(--sb)); }
+.stage.compact .hud-ko { display: none; }
+.stage.compact .hud-combo { top: auto; left: auto; bottom: calc(var(--u) * 4.7 + 18px + var(--sb)); right: calc(14px + var(--sr)); text-align: right; }
+.stage.compact .hud-combo b { font-size: 1.9rem; } .stage.compact .hud-combo span { font-size: .56rem; letter-spacing: .14em; }
+.stage.compact:not(.touchmode) .hud-skills { transform: scale(.78); transform-origin: bottom right; right: calc(6px + var(--sr)); bottom: calc(6px + var(--sb)); }
+.stage.compact .b20-boss { top: calc(70px + var(--st)); width: min(44vw, 340px); padding: 2px 8px 3px; }
+.stage.compact .fx-banner { top: 30%; font-size: 1.15rem; letter-spacing: .1em; }
+.stage.compact .hud.b20-bossing .fx-banner { top: calc(150px + var(--st)); }
+.stage.compact .cine { font-size: 2rem; letter-spacing: .14em; }
+.stage.compact .wp-box { padding: 2px 9px; } .stage.compact .wp-box b { font-size: .72rem; } .stage.compact .wp-box span { font-size: .66rem; }
+.stage.compact .ring { z-index: 6; width: min(440px, 92vw); max-height: calc(100vh - 16px); overflow: auto; padding: 8px 12px; }
+.stage.compact .ring-title { font-size: .86rem; margin-bottom: 6px; } .stage.compact .ring-title small { display: none; }
+.stage.compact .hud:has(.ring.on) .hud-wp { visibility: hidden; }
+.stage.compact .ring-grid { gap: 6px; } .stage.compact .ring-grid button { padding: 6px; } .stage.compact .ring-grid .ric { width: 32px; height: 32px; }
+.stage.compact .arena-top { top: calc(6px + var(--st)); padding: 3px 14px; min-width: 200px; } .stage.compact .arena-big { font-size: 1.35rem; }
+/* thẻ Huấn luyện: hẹp lại (nằm giữa cần điều khiển và cụm nút) để được cao gần hết màn — phần giới thiệu và nút "Bắt đầu" không bị cắt */
+.stage.compact .tut, .stage.compact.tut-mode .tut { width: min(440px, 58vw); max-height: calc(100vh - 64px); overflow: auto; top: calc(8px + var(--st)); }
+.stage.compact .tut-text { font-size: .84rem; line-height: 1.42; }
+.stage.compact .tut-icons img { width: 46px; height: 46px; } .stage.compact .tut-icons figure { width: 48px; }
+
+/* ---- lớp cảm ứng ---- */
+.stage.compact .touch .stick { left: calc(14px + var(--sl)); bottom: calc(54px + var(--sb)); width: calc(var(--u) * 2.2); height: calc(var(--u) * 2.2);
+  background: radial-gradient(circle, rgba(241,217,138,.04) 0 40%, rgba(255,255,255,.07) 72%, rgba(0,0,0,.18)); border: 2px solid rgba(241,217,138,.3); }
+.stage.compact .touch .knob { width: calc(var(--u) * .9); height: calc(var(--u) * .9); left: calc(var(--u) * .65 - 2px); top: calc(var(--u) * .65 - 2px);
+  background: radial-gradient(circle at 40% 35%, rgba(255,231,160,.8), rgba(201,161,74,.5)); box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+.stage.compact .touch .camzone { right: 0; top: 0; width: 62%; height: calc(100% - var(--u) * 4.6 - 24px); }
+.stage.compact .touch .tbtns { right: calc(12px + var(--sr)); bottom: calc(12px + var(--sb)); width: calc(var(--u) * 1.6); height: calc(var(--u) * 1.6); }
+.stage.compact .touch .tbtns > button { width: calc(var(--s) * var(--u)); height: calc(var(--s) * var(--u));
+  right: calc(var(--u) * .8 + var(--x) * var(--u) - var(--s) * var(--u) / 2); bottom: calc(var(--u) * .8 + var(--y) * var(--u) - var(--s) * var(--u) / 2);
+  background: rgba(21,18,16,.6); border: 2px solid rgba(241,217,138,.5); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.stage.compact .touch .tbtns > .big { border-color: rgba(255,210,122,.8); }
+.stage.compact .touch .tbtns > button em { font-size: .6rem; }
+.stage.compact .touch .tbtns > .big em { font-size: .9rem; }
+.stage.compact .touch .tbtns > button.on { background: rgba(155,45,32,.85); }
+.stage.compact .touch .tsys { left: calc(14px + var(--sl)); top: auto; bottom: calc(66px + var(--u) * 2.2 + var(--sb)); flex-direction: row; align-items: center; gap: 8px; }
+.touch .tmenu { position: relative; display: grid; place-items: center; width: calc(var(--u, 48px) * .92); height: calc(var(--u, 48px) * .92); padding: 0; border-radius: 12px;
+  background: rgba(21,18,16,.72); border: 2px solid rgba(241,217,138,.5); color: var(--vang2); touch-action: none; }
+.touch .tmenu svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.touch .tmenu.alert { border-color: #ffd27a; } .touch .tmenu.alert::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px rgba(255,210,122,1); opacity: 0; animation: glow .8s infinite alternate; pointer-events: none; }
+.touch .tsys.open .tmenu { background: rgba(155,45,32,.85); }
+.stage.compact .touch .tfan { display: none; gap: 6px; padding: 4px; border-radius: 14px; background: rgba(21,18,16,.55); }
+.stage.compact .touch .tsys.open .tfan { display: flex; }
+.stage.compact .touch .tfan button { position: relative; width: calc(var(--u) * .98); height: calc(var(--u) * .98); }
+.stage.compact .touch .tfan button em { font-size: .56rem; }
+.stage:not(.compact) .touch .tmenu { display: none; }
+.stage:not(.compact) .touch .tfan { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- điện thoại dọc: mọi trận cần màn ngang (B20 đã có lời nhắc riêng ở b20.css) ---- */
+@media (orientation: portrait) and (max-width: 600px) {
+  .stage.touchmode::after { content: "Xoay ngang điện thoại để chơi"; position: absolute; inset: 0; z-index: 60; display: grid; place-items: center;
+    padding: 32px; text-align: center; background: rgba(21,18,16,.95); color: var(--vang2); font: 900 1.15rem/1.5 var(--serif); letter-spacing: .06em; }
+}
+
+/* ---- khung hẹp (≤ 760 px, kể cả điện thoại ngang nhỏ 667 × 375): giữa trên không đủ chỗ giữa dải Hào Khí và bản đồ, nên
+   thẻ nhiệm vụ và tin xuống dưới dải Hào Khí, bên trái ---- */
+@media (max-width: 760px) {
+  .stage.compact .hud-phase { left: calc(8px + var(--sl)); top: calc(var(--lefty) + var(--st)); transform: none; max-width: min(56vw, calc(100vw - var(--mapw) - 40px)); }
+  .stage.compact .hud-phase.open { width: min(460px, calc(100vw - 24px)); }
+  .stage.compact .hud-msgs, .stage.compact .hud-left .hud-msgs, .stage.compact.b20 .hud-msgs { left: calc(8px + var(--sl)); top: calc(var(--lefty) + 36px + var(--st)); transform: none; width: min(56vw, 420px); align-items: flex-start; }
+  .stage.compact .hud-events { top: calc(var(--lefty) + 92px + var(--st)); }
+}
+
+/* chế độ Tự do (đợt 14): dải Danh tiếng thay Hào Khí dưới bậc Tướng, thanh Phá Thế của người lính, ô Tuyệt Kỹ chưa mở */
+.hk-bar.rep i { display: none; }
+.hk-bar.rep .hk-fill { background: linear-gradient(90deg, #6b4f2e, #c9a14a 60%, #f1d98a); }
+.bar.hpo { height: 5px; margin-top: 3px; } .bar.hpo[hidden] { display: none; } .bar.hpo > div { background: linear-gradient(90deg, #c9a14a, #ffe7a0); }
+.sk.locked { opacity: .35; filter: grayscale(1); }
+
+/* ô mục tiêu là cổng Hàm Tử quan (đợt 15a, hud.js gateBox): thanh độ bền màu gỗ, cao hơn để số "7.340 / 11.000" nằm trên thanh; còn khóa
+   (trước P3) thì thanh xám, tên nhạt, một dòng vì sao dưới thanh. Máy tính: dòng vì sao treo xuống khoảng trống dưới ô (ô neo đáy 96 px), để ô
+   không cao hơn ô sĩ quan và không chạm nhắc khóa chuột (đáy 150 px). HUD gọn: ô cổng neo đáy 22 px, trên dòng buffs của tướng (đáy 6–19 px,
+   nằm ngang tới giữa màn — "Liên hoàn ×2 · Tụ lực 1" chui dưới thanh nếu ô neo 8 px như ô sĩ quan); thanh cổng khi ấy ngang hàng thanh máu sĩ
+   quan. Dòng vì sao nằm trong ô dưới thanh, một dòng giữa ô và được rộng hơn ô: ô chỉ 30vw (200 px ở 667 px) mà câu cần ~230 px. */
+.hud-target .tnum, .hud-target .twhy { display: none; }
+.hud-target.gate .tname { color: #f0c98a; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.7); }
+.hud-target.gate .bar.thp { height: 16px; }
+.hud-target.gate .bar.thp > div { background: linear-gradient(#d6954a, #8a5222); }
+.hud-target.gate .tnum { display: block; position: absolute; inset: 0; font: 700 .72rem/16px var(--sans); text-align: center; color: #fff4dc; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.hud-target.gate.locked .tname { color: #ddd5c4; }
+.hud-target.gate.locked .bar.thp > div { background: linear-gradient(#8f897e, #5a554d); }
+.hud-target.gate.locked .twhy { display: block; position: absolute; left: 50%; top: calc(100% + 5px); transform: translateX(-50%); width: max-content; max-width: 100%;
+  box-sizing: border-box; padding: 1px 9px; border-radius: 8px; background: rgba(21,18,16,.8); font-size: .74rem; color: var(--vang2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage.compact .hud-target.gate { bottom: calc(22px + var(--sb)); }
+.stage.compact .hud-target.gate .bar.thp { height: 13px; }
+.stage.compact .hud-target.gate .tnum { font-size: .62rem; line-height: 13px; }
+.stage.compact .hud-target.gate.locked .twhy { position: relative; top: auto; margin: 2px 0 0; max-width: calc(100vw - 16px); padding: 0 7px; font-size: .64rem; }
+
+/* bảng tạm dừng: sổ tin trong trận */
+.msglog { margin: 10px 0 4px; }
+.msglog ol { list-style: none; margin: 6px 0 0; padding: 0; max-height: 28vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.msglog li { font-size: .8rem; line-height: 1.4; padding: 4px 9px; border-left: 3px solid var(--vang); background: rgba(0,0,0,.25); border-radius: 0 6px 6px 0; }
+.msglog li.bad { border-color: var(--bad); } .msglog li.good { border-color: var(--good); } .msglog li.tip { border-color: var(--vang2); }

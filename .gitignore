@@ -1,0 +1,9 @@
+# thư mục deploy Netlify do game/tools/build-netlify.mjs dựng (netlify.toml); Netlify tự dựng lại mỗi lần xây
+netlify-deploy/
+# GLB gốc tải từ Meshy (nặng, ngoài git) — design/tools/meshy.mjs nén từ đây ra design/glb/<nhóm>/
+design/glb/_raw/
+design/tools/node_modules/
+# Nguồn clip hoạt ảnh thô (Quaternius UAL CC0, FBX / GLB Mixamo tải về): game/tools/bake-clips.mjs nướng ra game/assets/anim/clips.json
+game/anim-src/
+# GLB rời ở gốc design/ (ENV_*, PROP_*, DAN_*...: file thô mới tải về, mỗi file ~40 MB) — chưa xử lý, ngoài git
+/design/*.glb

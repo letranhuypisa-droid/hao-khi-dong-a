@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:/hao-khi-dong-a-main/game/tools/dev-server.mjs",
+        "8942"
+      ],
+      "port": 8942
+    },
+    {
+      "name": "game-lab",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:/hao-khi-dong-a-main/game/tools/dev-server.mjs",
+        "8943"
+      ],
+      "port": 8943
+    }
+  ]
+}

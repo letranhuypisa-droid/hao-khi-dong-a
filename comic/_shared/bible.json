@@ -1,0 +1,67 @@
+{
+  "note": "Kinh thánh phong cách dùng chung cho mọi chương comic. Chương chỉ khai báo khung, trang, quiz, hiến kế; nhân vật và trang phục lấy ở đây để giữ cùng một khuôn mặt qua các chương.",
+  "render": {
+    "model": "nano_banana_pro",
+    "resolution": "2k",
+    "refFlag": "--image-references",
+    "why": "Nano Banana Pro giữ nhân vật qua nhiều lần sinh khi có ảnh tham chiếu (bài học từ lô avatar My Room, xem tools/art-gen.mjs)."
+  },
+  "style": "A single full-bleed illustration in graphic-novel style, inspired by Vietnamese lacquer painting (son mai): bold confident black ink linework, flat color fields with subtle cracked-lacquer texture and gold-leaf highlights, limited palette of vermilion red, gold, deep lacquer black, burnt umber, jade green and warm ivory, dramatic cinematic composition and lighting, 13th-century Dai Viet (Vietnam), Tran dynasty.",
+  "avoid": "Avoid: any text, letters, labels on maps, characters or symbols on flags and banners, captions, speech bubbles, logos, watermark or signature; blood, gore, corpses or wounds; Japanese samurai armor, Chinese Qing dynasty clothing, queue hairstyles, firearms, modern flags, modern objects; cartoonish or comedic exaggeration.",
+  "costume": {
+    "daiviet": "Dai Viet soldiers of the Tran dynasty: hair tied up under dark cloth head-wraps, loose dark tunics and trousers rolled to the knee, many barefoot, vests of dark lacquered leather lamellar plates, round woven rattan shields, spears and long single-edged sabers, red sashes.",
+    "yuan": "Yuan dynasty (Mongol-led) army: lamellar armor, round helmets with fur trim and tassels, long quilted coats, bows and sabers; large multi-deck Yuan war junks with ribbed batten sails."
+  },
+  "charSheet": "Character reference sheet for a comic: the same person shown twice side by side — full-body front view and full-body three-quarter view — standing in a neutral pose on a plain warm ivory background, even lighting, no props other than their own weapon.",
+  "characters": [
+    {
+      "id": "THD",
+      "name": "Trần Hưng Đạo",
+      "hero": "H31",
+      "aspect": "16:9",
+      "desc": "Tran Hung Dao, supreme commander of Dai Viet, about 60 years old, dignified and calm, long black beard streaked with grey, sharp thoughtful eyes, dark red lacquered lamellar armor with gold trim over a black robe, black cloth head-wrap, a large straight double-edged greatsword"
+    },
+    {
+      "id": "TKD",
+      "name": "Trần Khánh Dư",
+      "hero": "H34",
+      "aspect": "16:9",
+      "desc": "Tran Khanh Du, weathered broad-shouldered Vietnamese general in his forties, sun-darkened skin, short beard, dark brown lacquered lamellar armor, heavy two-handed greatsword carried on the shoulder, rugged and fierce"
+    },
+    {
+      "id": "YK",
+      "name": "Yết Kiêu",
+      "hero": "H38",
+      "aspect": "16:9",
+      "desc": "Yet Kieu, lean young Vietnamese naval diver, bare-chested and sinewy, wet short hair tied back with a cloth band, dark knee-length trousers, coiled rope over one shoulder, holding an iron chisel and a short knife"
+    },
+    {
+      "id": "OMN",
+      "name": "Ô Mã Nhi",
+      "hero": "X20",
+      "aspect": "16:9",
+      "desc": "O Ma Nhi (Omar), Yuan admiral of Central Asian origin, in his forties, full dark beard, proud and disciplined bearing, ornate Yuan lamellar armor, fur-trimmed round helmet with a red plume, heavy dark cloak — portrayed with dignity"
+    },
+    {
+      "id": "TH",
+      "name": "Thoát Hoan",
+      "hero": "X18",
+      "aspect": "16:9",
+      "desc": "Thoat Hoan (Toghon), Yuan prince, Mongol noble in his thirties, fur-trimmed brocade robe over gilded lamellar armor, stern and weary expression — portrayed with dignity"
+    },
+    {
+      "id": "TQT",
+      "name": "Trần Quốc Toản",
+      "hero": "H35",
+      "aspect": "16:9",
+      "desc": "Tran Quoc Toan, Marquis Hoai Van, a very young noble of the Tran royal clan in his late teens, slim, light and quick on his feet, a boyish beardless face with fierce bright eyes and a set jaw, black hair tied in a topknot under a vermilion cloth head-band whose ends trail behind, a dark vermilion knee-length tunic under a black lacquered leather lamellar vest with thin gold edging, dark trousers with cloth-wrapped shins and straw sandals, two short single-edged sabers with red silk tassels on the hilts, and a tall red banner bearing six plain empty gold squares in a single vertical column strapped on a bamboo pole to his back"
+    },
+    {
+      "id": "TD",
+      "name": "Toa Đô",
+      "hero": "X19",
+      "aspect": "16:9",
+      "desc": "Sogetu (Toa Do), Yuan marshal of the Jalair Mongol clan, a veteran commander in his fifties hardened by years of campaigning in the far south, weather-beaten face, grey-streaked moustache and beard, heavy iron lamellar armor dulled and scuffed by long marches, fur-trimmed round helmet with a dark plume, a long dark cloak, carrying a long-hafted great axe — portrayed with dignity as a loyal, unyielding and honorable opponent"
+    }
+  ]
+}

@@ -1,0 +1,861 @@
+{
+  "chapter": {
+    "id": "B15",
+    "title": {
+      "vi": "Chương: Hàm Tử",
+      "en": "Chapter: Hàm Tử"
+    },
+    "subtitle": {
+      "vi": "Tháng 4 năm Ất Dậu (khoảng tháng 5/1285)",
+      "en": "4th month, year Ất Dậu (about May 1285)"
+    },
+    "era": "E6 · Nhà Trần kháng Nguyên–Mông",
+    "note": "Nguồn: Đại Việt sử ký toàn thư, Bản kỷ q.5 và q.7 (nguyên văn chữ Hán, zh.wikisource), đối chiếu Nguyên sử q.209; dịch nghĩa do biên kịch, cố vấn đối chiếu bản Viện KHXH 1993. Lời thoại đều Hư cấu trừ hai câu có nguồn: D2 (lời Thượng hoàng dặn quân ta) và K1 (tiếng hô của quân Nguyên); sáu chữ trên cờ chỉ hiện qua lời dẫn O3 và signs, không thành lời hô. Hội đồng bàn kế, vai chủ soái của Nhật Duật, việc Triệu Trung dẫn đội và sự có mặt của Toa Đô ở Hàm Tử là Hư cấu hoặc suy luận, gắn nhãn trên hình. Màu cờ đỏ chữ vàng lấy từ Nguyễn Huy Tưởng (Hư cấu). D2 thành khung chèn giữa trận (R1 mở còn 8 khung) nhưng giữ part \"decree\" vì đặc tả chỉ có open/decree/close. BÁC: (1) xóa signs D3 — cờ sẽ lộ sáu ô vàng rỗng; (2) bỏ năm ở O4 — D3 không còn mang năm; (3) caption D3 'đón đánh ở Hàm Tử quan' — Toàn thư ghi 迎戰于西結步頭, giữ Tây Kết; (4) THD thiếu trong characters — THD có trong _shared/bible.json, render.mjs gộp; (5) đổi who thành object, mở ngân hàng quiz 10–15 câu, viewer/phông/âm thanh — ngoài phạm vi kịch bản, ghi reviewNotes; (6) chuyển khối trang phục song sang bible — chỉ B15 dùng; (7) đổi năm sinh Nhật Duật sang 1254 — Toàn thư q.5 chép sinh 1255.",
+    "name": {
+      "vi": "Hàm Tử",
+      "en": "Hàm Tử"
+    },
+    "teaser": {
+      "vi": "Chặn cánh quân Toa Đô ở bến Hàm Tử.",
+      "en": "Stop Sögetü's army at the Hàm Tử landing."
+    },
+    "battle": {
+      "vi": "Trận đánh diễn ra ở đây trong game — chiếm bến, đưa quân áo Tống lên bãi, đẩy lui cánh quân Toa Đô.",
+      "en": "The playable battle happens here — take the landing, bring the Song-clad troops ashore, drive Sögetü's army back."
+    },
+    "card": {
+      "vi": "Trọn vẹn! Mở khóa thẻ Sử quán: Lá cờ sáu chữ.",
+      "en": "Perfect! Archive card unlocked: The six-character banner."
+    }
+  },
+  "variants": {
+    "note": "B15 có hai biến thể trên cùng dữ liệu (canon B15.variants). Mặc định (trường pages) là bản R1 'Hàm Tử – toàn trận', có Hiến kế. Bản VS là màn hướng dẫn đầu tiên: miễn Quyết sách (canon quyetSach.mien = ['VS']), comic mở 6 khung ≤ 40 s, kết chương thêm khung tưởng niệm (K5) và teaser Bạch Đằng (K6, không vẽ cọc) rồi mở B20. Khung có trường only chỉ hiện ở biến thể đó; khung trong insert được engine phát giữa trận (trường insert của khung ghi pha và sự kiện), không tính vào comic mở. R1 mở 8 khung (~57 s). chapter.teaser dùng cho bản đồ chiến dịch trước Hiến kế; chapter.battle chỉ hiện sau Chủ soái quyết. R1 close 4 khung (~30 s) ngắn có chủ đích: R1 dồn tưởng niệm Quốc Toản về cuối Hồi 2. Viewer chưa đọc variants: cần công tắc ?v=VS.",
+    "R1": {
+      "council": true,
+      "open": [
+        "O1",
+        "O2",
+        "O3",
+        "O5",
+        "O4",
+        "O6",
+        "D1",
+        "D3"
+      ],
+      "insert": [
+        "D2"
+      ],
+      "close": [
+        "K1",
+        "K2",
+        "K3",
+        "K4"
+      ]
+    },
+    "VS": {
+      "council": false,
+      "maxOpenSec": 40,
+      "open": [
+        "O1",
+        "O2",
+        "O3",
+        "O5",
+        "O4",
+        "D3"
+      ],
+      "insert": [
+        "D2"
+      ],
+      "close": [
+        "K1",
+        "K2",
+        "K3",
+        "K4",
+        "K5",
+        "K6"
+      ],
+      "pages": [
+        {
+          "part": "open",
+          "rows": [
+            [
+              "O1"
+            ],
+            [
+              "O2",
+              "O3"
+            ]
+          ]
+        },
+        {
+          "part": "open",
+          "rows": [
+            [
+              "O5"
+            ],
+            [
+              "O4"
+            ]
+          ]
+        },
+        {
+          "part": "open",
+          "rows": [
+            [
+              "D3"
+            ]
+          ]
+        },
+        {
+          "part": "close",
+          "rows": [
+            [
+              "K1"
+            ],
+            [
+              "K2",
+              "K3"
+            ]
+          ]
+        },
+        {
+          "part": "close",
+          "rows": [
+            [
+              "K4",
+              "K5"
+            ]
+          ]
+        },
+        {
+          "part": "close",
+          "rows": [
+            [
+              "K6"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "costume": {
+    "song": "Exiled Southern Song soldiers fighting on the side of Dai Viet: black cloth head-wraps knotted at the back of the head, knee-length round-collared robes in muted ochre and dark brown cinched with leather belts, some wearing brown leather lamellar cuirasses with shoulder guards, recurve bows and full arrow quivers, a few straight double-edged swords; every one of them wears a jade-green scarf knotted at the neck, and small plain jade-green triangular pennants on bamboo poles fly above their ranks.",
+    "songCivil": "Exiled Southern Song refugees, men, women and children: men in black cloth head-wraps knotted at the back of the head and knee-length round-collared robes in muted ochre and dark brown; women in plain long robes with hair in simple buns; travel bundles, baskets and wooden chests; no weapons, no armor, no pennants, no scarves."
+  },
+  "characters": [
+    {
+      "id": "TND",
+      "name": "Trần Nhật Duật",
+      "hero": "H33",
+      "aspect": "16:9",
+      "desc": "Tran Nhat Duat, Prince Chieu Van of the Tran dynasty, about 30 years old, a scholar-general with a calm, warm and quick-witted face, thin neat moustache and short goatee, hair in a topknot under a small black silk cap, a jade-green brocade robe worn over light gold-edged dark lacquered lamellar armor, a jade belt, holding a large folding fan of split bamboo and plain ivory paper with no writing on it"
+    },
+    {
+      "id": "TT",
+      "name": "Triệu Trung",
+      "hero": null,
+      "aspect": "16:9",
+      "desc": "Zhao Zhong (Trieu Trung), an exiled Southern Song officer in his forties who serves Prince Chieu Van as a household general, lean weathered face with a trimmed moustache and short beard, grave and steady eyes carrying the sorrow of a lost homeland, black cloth head-wrap knotted at the back, knee-length round-collared dark ochre robe under a worn brown leather lamellar cuirass with shoulder guards, a jade-green scarf knotted at the neck, a recurve bow in hand and a quiver of arrows at the hip, a straight sword at his belt — portrayed with dignity as an honorable ally"
+    },
+    {
+      "id": "TQT82",
+      "sheet": "TQT",
+      "name": "Trần Quốc Toản",
+      "hero": "H35",
+      "aspect": "16:9",
+      "desc": "Tran Quoc Toan at about fifteen, the same boyish beardless face with fierce bright eyes as his reference sheet, hair in a topknot under a vermilion cloth head-band, a plain dark vermilion knee-length court tunic with a black sash, dark trousers and straw sandals; no armor, no weapons, no banner"
+    },
+    {
+      "id": "TTcivil",
+      "sheet": "TT",
+      "name": "Triệu Trung",
+      "hero": null,
+      "aspect": "16:9",
+      "desc": "Zhao Zhong, the same lean weathered face, trimmed moustache and short beard as his reference sheet, black cloth head-wrap, a plain knee-length round-collared dark ochre robe, unarmed, no armor, no scarf — portrayed with dignity"
+    }
+  ],
+  "panels": [
+    {
+      "id": "O1",
+      "part": "open",
+      "aspect": "21:9",
+      "refs": [
+        "TQT82"
+      ],
+      "costume": [
+        "daiviet"
+      ],
+      "scene": "Winter morning mist over a wide river confluence: a line of large Tran royal dragon boats with golden parasols moored at a wooden landing, princes and high officials in dark court robes and black caps filing up the gangplank to a council aboard the royal boat; on the muddy bank below, the young noble Tran Quoc Toan stands apart among junior attendants, not summoned aboard, looking up at the royal boat with clenched fists.",
+      "caption": {
+        "vi": "Mùa đông 1282, bến Bình Than. Vua họp vương hầu, trăm quan bàn kế đánh, giữ.",
+        "en": "Winter 1282, Bình Than landing. The king gathers the princes and officials to plan attack and defence.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "note": "Toàn thư q.5: 會王侯百官…以懷文侯國瓚、懷仁王並年幼，不許預議. Chỉ 'không cho dự bàn'; cảnh lính hạ giáo chặn ở cầu thuyền là của Nguyễn Huy Tưởng nên không vẽ. Refs TQT82: Quốc Toản năm 1282, chưa có giáp, song đao, cờ (cờ dựng ở O3)."
+    },
+    {
+      "id": "O2",
+      "part": "open",
+      "aspect": "4:3",
+      "refs": [
+        "TQT82"
+      ],
+      "costume": [],
+      "scene": "Dramatic close-up: the young noble Tran Quoc Toan's right hand crushing a round mandarin orange with a green-and-orange rind, pale golden-orange juice and bright orange pulp squeezing between his fingers and dripping down; behind his fist, his face in soft focus flushed with shame and anger, eyes burning and fixed on something out of frame; cold misty light off the river.",
+      "caption": {
+        "vi": "Vua cho là Quốc Toản còn nhỏ, không được dự bàn. Ông bóp nát quả cam lúc nào không biết.",
+        "en": "Deemed too young, Quốc Toản was barred from the council. He crushed the orange in his hand without noticing.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "note": "Toàn thư q.5: 手握柑子，不覺碎爛. Nước cam vàng cam nhạt, không được đỏ."
+    },
+    {
+      "id": "O3",
+      "part": "open",
+      "aspect": "16:9",
+      "refs": [
+        "TQT"
+      ],
+      "costume": [
+        "daiviet"
+      ],
+      "scene": "A riverside village courtyard at golden hour: Tran Quoc Toan stands on a low stone step raising a tall red banner bearing six plain empty gold squares in a single vertical column; before him a crowd of more than a thousand household men and kinsmen, young and old, raise spears and sabers; around them men sharpen blades on whetstones, re-lash rattan shields and caulk slender war boats pulled up on the bank.",
+      "caption": {
+        "vi": "Về nhà, ông họp gia nô, thân thuộc hơn nghìn người, đề lên cờ: \"Phá cường địch, báo hoàng ân\".",
+        "en": "Back home he gathered over a thousand retainers and kin, and wrote on his banner: \"Break the mighty foe, repay the king's grace.\"",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "signs": [
+        {
+          "text": "破強敵報皇恩",
+          "x": 38.9,
+          "y": 18.8,
+          "size": 3.4,
+          "vertical": true
+        }
+      ],
+      "imageLabel": {
+        "vi": "Cờ đỏ chữ vàng: Hư cấu (Nguyễn Huy Tưởng)",
+        "en": "Red banner, gold letters: fiction (Nguyễn Huy Tưởng)"
+      },
+      "note": "Toàn thư q.5: 率家奴及親属，得千餘人，脩戰噐戰船，題「破強敵，報皇恩」六字于旗. Chữ 題 là đề, viết lên cờ; sử không chép ông hô câu này, nên không dùng bóng thoại và câu này không vào ngân hàng 'Ai nói câu này'. Cương mục chép 'cường tặc', không dùng. Tọa độ signs chỉnh lại khi có ảnh.",
+      "capPos": "tr"
+    },
+    {
+      "id": "O5",
+      "part": "open",
+      "aspect": "16:9",
+      "refs": [
+        "TND",
+        "TTcivil"
+      ],
+      "costume": [
+        "songCivil"
+      ],
+      "scene": "Flashback in soft warm light: inside a wooden hall of a Tran prince's residence, Prince Chieu Van (Tran Nhat Duat) sits cross-legged on a mat and talks warmly with a group of exiled Southern Song men seated as honored guests, tea bowls between them; the Song officer Zhao Zhong kneels closest to the prince and bows in gratitude; outside the open doors, Song families unload bundles from a sea-going ship at a river landing.",
+      "caption": {
+        "vi": "Nhà Tống mất, người Tống sang nương nhờ. Chiêu Văn vương Nhật Duật thu nhận, có Triệu Trung làm gia tướng.",
+        "en": "When the Song fell, Song refugees came south. Prince Chiêu Văn took them in; one, Zhao Zhong, became his household general.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "note": "Toàn thư q.5: 初，宋亡，其人歸我。日燏納之，有趙忠者為家將. Toàn thư q.7 chép Nhật Duật giỏi tiếng Tống. Đặt trước O4 để mạch thời gian chỉ lùi một lần. Không lộ kế: người Tống ở đây là dân tị nạn (songCivil, TTcivil), không vũ khí, không khăn, không cờ hiệu."
+    },
+    {
+      "id": "O4",
+      "part": "open",
+      "aspect": "21:9",
+      "refs": [
+        "TD"
+      ],
+      "costume": [
+        "yuan"
+      ],
+      "scene": "Wide establishing shot under a hot hazy sky: a long Yuan army column marching north along a coastal plain between green rice fields and limestone hills, a line of Yuan war junks sailing close offshore beside it, Marshal Sogetu riding at the head of the column on a dark war horse, his veteran soldiers sun-burned and travel-worn after years of campaigning in the tropical south.",
+      "caption": {
+        "vi": "Năm 1285, cánh quân Toa Đô từ Chiêm Thành đánh ra Nghệ An, Thanh Hóa, rồi tiến lên Tây Kết.",
+        "en": "1285: Sögetü's army came up from Champa, struck Nghệ An and Thanh Hóa, then pushed on to Tây Kết.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "note": "Toàn thư q.5: 唆都…尋冦驩、愛，進駐西結. Giữ năm ở đây vì D3 chỉ còn 'tháng tư'."
+    },
+    {
+      "id": "O6",
+      "part": "open",
+      "only": "R1",
+      "aspect": "16:9",
+      "refs": [
+        "TND",
+        "TQT",
+        "TT"
+      ],
+      "costume": [
+        "daiviet"
+      ],
+      "scene": "Night war council on a river dike under flickering torches, still undecided: Prince Chieu Van (Tran Nhat Duat) stands at the center holding his closed folding fan, turning toward the young Tran Quoc Toan who kneels in the front row with his twin sabers across his knees, leaning forward eagerly; an older Tran prince in a dark court robe sits beside Chieu Van; the Song officer Zhao Zhong kneels at one side; a sturdy Dai Viet general and several officers kneel in a semicircle; the dark wide river and moored boats behind them, distant campfires on the far sandbank.",
+      "caption": null,
+      "bubbles": [
+        {
+          "who": "Trần Nhật Duật",
+          "x": 62,
+          "y": 5,
+          "tail": "left",
+          "vi": "Toa Đô đã đóng ở Tây Kết. Hoài Văn hầu, lần này ngươi được dự bàn. Có kế gì?",
+          "en": "Sögetü is camped at Tây Kết. Marquis Hoài Văn, this time you sit at the council. What do you propose?",
+          "label": "Hư cấu"
+        },
+        {
+          "who": "Triệu Trung",
+          "x": 23,
+          "y": 14,
+          "tail": "down",
+          "vi": "Toa Đô từng đánh đất Tống. Quân hắn đông mà quen trận.",
+          "en": "Sögetü once fought us in the Song lands. His army is large and battle-hardened.",
+          "label": "Hư cấu"
+        }
+      ],
+      "imageLabel": {
+        "vi": "Hội quân: Hư cấu",
+        "en": "Council: fiction"
+      },
+      "note": "Nối với O1–O2: năm 1282 Quốc Toản bị gạt khỏi hội nghị, nay được hỏi kế; người chơi hiến kế với tư cách Quốc Toản. Vị vương lớn tuổi ngồi cạnh là Chiêu Thành vương (Toàn thư nêu tên đầu danh sách được sai đi), không gọi tên trong khung. Bóng Triệu Trung không nhắc người Tống ra trận để không lộ thẻ A; nó làm thẻ B (đánh khi quân họ còn mỏi) thành lựa chọn hấp dẫn. Toa Đô từng đánh tàn quân Tống ở Phúc Kiến, Quảng Đông trước khi sang Chiêm Thành."
+    },
+    {
+      "id": "D1",
+      "part": "decree",
+      "only": "R1",
+      "aspect": "16:9",
+      "refs": [
+        "TND"
+      ],
+      "costume": [
+        "daiviet"
+      ],
+      "scene": "Same torch-lit council on the river dike: Prince Chieu Van (Tran Nhat Duat) standing, opening his folding fan with one firm decisive sweep, looking toward the viewer as if answering a young general's proposal; in the foreground the back and shoulders of a kneeling young general with two sabers and a red banner pole on his back; torches and the dark river behind.",
+      "caption": null,
+      "bubbles": [
+        {
+          "who": "Trần Nhật Duật",
+          "x": 30,
+          "y": 4,
+          "tail": "right",
+          "from": "reply",
+          "label": "Hư cấu"
+        },
+        {
+          "who": "Trần Nhật Duật",
+          "x": 30,
+          "y": 30,
+          "tail": "right",
+          "from": "decree",
+          "label": "Hư cấu"
+        }
+      ],
+      "note": "Lời quyết mang nhãn Hư cấu: sự việc (người Tống mặc áo Tống, cầm cung tên ra trận) là Chính sử, nhưng Toàn thư không chép đó là kế của ai; lệnh trong hội đồng là dựng cảnh. Trần mỗi khung 35 âm tiết: lời đáp dài nhất 18 + lời quyết 17."
+    },
+    {
+      "id": "D2",
+      "part": "decree",
+      "insert": {
+        "phase": "Áo Tống trên bến",
+        "event": "thuyền Triệu Trung đầu tiên cập bến trên"
+      },
+      "aspect": "4:3",
+      "refs": [],
+      "costume": [
+        "daiviet",
+        "song"
+      ],
+      "scene": "Dawn in a riverside camp: a royal messenger in a dark gold-trimmed court robe reins in his horse and points with a riding whip toward a company of exiled Song archers stringing their bows; a group of barefoot Dai Viet spearmen turn to look at the archers carefully, some surprised, one nodding in understanding; mist on the river behind.",
+      "caption": {
+        "vi": "Người Tống, người Nguyên tiếng nói, áo quần giống nhau. Thượng hoàng Thánh Tông sai người dặn các quân.",
+        "en": "Song men and Yuan troops sounded and dressed alike. Retired Emperor Thánh Tông sent word to the army.",
+        "label": "Chính sử"
+      },
+      "bubbles": [
+        {
+          "who": "Sứ giả của Thượng hoàng",
+          "x": 70,
+          "y": 3,
+          "tail": "left",
+          "vi": "Đây là quân Thát của Chiêu Văn đấy, phải nhận cho kỹ!",
+          "en": "These 'Tatars' are Prince Chiêu Văn's own men — know them well!",
+          "label": "Chính sử"
+        }
+      ],
+      "imageLabel": {
+        "vi": "Khăn xanh ngọc, cờ hiệu nhận diện: Hư cấu (quy ước game)",
+        "en": "Jade scarves and pennants: fiction (game convention)"
+      },
+      "note": "Toàn thư q.5: 上皇恐諸軍或不能辨，使人諭之曰：『此昭文韃也，當審識之。』蓋宋與韃聲音衣服相似. Lời Thượng hoàng dặn QUÂN TA (sửa canon). Thát (韃) là cách sử Việt gọi quân Mông–Nguyên; giữ vì là nguyên văn, thẻ Sử quán giải thích. Câu 蓋… là lời giải của người chép sử; quân Nguyên mặt nam nhiều lính Hán gốc Tống — đưa vào thẻ Sử quán, không làm trắc nghiệm. Vì sử ghi hai bên áo quần giống nhau, hình phân biệt bằng khăn và cờ hiệu xanh ngọc (quy ước game). Khung chèn giữa trận ở cả R1 và VS (variants.*.insert, systems §12.6 ví dụ sứ giả đến): engine phát khi thuyền Triệu Trung đầu tiên cập bến, dạy người chơi nhận đồng minh áo Tống. Trường pages vẫn xếp D2 ở trang Chủ soái quyết để viewer xem trước.",
+      "capPos": "bl"
+    },
+    {
+      "id": "D3",
+      "part": "decree",
+      "aspect": "21:9",
+      "refs": [
+        "TQT",
+        "TT"
+      ],
+      "costume": [
+        "daiviet",
+        "song",
+        "yuan"
+      ],
+      "scene": "Early morning on a wide brown river: slender Vietnamese war boats run up onto a sandy landing below a river dike; Tran Quoc Toan leaps from the lead boat into ankle-deep water with a saber in each hand, the tall red banner with six empty gold squares streaming from the pole on his back, his household men surging after him; on the next boats the Song officer Zhao Zhong and his archers draw their bows; ahead on the open sandbank a fortified Yuan wooden camp with watchtowers, its soldiers rushing out to form a line.",
+      "caption": {
+        "vi": "Tháng tư, vua sai Chiêu Thành vương, Quốc Toản, Nguyễn Khoái đón đánh ở Tây Kết.",
+        "en": "In the 4th month the king sent Prince Chiêu Thành, Quốc Toản and General Nguyễn Khoái to meet the Yuan at Tây Kết.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "signs": [
+        {
+          "text": "破強敵報皇恩",
+          "x": 33.6,
+          "y": 18,
+          "size": 3.3,
+          "vertical": true
+        }
+      ],
+      "imageLabel": {
+        "vi": "Cảnh đổ bộ, Triệu Trung dẫn đội áo Tống: Hư cấu (sử chỉ ghi là gia tướng) · Màu cờ: Hư cấu",
+        "en": "Landing scene, Zhao Zhong leading the Song archers: fiction (the annals only name him a household general) · Banner colour: fiction"
+      },
+      "note": "Khung chung hai biến thể: R1 là khung cuối phần Chủ soái quyết; VS là khung thứ 6 và cuối của comic mở. Toàn thư q.5: 帝命昭成王、懷文侯國瓚、將軍阮蒯等…迎戰于西結步頭 — câu Chính sử duy nhất đặt Quốc Toản vào chiến dịch này. Quốc Toản ở Hàm Tử: suy từ 諸軍咸在 (K1). Triệu Trung dẫn đội: Anderson 2014 suy luận. Signs giữ vì cờ vẽ sáu ô vàng trống; chỉnh tọa độ/góc xoay theo ảnh, nếu cờ bay ngang thì thêm rotate."
+    },
+    {
+      "id": "K1",
+      "part": "close",
+      "aspect": "21:9",
+      "refs": [
+        "TT",
+        "TQT"
+      ],
+      "costume": [
+        "yuan",
+        "song",
+        "daiviet"
+      ],
+      "scene": "The battle turns on a wide sandbank by the river: a line of Yuan soldiers falters in shock, several pointing in alarm at a company of exiled Song archers advancing and loosing arrows beside the Dai Viet troops, the Song officer Zhao Zhong at their head; in the midground Tran Quoc Toan cuts through the wavering line with his twin sabers, red banner streaming from his back; dust and river spray, dramatic clouds breaking into light; no blood, no bodies.",
+      "caption": {
+        "vi": "Ở Hàm Tử quan, quân Nguyên thấy người Tống đánh bên quân Trần, tưởng có quân Tống sang giúp, kinh hãi thua chạy.",
+        "en": "At Hàm Tử quan, a river checkpoint, the Yuan saw Song men fighting for the Trần, thought a Song army had come to help, and fled in panic.",
+        "label": "Chính sử"
+      },
+      "bubbles": [
+        {
+          "who": "Quân Nguyên",
+          "x": 60,
+          "y": 6,
+          "tail": "down",
+          "vi": "Có người Tống đến giúp!",
+          "en": "Song men have come to help!",
+          "label": "Chính sử"
+        }
+      ],
+      "signs": [
+        {
+          "text": "破強敵報",
+          "x": 51.8,
+          "y": 29.2,
+          "size": 3.6,
+          "vertical": true,
+          "rotate": 25
+        }
+      ],
+      "imageLabel": {
+        "vi": "Triệu Trung dẫn đội, khăn xanh ngọc, cờ hiệu: Hư cấu (quy ước game)",
+        "en": "Zhao Zhong leading, jade scarves and pennants: fiction (game convention)"
+      },
+      "note": "Toàn thư q.5: 官軍與元人交戰于鹹子關，諸軍咸在。惟昭文王日燏軍有宋人，衣宋衣執弓矢以戰。元人見之，皆驚曰：『有宋人來助！』因此敗北. Câu hô của quân Nguyên (canon cũ nhầm với lời Thượng hoàng). 有宋人來助 dịch sát 'có người Tống đến giúp', không thêm 'them'. signs (30/09/2026): cờ nghiêng ~25°, chỉ 4 ô lộ ra (2 ô cuối khuất sau đầu người lính) nên vẽ 4 chữ đầu."
+    },
+    {
+      "id": "K2",
+      "part": "close",
+      "aspect": "16:9",
+      "refs": [
+        "TD"
+      ],
+      "costume": [
+        "yuan"
+      ],
+      "scene": "Late afternoon at a river landing: Marshal Sogetu stands as the last man on the sand with his great axe planted before him, covering his soldiers as they climb back onto Yuan war junks and push off from the shore; he looks back over his shoulder toward the battlefield, jaw set, proud and unbroken in defeat; a torn plain Yuan standard without any characters or symbols lowered beside him, smoke drifting from the burning camp in the distance.",
+      "caption": {
+        "vi": "Quân Nguyên thua ở Hàm Tử quan, phải lui.",
+        "en": "Beaten at Hàm Tử, the Yuan fell back.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "imageLabel": {
+        "vi": "Toa Đô có mặt, cản hậu: Hư cấu (sử không nêu tên tướng Nguyên ở Hàm Tử)",
+        "en": "Sögetü present, covering the retreat: fiction (the annals name no Yuan general at Hàm Tử)"
+      },
+      "note": "Toàn thư q.5 ở đoạn Hàm Tử chỉ viết 元人; Toa Đô 進駐西結, nhận diện cánh Toa Đô ở Hàm Tử theo nghiên cứu hiện đại. Không nói trước cái chết của Toa Đô ở Tây Kết — để dành cho B17."
+    },
+    {
+      "id": "K3",
+      "part": "close",
+      "aspect": "16:9",
+      "refs": [
+        "TND",
+        "TT"
+      ],
+      "costume": [
+        "song"
+      ],
+      "scene": "Evening calm on the riverbank after battle: Prince Chieu Van (Tran Nhat Duat) and the Song officer Zhao Zhong face each other as equals, clasping forearms in a warrior's grip; around them tired exiled Song archers lower their bows and sit on the sand, some looking north across the water toward a homeland they cannot return to; warm gold sunset light on the river. The river water shimmers pale gold and jade green under a soft evening sky; no red water, no red sky.",
+      "caption": {
+        "vi": "Toàn thư chép: vì thế, công phá quân Nguyên, Chiêu Văn vương có phần nhiều.",
+        "en": "The Annals record: and so, in defeating the Yuan, the larger share of merit was Prince Chiêu Văn's.",
+        "label": "Chính sử"
+      },
+      "bubbles": [
+        {
+          "who": "Trần Nhật Duật",
+          "x": 22,
+          "y": 25,
+          "tail": "right",
+          "vi": "Người Tống theo ta hôm nay lập công lớn.",
+          "en": "The Song men who follow me won great merit today.",
+          "label": "Hư cấu"
+        },
+        {
+          "who": "Triệu Trung",
+          "x": 74,
+          "y": 3,
+          "tail": "left",
+          "vi": "Nước cũ mất rồi. Đất này, chúng tôi giữ đến cùng.",
+          "en": "Our old country is gone. This land, we will hold to the end.",
+          "label": "Hư cấu"
+        }
+      ],
+      "note": "Toàn thư q.5: 故敗元之功，日燏居多 — 故 nối với việc quân áo Tống ở Hàm Tử; 居多 là 'có phần nhiều', không phải 'lớn nhất'. Triệu Trung là đồng minh có phẩm giá, đánh vì mối thù mất nước và nghĩa với nơi nương thân, không phải lính đánh thuê.",
+      "capW": 40
+    },
+    {
+      "id": "K4",
+      "part": "close",
+      "aspect": "16:9",
+      "refs": [
+        "TQT"
+      ],
+      "costume": [],
+      "scene": "Dusk on top of a grassy river dike: Tran Quoc Toan seen from behind and slightly to the side, sabers sheathed, the red banner on his back stirring in the wind, gazing along the wide Red River as it bends away upstream into haze toward the distant capital, a faint warm glow far beyond the horizon in the evening sky; birds over the water, a few campfires on the near bank.",
+      "caption": {
+        "vi": "Toàn thư chép: ông xông trước quân lính; địch thấy phải tránh, không ai dám đương đầu.",
+        "en": "The Annals record: he led from the front; the enemy gave way, none daring to face him.",
+        "label": "Chính sử"
+      },
+      "bubbles": [
+        {
+          "who": "Trần Quốc Toản",
+          "x": 50,
+          "y": 30,
+          "tail": "right",
+          "vi": "Chưa xong đâu. Còn Thăng Long.",
+          "en": "It isn't over. Thăng Long is still theirs.",
+          "label": "Hư cấu"
+        }
+      ],
+      "note": "Toàn thư q.5: 後與賊對陣，身先士卒，賊見之退避，無敢當其鋒者 (賊 dịch 'địch', không dùng 'giặc'). Câu chép chung về các trận của ông, không riêng Hàm Tử. Bỏ vế 'Hàm Tử, Chương Dương nằm hai bờ sông Hồng' (định vị hiện đại, còn bàn cãi). R1: khung cuối, nối sang B16 Chương Dương (Toàn thư: ngày 10/5 âm lịch có tin Quang Khải, Quốc Toản thắng ở Kinh thành và Chương Dương); thơ 'Đoạt sáo Chương Dương độ, Cầm Hồ Hàm Tử quan' để dành cho comic kết B16."
+    },
+    {
+      "id": "K5",
+      "part": "close",
+      "only": "VS",
+      "aspect": "4:3",
+      "refs": [],
+      "costume": [],
+      "scene": "Quiet memorial at dawn: on an empty river dike in soft mist, a tall red banner with six empty gold squares in a single vertical column stands planted alone in the grass, stirring gently in the wind; at its foot lie two short sabers with red silk tassels, laid side by side on a folded vermilion cloth, a single stick of incense sending up a thin line of smoke; the river pale and still beyond; peaceful and reverent, no people.",
+      "caption": {
+        "vi": "Toàn thư chép: khi ông mất, vua thương tiếc, tự làm văn tế, truy phong tước vương.",
+        "en": "The Annals record: when he died, the king mourned him, wrote his eulogy himself and made him a prince.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "signs": [
+        {
+          "text": "破強敵報皇恩",
+          "x": 27.6,
+          "y": 35,
+          "size": 6.2,
+          "vertical": true,
+          "rotate": -9
+        }
+      ],
+      "imageLabel": {
+        "vi": "Màu cờ: Hư cấu",
+        "en": "Banner colour: fiction"
+      },
+      "note": "Chỉ bản VS: Quốc Toản không có mặt ở B20 (quyết định canon), nên người chơi cần biết. Toàn thư q.5: 帝深歎惜，親為文祭之，又加贈封以王爵. Năm mất 1285 và nơi mất (Như Nguyệt) là Tương truyền — đưa vào thẻ Sử quán. Không dựng cảnh tử trận. Mở gợi ý Chronicle 'Quốc Toản còn sống' (whatIf B18). Bản R1: thẻ tưởng niệm ở cuối Hồi 2.",
+      "capPos": "tr"
+    },
+    {
+      "id": "K6",
+      "part": "close",
+      "only": "VS",
+      "aspect": "21:9",
+      "refs": [
+        "THD"
+      ],
+      "costume": [
+        "daiviet",
+        "yuan"
+      ],
+      "scene": "Teaser at sunset over a wide tidal estuary with mangroves and distant limestone hills, the water high and smooth: Tran Hung Dao stands alone on a rocky headland seen from behind, cloak lifting in the wind, one hand resting on the hilt of his planted greatsword, looking out to sea; far out on the horizon the sails of a vast Yuan fleet approach in a long line; dramatic red-gold sky; no work parties on the river.",
+      "caption": {
+        "vi": "Cuối năm 1287, quân Nguyên–Mông trở lại lần thứ ba. Trận quyết định sẽ ở Bạch Đằng.",
+        "en": "Late 1287, the Mongol-Yuan armies came a third time. The decisive battle would be fought on the Bạch Đằng.",
+        "label": "Chính sử"
+      },
+      "bubbles": [],
+      "note": "Chỉ bản VS: teaser rồi mở B20. Không vẽ cọc, gỗ, thủy triều ròng: B20 là Quyết sách đầu tiên của VS, thẻ A là bãi cọc (mục 22.2). THD lấy từ _shared/bible.json."
+    }
+  ],
+  "pages": [
+    {
+      "part": "open",
+      "rows": [
+        [
+          "O1"
+        ],
+        [
+          "O2",
+          "O3"
+        ]
+      ]
+    },
+    {
+      "part": "open",
+      "rows": [
+        [
+          "O5"
+        ],
+        [
+          "O4"
+        ]
+      ]
+    },
+    {
+      "part": "open",
+      "rows": [
+        [
+          "O6"
+        ]
+      ]
+    },
+    {
+      "part": "decree",
+      "rows": [
+        [
+          "D1",
+          "D2"
+        ],
+        [
+          "D3"
+        ]
+      ]
+    },
+    {
+      "part": "close",
+      "rows": [
+        [
+          "K1"
+        ],
+        [
+          "K2",
+          "K3"
+        ]
+      ]
+    },
+    {
+      "part": "close",
+      "rows": [
+        [
+          "K4"
+        ],
+        [
+          "K5",
+          "K6"
+        ]
+      ]
+    }
+  ],
+  "quiz": [
+    {
+      "q": {
+        "vi": "Ở hội nghị Bình Than năm 1282, vì sao Trần Quốc Toản bóp nát quả cam trong tay?",
+        "en": "At the Bình Than council of 1282, why did Trần Quốc Toản crush the orange in his hand?"
+      },
+      "options": [
+        "Ông bị cho là còn nhỏ, không được dự bàn việc nước",
+        "Ông bị giáng tước vì thua một trận trước đó",
+        "Vua giao thủy quân cho một tướng khác",
+        "Tin quân Nguyên đã chiếm Thăng Long vừa tới"
+      ],
+      "optionsEn": [
+        "He was judged too young and barred from the council",
+        "He had been demoted after losing an earlier battle",
+        "The king gave the fleet to another general",
+        "News had just come that the Yuan had taken Thăng Long"
+      ],
+      "answer": 0,
+      "why": {
+        "vi": "Toàn thư chép vua thấy Quốc Toản còn nhỏ nên không cho dự bàn; ông bóp nát quả cam trong tay lúc nào không biết.",
+        "en": "The Annals say the king thought him too young to join the council; he crushed the orange in his hand without noticing."
+      },
+      "label": "Chính sử",
+      "panel": "O2"
+    },
+    {
+      "q": {
+        "vi": "Sáu chữ Quốc Toản đề trên lá cờ của mình là gì?",
+        "en": "What six characters did Quốc Toản write on his banner?"
+      },
+      "options": [
+        "Phá cường địch, báo hoàng ân",
+        "Giữ non sông, yên xã tắc",
+        "Một lòng son, giữ nước Nam",
+        "Đuổi quân Nguyên, cứu muôn nhà"
+      ],
+      "optionsEn": [
+        "Break the mighty foe, repay the king's grace",
+        "Guard the land, keep the realm at peace",
+        "A loyal heart to guard the South",
+        "Drive out the Yuan, save every home"
+      ],
+      "answer": 0,
+      "why": {
+        "vi": "Toàn thư chép ông họp hơn nghìn gia nô, thân thuộc và đề lên cờ sáu chữ 'Phá cường địch, báo hoàng ân'. Màu cờ đỏ chữ vàng thì sử không ghi, đó là chi tiết của nhà văn Nguyễn Huy Tưởng.",
+        "en": "The Annals record he gathered over a thousand retainers and kin and wrote 'Break the mighty foe, repay the king's grace' on his banner. The red-and-gold colours are not in the annals; they come from writer Nguyễn Huy Tưởng."
+      },
+      "label": "Chính sử",
+      "panel": "O3"
+    },
+    {
+      "q": {
+        "vi": "Những người mặc áo Tống trong quân Chiêu Văn vương Trần Nhật Duật là ai?",
+        "en": "Who were the men in Song clothes in Prince Chiêu Văn Trần Nhật Duật's army?"
+      },
+      "options": [
+        "Người Tống mất nước sang Đại Việt, được Nhật Duật thu nhận",
+        "Quân Việt cải trang thành người Tống để lừa đối phương",
+        "Lính Nguyên bỏ hàng ngũ ngay giữa trận",
+        "Quân Chiêm Thành sang giúp Đại Việt"
+      ],
+      "optionsEn": [
+        "Song refugees who came to Đại Việt and were taken in by Nhật Duật",
+        "Việt troops disguised as Song men to fool the enemy",
+        "Yuan soldiers who deserted in mid-battle",
+        "Champa troops sent to help Đại Việt"
+      ],
+      "answer": 0,
+      "why": {
+        "vi": "Khi nhà Tống mất, nhiều người Tống sang Đại Việt; Nhật Duật thu nhận họ, trong đó có Triệu Trung làm gia tướng. Áo Tống là áo của chính họ, không phải đồ cải trang.",
+        "en": "When the Song dynasty fell, many Song people came to Đại Việt; Nhật Duật took them in, Zhao Zhong among them as his household general. The Song dress was their own, not a disguise."
+      },
+      "label": "Chính sử",
+      "panel": "O5"
+    },
+    {
+      "q": {
+        "vi": "Ở Hàm Tử, điều gì khiến quân Nguyên kinh hãi rồi thua chạy?",
+        "en": "At Hàm Tử, what threw the Yuan troops into alarm and flight?"
+      },
+      "options": [
+        "Họ thấy người Tống đánh bên phía Đại Việt",
+        "Nước sông dâng ngập doanh trại",
+        "Thuyền lương bị đánh chìm trước trận",
+        "Toa Đô bị bắt sống ngay đầu trận"
+      ],
+      "optionsEn": [
+        "They saw Song men fighting on the Đại Việt side",
+        "The river rose and flooded their camp",
+        "Their grain boats were sunk before the battle",
+        "Sögetü was captured at the start of the battle"
+      ],
+      "answer": 0,
+      "why": {
+        "vi": "Toàn thư chép quân Nguyên thấy người Tống mặc áo Tống cầm cung tên bên phía ta, đều kinh hãi kêu 'Có người Tống đến giúp!', nhân thế thua chạy.",
+        "en": "The Annals record that on seeing Song men in Song dress with bows on the Việt side, the Yuan cried 'Song men have come to help!' and broke."
+      },
+      "label": "Chính sử",
+      "panel": "K1"
+    }
+  ],
+  "council": {
+    "title": {
+      "vi": "Hội đồng quân sự · Hiến kế",
+      "en": "War council · Offer a plan"
+    },
+    "prompt": {
+      "vi": "Bạn là Hoài Văn hầu Quốc Toản, lần đầu được dự bàn. Hiến một kế với Chiêu Văn vương:",
+      "en": "You are Marquis Hoài Văn, Quốc Toản, at your first council. Offer Prince Chiêu Văn a plan:"
+    },
+    "cards": [
+      {
+        "id": "A",
+        "historical": true,
+        "label": "Chính sử",
+        "text": {
+          "vi": "Cho người Tống trong quân Chiêu Văn vương ra trận trong áo Tống của họ, cầm cung tên, đánh cùng quân ta.",
+          "en": "Send the Song men of Prince Chiêu Văn's army into battle in their own Song dress, with bows, alongside our troops."
+        },
+        "reply": {
+          "vi": "Đúng ý ta. Thấy người Tống đánh bên ta, quân Nguyên ắt dao động.",
+          "en": "My own thought. Seeing Song men fight on our side, the Yuan will waver."
+        }
+      },
+      {
+        "id": "B",
+        "label": "Hư cấu",
+        "text": {
+          "vi": "Dồn quân đánh thẳng doanh trại Toa Đô từ mặt bến, khi quân họ còn mỏi sau đường xa.",
+          "en": "Throw everything at Sögetü's camp straight from the landing, while his men are still worn from the long march."
+        },
+        "reply": {
+          "vi": "Bến trống trải, thuyền Nguyên bắn từ sông. Đánh thẳng là mất nhiều người.",
+          "en": "The landing is open and their boats shoot from the river. A frontal charge costs too many men."
+        }
+      },
+      {
+        "id": "C",
+        "label": "Hư cấu",
+        "text": {
+          "vi": "Giữ phòng tuyến ở Thiên Trường, không ra đánh, đợi quân Toa Đô tự mỏi.",
+          "en": "Hold the line at Thiên Trường and do not sally out; let Sögetü's army wear itself down."
+        },
+        "reply": {
+          "vi": "Ngồi giữ Thiên Trường thì Toa Đô rảnh tay hội với Thoát Hoan. Phải chặn ở Hàm Tử.",
+          "en": "Sit tight at Thiên Trường and Sögetü is free to join Toghon. He must be stopped at Hàm Tử."
+        }
+      }
+    ],
+    "decree": {
+      "vi": "Ta quyết: người Tống mặc áo Tống, cầm cung tên ra trận. Cờ sáu chữ đi đầu.",
+      "en": "My decision: our Song men fight in Song dress with bows. The six-character banner leads."
+    },
+    "skipInVS": true,
+    "note": "Theo mục 22.2: chủ soái luôn quyết theo sử; trước khi chọn, không thẻ nào ghi 'cách người xưa'; vị trí thẻ xáo mỗi lần. Ba thẻ theo canon B15.chapter.quyetSach (lichSu 'Cờ áo Tống (Lớn)', khac 2 kế). Toàn thư chép sự việc (người Tống mặc áo Tống cầm cung tên ra trận, quân Nguyên thấy thì hoảng), không chép đây là kế của ai hay có ý đánh lừa; tên Kế Sách 'Cờ áo Tống' là cơ chế game; dự đoán 'quân Nguyên ắt dao động' nằm ở lời đáp (Hư cấu). skipInVS: canon quyetSach.mien = ['VS']; Quyết sách đầu tiên của VS là B20. Chủ soái của hội đồng (Hư cấu) là Nhật Duật vì quân áo Tống là quân của ông; Toàn thư không ghi ai chỉ huy chung ở Hàm Tử."
+  },
+  "reviewNotes": [
+    "Canon H33: giữ lifespan 1255–1330 theo năm sinh Toàn thư q.5 (皇第六子日燏生, Nguyên Phong 5, chú 宋寶祐三年 = 1255; bản wikisource in nhầm can chi 丁卯). Toàn thư q.7 chép mất Khai Hựu 2 (1330), 年七十七 — lệch 1 năm ngay trong Toàn thư, ghi vào caveats, không đổi năm. Bio nên sửa: 'có người Tống mặc áo Tống ra trận; Triệu Trung là một người Tống được thu làm gia tướng'.",
+    "Canon H35: lifespan 1267–1285 và 'mất cùng năm' gắn nhãn Tương truyền; Toàn thư chỉ ghi 年幼 và việc vua làm văn tế, truy phong tước vương. Comic không ghi số tuổi. Tờ nhân vật vẽ 'late teens' là lựa chọn hình ảnh; biến thể TQT82 (khoảng 15 tuổi, chưa giáp/cờ) dùng chung tờ ref-TQT.",
+    "Canon B15: câu 'Đây là quân Thát của Chiêu Văn, phải nhận kỹ' là lời Thượng hoàng dặn quân ta (D2); câu quân Nguyên hô là 'Có người Tống đến giúp!' (K1). Sửa phases[4].events: 'Biến thể VS: comic kết chương thêm 1 khung tưởng niệm Quốc Toản (Chính sử: vua làm văn tế, truy phong) và 1 khung teaser Bạch Đằng (không vẽ cọc) rồi mở B20.'",
+    "Không vẽ lễ trao Tiết chế tại Bình Than (Toàn thư chép ở tháng 10 năm 1283). O1 chỉ vẽ vua họp vương hầu, trăm quan.",
+    "Dịch nghĩa chữ Hán do biên kịch; cố vấn đối chiếu bản Viện KHXH (1993) trước khi chốt O1, O2, O3, D2, D3, K1, K3, K4, K5.",
+    "Duyệt ảnh: O2 nước cam vàng cam nhạt, không đỏ; O1–O2 Quốc Toản không giáp, không cờ; O5 không vũ khí, không khăn; K6 không cọc/gỗ; mọi cờ không có chữ.",
+    "Signs (sáu chữ trên cờ) ở O3, D3, K5 có tọa độ đoán trước; chỉnh sau khi có ảnh (D3 cờ bay có thể cần rotate). K1, K4 cờ nhỏ/quay lưng: thêm signs nếu ô vàng đọc được trên ảnh.",
+    "Nguyễn Khoái (H40) và Chiêu Thành vương chưa có tờ nhân vật; O6 vẽ không tham chiếu, không gọi tên.",
+    "TQT, TD đã chuyển sang _shared/bible.json (dùng lại ở B16, B17): desc trong bible là nguồn duy nhất, chương sau chỉ tham chiếu id. TND chuyển sang bible khi có chương thứ hai dùng. render.mjs đã hỗ trợ trường 'sheet' cho biến thể (TQT82, TTcivil).",
+    "Việc cho viewer/engine (ngoài kịch bản): (a) xáo thẻ Hiến kế và vị trí đáp án quiz bằng hạt giống ngẫu nhiên mỗi phiên — viewer.html đang dùng mix(i, 7) cố định nên thẻ lịch sử luôn cùng vị trí; (b) subset phông chữ Hán trên cờ vào _shared/fonts/sign-han.woff2 thay Google Fonts (chạy ngoại tuyến Steam/kho ứng dụng, tránh rủi ro GDPR); (c) nút 'Bắt đầu' mở khóa âm thanh trên trình duyệt; tải O1 trước, khung K tải lười, mỗi khung ≤ 250 KB WebP/AVIF; (d) viewer đọc variants (?v=VS); (e) tên người nói 'who' cần bản en (Quân Nguyên → Yuan soldiers).",
+    "Ngân hàng quiz B15 cần mở rộng lên 10–15 câu (có id, type, seenRef) khi engine hỗ trợ: whoSaid 'Có người Tống đến giúp!' (K1); vì sao Thượng hoàng dặn nhận kỹ quân Chiêu Văn (D2, chỉ R1); timeline; đúng/sai 'quân áo Tống là quân Việt cải trang' (O5). Câu sáu chữ trên cờ KHÔNG vào whoSaid.",
+    "Engine cần đọc variants.*.insert và trường insert {phase, event} của khung D2 (pha \"Áo Tống trên bến\" theo canon B15; kiểm lại tên pha)."
+  ]
+}

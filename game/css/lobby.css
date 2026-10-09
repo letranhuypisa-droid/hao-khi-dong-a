@@ -1,0 +1,255 @@
+/* lobby.css — sảnh chính (thẻ Xuất trận, đợt 16; main.js xuattran, stageCard, openPrep, openBattleInfo).
+   Kiểu màn chờ của game hành động trên điện thoại: tranh comic của trận đang chọn phủ cả màn (mờ dần về đáy, tàn lửa bay),
+   logo chữ vàng thếp trên mặt trống đồng, cột nút tắt bằng icon sơn mài, thẻ trận bằng tranh, nút XUẤT CHINH hình mũi tên
+   viền vàng. Điện thoại dọc: logo trên, thẻ trận + nút ở đáy. Ngang / màn rộng: logo + thẻ trận cột trái, nút góc phải dưới
+   (tranh để nhân vật ở giữa phải). Mọi tranh là khung comic có sẵn (assets/comic, đã gắn dấu nội dung AI). */
+
+/* ---- tranh theo trận: nền sảnh, thẻ trận, đầu bảng Sử liệu ---- */
+.lobby.b-B15 .lb-img, .ttl .lb-img { background-image: url(../assets/comic/B15/K6.webp); background-image: image-set(url(../assets/comic/B15/K6.avif) type("image/avif"), url(../assets/comic/B15/K6.webp) type("image/webp")); --pos: 67% 60%; }
+.lobby.b-B20 .lb-img { background-image: url(../assets/comic/B20/O3.webp); background-image: image-set(url(../assets/comic/B20/O3.avif) type("image/avif"), url(../assets/comic/B20/O3.webp) type("image/webp")); --pos: 70% 35%; }
+.s-B15 .st-art, .bi-art.s-B15, .ld-art.b-B15 .ld-img { background-image: url(../assets/comic/B15/D3.webp); background-image: image-set(url(../assets/comic/B15/D3.avif) type("image/avif"), url(../assets/comic/B15/D3.webp) type("image/webp")); }
+.s-B20 .st-art, .bi-art.s-B20, .ld-art.b-B20 .ld-img { background-image: url(../assets/comic/B20/K1.webp); background-image: image-set(url(../assets/comic/B20/K1.avif) type("image/avif"), url(../assets/comic/B20/K1.webp) type("image/webp")); }
+
+/* ---- khung: sảnh chiếm trọn chiều cao màn, dải đầu nằm trên tranh ---- */
+/* isolation: tranh nền (z-index −1) nằm trong lớp xếp của .hub, trên nền body chứ không bị nền body che */
+.hub.g-xuattran { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; position: relative; isolation: isolate; }
+.hub.g-xuattran .hub-body { flex: 1; display: flex; min-height: 0; }
+.hub.g-xuattran .hub-head { border-bottom: 0; z-index: 2; }
+.hub.g-xuattran .hub-head::after { display: none; }
+.lobby { flex: 1; position: relative; display: grid; gap: 12px; padding: 6px 0 4px;
+  grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "rail" "." "stages" "cta"; }
+
+/* tranh nền: phủ cả màn, sau mọi thứ; trôi chậm (Ken Burns); đổi trận thì mờ vào */
+.lb-art { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--then); pointer-events: none; }
+.lb-img { position: absolute; left: 0; right: 0; top: 0; height: 74%; background-size: cover; background-position: var(--pos, center);
+  transform-origin: 60% 45%; animation: lbDrift 28s ease-in-out infinite alternate; }
+.lb-art.fresh .lb-img { animation: lbIn .7s ease-out both, lbDrift 28s ease-in-out .7s infinite alternate; }
+.lb-art::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(10,7,6,.82) 0%, rgba(10,7,6,.15) 18%, rgba(10,7,6,0) 34%, rgba(10,7,6,.35) 56%, #0c0907 74%, #0c0907 100%),
+    radial-gradient(120% 60% at 50% 30%, transparent 40%, rgba(10,7,6,.55) 100%); }
+@keyframes lbDrift { from { transform: scale(1.02); } to { transform: scale(1.1) translate(-1.5%, -1%); } }
+@keyframes lbIn { from { opacity: 0; filter: brightness(1.8) saturate(.4); } to { opacity: 1; filter: none; } }
+/* tàn lửa bay lên */
+.ember { position: absolute; bottom: 8%; left: var(--x); width: var(--s, 4px); height: var(--s, 4px); border-radius: 50%; opacity: 0;
+  background: #ffd890; box-shadow: 0 0 6px 2px rgba(255,120,40,.85), 0 0 14px 4px rgba(255,80,20,.35); animation: ember var(--d) linear var(--t) infinite; }
+.ember:nth-of-type(1) { --x: 8%;  --d: 9s;  --t: 0s;   --dx: 30px; }
+.ember:nth-of-type(2) { --x: 22%; --d: 12s; --t: 2.5s; --dx: -20px; --s: 3px; }
+.ember:nth-of-type(3) { --x: 35%; --d: 10s; --t: 5s;   --dx: 40px; --s: 5px; }
+.ember:nth-of-type(4) { --x: 48%; --d: 13s; --t: 1s;   --dx: -35px; --s: 3px; }
+.ember:nth-of-type(5) { --x: 61%; --d: 8s;  --t: 3.5s; --dx: 25px; }
+.ember:nth-of-type(6) { --x: 72%; --d: 11s; --t: 6s;   --dx: -30px; --s: 5px; }
+.ember:nth-of-type(7) { --x: 83%; --d: 9.5s; --t: 4.2s; --dx: 20px; --s: 3px; }
+.ember:nth-of-type(8) { --x: 92%; --d: 12.5s; --t: .6s; --dx: -25px; }
+.ember:nth-of-type(9) { --x: 55%; --d: 14s; --t: 7.5s; --dx: 45px; --s: 2px; }
+@keyframes ember { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .95; } 70% { opacity: .6; } 100% { transform: translate(var(--dx), -75vh); opacity: 0; } }
+
+/* ---- logo: chữ vàng thếp, mặt trống đồng quay chậm phía sau, dải son "Nam Quốc Sơn Hà" (từ đợt 17 chỉ ở màn chào .ttl) ---- */
+.lb-logo { grid-area: logo; position: relative; z-index: 0; text-align: center; pointer-events: none; padding-top: 6px; }
+.lb-logo::before { content: ""; position: absolute; left: 50%; top: 46%; width: 190px; height: 190px; margin: -95px 0 0 -95px; z-index: -1; opacity: .2;
+  background: url(../assets/fx/seal.webp) center/contain no-repeat; animation: spin 140s linear infinite; }
+.lb-logo h1 { margin: 0; font: 900 clamp(2.2rem, 11vw, 3.6rem)/1 var(--serif); letter-spacing: .06em; text-transform: uppercase; color: var(--vang2);
+  background: linear-gradient(180deg, #fff6d6 0%, #f4dc8e 36%, #c99a3e 60%, #f1d98a 78%, #8a6420 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 0 #3a1408) drop-shadow(0 8px 16px rgba(0,0,0,.75)); }
+.lb-logo h1 span { display: block; font-size: 1.12em; }
+.lb-logo p { display: inline-block; margin: 10px 0 0; padding: 3px 26px; font: 700 .74rem/1.6 var(--serif); letter-spacing: .34em; text-transform: uppercase; color: #ffeab0;
+  background: linear-gradient(90deg, transparent, rgba(155,45,32,.92) 18%, rgba(155,45,32,.92) 82%, transparent); text-shadow: 0 1px 2px #000; }
+
+/* ---- cột nút tắt: icon sơn mài khung vàng, nhãn ngắn; nút "Mới" sáng nhịp ---- */
+.lb-rail { grid-area: rail; display: flex; gap: 16px; align-self: start; padding: 4px 2px; }
+.rail-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; min-height: 0; background: none; border: 0; box-shadow: none; color: var(--trung); }
+.rail-btn:hover:not(:disabled) { background: none; color: var(--vang2); }
+.rail-btn img { width: 48px; height: 48px; border-radius: 12px; border: 2px solid rgba(201,161,74,.8); box-shadow: 0 0 0 2px rgba(0,0,0,.65), 0 6px 14px rgba(0,0,0,.65); transition: transform .15s; }
+.rail-btn:active img { transform: scale(.94); }
+.rail-btn span { font: 700 .7rem/1.2 var(--sans); letter-spacing: .02em; white-space: nowrap; text-shadow: 0 1px 2px #000, 0 0 6px #000; }
+.rail-btn em { position: absolute; top: -6px; right: -10px; font: 700 .62rem/1.5 var(--sans); font-style: normal; padding: 0 6px; border-radius: 9px; color: #fff; background: var(--son2); border: 1px solid #ffd27a; box-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.rail-btn.hot img { animation: hot 1.6s ease-in-out infinite; }
+@keyframes hot { 50% { box-shadow: 0 0 0 2px rgba(0,0,0,.65), 0 0 18px 4px rgba(255,210,122,.75); border-color: #ffe7a0; } }
+
+/* ---- thẻ trận: tranh, ấn mã trận, tên lớn; thẻ chọn thì sáng màu, viền vàng, vạch son bên trái ---- */
+.lb-stages { grid-area: stages; display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 4px 2px; }
+.lb-stages::-webkit-scrollbar { display: none; }
+.st-card { position: relative; flex: 0 0 calc(50% - 5px); scroll-snap-align: start; }
+.st-pick { position: relative; display: block; width: 100%; height: 108px; padding: 0; min-height: 0; overflow: hidden; text-align: left; border-radius: 10px;
+  border: 1px solid rgba(201,161,74,.4); background: #120d0b; box-shadow: 0 8px 20px rgba(0,0,0,.55); }
+.st-pick:hover:not(:disabled) { border-color: var(--vang); }
+.st-art { position: absolute; inset: 0; background-size: cover; background-position: center; filter: saturate(.45) brightness(.55); transition: filter .25s, transform .5s; }
+.st-pick::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(8,6,5,.94) 0%, rgba(8,6,5,.35) 58%, rgba(8,6,5,0) 100%); }
+.st-card.on .st-pick { border: 2px solid var(--vang2); box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 0 20px rgba(241,217,138,.35), 0 10px 24px rgba(0,0,0,.6); }
+.st-card.on .st-pick::before { content: ""; position: absolute; z-index: 1; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(var(--son2), #7a2216); }
+.st-card.on .st-art { filter: none; transform: scale(1.05); }
+.st-seal { position: absolute; z-index: 1; top: 8px; left: 10px; padding: 2px 7px; font: 900 .74rem/1.4 var(--serif); color: var(--vang2);
+  background: linear-gradient(#a8331f, #6e1d12); border: 1px solid var(--vang); border-radius: 4px; transform: rotate(-4deg); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.st-txt { position: absolute; z-index: 1; left: 12px; right: 40px; bottom: 9px; }
+.st-txt b { display: block; font: 900 1.25rem/1.1 var(--serif); color: #fff3cc; text-shadow: 0 2px 6px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-txt small { display: block; margin-top: 2px; font-size: .72rem; font-weight: 700; letter-spacing: .14em; color: var(--vang); }
+.st-rank { position: absolute; z-index: 1; right: 9px; bottom: 9px; width: 28px; height: 28px; display: grid; place-items: center; font: 900 .95rem var(--serif); font-style: normal;
+  border-radius: 50%; color: #2a1608; background: radial-gradient(circle at 35% 30%, #fff1c4, #c9a14a 70%); border: 1px solid #6b4a1a; box-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.st-rank.rS { background: radial-gradient(circle at 35% 30%, #fff6d6, #ffbf3a 70%); }
+.st-rank.rC { background: radial-gradient(circle at 35% 30%, #e9ded0, #9a8a78 70%); }
+.st-tag { position: absolute; z-index: 1; top: 9px; left: 54px; padding: 1px 7px; font: 700 .64rem/1.5 var(--sans); color: #e8dcf5; background: rgba(74,58,92,.92); border-radius: 3px; }
+.st-info { position: absolute; z-index: 2; top: 6px; right: 6px; width: 30px; height: 30px; min-height: 0; padding: 0; border-radius: 50%; display: grid; place-items: center;
+  font: italic 900 .95rem/1 var(--serif); color: var(--vang2); background: rgba(0,0,0,.6); border: 1px solid rgba(201,161,74,.65); box-shadow: none; }
+.st-info::before { content: ""; position: absolute; inset: -8px; }                         /* vùng chạm rộng hơn nút */
+
+/* ---- ô Bày trận + nút XUẤT CHINH ---- */
+.lb-cta { grid-area: cta; display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.lb-prep { align-self: center; display: flex; align-items: center; max-width: 100%; padding: 6px 16px 6px 12px; min-height: 0; border-radius: 99px; font-size: .82rem; white-space: nowrap;
+  background: rgba(8,6,5,.72); border: 1px solid rgba(201,161,74,.45); box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+.lb-prep svg { flex: none; width: 18px; height: 18px; margin-right: 8px; color: var(--vang2); }
+.lb-prep span { overflow: hidden; text-overflow: ellipsis; }
+.lb-prep span + span::before { content: "·"; margin: 0 7px; color: var(--vang); }
+@media (pointer: coarse) { .lb-prep { min-height: 36px; } }
+/* nút hình mũi tên hai đầu: lớp ngoài vàng thếp, lớp trong sơn son, vệt sáng lướt qua; bóng đổ theo hình nhờ drop-shadow ở nút */
+.lb-go { display: block; width: 100%; padding: 0; min-height: 0; background: none; border: 0; box-shadow: none; color: #ffeab0;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)) drop-shadow(0 0 14px rgba(192,57,43,.45)); transition: transform .12s; }
+.lb-go:hover:not(:disabled) { background: none; color: #fff3cc; filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)) drop-shadow(0 0 22px rgba(255,170,90,.6)); }
+.lb-go:active { transform: scale(.97); }
+.lb-go .gi { position: relative; display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 66px; padding: 8px 34px; overflow: hidden;
+  background: linear-gradient(180deg, #fff1c4, #c9a14a 45%, #8a6420 100%);
+  clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 18px 100%, 0 50%); }
+.lb-go .gi::before { content: ""; position: absolute; inset: 2px; background: linear-gradient(180deg, #df5236 0%, #b2321f 42%, #7e1f13 100%);
+  clip-path: polygon(17px 0, calc(100% - 17px) 0, 100% 50%, calc(100% - 17px) 100%, 17px 100%, 0 50%); box-shadow: inset 0 0 0 1px rgba(255,226,150,.35); }
+.lb-go .gi::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgba(255,240,200,.35), transparent); animation: sheen 3.8s ease-in-out 1s infinite; }
+/* vệt sáng chạy bằng transform (đợt 19c; trước đây đổi left: tính lại bố cục mỗi khung ở sảnh). 566,67% = 170% khung nút / 30% bề rộng vệt */
+@keyframes sheen { 0%, 60% { transform: skewX(-20deg) translateX(0); } 100% { transform: skewX(-20deg) translateX(566.67%); } }
+.lb-go i, .lb-go .gi > span { position: relative; z-index: 1; }
+.lb-go i { display: grid; place-items: center; width: 36px; height: 36px; }
+.lb-go i svg { width: 32px; height: 32px; stroke-width: 2; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.lb-go .gi > span { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; text-align: left; }
+.lb-go b { white-space: nowrap; font: 900 1.55rem/1.05 var(--serif); letter-spacing: .16em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(60,10,4,.7), 0 0 12px rgba(255,200,120,.35); }
+.lb-go small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; font: 600 .74rem/1.2 var(--sans); letter-spacing: .04em; color: #ffd9a0; opacity: .92; }
+
+/* ---- điện thoại ngang (thấp) và màn rộng: logo + thẻ trận cột trái, nút tắt + XUẤT CHINH bên phải ---- */
+@media (min-width: 861px), (max-height: 500px) and (orientation: landscape) {
+  .lobby { grid-template-columns: minmax(240px, 360px) 1fr auto; grid-template-rows: auto 1fr auto;
+    grid-template-areas: ". . rail" "stages . ." "stages . cta"; gap: 10px 16px; }
+  .lb-img { height: 100%; }
+  .lb-art::after { background: linear-gradient(90deg, rgba(10,7,6,.88) 0%, rgba(10,7,6,.55) 30%, rgba(10,7,6,0) 55%),
+      linear-gradient(180deg, rgba(10,7,6,.8) 0%, rgba(10,7,6,0) 22%, rgba(10,7,6,0) 62%, rgba(10,7,6,.85) 100%); }
+  .lb-logo { text-align: left; padding-top: 0; white-space: nowrap; }
+  .lb-logo::before { left: 0; margin-left: -40px; }
+  .lb-logo h1 span { display: inline; font-size: 1em; }
+  .lb-logo p { padding-left: 4px; background: linear-gradient(90deg, rgba(155,45,32,.92) 0%, rgba(155,45,32,.92) 70%, transparent); }
+  .lb-rail { align-self: start; justify-self: end; }
+  .lb-stages { flex-direction: column; overflow: visible auto; scroll-snap-type: none; align-self: end; max-height: 100%; }
+  .st-card { flex: none; }
+  .lb-cta { align-self: end; width: min(340px, 42vw); }
+  .lb-prep { align-self: stretch; justify-content: center; }
+}
+@media (min-width: 861px) {
+  .hub.g-xuattran { padding-bottom: 18px; }
+  .lobby { padding: 18px 0 8px; }
+  .lb-logo h1 { font-size: 3.4rem; } .lb-logo h1 span { display: block; }
+  .lb-logo::before { width: 260px; height: 260px; margin: -130px 0 0 -70px; }
+  .st-pick { height: 124px; } .st-txt b { font-size: 1.5rem; }
+  .rail-btn img { width: 60px; height: 60px; }
+  .lb-cta { width: 400px; }
+  .lb-go .gi { min-height: 76px; } .lb-go b { font-size: 1.8rem; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .lobby { padding: 0; gap: 8px 14px; grid-template-columns: minmax(220px, 300px) 1fr auto; }
+  .lb-logo h1 { font-size: min(1.75rem, 4.1vw); } .lb-logo p { margin-top: 6px; font-size: .64rem; }
+  .lb-logo::before { width: 130px; height: 130px; margin: -65px 0 0 -30px; }
+  .st-pick { height: 82px; } .st-txt b { font-size: 1.1rem; } .st-txt small { font-size: .66rem; }
+  .lb-stages { gap: 8px; padding: 0 2px; }
+  .lb-rail { gap: 14px; padding-top: 0; }
+  .rail-btn img { width: 44px; height: 44px; border-radius: 10px; } .rail-btn span { font-size: .64rem; }
+  .lb-cta { width: min(300px, 40vw); gap: 8px; }
+  .lb-go .gi { min-height: 56px; padding: 6px 28px; gap: 10px; } .lb-go b { font-size: 1.3rem; } .lb-go i svg { width: 26px; height: 26px; }
+}
+@media (max-width: 380px) { .st-txt b { font-size: 1.08rem; } .st-txt { right: 30px; } .lb-go .gi { padding: 8px 26px; gap: 10px; } }
+/* điện thoại dọc thấp (máy nhỏ): thu logo và thẻ để vẫn vừa một màn */
+@media (max-width: 860px) and (max-height: 700px) and (orientation: portrait) {
+  .lb-logo h1 { font-size: 2rem; } .lb-logo::before { width: 140px; height: 140px; margin: -70px 0 0 -70px; } .lb-logo p { margin-top: 6px; }
+  .st-pick { height: 92px; } .lobby { gap: 8px; }
+  .rail-btn img { width: 42px; height: 42px; border-radius: 10px; } .rail-btn span { font-size: .64rem; }
+  .lb-go .gi { min-height: 58px; }
+}
+
+/* ---- bảng Bày trận / Sử liệu (khung chung .sheet ở css/hub.css) ---- */
+.prep .sheet, .binfo .sheet { width: min(520px, 100%); }
+.prep h4, .binfo h4 { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--vang); }
+.prep h4::after, .binfo h4::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.prep .q { flex: none; width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; font: 700 .75rem/1 var(--sans); color: var(--vang2); background: rgba(0,0,0,.4); border-color: var(--line); position: relative; }
+.prep .q::before { content: ""; position: absolute; inset: -9px; }
+.prep .q.on { background: var(--son); border-color: var(--vang); }
+.why-p { margin: -2px 0 8px; padding: 8px 10px; font-size: .8rem; line-height: 1.5; color: var(--trung); background: rgba(0,0,0,.3); border-left: 2px solid var(--vang); border-radius: 0 6px 6px 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 7px 8px; min-width: 0; border-radius: 8px; background: rgba(0,0,0,.3); }
+.seg button b { font-weight: 700; font-size: .88rem; white-space: nowrap; }
+.seg button small { font-size: .68rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.seg button.on { border-color: var(--vang2); color: var(--vang2); background: linear-gradient(#5a2016, #3a160f); box-shadow: inset 0 0 0 1px rgba(255,226,150,.25), 0 0 10px rgba(241,217,138,.18); }
+.seg button.on small { color: #e8c98a; }
+.seg.diff button { flex-basis: calc(33.33% - 4px); }
+.seg.rgrid { display: grid; grid-template-columns: repeat(5, 1fr); }
+.seg.rgrid button { position: relative; flex-direction: row; gap: 4px; padding: 7px 2px; font-weight: 700; font-size: .84rem; }
+.seg.rgrid em { font-size: .74rem; }
+.seg.rgrid .lk svg { width: 14px; height: 14px; display: block; }
+.seg-note { margin: 6px 2px 0; font-size: .76rem; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tile { padding: 6px 9px; border-radius: 8px; background: rgba(0,0,0,.3); border: 1px solid var(--line2); }
+.tile small { display: block; font-size: .66rem; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+.tile b { font: 700 1.05rem/1.3 var(--serif); color: var(--trung); font-variant-numeric: tabular-nums; }
+.tile .lift { margin-left: 4px; vertical-align: 2px; }
+.prep .lb-go { position: sticky; bottom: -16px; margin: 6px 0 -4px; padding: 14px 0 4px; background: linear-gradient(180deg, rgba(26,21,18,0), #1a1512 38%); }
+.prep .lb-go .gi { min-height: 58px; } .prep .lb-go b { font-size: 1.3rem; }
+/* Sử liệu: đầu bảng là tranh của trận, chữ đè lên */
+.bi-art { position: relative; display: flex; align-items: flex-end; gap: 12px; min-height: 140px; margin: -12px -18px 10px; padding: 14px 18px 12px;
+  background-size: cover; background-position: center; border-top-left-radius: inherit; border-top-right-radius: inherit; isolation: isolate; }
+.bi-art::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: linear-gradient(0deg, #1d1713 0%, rgba(29,23,19,.6) 45%, rgba(29,23,19,.1) 100%); }
+.bi-art .st-seal { position: static; flex: none; font-size: .9rem; padding: 4px 9px; }
+.bi-art h3 { margin: 0; font-size: 1.3rem; text-shadow: 0 2px 6px #000; }
+.bi-art p { margin: 2px 0 0; font-size: .78rem; color: var(--trung); text-shadow: 0 1px 3px #000; }
+.bi-art [data-close] { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; background: rgba(0,0,0,.55); }
+.binfo .lead { margin: 4px 0 10px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.facts span { padding: 3px 10px; border-radius: 99px; font-size: .76rem; background: rgba(0,0,0,.35); border: 1px solid var(--line); }
+.facts .best { border-color: var(--vang); color: var(--vang2); }
+.binfo .notes li { font-size: .84rem; }
+
+/* ---- màn nạp trận: tranh của trận mờ phía sau ---- */
+.ld-art { position: relative; isolation: isolate; }
+.ld-art .ld-img { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; opacity: .3; filter: saturate(.7); }
+.ld-art .ld-img::after { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 70% at 50% 50%, rgba(12,9,7,.55), #0c0907); }
+
+/* ---- màn chào (đợt 17; main.js titleScreen): tranh, logo, Bắt đầu / Tiếp tục, Chơi mới, Cài đặt — không gì khác ---- */
+.ttl { position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  gap: 24px; padding: calc(12vh + var(--st)) calc(24px + var(--sr)) calc(7vh + var(--sb)) calc(24px + var(--sl)); }
+.ttl .lb-img { height: 100%; }
+.ttl .lb-art::after { background: linear-gradient(180deg, rgba(10,7,6,.7) 0%, rgba(10,7,6,.1) 30%, rgba(10,7,6,0) 50%, rgba(10,7,6,.55) 72%, rgba(10,7,6,.92) 100%); }
+.ttl-logo { animation: ttlLogo 1.1s cubic-bezier(.2,.7,.2,1) both; }
+.ttl-logo h1 { font-size: clamp(2.8rem, 14vw, 5rem); }
+.ttl-logo h1 span { display: block; }
+.ttl-logo::before { width: 240px; height: 240px; margin: -120px 0 0 -120px; opacity: .24; }
+.ttl-menu { display: flex; flex-direction: column; align-items: stretch; gap: 12px; width: min(320px, 100%); animation: ttlUp .6s ease-out .5s both; }
+.ttl-menu .lb-go b { font-size: 1.7rem; letter-spacing: .22em; }
+.ttl-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 18px; border-radius: 99px;
+  font: 700 .95rem/1 var(--serif); letter-spacing: .2em; text-transform: uppercase; color: var(--vang2);
+  background: rgba(8,6,5,.62); border: 1px solid rgba(201,161,74,.55); box-shadow: 0 6px 16px rgba(0,0,0,.45); }
+.ttl-btn:hover:not(:disabled) { background: rgba(60,20,12,.75); }
+.ttl-btn svg { width: 20px; height: 20px; }
+@keyframes ttlLogo { from { opacity: 0; transform: scale(1.12); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes ttlUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+/* ngang / màn rộng: logo góc trên trái, nút góc phải dưới (như sảnh) để nhân vật trong tranh ở giữa */
+@media (min-width: 861px), (max-height: 500px) and (orientation: landscape) {
+  .ttl { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; align-items: start; justify-items: start; gap: 12px;
+    padding: calc(7vh + var(--st)) calc(5vw + var(--sr)) calc(7vh + var(--sb)) calc(5vw + var(--sl)); }
+  .ttl .lb-art::after { background: linear-gradient(90deg, rgba(10,7,6,.8) 0%, rgba(10,7,6,.3) 35%, rgba(10,7,6,0) 55%), linear-gradient(180deg, rgba(10,7,6,0) 55%, rgba(10,7,6,.75) 100%); }
+  .ttl-logo { grid-area: auto; grid-column: 1; grid-row: 1; }
+  .ttl-logo h1 span { display: block; }
+  .ttl-menu { grid-column: 2; grid-row: 2; width: min(320px, 40vw); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .ttl-logo h1 { font-size: min(3.2rem, 8.5vw); }
+  .ttl-logo::before { width: 170px; height: 170px; margin: -85px 0 0 -40px; }
+  .ttl-menu { gap: 8px; } .ttl-menu .lb-go .gi { min-height: 56px; } .ttl-menu .lb-go b { font-size: 1.35rem; } .ttl-btn { min-height: 40px; }
+}
+@media (min-width: 861px) { .ttl-logo h1 { font-size: 5rem; } .ttl-logo::before { width: 300px; height: 300px; margin: -150px 0 0 -80px; } }
+.ttl-new .sheet p { margin: 8px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-img, .lb-art.fresh .lb-img, .lb-logo::before, .rail-btn.hot img, .lb-go .gi::after, .ttl-logo, .ttl-menu { animation: none; }
+  .ember { display: none; }
+}
