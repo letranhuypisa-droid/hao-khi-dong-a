@@ -45,6 +45,24 @@ Chương thứ ba theo thứ tự Quyển VI (VI·5, ngay sau Hàm Tử). Canon:
   - Par các pha nay là 150 / 210 / 240 / 90 / 30, tổng 12:00.
 - **Kiểm vết bot B15**: cùng seed, cùng `Date.now`/`Math.random`. Ảnh chụp `__state()` 132 s đầu của bản đợt 1 và bản này trùng mã băm. Các móc dùng chung không đổi B15.
 
+### Rà soát và sửa (2026-10-10, commit e5ee7d3)
+
+Ba lượt rà soát song song: luật, tích hợp và chữ, hiệu năng. Những gì đã sửa:
+
+- **Lỗi lớn nhất: lính bị dùng lại.** Crowd dùng lại đối tượng lính đã chết, nên các danh sách lính của B16 có thể "nhận nhầm" lính mới. Ví dụ: dân binh mới hóa lính cầm đuốc, người đẩy xe bị kéo đi, quân giữ bến bị lôi theo xe húc. Nay mọi danh sách giữ `{ a, id }` theo id lúc sinh.
+- **Tải lại đầu pha:**
+  - Tải lại ở P5 không mất thưởng đánh lui Thoát Hoan.
+  - Lưu số lần phản đòn boss.
+  - Dân binh về lệnh "Theo ta".
+  - Đội Đoạt Giáo đã tước không sinh lại.
+  - Mất bến và quá giờ tải lại được.
+- **HUD:** nhãn "còn chặn" chỉ cả sĩ quan; HUD không lộ id cổng B3/A3.
+- **Comic rỗng:** vẫn ghi đã xem, nên kết chương không lặp mỗi lần thắng. Sảnh, Sử liệu và Sử quán xử lý đúng Chương chưa có comic (cờ `noComic`).
+- **Chữ thẻ:** câu diễn giải không còn mang nhãn Chính sử. Dịch nghĩa bài thơ trung tính hơn. Thẻ Thoát Hoan có id riêng (`X18-b16`).
+- **Hiệu năng:** cờ cắm (Tổng Phản Công, Tuyệt Kỹ) được giải phóng khi gỡ; giảm cấp phát mỗi khung.
+- **Bot:** đi vòng thân điện.
+- **Đã kiểm:** bot thắng cả khi bị ép gục ở P5 rồi tải lại.
+
 ## Còn lại
 
 - **Comic** mở chương, kết chương, khung "Tụng giá hoàn kinh":
