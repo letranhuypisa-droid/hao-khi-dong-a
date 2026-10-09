@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Tờ xem trước GLB</title>
+<!-- Soát lô GLB thả vào design/: dựng từng tệp (một khung nhìn chéo, ánh sáng trung tính) lên một tờ lưới rồi gửi JPEG về máy chủ (design/tools/serve.mjs /__save).
+     Mở qua serve.mjs:  /design/glb/contact-sheet.html?dir=design&from=0&n=30&cols=6&cell=256&view=front|side|top
+     Mỗi tệp nạp lần lượt rồi giải phóng (tệp 30–50 MB, ba ảnh 4096²). Không dùng khi chạy game. -->
+<script type="importmap">
+  { "imports": { "three": "../../game/vendor/three/three.module.js", "three/addons/": "../../game/vendor/three/addons/" } }
+</script>
+<style>body { margin: 0; background: #e9e5dc; font: 12px system-ui } #log { padding: 6px }</style>
+</head>
+<body>
+<div id="log">đang chạy…</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const q = new URLSearchParams(location.search);
+const dir = q.get("dir") || "design", from = +(q.get("from") || 0), n = +(q.get("n") || 30), cols = +(q.get("cols") || 6), cell = +(q.get("cell") || 256), view = q.get("view") || "front";
+const only = q.get("only"), all = await (await fetch(`/__list?dir=${encodeURIComponent(dir)}`)).json();
+const names = (only ? only.split(",").map((s) => s + ".glb").filter((s) => all.includes(s)) : all).slice(from, from + n);
+const rows = Math.ceil(names.length / cols), sheet = document.createElement("canvas");
+sheet.width = cols * cell; sheet.height = rows * (cell + 18);
+const sc = sheet.getContext("2d"); sc.fillStyle = "#e9e5dc"; sc.fillRect(0, 0, sheet.width, sheet.height); sc.font = "bold 12px system-ui";
+document.body.appendChild(sheet);
+
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(cell, cell); R.setClearColor(0xd9d4c8); R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8478, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(32, 1, 0.01, 50);
+const loader = new GLTFLoader();
+const disposeAll = (root) => root.traverse((o) => { if (o.geometry) o.geometry.dispose(); const ms = o.material ? [].concat(o.material) : []; for (const m of ms) { for (const k of Object.keys(m)) if (m[k]?.isTexture) m[k].dispose(); m.dispose(); } });
+
+for (let i = 0; i < names.length; i++) {
+  const name = names[i], x = (i % cols) * cell, y = Math.floor(i / cols) * (cell + 18);
+  let label = name.replace(/\.glb$/i, "");
+  try {
+    const g = await loader.loadAsync(`/${dir}/${encodeURIComponent(name)}`);
+    const root = g.scene; scene.add(root);
+    const box = new THREE.Box3().setFromObject(root), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), r = Math.max(s.x, s.y, s.z) * 0.5 * 1.25 / Math.tan(THREE.MathUtils.degToRad(16));
+    const dirv = view === "straight" ? new THREE.Vector3(0, 0.06, 1) : view === "back" ? new THREE.Vector3(0, 0.06, -1) : view === "side" ? new THREE.Vector3(1, 0.25, 0) : view === "top" ? new THREE.Vector3(0.001, 1, 0.3) : new THREE.Vector3(0.55, 0.3, 0.8);
+    cam.position.copy(c).addScaledVector(dirv.normalize(), r); cam.lookAt(c); cam.updateProjectionMatrix();
+    R.render(scene, cam);
+    sc.drawImage(R.domElement, x, y, cell, cell);
+    label += `  ${(s.x).toFixed(2)}×${(s.y).toFixed(2)}×${(s.z).toFixed(2)}`;
+    scene.remove(root); disposeAll(root);
+  } catch (e) { sc.fillStyle = "#c33"; sc.fillRect(x, y, cell, cell); label += "  LỖI " + e.message; sc.fillStyle = "#e9e5dc"; }
+  sc.fillStyle = "#1d1a17"; sc.fillText(`${from + i}  ${label}`, x + 4, y + cell + 13);
+  document.getElementById("log").textContent = `${i + 1}/${names.length} ${name}`;
+}
+const blob = await new Promise((r) => sheet.toBlob(r, "image/jpeg", 0.88));
+const out = `sheet-${dir.replace(/\W+/g, "_")}-${view}-${only ? "sel" : from}.jpg`;
+const resp = await fetch(`/__save?name=${out}`, { method: "POST", body: blob });
+document.getElementById("log").textContent = "xong: " + await resp.text();
+window.__done = true;
+</script>
+</body>
+</html>

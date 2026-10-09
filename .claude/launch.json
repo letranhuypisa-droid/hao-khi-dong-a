@@ -18,6 +18,15 @@
         "8943"
       ],
       "port": 8943
+    },
+    {
+      "name": "design-serve",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:/hao-khi-dong-a-main/design/tools/serve.mjs",
+        "8950"
+      ],
+      "port": 8950
     }
   ]
 }
