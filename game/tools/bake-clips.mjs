@@ -52,6 +52,11 @@ const SKELS = {
   hy: { hips: "Hip", spine: "LowerSpine", neck: "Neck", head: "Head",
     side: (s) => ({ arm: `${s}Shoulder`, fore: `${s}Forearm`, hand: `${s}Hand`, mid: `${s}Finger2`,
       thigh: `${s}Thigh`, shin: `${s}Shin`, foot: `${s}Foot`, toe: `${s}Toe` }) },
+  // Motifect (mocap sinh bằng AI, anim-src/motifect): KHÔNG có xương hông — nút "Hips" là gốc cảnh (không phải khớp) mang chuyển động hông, cột sống và hai
+  // chân là ba gốc rời nhau; LeftLeg / RightLeg là ĐÙI.
+  mt: { hips: "Hips", spine: "Spine1", neck: "Neck1", head: "Head",
+    side: (s) => { const n = s === "L" ? "Left" : "Right"; return { arm: `${n}Arm`, fore: `${n}ForeArm`, hand: `${n}Hand`, mid: `${n}HandMiddle1`,
+      thigh: `${n}Leg`, shin: `${n}Shin`, foot: `${n}Foot`, toe: `${n}ToeBase` }; } },
 };
 const SOURCES = {
   ual: { file: "anim-src/ual/Animation Library[Standard]/Godot/AnimationLibrary_Godot_Standard.glb", skel: "ual" },
@@ -101,6 +106,10 @@ const CLIPS = {
   hySide2:   { src: "hy:SwordSwingSide2", clip: "SwordSwingSide2", aim: true, trim: [0.45, 1.5] },
   hyFront:   { src: "hy:SwordSwingFront", clip: "SwordSwingFront", aim: true, trim: [0.55, 2.0] },
   hyDown:    { src: "hy:SwordSwingDown", clip: "SwordSwingDown", aim: true, trim: [0.95, 2.9] },
+  // Motifect (mocap sinh bằng AI, anim-src/motifect, 30 fps; mọi clip bị kéo dài thành 3–6 s nên trim bỏ đoạn đứng chờ): khuỵu gối rồi gục đầu → Vỡ Thế của sĩ quan / boss
+  // (anim.js stagger). Đã thử, không dùng: knockdown_fall + get_up (ngã SẤP rồi đứng dậy, không nối được với knockback / LayToIdle nằm NGỬA của downPose; đứng dậy mất
+  // 2,5 s, nén vào 0,55 s của trạng thái ngã là ~4,5× so với ~2,4× của LayToIdle), hit_react_* (giật nhẹ, không hơn Hit_Chest × HIT_GAIN).
+  mtKnees:   { src: "mt:knocked_to_knees", clip: "knocked_to_knees", trim: [0.8, 2.6] },
 };
 
 const args = process.argv.slice(2);
@@ -352,14 +361,19 @@ function ensureGlb(fbx, glb) {
   console.log(ok ? "xong" : ["LỖI", ...(r.stdout || "").split("\n").slice(-6), r.stderr || ""].join("\n"));
   return ok;
 }
-// Haley Tuffles: thả FBX vào anim-src/haley/; mỗi tệp thành nguồn "hy:<tên tệp>" (bộ xương hy). Không tự thêm clip: khai báo tường minh trong CLIPS.
-function discoverHaley() {
-  const dir = path.join(ROOT, "anim-src/haley");
-  if (!fs.existsSync(dir)) return;
-  for (const f of fs.readdirSync(dir)) {
-    const m = /^(.*)\.fbx$/i.exec(f); if (!m) continue;
-    const glb = path.join(dir, m[1] + ".glb");
-    if (ensureGlb(path.join(dir, f), glb)) SOURCES["hy:" + m[1]] = { file: glb, skel: "hy" };
+// Gói mocap theo thư mục: thả FBX vào anim-src/<thư mục>/; mỗi tệp thành nguồn "<tiền tố>:<tên tệp>" với bộ xương skel. Không tự thêm clip: khai báo tường minh
+// trong CLIPS. ref: nguồn dùng dựng khung hệ trục cho cả gói — prepare() lấy hướng mặt từ tư thế NGHỈ của tệp, mà clip bắt đầu / kết thúc nằm dưới đất
+// (đứng dậy, ngã, chết) có tư thế nghỉ không đứng ("xương R không nằm bên phải giải phẫu"); clip vẫn phát trên khung của tệp đứng thẳng (khớp theo tên nút).
+const PACKS = [{ dir: "haley", prefix: "hy", skel: "hy" }, { dir: "motifect", prefix: "mt", skel: "mt", ref: "jab_right" }];
+function discoverPacks() {
+  for (const pk of PACKS) {
+    const dir = path.join(ROOT, "anim-src", pk.dir);
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      const m = /^(.*).fbx$/i.exec(f); if (!m) continue;
+      const glb = path.join(dir, m[1] + ".glb");
+      if (ensureGlb(path.join(dir, f), glb)) SOURCES[pk.prefix + ":" + m[1]] = { file: glb, skel: pk.skel, ...(pk.ref ? { ref: pk.prefix + ":" + pk.ref } : {}) };
+    }
   }
 }
 function discoverMixamo() {
@@ -376,7 +390,7 @@ function discoverMixamo() {
     if (!CLIPS[key] && !Object.values(CLIPS).some((c) => c.src === id)) CLIPS[key] = { src: id, clip: m[1], auto: true, ...(/great sword|two handed sword|longsword/i.test(m[1]) ? { sword: true } : {}) };
   }
 }
-if (!flag("--list")) { discoverMixamo(); discoverHaley(); }
+if (!flag("--list")) { discoverMixamo(); discoverPacks(); }
 
 // Tự phân loại một clip lạ: lấy mẫu thử không lặp, rồi so khung đầu / cuối và đo tốc độ.
 function classify(src, clip, cfg) {
@@ -417,7 +431,7 @@ for (const [name, cfg] of Object.entries(CLIPS)) {
   const gltf = (cache[cfg.src] ||= await loadGLB(def.file));
   const clip = gltf.animations.find((a) => a.name === cfg.clip) || gltf.animations.find((a) => a.name.endsWith("|" + cfg.clip));
   if (!clip) { console.log(`  ! ${name}: không có clip "${cfg.clip}" trong ${cfg.src}`); bad++; continue; }
-  const src = (cache[cfg.src + ":prep"] ||= prepare(gltf, def.skel));
+  const refId = def.ref && SOURCES[def.ref] ? def.ref : cfg.src, src = (cache[refId + ":prep"] ||= prepare(refId === cfg.src ? gltf : (cache[refId] ||= await loadGLB(SOURCES[refId].file)), def.skel));
   if (cfg.auto) classify(src, clip, cfg);
   const sample = sampleClip(src, clip, cfg);
   if (opt("--probe") === name) {                       // in vị trí hai bàn tay (hệ trục game, đơn vị rig) để xem tay nào dẫn đầu, gươm hướng đâu

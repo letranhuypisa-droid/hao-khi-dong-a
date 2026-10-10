@@ -450,9 +450,13 @@ const REEL = P({ rootX: -0.22, hipsY: -0.16, torsoX: -0.35, headX: -0.3, shRx: 0
 const SLUMP = P({ rootX: 0.05, hipsY: -0.3, torsoX: 0.5, torsoY: 0.12, headX: 0.45, shRx: 0.05, shRz: 0.2, elRx: -0.35, handRx: 0.85,
   shLx: 0.15, shLz: -0.25, elLx: -0.45, handLx: 0.6, hipLx: -0.55, hipLz: -0.08, kneeLx: 1.0, hipRx: 0.35, hipRz: 0.1, kneeRx: 1.05 });
 // style(p, t, w): lớp vũ khí khác đặt lại tay (vd đại kiếm chống mũi gươm xuống đất); bỏ trống = như cũ.
+const KNEES_CLIP = "mtKnees";
 export function stagger(t, long = false, style = null) {
   const p = keys(seg(t, 0.15, 0.7), [[0, REEL], [1, SLUMP, "io"]]);
   const b = Math.sin(t * 4.5), w = seg(t, 0.4, 1);
+  // Có clip khuỵu gối (mtKnees, Motifect): thân, đầu, chân theo clip (xốc người, khuỵu, gục đầu, rồi giữ khung cuối); tay vẫn thủ tục bên dưới để cán dài chống mũi
+  // xuống đất và style của lớp vũ khí đặt tay như cũ.
+  if (C.clipsReady() && C.has(KNEES_CLIP)) C.sampleT(KNEES_CLIP, t, p, C.LOWER);
   if (long) p.handRx = 0.35 + (0.85 - 0.35) * (1 - w);          // cán dài: mũi chống đất phía trước
   if (style) style(p, t, w);
   return add(p, { torsoX: 0.05 * b * w, headX: 0.04 * b * w, shRx: -0.03 * b * w, hipsY: 0.012 * b * w,

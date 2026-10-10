@@ -243,6 +243,31 @@ t("mọi đòn của HERO_ANIM trả số hữu hạn ở mọi u, có clip và 
     for (const k of HA.HERO_MOVE_LIST) for (let u = 0; u <= 1.0001; u += 0.05) for (const [key, v] of Object.entries(HA.HERO_ANIM[k](Math.min(1, u)))) if (typeof v === "number") assert.ok(Number.isFinite(v), `${k}@${u} ${key}=${v}`);
   }
 });
+// Vỡ Thế (sĩ quan / boss, A.stagger): thân, đầu, chân từ clip khuỵu gối của Motifect (mtKnees, mocap AI), tay vẫn thủ tục.
+const ARM_KEYS = ["shRx", "shRy", "shRz", "elRx", "handRx", "handRz", "shLx", "shLy", "shLz", "elLx", "handLx", "handLz"];
+t("clip mtKnees (Motifect): không lặp, hông hạ ≥ 0,4 (khuỵu gối), giữ yên ở cuối clip, số hữu hạn", () => {
+  const c = CLIPS_JSON.clips.mtKnees, nk = CLIPS_JSON.keys.length, hy = CLIPS_JSON.keys.indexOf("hipsY");
+  assert.ok(c, "mtKnees có trong clips.json"); assert.equal(c.loop, false); assert.equal(c.data.length, c.n * nk); assert.ok(c.data.every(Number.isFinite));
+  let lo = 0; for (let i = 0; i < c.n; i++) lo = Math.min(lo, c.data[i * nk + hy]);
+  assert.ok(lo <= -0.4, "hông hạ " + lo);
+  let move = 0; for (let i = c.n - 6; i < c.n; i++) for (let k = 0; k < nk; k++) move = Math.max(move, Math.abs(c.data[i * nk + k] - c.data[(i - 1) * nk + k]));
+  assert.ok(move < 0.03, "6 khung cuối còn động " + move);
+});
+t("Vỡ Thế có clip: thân, đầu, chân khác khung khoá (khuỵu sâu hơn); tay và cổ tay y hệt bản thủ tục, cán dài vẫn chống đất", () => {
+  for (const long of [false, true]) for (const tt of [0.3, 1, 3]) {
+    C.setClips(CLIPS_JSON); const on = A.stagger(tt, long);
+    C.setClips(null); const off = A.stagger(tt, long);
+    for (const k of ARM_KEYS) near(on[k], off[k], 1e-9, `long=${long} t=${tt} ${k}`);
+    if (tt === 3) { assert.ok(on.hipsY < off.hipsY - 0.15, `hông ${on.hipsY} so với ${off.hipsY}`); assert.ok(on.kneeLx > off.kneeLx + 0.5, "gối gập sâu hơn"); }
+  }
+});
+t("Vỡ Thế không clip (?noclips): đúng khung khoá cũ (xốc ngửa rồi gục: hông −0,3 ở cuối)", () => {
+  C.setClips(null);
+  near(A.stagger(3.4).hipsY, -0.3, 0.03, "hông"); near(A.stagger(3.4).torsoX, 0.5, 0.06, "thân gập");
+});
+t("A.stagger trả số hữu hạn ở mọi t (0 – 4 s), có clip và không có, cán dài hay không", () => {
+  for (const on of [true, false]) { C.setClips(on ? CLIPS_JSON : null); for (const long of [false, true]) for (let tt = 0; tt <= 4; tt += 0.1) for (const [k, v] of Object.entries(A.stagger(tt, long))) if (typeof v === "number") assert.ok(Number.isFinite(v), `${tt} ${k}`); }
+});
 t("downPose: null khi không có clip hoặc đối số hỏng; có clip thì ngã nằm rồi cuối là đứng dậy gần thế đứng", () => {
   C.setClips(null); assert.equal(A.downPose(0.3, 1.1), null);
   C.setClips(CLIPS_JSON);
