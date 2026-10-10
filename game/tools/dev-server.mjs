@@ -16,7 +16,7 @@ http.createServer((req, res) => {
   let rel;
   try { rel = decodeURIComponent(new URL(req.url, "http://x").pathname); } catch { res.writeHead(400).end(); return; }
   let file = path.join(ROOT, rel.endsWith("/") ? rel + "index.html" : rel);
-  if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }       // không thoát khỏi thư mục game
+  if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { res.writeHead(403).end(); return; }       // không thoát khỏi thư mục game (kèm dấu phân cách: "/..%2Fgame-cu/" khớp tiền tố "game")
   fs.stat(file, (e, st) => {
     if (e || !st.isFile()) { res.writeHead(404, { "Cache-Control": "no-store" }).end("404"); return; }
     res.writeHead(200, { "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream", "Content-Length": st.size, "Cache-Control": "no-store" });
