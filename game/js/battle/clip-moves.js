@@ -6,7 +6,7 @@
 // thế thủ của lớp (đòn nào cũng bắt đầu và kết thúc ở thế thủ, như khung khoá cũ), trộn theo phép quay (anim.js blendPoseQ: góc Euler đầu / cuối
 // clip có thể là cách viết khác của cùng hướng với thế thủ).
 //
-// spec = { clip, t0?, t1?, strike?, mirror?, even? }: t0 mặc định 0 (clip gươm hai tay: start của clip — bỏ đoạn đứng chờ), t1 mặc định hết clip,
+// spec = { clip, t0?, t1?, strike?, mirror?, even?, bias? } (bias: độ lệch cổ tay, mặc định HAND_BIAS; vũ khí cán dài lệch ít hơn): t0 mặc định 0 (clip gươm hai tay: start của clip — bỏ đoạn đứng chờ), t1 mặc định hết clip,
 // even: t1 chọn sao cho tốc độ phát sau cú chém bằng tốc độ phát trước nó (không nén phần theo đà vào khoảng ngắn hơn nhiều).
 // Clip một tay (song đao): cổ tay = góc cổ tay clip + HAND_BIAS cho lưỡi nối dài cánh tay (rig game: handRx ≈ 1,5 là lưỡi dọc cẳng tay; tay cầm
 // kiếm thật lệch chừng 20–30° so với đường cẳng tay); tay trái là bản mirror của clip tay phải. Clip gươm hai tay (clips.json sword: tay đã giải theo
@@ -31,7 +31,7 @@ export function clipMovePose(spec, hitU, u, base = GUARD, durM = 0) {
   const t = u <= hitU ? t0 + (strike - t0) * (u / hitU) : strike + (t1 - strike) * ((u - hitU) / (1 - hitU));
   const p = { ...base }; delete p.fk; delete p.fu;
   C.sampleT(spec.clip, t, p);
-  if (sword) p.grip = 1; else { p.handRx += HAND_BIAS; p.handLx += HAND_BIAS; }
+  if (sword) p.grip = 1; else { const b = spec.bias ?? HAND_BIAS; p.handRx += b; p.handLx += b; }
   const q = (spec.mirror ?? (!sword && inf.hand === "L")) ? mirror(p) : p;
   return blendPoseQ(base, q, sm(0, IN, u) * (1 - sm(1 - OUT, 1, u)));
 }
@@ -46,4 +46,20 @@ export function withClips(proc, specs, base = GUARD, moves = MOVES) {
     out[k] = (u) => (C.clipsReady() && C.has(spec.clip) ? clipMovePose(spec, hitU, u, base, durM) : old(u));
   }
   return out;
+}
+
+// ---- đòn cận chiến theo vũ khí của lính cận vệ, tướng đồng minh, sĩ quan (guard.js swingPose, units.js updateAlly / updateAttack) ------------------------
+// Clip Human Melee Animations FREE (Kevin Iglesias, anim-src/humanmelee): nhịp đòn ~0,3–0,6 s tới cú chém, gần đúng nhịp đòn của lính (mốc chém 0,5–0,55 của
+// 0,5–1 s) nên phát ~1×, không cần cắt đoạn lấy đà như clip Haley. bias: giáo / đại đao cán dài lệch cổ tay ít hơn song đao (lab: 0 giáo chếch lên 30°, 0,6 nằm
+// ngang, 1,2 mũi chúi xuống đất; 0,3 giữ mũi hơi ngẩng như tư thế đâm); khiên: clip húc khiên đánh bằng TAY TRÁI (tay giữ khiên của rig), không lật trái-phải.
+export const SWINGS = {
+  giao: { clip: "hmPolearm", even: true, bias: 0.3 },
+  dadao: { clip: "hm2H", even: true, bias: 0.3 },
+  dao: { clip: "hm1H", even: true },
+  khien: { clip: "hmShield", even: true, mirror: false },
+};
+// Tư thế đòn loại kind ở tiến độ u ∈ [0,1] (mốc sát thương hitU, thời lượng durM giây); chưa có clip / ?noclips / loại chưa có spec thì gọi fallback() (khung khoá cũ).
+export function weaponSwing(kind, hitU, u, durM, fallback) {
+  const spec = SWINGS[kind];
+  return spec && C.clipsReady() && C.has(spec.clip) ? clipMovePose(spec, hitU, u, GUARD, durM) : fallback();
 }

@@ -64,8 +64,12 @@ export function solvePose(P, st, out = {}, armOff = ARM_OFF) {
     keep.normalize();
     // khuỷu gần thẳng: mặt phẳng gập chưa xác định → trộn dần từ mặt phẳng khung trước
     const blend = clamp(Math.sin(phi) / 0.15, 0, 1);
-    const w = perp.lengthSq() > 1e-10 ? keep.clone().lerp(perp.normalize(), blend).normalize() : keep;
+    // st.over[s] (từ armPlaneFix): mặt phẳng ép sẵn cho khung này; st.trace[s]: ghi lại u, góc gập, mặt phẳng dữ liệu và mặt phẳng đã chọn của từng khung
+    const ov = st.over?.[s] ? st.over[s].clone().sub(u.clone().multiplyScalar(st.over[s].dot(u))).normalize() : null;
+    const pn = perp.lengthSq() > 1e-10 ? perp.clone().normalize() : null;
+    const w = ov || (pn ? keep.clone().lerp(pn, blend).normalize() : keep);
     st.w[s].copy(w);
+    if (st.trace) st.trace[s].push({ u: u.clone(), phi, perp: pn, w: w.clone() });
     const Rsh = new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(u.clone().negate(), w), u.clone().negate(), w);
     euler(Rsh, "YXZ"); out["sh" + s + "x"] = _e.x; out["sh" + s + "y"] = _e.y; out["sh" + s + "z"] = _e.z;
     const el = armOff - phi; out["el" + s + "x"] = el;
@@ -107,6 +111,37 @@ function refineLeg(u, f, x, z, k) {
     if (!moved) step *= 0.5;
   }
   return [x, z, k];
+}
+
+// Khuỷu duỗi thẳng thì mặt phẳng gập chưa xác định; dữ liệu mocap qua trạng thái thẳng rồi gập sang phía đối diện làm mặt phẳng (và phần xoắn của vai, YXZ)
+// đảo ~180° chỉ trong một khung — nội suy Euler giữa hai khung đó cho tay quay vòng. Vì lúc thẳng cẳng tay gần trùng hướng tay trên (lệch ≤ góc gập), cú xoắn
+// rải đều ra đoạn khuỷu gần thẳng (phi < T) giữa hai mặt phẳng xác định mà gần như không đổi hướng cẳng tay. trace = st.trace sau một lượt giải { L, R }
+// (mỗi mảng theo khung); trả mảng theo khung { L, R } (Vector3 hoặc null = giữ nguyên bộ giải) hoặc null nếu không có cú đảo nào (> jump rad).
+export function armPlaneFix(trace, T = 0.3, jump = 1.0) {
+  const n = trace.L.length, over = Array.from({ length: n }, () => ({ L: null, R: null }));
+  let any = false;
+  const proj = (v, u) => v.clone().sub(u.clone().multiplyScalar(v.dot(u))).normalize();
+  const twist = (a, b, u) => Math.atan2(u.dot(new THREE.Vector3().crossVectors(a, b)), a.dot(b));
+  for (const s of ["L", "R"]) {
+    const T_ = trace[s];
+    for (let i = 1; i < n; i++) {
+      if (Math.abs(twist(proj(T_[i - 1].w, T_[i].u), proj(T_[i].w, T_[i].u), T_[i].u)) <= jump) continue;
+      let a = i - 1; while (a >= 0 && !(T_[a].phi >= T && T_[a].perp)) a--;       // mốc xác định bên trái
+      let b = i; while (b < n && !(T_[b].phi >= T && T_[b].perp)) b++;              // và bên phải
+      if (b - a < 2) continue;                                                       // hai khung liền kề đều xác định: cú đảo có thật, không rải được
+      const ua = a >= 0 ? T_[a].u : T_[b].u, ub = b < n ? T_[b].u : T_[a].u;
+      const um = ua.clone().add(ub).normalize();
+      const wa = a >= 0 ? proj(T_[a].perp, um) : null, wb = b < n ? proj(T_[b].perp, um) : null;
+      const psi = wa && wb ? twist(wa, wb, um) : 0;
+      for (let k = a + 1; k < b; k++) {
+        const u = T_[k].u, w0 = wa ? proj(wa, u) : proj(wb, u);
+        const tt = wa && wb ? (k - a) / (b - a) : 0;
+        over[k][s] = w0.clone().applyAxisAngle(u, psi * tt);
+        any = true;
+      }
+    }
+  }
+  return any ? over : null;
 }
 
 // Tên các kênh bộ giải ghi (theo thứ tự cố định để nén thành mảng).

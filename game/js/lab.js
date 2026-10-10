@@ -4,7 +4,7 @@
 //   ?view=hero&m=N1        tướng: dải khung hình của một đòn (m còn nhận idle, run, strafe, block, hit, dodge, down,
 //                          blockwalk = bước khi đỡ, &dir=90 hướng đi theo độ: 0 trước, 90 phải, 180 lùi)
 //   ?view=rigs&m=run&us=.3 tướng, sĩ quan, boss, tướng đồng minh cạnh nhau (&rigs=tuong,H33 để lọc); m như trên
-//                          cộng sweep, heavy, roar, shoot, ult (Tuyệt Kỹ boss), broken (Vỡ Thế 3,5 s); nhiều u
+//                          cộng sweep, heavy, roar, shoot, ult (Tuyệt Kỹ boss), broken (Vỡ Thế 3,5 s), swing (đòn thường theo vũ khí); nhiều u
 //                          (&us=0,.25,.5) = mỗi rig một dải
 //   &hero=H31              tướng H31 (rig RIGS.H31, bộ đòn WC01 anim-wc01.js) thay H35 ở view=hero; m nhận thêm hich, binhThu,
 //                          ult; ở view=rigs thì H31 chỉ hiện khi ghi rõ (&rigs=H31) và dùng tư thế WC01
@@ -30,6 +30,7 @@ import { RigMotion } from "./battle/rig-motion.js";
 import { preloadModels, model } from "./battle/glb.js";
 import { loadClips, sampleU as clipSampleU, clipDur, info as clipInfo } from "./battle/clips.js";
 import { MOVES } from "./data/tuning.js";
+import { weaponSwing } from "./battle/clip-moves.js";
 import { ANIMS } from "./battle/hero-anim.js";
 import * as W1 from "./battle/anim-wc01.js";
 import { MOVES_WC01 } from "./data/moves-wc01.js";
@@ -212,6 +213,7 @@ window.__lab = { set, get opts() { return opts; } };
 const RIG_ANIM = {
   fall: (u) => A.downPose(u * 1.1, 1.1) ?? A.knockdown(u),                                   // hero bị đánh ngã: ngã, nằm, đứng dậy (hero.js state "down")
   idle: (u, t) => A.idle(t), block: () => A.block(), hit: (u) => A.hitReact(u), dodge: (u) => A.dodgeRoll(u), down: (u) => A.knockdown(u),
+  swing: (u, t, it) => weaponSwing(RIGS[it.key].weapon, 0.55, u, 0.8, () => A.slash(u, 1, 0.3)),   // đòn thường của tướng đồng minh / cận vệ (units.js updateAlly)
   sweep: (u) => A.sweep(u), heavy: (u, t, it) => A.heavyChop(u, 0.4, longWpn(it)), roar: (u) => A.roar(u), shoot: (u) => A.shoot(u),
   broken: (u, t, it) => A.stagger(u * 3.5, longWpn(it)),                                      // Vỡ Thế (BigUnit.broken)
   ult: (u) => (u < 0.45 ? A.heavyChop(u / 0.45 * 0.5, 0.9) : A.spin((u - 0.45) / 0.55, 2)),     // Tuyệt Kỹ Toa Đô

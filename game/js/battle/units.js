@@ -24,6 +24,7 @@ import { makeRig, disposeRig, RIGS } from "./models.js";
 import { model, weaponMesh } from "./glb.js";
 import { RigMotion } from "./rig-motion.js";
 import * as A from "./anim.js";
+import { weaponSwing } from "./clip-moves.js";
 import * as THREE from "three";
 import { heightAt, collide } from "./world.js";
 import { fortRoute } from "./fort.js";
@@ -82,6 +83,7 @@ export class BigUnit {
     this.fate = o.fate || null; this.lastStand = o.lastStand || null; this.lsOn = false; this.slam = null; this.killed = false;
     this.rig = makeRig(cfg);
     this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, áo choàng, tua giáo (rig-motion.js)
+    this.weapon = cfg.weapon;
     this.longWeapon = cfg.weapon === "giao" || cfg.weapon === "dadao";
     ctx.scene.add(this.rig.root);
     this.x = o.x; this.z = o.z; this.yaw = o.yaw ?? -Math.PI / 2; this.home = { x: o.x, z: o.z };
@@ -255,7 +257,7 @@ export class BigUnit {
     this.st += dt;
     if (this.state === "atk") {
       const dur = 0.95, u = this.st / dur;
-      this.setPose(this.combo % 2 ? A.sweep(u) : A.heavyChop(u, 0.4, this.longWeapon), 0.5);
+      this.setPose(this.combo % 2 ? A.sweep(u) : this.longWeapon ? weaponSwing(this.weapon, 0.5, u, dur, () => A.heavyChop(u, 0.4, true)) : A.heavyChop(u, 0.4, false), 0.5);
       if (!this.hitDone && u > 0.5) {
         this.hitDone = true;
         if (d < 3.3 && facing(this, hero, 1.2)) hero.receiveHit({ dmg: this.cong * T.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: false, src: this, heavy: true });
@@ -354,7 +356,7 @@ export class BigUnit {
     }
     if (this.state === "atk") {
       this.st += dt; const u = this.st / 0.8;
-      this.setPose(this.rigKey === "H40" ? A.shoot(u) : A.slash(u, 1, 0.3), 0.5);
+      this.setPose(this.rigKey === "H40" ? A.shoot(u) : weaponSwing(this.weapon, 0.55, u, 0.8, () => A.slash(u, 1, 0.3)), 0.5);
       if (!this.hitDone && u > 0.55) {
         this.hitDone = true;
         if (this.atkTarget && ctx.crowd.hittable(this.atkTarget)) {

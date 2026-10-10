@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { BigUnit } from "./units.js";
 import { RIGS, PAL, modelOf, sizeOf } from "./models.js";
 import * as A from "./anim.js";
+import { weaponSwing } from "./clip-moves.js";
 import { heightAt, collide } from "./world.js";
 import { turn } from "./crowd.js";
 import { heSoGiap, hitPad } from "../data/tuning.js";
@@ -210,9 +211,10 @@ export class Guard extends BigUnit {
     const C = this.C, n = this.swingN || 0;
     if (C.ranged) return A.shoot(u);
     if (C.id === "songdao") return n % 2 ? A.doubleChop(u) : A.scissor(u);
-    if (C.id === "daidao") return n % 2 ? A.sweep(u) : A.heavyChop(u, 0.45, true);
-    if (C.id === "giao") return A.slash(u, n % 2 ? 1 : -1, 0);
-    return A.slash(u, n % 2 ? 1 : -1, 0.3);
+    // nhát thường: clip Human Melee theo vũ khí (clip-moves.js SWINGS); xen kẽ với quét / chém của khung khoá cũ (daidao), húc khiên và nhát kiếm (khiên thủ)
+    if (C.id === "daidao") return n % 2 ? A.sweep(u) : weaponSwing("dadao", 0.55, u, C.swing, () => A.heavyChop(u, 0.45, true));
+    if (C.id === "giao") return weaponSwing("giao", 0.55, u, C.swing, () => A.slash(u, n % 2 ? 1 : -1, 0));
+    return weaponSwing(n % 2 ? "dao" : "khien", 0.55, u, C.swing, () => A.slash(u, n % 2 ? 1 : -1, 0.3));
   }
   updateSwing(dt) {
     const ctx = this.ctx, C = this.C, f = this.atkTarget;

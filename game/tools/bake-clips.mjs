@@ -25,7 +25,7 @@ const threeUrl = pathToFileURL(path.join(ROOT, "vendor/three/three.module.js")).
 registerHooks({ resolve: (s, c, next) => (s === "three" ? { url: threeUrl, shortCircuit: true } : next(s, c)) });
 const THREE = await import("three");
 const { GLTFLoader } = await import(pathToFileURL(path.join(ROOT, "vendor/three/addons/loaders/GLTFLoader.js")).href);
-const { solvePose, newState, KEYS, WRAP, HIPS_Y, torsoFrame } = await import("./retarget.mjs");
+const { solvePose, newState, KEYS, WRAP, HIPS_Y, torsoFrame, armPlaneFix } = await import("./retarget.mjs");
 const W1 = await import("../js/battle/anim-wc01.js");
 const { makeRig } = await import("../js/battle/models.js");
 const A = await import("../js/battle/anim.js");
@@ -54,6 +54,10 @@ const SKELS = {
       thigh: `${s}Thigh`, shin: `${s}Shin`, foot: `${s}Foot`, toe: `${s}Toe` }) },
   // Motifect (mocap sinh bằng AI, anim-src/motifect): KHÔNG có xương hông — nút "Hips" là gốc cảnh (không phải khớp) mang chuyển động hông, cột sống và hai
   // chân là ba gốc rời nhau; LeftLeg / RightLeg là ĐÙI.
+  // Human Melee Animations FREE (Kevin Iglesias, rig 55 xương B-*, nam HumanM@ / nữ HumanF@): chỉ một thân hông / ngực, không có Spine1–2
+  hm: { hips: "B-hips", spine: "B-spine", neck: "B-neck", head: "B-head",
+    side: (s) => ({ arm: `B-upperArm${s}`, fore: `B-forearm${s}`, hand: `B-hand${s}`, mid: `B-middleFinger01${s}`,
+      thigh: `B-thigh${s}`, shin: `B-shin${s}`, foot: `B-foot${s}`, toe: `B-toe${s}` }) },
   mt: { hips: "Hips", spine: "Spine1", neck: "Neck1", head: "Head",
     side: (s) => { const n = s === "L" ? "Left" : "Right"; return { arm: `${n}Arm`, fore: `${n}ForeArm`, hand: `${n}Hand`, mid: `${n}HandMiddle1`,
       thigh: `${n}Leg`, shin: `${n}Shin`, foot: `${n}Foot`, toe: `${n}ToeBase` }; } },
@@ -109,6 +113,13 @@ const CLIPS = {
   // Motifect (mocap sinh bằng AI, anim-src/motifect, 30 fps; mọi clip bị kéo dài thành 3–6 s nên trim bỏ đoạn đứng chờ): khuỵu gối rồi gục đầu → Vỡ Thế của sĩ quan / boss
   // (anim.js stagger). Đã thử, không dùng: knockdown_fall + get_up (ngã SẤP rồi đứng dậy, không nối được với knockback / LayToIdle nằm NGỬA của downPose; đứng dậy mất
   // 2,5 s, nén vào 0,55 s của trạng thái ngã là ~4,5× so với ~2,4× của LayToIdle), hit_react_* (giật nhẹ, không hơn Hit_Chest × HIT_GAIN).
+  // Human Melee Animations FREE (anim-src/humanmelee, bản nam HumanM@…, 30 fps, đòn ~1–1,6 s, tay phải): giáo, hai tay, một tay, húc khiên → clip-moves.js SWINGS
+  // (lính cận vệ, tướng đồng minh, sĩ quan cán dài). Đã thử, không dùng: Death01 (ngã SẤP, rootX +1,6; ngã của game nằm NGỬA), CombatDamage01 (1 s, đòn trúng đòn của game 0,3 s),
+  // Run01_* / StrafeRun01_* (8 hướng: chỉ tướng chạy tiến, quay mặt theo hướng chạy; đi ngang của sĩ quan 1,5 m/s dùng bước IK guardStep đã đo trượt chân, clip chạy 3,2–3,7 m/s).
+  hmPolearm: { src: "hm:HumanM@AttackPolearm01", clip: "HumanM@AttackPolearm01", aim: true },
+  hm2H:      { src: "hm:HumanM@Attack2H01", clip: "HumanM@Attack2H01", aim: true },
+  hm1H:      { src: "hm:HumanM@Attack1H01_R", clip: "HumanM@Attack1H01_R", aim: true },
+  hmShield:  { src: "hm:HumanM@AttackShield01", clip: "HumanM@AttackShield01", aim: true },
   mtKnees:   { src: "mt:knocked_to_knees", clip: "knocked_to_knees", trim: [0.8, 2.6] },
 };
 
@@ -171,6 +182,7 @@ function sampleClip(src, clip, cfg) {
   const mixer = new THREE.AnimationMixer(src.root), action = mixer.clipAction(clip);
   action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
   const frames = [], joints = [], st = newState();
+  st.trace = { L: [], R: [] };
   for (let i = 0; i < n; i++) {
     const t = ta + (loop ? (i * D) / n : Math.min(D, (i * D) / (n - 1)));
     mixer.setTime(t);
@@ -179,6 +191,9 @@ function sampleClip(src, clip, cfg) {
     frames.push(solvePose(P, st, {}));
   }
   mixer.uncacheAction(clip);
+  // vai lật ~180° qua khung khuỷu duỗi thẳng (xem armPlaneFix): giải lại cả clip với mặt phẳng gập rải đều ra đoạn khuỷu gần thẳng; clip không lật giữ nguyên
+  const fix = armPlaneFix(st.trace);
+  if (fix) { const st2 = newState(); for (let i = 0; i < n; i++) { st2.over = fix[i]; frames[i] = solvePose(joints[i], st2, {}); } console.log("    (đã rải cú lật mặt phẳng khuỷu của " + fix.filter((f) => f.L || f.R).length + " khung)"); }
   return { n, dur: D, frames, joints, loop };
 }
 
@@ -364,7 +379,8 @@ function ensureGlb(fbx, glb) {
 // Gói mocap theo thư mục: thả FBX vào anim-src/<thư mục>/; mỗi tệp thành nguồn "<tiền tố>:<tên tệp>" với bộ xương skel. Không tự thêm clip: khai báo tường minh
 // trong CLIPS. ref: nguồn dùng dựng khung hệ trục cho cả gói — prepare() lấy hướng mặt từ tư thế NGHỈ của tệp, mà clip bắt đầu / kết thúc nằm dưới đất
 // (đứng dậy, ngã, chết) có tư thế nghỉ không đứng ("xương R không nằm bên phải giải phẫu"); clip vẫn phát trên khung của tệp đứng thẳng (khớp theo tên nút).
-const PACKS = [{ dir: "haley", prefix: "hy", skel: "hy" }, { dir: "motifect", prefix: "mt", skel: "mt", ref: "jab_right" }];
+const PACKS = [{ dir: "haley", prefix: "hy", skel: "hy" }, { dir: "motifect", prefix: "mt", skel: "mt", ref: "jab_right" },
+  { dir: "humanmelee", prefix: "hm", skel: "hm" }];
 function discoverPacks() {
   for (const pk of PACKS) {
     const dir = path.join(ROOT, "anim-src", pk.dir);

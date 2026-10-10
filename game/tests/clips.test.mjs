@@ -11,7 +11,7 @@ const THREE = await import("three");
 const { makeRig } = await import("../js/battle/models.js");
 const { RigMotion } = await import("../js/battle/rig-motion.js");
 const A = await import("../js/battle/anim.js");
-const { solvePose, newState, KEYS, HIPS_Y } = await import("../tools/retarget.mjs");
+const { solvePose, newState, KEYS, HIPS_Y, armPlaneFix } = await import("../tools/retarget.mjs");
 const C = await import("../js/battle/clips.js");
 const ikMod = await import("../js/battle/ik.js");
 const { readFileSync } = await import("node:fs");
@@ -59,6 +59,27 @@ t("dựng lại rig từ pose giải được: khuỷu, cổ tay, gối, cổ ch
   A.applyPose(rig, solved);
   const P1 = jointsOf(rig);
   for (const s of ["L", "R"]) for (const j of ["fore", "hand", "shin", "foot"]) assert.ok(dist(P0[s][j], P1[s][j]) < 1e-3, `${s}.${j} lệch ${dist(P0[s][j], P1[s][j])}`);
+});
+t("armPlaneFix: mặt phẳng khuỷu đảo 180° qua đoạn khuỷu gần thẳng được rải đều (≤ 45° mỗi khung); không đảo thì trả null", () => {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z), u = V(0, -1, 0);
+  const mk = (phi, perp, w) => ({ u: u.clone(), phi, perp, w });
+  // khung 0–1 xác định (mặt phẳng +x), 2–3 khuỷu gần thẳng, 4 dữ liệu đã đảo sang −x (bộ giải nhảy 180° ở khung 4), 5–6 xác định (−x)
+  const L = [mk(0.8, V(1, 0, 0), V(1, 0, 0)), mk(0.5, V(1, 0, 0), V(1, 0, 0)), mk(0.1, V(0, 0, 1), V(1, 0, 0)), mk(0, null, V(1, 0, 0)),
+    mk(0.1, V(-1, 0, 0), V(-1, 0, 0)), mk(0.5, V(-1, 0, 0), V(-1, 0, 0)), mk(0.8, V(-1, 0, 0), V(-1, 0, 0))];
+  const R = L.map((e) => mk(e.phi, e.perp && V(1, 0, 0), V(1, 0, 0)));
+  const fix = armPlaneFix({ L, R });
+  assert.ok(fix, "phát hiện cú đảo"); assert.equal(fix.length, 7);
+  assert.ok(fix.every((f) => f.R === null), "tay không đảo giữ nguyên");
+  const ang = (w) => Math.atan2(w.z, w.x);
+  const planes = L.map((e, i) => (fix[i].L ? fix[i].L : e.w));
+  for (let i = 1; i < 7; i++) {
+    assert.ok(Math.abs(planes[i].dot(u)) < 1e-9 && Math.abs(planes[i].length() - 1) < 1e-9, `khung ${i}: vuông góc tay, đơn vị`);
+    const d = Math.abs(Math.atan2(planes[i - 1].clone().cross(planes[i]).dot(u), planes[i - 1].dot(planes[i])));
+    assert.ok(d <= Math.PI / 4 + 1e-6, `khung ${i}: xoắn ${d.toFixed(2)} rad`);
+  }
+  assert.ok(fix[2].L && fix[3].L && fix[4].L && !fix[1].L && !fix[5].L, "chỉ rải đoạn khuỷu gần thẳng giữa hai mốc");
+  const still = L.map((e) => mk(e.phi, e.perp && V(1, 0, 0), V(1, 0, 0)));
+  assert.equal(armPlaneFix({ L: still, R: still }), null);
 });
 t("khuỷu duỗi thẳng: không NaN, giữ mặt phẳng gập của khung trước", () => {
   const st = newState();
@@ -267,6 +288,37 @@ t("Vỡ Thế không clip (?noclips): đúng khung khoá cũ (xốc ngửa rồi
 });
 t("A.stagger trả số hữu hạn ở mọi t (0 – 4 s), có clip và không có, cán dài hay không", () => {
   for (const on of [true, false]) { C.setClips(on ? CLIPS_JSON : null); for (const long of [false, true]) for (let tt = 0; tt <= 4; tt += 0.1) for (const [k, v] of Object.entries(A.stagger(tt, long))) if (typeof v === "number") assert.ok(Number.isFinite(v), `${tt} ${k}`); }
+});
+// Đòn cận chiến theo vũ khí (clip Human Melee, clip-moves.js weaponSwing): lính cận vệ, tướng đồng minh, sĩ quan cán dài.
+const SWING_CLIP = { giao: "hmPolearm", dadao: "hm2H", dao: "hm1H", khien: "hmShield" };
+t("clip Human Melee (hmPolearm, hm2H, hm1H, hmShield): không lặp, cú chém trong clip (tay phải; húc khiên tay trái), khung hữu hạn", () => {
+  for (const [kind, name] of Object.entries(SWING_CLIP)) {
+    const c = CLIPS_JSON.clips[name];
+    assert.ok(c, name + " có trong clips.json"); assert.equal(c.loop, false, name);
+    assert.equal(c.hand, kind === "khien" ? "L" : "R", name + " tay vung");
+    assert.ok(c.strike > 0.15 && c.strike < c.dur - 0.3, `${name}: strike ${c.strike} / dur ${c.dur}`);
+    assert.equal(c.data.length, c.n * CLIPS_JSON.keys.length, name); assert.ok(c.data.every(Number.isFinite), name);
+  }
+});
+t("weaponSwing: đầu / cuối đúng thế thủ, mốc sát thương đúng tư thế clip lúc chém; cổ tay lệch 0,3 (giáo, đại đao) hay HAND_BIAS; khiên không lật trái-phải", () => {
+  C.setClips(CLIPS_JSON);
+  for (const [kind, name] of Object.entries(SWING_CLIP)) {
+    const fb = () => assert.fail("không được rơi về khung khoá cũ khi có clip");
+    for (const u of [0, 1]) for (const key of ["torsoY", "hipsY", "shRx", "kneeLx", "handRx"]) near(CM.weaponSwing(kind, 0.55, u, 0.8, fb)[key], A.GUARD[key], 1e-6, `${kind} u=${u} ${key}`);
+    const want = A.zeroPose(); C.sampleT(name, CLIPS_JSON.clips[name].strike, want);
+    const got = CM.weaponSwing(kind, 0.55, 0.55, 0.8, fb), bias = CM.SWINGS[kind].bias ?? CM.HAND_BIAS;
+    for (const key of ["torsoY", "shRx", "shRy", "shLx", "elRx", "elLx", "hipLx", "kneeRx"]) near(got[key], want[key], 1e-5, `${kind}@hit ${key}`);
+    near(got.handRx, want.handRx + bias, 1e-5, kind + " cổ tay phải"); near(got.handLx, want.handLx + bias, 1e-5, kind + " cổ tay trái");
+  }
+  assert.equal(CM.SWINGS.giao.bias, 0.3); assert.equal(CM.SWINGS.dadao.bias, 0.3);
+});
+t("weaponSwing: loại chưa có spec (song đao, cung…) và mọi loại khi không có clip (?noclips) trả đúng kết quả fallback", () => {
+  C.setClips(CLIPS_JSON); assert.equal(CM.weaponSwing("songdao", 0.55, 0.3, 0.8, () => "fb"), "fb");
+  C.setClips(null); for (const kind of Object.keys(SWING_CLIP)) assert.equal(CM.weaponSwing(kind, 0.55, 0.3, 0.8, () => "fb"), "fb");
+});
+t("weaponSwing: số hữu hạn ở mọi u, mọi loại, mọi thời lượng đòn (0,5 – 1 s)", () => {
+  C.setClips(CLIPS_JSON);
+  for (const kind of Object.keys(SWING_CLIP)) for (const durM of [0.5, 0.8, 1.0]) for (let u = 0; u <= 1.0001; u += 0.05) for (const [k, v] of Object.entries(CM.weaponSwing(kind, 0.55, Math.min(1, u), durM, () => null))) if (typeof v === "number") assert.ok(Number.isFinite(v), `${kind} ${durM} ${u} ${k}`);
 });
 t("downPose: null khi không có clip hoặc đối số hỏng; có clip thì ngã nằm rồi cuối là đứng dậy gần thế đứng", () => {
   C.setClips(null); assert.equal(A.downPose(0.3, 1.1), null);
