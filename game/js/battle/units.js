@@ -11,6 +11,9 @@
 // Boss B20 (director-b20.js): o.T đè số của bậc (Ô Mã Nhi: bậc "tuong" nhưng HP 12000, Phá Thế 1000 — Đại tướng), o.leash (m quanh
 // nhà), o.stay(tướng) (boss giữ boong của mình: tướng ở ngoài thì về chỗ đứng), this.script = { pts, k, onDone } đi theo kịch bản (lui lên lầu kỳ hạm — không nhận đòn), T.lunge
 // "Kích xuyên" (lao đâm: báo trước rồi lướt tới) khi this.lungeOn.
+// B17 (director-b17.js): this.march (đi theo cánh hành quân, vẫn nhận đòn), o.fate "killed" (về 0 Sinh lực thì tử trận — ngã theo clip death, nằm lại,
+// không rút chạy; director.onBossKilled), o.lastStand { below, atk, every, r, mv, tele, first } (Chí Tử Chiến: dưới below × Sinh lực thì Công × (1 + atk),
+// cứ every giây một đòn bổ đất sóng chấn r m, báo trước tele s, không đỡ được — trạng thái "ult" với this.slam; director.onLastStand).
 // B15 không có các trường này nên mọi nhánh mới không chạy.
 
 import { makeRig, disposeRig, RIGS } from "./models.js";
@@ -72,6 +75,7 @@ export class BigUnit {
     this.weaponKind = cfg.weapon;
     this.defeatMeans = o.defeatMeans || null; this.hpLockPct = o.hpLockPct || 0; this.captureAtPct = o.captureAtPct ?? this.hpLockPct;
     this.captured = false; this.hpLocked = false; this.leash = o.leash; this.stay = o.stay || null; this.script = null; this.lungeOn = false; this.lungeCd = 3;
+    this.fate = o.fate || null; this.lastStand = o.lastStand || null; this.lsOn = false; this.slam = null; this.killed = false;
     this.rig = makeRig(cfg);
     this.motion = new RigMotion(this.rig);        // chân bám đất, vạt áo, áo choàng, tua giáo (rig-motion.js)
     this.longWeapon = cfg.weapon === "giao" || cfg.weapon === "dadao";
@@ -124,7 +128,8 @@ export class BigUnit {
     this.animT += dt; this.flash = Math.max(0, this.flash - dt);
     if (!this.alive) return;
     if (this.captured) { this.setPose(A.captured(this.animT), 0.12); this.place(dt); return; }   // bị bắt: đứng yên
-    if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.dead), 0.3); if (this.dead > 3.5) this.dispose(); this.place(dt); return; }
+    // ngã: sĩ quan (clip death nhanh ×2,2) rồi gỡ sau 3,5 s; tử trận (fate "killed") ngã đúng nhịp clip rồi nằm lại tới hết trận
+    if (this.dead > 0) { this.dead += dt; this.setPose(A.knockdown(this.killed ? this.dead / 2.2 : this.dead), 0.3); if (this.dead > 3.5 && !this.killed) this.dispose(); this.place(dt); return; }
     if (this.script) { this.updateScript(dt); this.place(dt); return; }   // đi theo kịch bản (B20: lui lên lầu kỳ hạm)
     if (this.retreating) { this.updateRetreat(dt); return; }
 
@@ -192,6 +197,13 @@ export class BigUnit {
     this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 6);
     this.atkCd -= dt; this.redCd -= dt; this.ultCd -= dt;
     const T = this.T;
+    if (this.lsOn) {                               // Chí Tử Chiến (B17 Toa Đô): cứ every giây bổ đất khi tướng trong r + 3 m
+      const LS = this.lastStand; this.slamCd -= dt;
+      if (this.slamCd <= 0 && d < LS.r + 3) {
+        this.state = "ult"; this.st = 0; this.hitDone = false; this.slam = LS; this.slamCd = LS.every;
+        ctx.fx.telegraph(this, LS.r, LS.tele, true); ctx.audio.play("horn", this.x, this.z); return;
+      }
+    }
     if (T.lunge && this.lungeOn) {                 // Kích xuyên (B20 Ô Mã Nhi ở lầu chỉ huy): tướng cách 3,5–7,5 m thì lao đâm
       this.lungeCd -= dt;
       if (this.lungeCd <= 0 && d > 3.5 && d < 7.5) {
@@ -256,6 +268,17 @@ export class BigUnit {
         ctx.fx.shake(0.35); ctx.fx.dust(this.x + Math.sin(this.yaw) * 2, this.z + Math.cos(this.yaw) * 2, 1.4);
       }
       if (u >= 1) { this.state = "idle"; this.atkCd = 0.8; }
+    } else if (this.state === "ult" && this.slam) {
+      // Chí Tử Chiến: đại phủ giơ cao (báo trước tele s) rồi bổ xuống đất, sóng chấn r m quanh mình, không đỡ được (trúng như Tuyệt Kỹ: tele + 0,3 s)
+      const S = this.slam, dur = S.tele + 0.9;
+      this.setPose(A.heavyChop(Math.min(1, this.st / (S.tele + 0.5)), S.tele / (S.tele + 0.5), this.longWeapon), 0.6);
+      if (!this.hitDone && this.st >= S.tele + 0.3) {
+        this.hitDone = true;
+        ctx.fx.shake(0.6); ctx.fx.shockwave(this.x, this.z, S.r);
+        if (d < S.r) hero.receiveHit({ dmg: this.cong * S.mv * heSoGiap(hero.giap, ctx.R) * ctx.diff.dmg * hitMult(this, hero), x: this.x, z: this.z, red: false, unblockable: true, src: this, knockdown: true });
+        this.hitCrowd(S.r, 2);
+      }
+      if (this.st >= dur) { this.state = "idle"; this.slam = null; this.atkCd = 1; }
     } else if (this.state === "ult") {
       const tele = T.ultTelegraph, dur = tele + 1.1;
       this.setPose(this.st < tele ? A.heavyChop(this.st / tele * 0.5, 0.9) : A.spin((this.st - tele) / 1.1, 2), 0.6);
@@ -397,6 +420,10 @@ export class BigUnit {
     this.hp -= dmg * mult; this.flash = 0.12; this.noHit = 0; this.awake = true;
     // Sàn Sinh lực (B16: Thoát Hoan còn Vương Kỳ đứng thì không xuống dưới floorPct%) — trận khác không đặt floorPct nên nhánh này không chạy
     if (this.floorPct > 0) { const f = this.maxHp * this.floorPct / 100; if (this.hp < f) this.hp = f; this.hpLocked = this.hp <= f + 1e-6; }
+    // Chí Tử Chiến (o.lastStand, B17): lần đầu xuống dưới below × Sinh lực
+    if (this.lastStand && !this.lsOn && this.hp > 0 && this.hp < this.maxHp * this.lastStand.below) {
+      this.lsOn = true; this.cong *= 1 + this.lastStand.atk; this.slamCd = this.lastStand.first ?? 2; ctx.director?.onLastStand?.(this);
+    }
     if (this.defeatMeans === "bị bắt") {                 // bắt sống (B20): khóa Sinh lực, Đòn Quyết lúc Vỡ Thế thì bị bắt
       const lock = this.maxHp * this.hpLockPct / 100;
       if (lock > 0 && this.hp < lock) this.hp = lock;
@@ -412,6 +439,12 @@ export class BigUnit {
     }
     if (this.hp <= 0) {
       this.hp = 0;
+      if (this.fate === "killed") {                      // tử trận (B17 Toa Đô): ngã, nằm lại; không rút chạy, không rã quân quanh (director lo)
+        this.dead = 0.001; this.killed = true; this.state = "idle"; this.slam = null; this.march = null;
+        if (ctx.hero?.lock === this) ctx.hero.lock = null;
+        if (ctx.director?.onBossKilled) ctx.director.onBossKilled(this, opt); else ctx.director?.onBossDefeated?.(this, opt);
+        return { killed: true, broke };
+      }
       if (this.tier === "tuong") { this.retreating = true; this.retreatT = 0; ctx.director?.onBossDefeated(this, opt); }
       else { this.dead = 0.001; ctx.director?.onOfficerKilled(this, opt); ctx.crowd?.rout(this.x, this.z, AI.rout.officerR); }
       return { killed: true, broke };

@@ -46,7 +46,7 @@ export function createB17({ timeout = TIMEOUT_B17, ksWin = 1 } = {}) {
     t: 0, phase: 0, phaseT: 0, timeout, over: false, won: null, why: null,
     bed: null, bedAuto: false,                                        // bãi lau đã chọn: "W" | "E"
     col: { s: 0, len: ROUTE_LEN, mult: 1, halt: null, fight: false, engT: 0, cdT: 0, blockT: 0, blocked: OUTPOSTS.map(() => false),
-      entered: false, stood: false, standWhy: null, standT: null, arrived: false, morale: COLUMN.morale },
+      entered: false, stood: false, standWhy: null, standT: null, arrived: false, morale: COLUMN.morale, moraleT: 0 },
     outposts: OUTPOSTS.map((O) => ({ id: O.id, p: 0, taken: false, takenT: null, blockedRing: false })), taken: 0,
     arena: null,                                                      // chỗ Toa Đô cố thủ khi đứng lại: { x, z, mound } (mound: chỉ số gò trong bãi, null)
     bossDown: false, main: [false, false, false],
@@ -143,6 +143,13 @@ export function tickB17(st, inp, dt) {
       if (st.phase === 1) setPhase(st, 2, ev);
     }
     if (C.s >= C.len - 1e-9) { C.arrived = true; finish(st, false, "Toa Đô ra tới cửa sông: cánh quân Nguyên thoát ra biển.", ev); return ev; }
+    // Quân Viễn Chinh: Sĩ Khí cánh mòn dần; về 0 thì đội hình vỡ
+    C.moraleT += dt;
+    if (C.moraleT >= COLUMN.moraleEvery) {
+      C.moraleT -= COLUMN.moraleEvery; C.morale = Math.max(0, C.morale - COLUMN.moraleDrop);
+      ev.push({ type: "moraleDrop", morale: C.morale });
+      if (C.morale <= 0) stand(st, "morale", ev);
+    }
   }
 
   // ---- Kế Sách Phục kích bãi lau: G trong cửa sổ ----
@@ -175,7 +182,7 @@ function blockAt(st, i, ev) {
   ev.push({ type: "outpostBlock", id: OUTPOSTS[i].id });
 }
 
-// Toa Đô đứng lại hẳn (đội hình vỡ / chạm sàn Sinh lực): cánh thôi đi, ông lên gò gần nhất cố thủ → P4
+// Toa Đô đứng lại hẳn (why: "broken" phục kích làm vỡ đội hình, "morale" Sĩ Khí cánh về 0, "half" chạm sàn Sinh lực): cánh thôi đi, ông lên gò gần nhất cố thủ → P4
 function stand(st, why, ev) {
   const C = st.col;
   if (C.stood) return;
@@ -194,6 +201,8 @@ function ksResult(st, ok, why, ev) {
   ev.push({ type: "keSach", id: "phucKich", ok, why });
   if (ok) { st.col.morale = Math.max(0, st.col.morale - KE_SACH.phucKich.morale); stand(st, "broken", ev); }
 }
+// đội hình vỡ (một nửa lính hộ tống tán loạn): phục kích thành công hoặc Sĩ Khí cánh về 0
+export const routed = (st) => st.col.standWhy === "broken" || st.col.standWhy === "morale";
 
 export function finish(st, won, why, ev = []) {
   if (st.over) return ev;

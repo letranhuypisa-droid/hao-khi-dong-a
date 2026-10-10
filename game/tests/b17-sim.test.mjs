@@ -177,6 +177,15 @@ await t("chụp / khôi phục giữ trạng thái; hai lượt cùng đầu và
   restoreB17(st, snap); assert.deepEqual(st, snap);
 });
 
+await t("Quân Viễn Chinh: cứ 180 s Sĩ Khí cánh −10; về 0 thì đội hình vỡ (đứng lại, như phục kích)", () => {
+  const st = createB17(); toP2(st);
+  const ev = run(st, D.COLUMN.moraleEvery + 0.05, inp(FAR, { engaged: true }));
+  assert.ok(types(ev).includes("moraleDrop")); assert.equal(st.col.morale, D.COLUMN.morale - D.COLUMN.moraleDrop);
+  st.col.morale = D.COLUMN.moraleDrop;
+  const ev2 = run(st, D.COLUMN.moraleEvery, inp(FAR, { engaged: true }));
+  assert.ok(types(ev2).includes("stand")); assert.equal(st.col.standWhy, "morale"); assert.ok(S.routed(st)); assert.equal(st.phase, 3);
+});
+
 console.log("Lớp phủ đầm lầy, gò");
 await t("bùn: mặt đường A khô, trong bãi lau và dải bờ bắc chậm 25% (bộ) / 50% (kỵ); đỉnh gò khô; ngoài đầm khô", () => {
   assert.equal(S.mudB17(400, -75), 0); assert.equal(S.mudB17(200, 50), 0);
@@ -190,6 +199,60 @@ await t("bùn: mặt đường A khô, trong bãi lau và dải bờ bắc chậ
 await t("chữ nhạy cảm (canon B17.sensitivity): dữ liệu trận không có \"thủ cấp\", \"chém đầu\"", () => {
   const all = JSON.stringify([D.PHASES, D.KE_SACH, D.HISTORY_NOTES, D.BOSS_B17, D.OUTPOSTS, D.BEDS, D.SIDE_MISSIONS]).toLowerCase();
   for (const w of ["thủ cấp", "chém đầu"]) assert.ok(!all.includes(w), w);
+});
+
+console.log("BigUnit: tùy chọn của B17 (march, fate \"killed\", lastStand); không đặt thì như cũ");
+const THREE0 = await import("three");
+const { BigUnit } = await import("../js/battle/units.js");
+const { makeRng } = await import("../js/core/rng.js");
+const { DIFFICULTY } = await import("../js/data/tuning.js");
+function bigCtx() {
+  const hero = { x: 3, z: 0, alive: true, state: "free", st: 0, dur: 1, giap: 50, hits: [], lock: null, receiveHit(o) { this.hits.push(o); return "hit"; } };
+  const calls = [];
+  const ctx = { R: 16, rng: makeRng(3), diff: DIFFICULTY[1], hero, units: [], clock: 0, openGates: {}, world: { colliders: [], gates: {} }, scene: new THREE0.Scene(),
+    fx: { telegraph() {}, shake() {}, shockwave() {}, dust() {}, banner() {} }, audio: { play() {} }, crowd: { agents: [], hittable: () => false, damage() {}, rout() {} },
+    director: { onBossKilled: () => calls.push("killed"), onBossDefeated: () => calls.push("defeated"), onLastStand: () => calls.push("ls"), onOfficerAwake() {}, onBreak() {}, onOfficerKilled() {} } };
+  return { ctx, hero, calls };
+}
+const boss = (ctx, extra = {}) => new BigUnit(ctx, { kind: "boss", side: "dich", tier: "tuong", rigKey: "X19", name: "Toa Đô", x: 0, z: 0, awake: true, ...extra });
+const step = (ctx, u, sec) => { for (let i = 0; i < Math.round(sec * 60); i++) { ctx.clock += 1 / 60; u.update(1 / 60); } };
+await t("không đặt tùy chọn (B15, B20): tướng Nguyên về 0 Sinh lực thì rút chạy (onBossDefeated); dưới 25% không có Chí Tử Chiến", () => {
+  const { ctx, calls } = bigCtx(), u = boss(ctx);
+  assert.equal(u.fate, null); assert.equal(u.lastStand, null);
+  const c0 = u.cong; u.takeHeroHit(u.maxHp * 0.8, 0); assert.equal(u.lsOn, false); assert.equal(u.cong, c0);
+  u.takeHeroHit(u.maxHp, 0);
+  assert.equal(u.retreating, true); assert.equal(u.dead, 0); assert.deepEqual(calls, ["defeated"]);
+});
+await t("fate \"killed\": về 0 Sinh lực thì tử trận (ngã, nằm lại, không rút, không gỡ rig), onBossKilled; không nhận đòn nữa", () => {
+  const { ctx, hero, calls } = bigCtx(), u = boss(ctx, { fate: "killed" });
+  hero.lock = u;
+  const r = u.takeHeroHit(u.maxHp * 2, 0);
+  assert.equal(r.killed, true); assert.equal(u.killed, true); assert.ok(u.dead > 0); assert.equal(u.retreating, false); assert.deepEqual(calls, ["killed"]); assert.equal(hero.lock, null);
+  step(ctx, u, 6); assert.equal(u.alive, true, "nằm lại, không gỡ sau 3,5 s như sĩ quan");
+  assert.deepEqual(u.takeHeroHit(100, 0), {});
+});
+await t("lastStand (Chí Tử Chiến): dưới 25% bật một lần (Công × 1,3, onLastStand); cứ 8 s bổ đất sóng chấn r 6 m, không đỡ được, rồi về đánh thường", () => {
+  const { ctx, hero, calls } = bigCtx(), u = boss(ctx, { fate: "killed", lastStand: D.LAST_STAND });
+  const c0 = u.cong;
+  u.takeHeroHit(u.maxHp * 0.5, 0); assert.equal(u.lsOn, false);
+  u.takeHeroHit(u.maxHp * 0.3, 0); assert.equal(u.lsOn, true); assert.ok(near(u.cong, c0 * 1.3, 1e-6)); assert.deepEqual(calls, ["ls"]);
+  u.takeHeroHit(1, 0); assert.deepEqual(calls, ["ls"], "chỉ một lần");
+  let slamAt = null;
+  for (let i = 0; i < 60 * 10 && slamAt == null; i++) { ctx.clock += 1 / 60; u.update(1 / 60); if (u.slam) slamAt = i / 60; }
+  assert.ok(slamAt != null && slamAt >= D.LAST_STAND.first - 0.05 && slamAt <= D.LAST_STAND.first + 4, "cú bổ đầu sau first giây (đồng hồ đứng khi đang vung đòn thường, lùi né): " + slamAt);
+  hero.hits.length = 0; step(ctx, u, D.LAST_STAND.tele + 0.4);
+  const hit = hero.hits.find((h) => h.unblockable);
+  assert.ok(hit && hit.knockdown && hit.dmg > 0, JSON.stringify(hero.hits.map((h) => h.unblockable)));
+  step(ctx, u, 0.6); assert.equal(u.slam, null); assert.notEqual(u.state, "ult");
+});
+await t("march: đi theo điểm của mình trong cánh, không ra đòn dù tướng đứng sát, vẫn nhận đòn; bỏ march thì đánh lại", () => {
+  const { ctx, hero } = bigCtx(), u = boss(ctx);
+  u.march = { x: 20, z: 0, v: 1.8 };
+  step(ctx, u, 3);
+  assert.ok(u.x > 3, "đi về phía điểm: " + u.x); assert.equal(hero.hits.length, 0); assert.notEqual(u.state, "atk");
+  const hp = u.hp; u.takeHeroHit(500, 0); assert.ok(u.hp < hp, "vẫn nhận đòn");
+  u.march = null; hero.x = u.x + 2; hero.z = u.z;
+  step(ctx, u, 6); assert.ok(hero.hits.length > 0, "đánh lại khi bỏ march");
 });
 
 console.log("World B17 thật (Node): lớp phủ bật khi dựng, gỡ khi dispose");

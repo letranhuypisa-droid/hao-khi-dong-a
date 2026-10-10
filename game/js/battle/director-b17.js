@@ -17,8 +17,8 @@ import { BannerQueue } from "./banner-queue.js";
 import { flagTexture } from "./models.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
 import { HAO_KHI, TIERS, MODES, HERO } from "../data/tuning.js";
-import { createB17, tickB17, sideB17, snapshotB17, restoreB17, along, routeS, columnHead, columnSpeed, secLeft, bedOf, BED_S, finish as simFinish } from "../sim/b17.js";
-import { HUNG_DAO, ROUTE, MOUTH, COLUMN, OUTPOSTS, BEDS, AMBUSH, PHASES, KE_SACH, KS_ORDER, REINF, PAR_B17, BOSS_B17, REMNANTS, inRect } from "../data/battle-b17.js";
+import { createB17, tickB17, sideB17, snapshotB17, restoreB17, along, routeS, columnHead, columnSpeed, secLeft, bedOf, routed, BED_S, finish as simFinish } from "../sim/b17.js";
+import { HUNG_DAO, ROUTE, MOUTH, COLUMN, LAST_STAND, OUTPOSTS, BEDS, AMBUSH, PHASES, KE_SACH, KS_ORDER, REINF, PAR_B17, BOSS_B17, REMNANTS, inRect } from "../data/battle-b17.js";
 
 const COL = { ta: 0x9b2d20, dich: 0x2c3e55, gold: 0xf1d98a, ring: 0xffffff };
 const RING_ITEMS = [
@@ -98,8 +98,8 @@ export class DirectorB17 {
     for (let i = 0; i < n; i++) { const a = rng.range(0, Math.PI * 2), d = rng.range(1, r); out.push(this.spawnEnemy(c.x + Math.cos(a) * d, c.z + Math.sin(a) * d, { anchor: { x: c.x, z: c.z, r: r + pad }, elite })); }
     return out;
   }
-  spawnOfficer(tier, x, z, { awake = false, aggro = 22, name = null, kind = "officer", rigKey } = {}) {
-    const u = new BigUnit(this.ctx, { kind, side: "dich", tier, name: name || `${TIERS[tier].name} Nguyên`, x, z, awake, aggro, ...(rigKey ? { rigKey } : {}) });
+  spawnOfficer(tier, x, z, { awake = false, aggro = 22, name = null, kind = "officer", rigKey, extra = null } = {}) {
+    const u = new BigUnit(this.ctx, { kind, side: "dich", tier, name: name || `${TIERS[tier].name} Nguyên`, x, z, awake, aggro, ...(rigKey ? { rigKey } : {}), ...extra });
     u.home = { x, z }; u.retreatTo = { x: MOUTH.x, z: MOUTH.z };
     this.ctx.units.push(u);
     return u;
@@ -165,18 +165,24 @@ export class DirectorB17 {
   }
   spawnColumn() {
     const st = this.st, C = st.col, head = columnHead(st), at = C.stood && st.arena ? st.arena : head;
-    const u = this.spawnOfficer("tuong", at.x, at.z, { kind: "boss", rigKey: BOSS_B17.rigKey, name: BOSS_B17.name, aggro: BOSS_B17.aggro });
+    const u = this.spawnOfficer("tuong", at.x, at.z, { kind: "boss", rigKey: BOSS_B17.rigKey, name: BOSS_B17.name, aggro: BOSS_B17.aggro, extra: { fate: "killed", lastStand: LAST_STAND } });
     u.yaw = head.yaw; u.defeatMeans = null;
     this.boss = u; this.bossMet = true;
     this.officers = [];
     for (let k = 0; k < COLUMN.officers; k++) { const q = this.officerPoint(k); this.officers.push(this.spawnOfficer("doitruong", q.x, q.z, { aggro: 16, name: "Đội trưởng hộ tống" })); }
-    const n = C.stood && C.standWhy === "broken" ? Math.ceil(COLUMN.escorts * (1 - AMBUSH.scatter)) : COLUMN.escorts;
+    const n = C.stood && routed(st) ? Math.ceil(COLUMN.escorts * (1 - AMBUSH.scatter)) : COLUMN.escorts;
     this.escorts = [];
     for (let k = 0; k < n; k++) {
       const q = this.slotPoint(k);
       this.escorts.push(this.ref(this.spawnEnemy(q.x, q.z, { role: "squad", unit: "KHIEN_NG", kit: ESCORT_KITS[k % ESCORT_KITS.length], elite: 0.12 }), { k }));
     }
+    this.weakenEscorts();
     this.stepColumn();
+  }
+  // Quân Viễn Chinh: Sĩ Khí cánh dưới weakBelow thì lính hộ tống Công × weakMult (mỗi người một lần)
+  weakenEscorts() {
+    if (this.st.col.morale >= COLUMN.weakBelow) return;
+    for (const r of this.escorts) if (this.live(r) && !r.weak) { r.weak = true; r.a.cong *= COLUMN.weakMult; }
   }
   // ô của lính hộ tống thứ k: theo lộ trình khi cánh đi; quanh gò khi đã đứng lại
   slotPoint(k) {
@@ -466,7 +472,7 @@ export class DirectorB17 {
       return null;                                                            // goalText: % đường, số đồn
     }
     if (st.phase === 2) return "Đánh Toa Đô xuống nửa Sinh lực để chặn cánh";
-    if (st.phase === 3) return st.col.standWhy === "broken" ? "Đội hình Nguyên vỡ — hạ Toa Đô trên gò" : "Toa Đô cố thủ trên gò — hạ ông";
+    if (st.phase === 3) return this.boss?.lsOn ? "Chí Tử Chiến: tránh vòng đỏ, hạ Toa Đô" : routed(st) ? "Đội hình Nguyên vỡ — hạ Toa Đô trên gò" : "Toa Đô cố thủ trên gò — hạ ông";
     if (st.phase === 4) return `Dẹp tàn quân · còn ${Math.max(0, Math.ceil(REMNANTS.sec - st.phaseT))} s`;
     return null;
   }
@@ -525,12 +531,16 @@ export class DirectorB17 {
         if (e.ok) {
           this.hk(K.hk, "Kế Sách " + K.name); this.banner(`KẾ SÁCH · ${K.name.toUpperCase()}`, "#ffd27a", 1.8); ctx.audio.play("horn"); ctx.audio.play("drums3");
           this.say("Phục binh đánh úp: đội hình Nguyên vỡ, một nửa lính hộ tống tán loạn!", 5, "good");
-          this.scatterEscorts();
+          this.scatterEscorts(); this.weakenEscorts();
         } else this.say(`Kế Sách ${K.name}: không thành — ${KS_WHY[e.why] || "lỡ thời cơ"}. Phục binh vẫn xông ra đánh.`, 5, "bad");
         this.setWingOrder("xungtran", true);
       } else if (e.type === "stand") {
-        this.banner(e.why === "broken" ? "ĐỘI HÌNH NGUYÊN VỠ" : "TOA ĐÔ ĐỨNG LẠI", "#ff8a6a", 1.6);
+        this.banner(e.why === "half" ? "TOA ĐÔ ĐỨNG LẠI" : "ĐỘI HÌNH NGUYÊN VỠ", "#ff8a6a", 1.6);
         if (e.why === "half") this.say("Toa Đô núng thế, thôi đẩy cánh: ông lên gò gần nhất cố thủ.", 5, "good");
+        if (e.why === "morale") { this.say("Quân Viễn Chinh kiệt sức, Sĩ Khí cạn: đội hình Nguyên vỡ, Toa Đô lên gò cố thủ.", 5, "good"); this.scatterEscorts(); }
+      } else if (e.type === "moraleDrop") {
+        if (e.morale > 0) this.say(`Quân Viễn Chinh mỏi mệt: Sĩ Khí cánh Toa Đô còn ${e.morale}.`, 3.5, "good");
+        this.weakenEscorts();
       } else if (e.type === "win") this.win(e.why);
       else if (e.type === "lose") this.lose(e.why, true);
     }
@@ -561,18 +571,22 @@ export class DirectorB17 {
     ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
   }
   onOfficerAwake(u) { if (u === this.boss && !this.bossRoared) { this.bossRoared = true; this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.4); this.ctx.audio.play("horn"); } }
-  // Toa Đô về 0 Sinh lực: tử trận (canon "bị giết"). Bản thử A1 dùng nhánh ngã của sĩ quan (BigUnit.dead: khuỵu, gục, rồi gỡ) thay cho rút chạy;
-  // clip death, camera lùi xa là đợt A2. Không máu me, không thủ cấp (canon B17.sensitivity).
-  onBossDefeated(u) {
-    if (u !== this.boss) return;
-    u.retreating = false; u.dead = 0.001; u.march = null;
-    if (this.hero.lock === u) this.hero.lock = null;
+  // Toa Đô về 0 Sinh lực: tử trận (canon "bị giết"; BigUnit fate "killed" — ngã theo clip death, nằm lại). Camera lùi xa, chậm hình (ctx.cinematic),
+  // băng chữ. Không máu me, không thủ cấp (canon B17.sensitivity).
+  onBossKilled(u) {
+    if (u !== this.boss || this.bossDown) return;
     this.bossDown = true; this.ko++;
-    this.bq.clear(); this.ctx.fx.banner("TOA ĐÔ TỬ TRẬN", "#f1d98a", 2.4); this.ctx.audio.play("drums3");
+    this.bq.clear(); this.ctx.cinematic?.("TOA ĐÔ TỬ TRẬN", u, true); this.ctx.audio.play("drums3");
     this.ctx.crowd.rout(u.x, u.z, 24);
     this.hk(15, "hạ Toa Đô");
   }
+  onBossDefeated(u) { if (u === this.boss) { u.retreating = false; u.dead = 0.001; u.killed = true; u.march = null; this.onBossKilled(u); } }   // dự phòng: BigUnit không có fate
   onCaptured(u) { this.onBossDefeated(u); }
+  onLastStand(u) {
+    if (u !== this.boss) return;
+    this.banner("CHÍ TỬ CHIẾN", "#ff5a3a", 1.6); this.ctx.audio.play("horn", u.x, u.z);
+    this.say("Toa Đô liều chết: Công +30%, cứ 8 giây bổ đại phủ xuống đất — tránh khỏi vòng đỏ, không đỡ được!", 6, "bad");
+  }
   onCounterBoss() { if (this.counterBoss < HAO_KHI.src.counterBossMax) { this.counterBoss++; this.hk(HAO_KHI.src.counterBoss, "phản đòn Toa Đô"); } }
   onBreak(u) { this.ctx.fx.banner("VỠ THẾ · ĐÒN MẠNH ĐỂ RA ĐÒN QUYẾT", "#ffd27a", 1.2); this.ctx.audio.play("parry", u.x, u.z); }
   onHeroHit() {}

@@ -107,7 +107,7 @@ function drawTop({ c, X, Z, t, sx }, ctx) {
 // bảng dưới bản đồ to: cánh Toa Đô, phục binh, tiếp viện
 function frontsHTML(ctx) {
   const d = ctx.director, st = d.st, C = st.col, B = bedOf(st.bed);
-  const halt = C.stood ? (C.standWhy === "broken" ? "đội hình vỡ, cố thủ trên gò" : "đứng lại cố thủ trên gò") : C.halt === "engage" ? "dừng giao chiến" : C.halt === "outpost" ? "bị đồn ta chặn" : st.phase === 0 ? "chờ lệnh" : "đang đi";
+  const halt = C.stood ? (C.standWhy === "half" ? "đứng lại cố thủ trên gò" : "đội hình vỡ, cố thủ trên gò") : C.halt === "engage" ? "dừng giao chiến" : C.halt === "outpost" ? "bị đồn ta chặn" : st.phase === 0 ? "chờ lệnh" : "đang đi";
   const rows = [`<div class="front here"><b>Cánh Toa Đô</b><span class="vs">${Math.round(C.s / C.len * 100)}% đường ra biển · ${halt} · tốc ×${C.mult.toFixed(2).replace(".", ",")} · Sĩ Khí ${C.morale}</span></div>`,
     `<div class="front"><b>Phục binh</b><span class="ta">${d.wingsUp()}</span><span class="vs">${B ? B.name : "chưa đặt"} · ${d.wingsHold() ? "Giữ vững" : d.wingOrder === "giucho" ? "chưa vào chỗ" : "đã xuất"}</span></div>`,
     `<div class="front reinf">Gọi tiếp viện: ${d.reinf.charges} lượt${d.reinf.cd > 0 ? ` · hồi ${Math.ceil(d.reinf.cd)}s` : ""}</div>`];

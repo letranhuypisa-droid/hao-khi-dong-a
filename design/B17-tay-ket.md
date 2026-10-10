@@ -2,9 +2,19 @@
 
 Chương thứ tư theo thứ tự Quyển VI (VI·6, ngay sau Chương Dương). Canon: `design/canon.json` → `battles` B17, `heroes` H30 và H40, `enemies` X19 và X20.
 
-Trạng thái: **đợt A1 (greybox) đã dựng** trên nhánh `claude/happy-lichterman-f0e557` (2026-10-10, chưa gộp vào `main`); A2–A6 và mạch B chưa làm.
+Trạng thái: **đợt A1 (greybox) và phần boss của A2 đã dựng** trên nhánh `claude/happy-lichterman-f0e557` (2026-10-10, chưa gộp vào `main`); phần còn lại của A2, A3–A6 và mạch B chưa làm.
 
 ## Đã làm
+
+### Đợt A2, phần boss (2026-10-10, cùng nhánh)
+
+- **`BigUnit`** (`units.js`, tùy chọn; không đặt thì như cũ, có test trong `b17-sim.test.mjs`):
+  - `fate: "killed"`: về 0 Sinh lực thì tử trận. Ngã theo clip `death` đúng nhịp, nằm lại tới hết trận, không rút chạy. Gọi `director.onBossKilled`.
+  - `lastStand`: Chí Tử Chiến dưới 25% Sinh lực. Công +30%; cứ 8 s một đòn bổ đất, sóng chấn r 6 m, báo trước 1 s, không đỡ được. Dùng trạng thái `"ult"` với `this.slam`, nên bot né như Tuyệt Kỹ của Toa Đô B15.
+- **Toa Đô B17** đặt cả hai. Lúc tử trận: `ctx.cinematic` (camera lùi, chậm hình), băng chữ "Toa Đô tử trận"; không máu, không thủ cấp.
+- **Quân Viễn Chinh** (`sim/b17.js`): từ P2, cứ 180 s Sĩ Khí cánh −10. Dưới 40 thì lính hộ tống Công −15%. Về 0 thì đội hình vỡ như phục kích.
+- **Kiểm chứng**: test xanh. Bot B17 seed 1001 thắng 298 s, Chí Tử Chiến bật ở 282 s (bot hạ Toa Đô trước cú bổ đầu; cú bổ kiểm trong khung trình duyệt và test Node). Vết B15 trùng mã băm; bot B16 528 s; bot B20 thắng 168 s.
+- **Chưa làm của A2**: Phá Trận Thủy Bộ (thuyền đổ bộ), Ô Mã Nhi và bến tàn quân (2 nhiệm vụ phụ còn lại), sứ giả (Kế Sách Nhỏ, bãi thứ hai), vua Nhân Tông AI với điều kiện thua, Yết Kiêu.
 
 ### Đợt A1: bản thử greybox (2026-10-10)
 
@@ -24,7 +34,7 @@ Trạng thái: **đợt A1 (greybox) đã dựng** trên nhánh `claude/happy-li
 - **Lối chơi**: xem dòng "B17 Tây Kết" của `game/README.md`.
 - **Khác kế hoạch**:
   - Tốc cánh 1,8 m/s chứ không phải 1,1. Lần đo bot đầu: hạ đủ 3 đồn lúc ~100 s thì cánh chỉ còn 0,56 m/s, tới bãi tây ở phút 7, bot đứng chờ ~5 phút.
-  - Toa Đô "tử trận" mượn nhánh ngã của sĩ quan (`BigUnit.dead`), chưa có `fate: "killed"`, clip `death`, camera lùi.
+  - Toa Đô "tử trận" lúc đầu mượn nhánh ngã của sĩ quan (`BigUnit.dead`); phần boss của A2 (trên) thay bằng `fate: "killed"`.
   - Chỉ có Kế Sách Lớn; nhiệm vụ phụ chỉ có "Phục kích thành công" (2 nhiệm vụ phụ còn lại cần Ô Mã Nhi và thuyền, đợt A2).
   - Ghi chú "ai giết Toa Đô" mang nhãn Chính sử: nó nói về điều sử ghi, không phải chuyện game đặt ra.
 - **Kiểm chứng**:

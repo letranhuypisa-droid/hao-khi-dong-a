@@ -22,7 +22,13 @@ export const MOUTH = { x: 578, z: -156, r: 7 };                      // mốc c�
 // engageR m quanh ông): cánh dừng, ông đánh — tối đa engageMax giây cộng dồn, rồi engageCd giây cánh đẩy tiếp dù đang bị đánh (người chơi không giam
 // cánh mãi được). floorPct: Sinh lực Toa Đô không xuống dưới mức này khi cánh còn đi; chạm mức đó thì ông "đứng lại" (cánh thôi đi, sang P4).
 // standSeek: đứng lại thì lên gò gần nhất trong bấy nhiêu mét (không có thì giữ chỗ). escorts: lính hộ tống đi theo cánh; officers: 2 Đội trưởng.
-export const COLUMN = { speed: 1.8, slowPer: 0.8, engageR: 12, engageMax: 20, engageCd: 30, floorPct: 50, standSeek: 90, standLeash: 16, escorts: 24, officers: 2, morale: 100 };
+// Quân Viễn Chinh (canon X19, đợt A2): từ P2, cứ moraleEvery giây cánh Sĩ Khí −moraleDrop; dưới weakBelow thì lính hộ tống Công × weakMult; về 0 thì
+// đội hình vỡ như khi phục kích thành công (Toa Đô đứng lại).
+export const COLUMN = { speed: 1.8, slowPer: 0.8, engageR: 12, engageMax: 20, engageCd: 30, floorPct: 50, standSeek: 90, standLeash: 16, escorts: 24, officers: 2, morale: 100,
+  moraleEvery: 180, moraleDrop: 10, weakBelow: 40, weakMult: 0.85 };
+// Toa Đô (canon X19, đợt A2): tử trận (BigUnit fate "killed": ngã, nằm lại, không rút) và Chí Tử Chiến dưới 25% Sinh lực — Công +30%, cứ 8 s một đòn
+// bổ đất sóng chấn r 6 m, báo trước 1 s, không đỡ được (BigUnit lastStand). mv: hệ số đòn (Tuyệt Kỹ tướng Nguyên là 8). first: giây tới cú bổ đầu.
+export const LAST_STAND = { below: 0.25, atk: 0.3, every: 8, r: 6, mv: 4, tele: 1, first: 2 };
 
 // Ba đồn dọc đường (đồn A1, doanh trại A2 có tường của B15; đồn 3 là vòng ở cổng A3). Chiếm: đứng trong vòng r capSec giây không có địch. Hạ trước khi
 // cánh tới thì đồn chặn cánh block.sec giây ở cách tâm đồn stop m (ngoài cổng tây). hk: Hào Khí khi chiếm.
