@@ -11,9 +11,12 @@
 // đồ rơi dày hơn ở bãi giằng co và trước cổng (addLaneProps). Đạo cụ ngẫu nhiên cũ tránh lũy, hào, hố.
 //
 // Mô hình môi trường nướng (glb.js envPart, màu phẳng gộp vào cùng lưới tĩnh / InstancedMesh) thay khối code khi đã nạp: bến gỗ, thuyền
-// mui, thúng câu, xe lương, hòm, thùng, khung lều cháy, bếp lửa, cọc buộc ngựa, cây đa, cau, cự mã nguyên, cờ đuôi ngựa; thuyền mui và cây
-// đa đặt riêng nên dùng envLOD (gần / xa). Đường code và đường mẫu rút rng y hệt nhau (vị trí mọi thứ khác không đổi), vật va chạm không đổi.
-// Võ trường (addArenaScenery, world.js ARENA_ENV): khán đài (envLOD, gần có texture), đài chỉ huy, bia rơm.
+// mui, thúng câu, lưới phơi, xe lương, hòm, thùng, khung lều cháy, bếp lửa, cọc buộc ngựa, cây đa, cau, đá tảng; trên hai làn: cọc lũy Nguyên
+// (khúc nguyên, cọc mép chỗ vỡ vẫn code), cọc tre ụ đất, sọt đất, chông hố chông, cự mã nguyên, cờ đuôi ngựa, xác ngựa, mũ Nguyên, nón tre, ống
+// tên, bó rơm; thuyền mui và cây đa đặt riêng nên dùng envLOD (gần / xa). Đường code và đường mẫu rút rng y hệt nhau (vị trí mọi thứ khác không
+// đổi), vật va chạm không đổi. Kè ván mái lũy giữ code (mái lồi, tấm phẳng ENV_ke_van chìm nửa trên), rào ruộng giữ code (gãy, xiêu từng cột).
+// Đồ thêm không có bản code (VILLAGE_PROPS, WORLD_PROPS): miếu, chòi, chuối, rào tre, đồ dân bỏ lại ở làng, cây gạo, ngựa, cọc trói — chưa nạp thì bỏ.
+// Võ trường (addArenaScenery, world.js ARENA_ENV): khán đài (envLOD, gần có texture), đài chỉ huy, bia rơm, vạc lửa.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -22,7 +25,32 @@ import { laneFeaturesOn, featureNear, TERRAIN_FEATURES } from "./ground.js";
 import { MAP, FRONTS, VILLAGE, KE_SACH } from "../data/battle-b15.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
 import { makeRng } from "../core/rng.js";
-import { envPart, envLOD, model } from "./glb.js";
+import { envPart, envLOD, envBounds, model } from "./glb.js";
+
+// Đồ thêm từ mẫu nướng, không có bản code (addScenery: chưa nạp mô hình thì bỏ). Làng (toạ độ lệch từ tâm VILLAGE): miếu dưới gốc đa ngoài cổng lũy
+// tre (mặt ra lối vào), hai phiến đá ngồi dưới gốc đa, chòi tranh và bó rơm cuối làng, vườn rào tre chẻ, khóm chuối sau nhà, quang gánh, nón lá, tay
+// nải dân bỏ lại khi chạy loạn (cả dọc đường ra cổng). Toàn bộ là Hư cấu như làng. s: tỉ lệ, sy: tỉ lệ đứng thêm (nón lá mẫu cao 0,56 m → 0,25 m).
+export const VILLAGE_PROPS = [
+  { id: "ENV_mieu", dx: -19, dz: -36, ry: Math.PI / 2 },
+  { id: "ENV_da_c", dx: -9.6, dz: -38, ry: 0.4 }, { id: "ENV_da_c", dx: -2.4, dz: -38.6, ry: -0.3 },
+  { id: "ENV_choi_tranh", dx: 0, dz: 24, ry: Math.PI },
+  { id: "ENV_bo_rom", dx: 3.4, dz: 26.4, ry: 0.3 }, { id: "ENV_bo_rom", dx: -3.1, dz: 27.1, ry: 1.2 }, { id: "ENV_bo_rom", dx: -2.6, dz: 26.5, ry: 2.6 },
+  { id: "ENV_rao_tre", dx: 14, dz: 15, ry: Math.PI / 2 }, { id: "ENV_rao_tre", dx: 18, dz: 15, ry: Math.PI / 2 }, { id: "ENV_rao_tre", dx: 20, dz: 17 },
+  { id: "ENV_rao_tre", dx: 20, dz: 21 }, { id: "ENV_rao_tre", dx: 12, dz: 17 },
+  { id: "ENV_khom_chuoi", dx: -13, dz: 14, ry: 0.5 }, { id: "ENV_khom_chuoi", dx: 25, dz: 9, ry: 2.1 }, { id: "ENV_khom_chuoi", dx: -20, dz: -12, ry: 4 },
+  { id: "ENV_khom_chuoi", dx: 6.5, dz: -14.5, ry: 1.3 }, { id: "ENV_khom_chuoi", dx: -7, dz: 21, ry: 5.2, s: 0.85 },
+  { id: "PROP_quang_ganh", dx: 3, dz: -9, ry: 0.5 }, { id: "PROP_quang_ganh", dx: -5, dz: 6, ry: 2 }, { id: "PROP_quang_ganh", dx: 3, dz: -44, ry: -0.4 },
+  { id: "PROP_non_la", dx: 1.5, dz: -7.6, sy: 0.45 }, { id: "PROP_non_la", dx: -3.6, dz: 4.4, ry: 1, sy: 0.45 }, { id: "PROP_non_la", dx: 15.5, dz: 2.5, sy: 0.45 },
+  { id: "PROP_non_la", dx: 1.8, dz: -46.5, ry: 2, sy: 0.45 }, { id: "PROP_non_la", dx: -12, dz: 18.5, sy: 0.45 },
+  { id: "PROP_tay_nai", dx: -3, dz: 7.2 }, { id: "PROP_tay_nai", dx: -11, dz: -3, ry: 1 }, { id: "PROP_tay_nai", dx: -1.2, dz: -42.5, ry: 2 }, { id: "PROP_tay_nai", dx: 4.4, dz: -50 },
+];
+// Đồ thêm ngoài làng (toạ độ thế giới): cây gạo trên bờ sông bắc (mốc bến quê; Hư cấu), ngựa tướng buộc cọc trong bản doanh ta, hai cọc trói trong trại
+// Nguyên ngoài thành (Hư cấu). foot: bán kính chân cho kiểm thử đường đi (cây: gốc, tán ở trên cao). Ngựa Nguyên ở cọc buộc ngựa: addScenery.
+export const WORLD_PROPS = [
+  { id: "ENV_cay_gao", x: 66, z: -154, ry: 0.6, foot: 0.8 }, { id: "ENV_cay_gao", x: 262, z: -152, ry: 2.2, s: 0.9, foot: 0.8 },
+  { id: "ENV_coc_buoc_ngua", x: 28, z: -13.2, ry: Math.PI / 2 }, { id: "MOUNT_ngua_tuong", x: 28.3, z: -11.7, ry: -Math.PI / 2 },
+  { id: "ENV_coc_troi", x: 404, z: 28, ry: 0.3 }, { id: "ENV_coc_troi", x: 407.5, z: 30.5, ry: -0.4 },
+];
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, s = 6) => new THREE.CylinderGeometry(rt, rb, h, s);
@@ -30,6 +58,16 @@ const cone = (r, h, s = 6) => new THREE.ConeGeometry(r, h, s);
 const ico = (r, d = 0) => new THREE.IcosahedronGeometry(r, d);
 const blade = (r, h) => new THREE.ConeGeometry(r, h, 3, 1, true);      // lá cỏ, khóm lúa: nón hở đáy, 3 tam giác
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler(), _c = new THREE.Color();
+
+// Màu mẫu nướng nhân lên cho trung bình kênh ≈ k: lưới code của InstancedMesh tô trắng, sắc từng bản do instanceColor; mẫu giữ vân, rêu của nó.
+function whiten(g, k = 0.85) {
+  if (!g) return g;
+  const C = g.attributes.color.array; let m = 0;
+  for (let i = 0; i < C.length; i++) m += C[i];
+  m = m / C.length || 1;
+  for (let i = 0; i < C.length; i++) C[i] = Math.min(1, C[i] * k / m);
+  return g;
+}
 
 // Vùng đánh nhau và đường đi — cảnh lớn không được đặt vào.
 function busy(x, z, pad = 0) {
@@ -172,7 +210,9 @@ export function addScenery(scene, world, { shadows, mat }) {
   }
 
   // ---- gò đá giữa hai mặt trận ---------------------------------------------------------------------
-  const rockGeo = merge([part(new THREE.DodecahedronGeometry(1, 0), 0xffffff, { sy: 0.7 })]);
+  // mẫu ENV_da_b mức xa (60 tam giác, khối 12 mặt code 36) co về khối đơn vị như code (ngang ±1, cao −0,7…0,67), màu mẫu nâng sáng để màu từng bản
+  // (instanceColor, như khối code trắng) vẫn quyết sắc đá
+  const rockGeo = whiten(envPart("ENV_da_b", { lod: 1, s: 2 / 1.9, y: -0.7 })) || merge([part(new THREE.DodecahedronGeometry(1, 0), 0xffffff, { sy: 0.7 })]);
   const rocks = inst(rockGeo, 260, { cast: true });
   const ROCK = [0x9a9384, 0x857d6c, 0xa79f8a, 0x6f6a5e];
   for (const k of ZONES.knolls) {
@@ -236,9 +276,11 @@ export function addScenery(scene, world, { shadows, mat }) {
       scene.add(b); skiffs.push(b);
     }
   }
-  // thúng câu, lưới phơi trên bờ
+  // thúng câu, lưới phơi trên bờ (mẫu ENV_luoi_phoi: lưới 3 m trên hai cọc, dài dọc z → xoay dọc x như giàn code)
   for (const [x, z] of [[160, -158], [270, -157], [372, -159]]) {
     statics.push(envPart("ENV_thung_cau", { x, y: heightAt(x, z) - 0.05, z, rz: 0.4 }) || part(cyl(0.9, 0.6, 0.5, 8), 0x8c7a52, { x, y: heightAt(x, z) + 0.2, z, rz: 0.4 }));
+    const net = envPart("ENV_luoi_phoi", { x: x + 3.5, y: Math.min(heightAt(x + 2, z), heightAt(x + 5, z)) - 0.1, z, ry: Math.PI / 2 });
+    if (net) { statics.push(net); continue; }
     statics.push(part(box(0.08, 1.8, 0.08), PAL.go, { x: x + 2, y: heightAt(x + 2, z) + 0.9, z }), part(box(0.08, 1.8, 0.08), PAL.go, { x: x + 5, y: heightAt(x + 5, z) + 0.9, z }),
       part(box(3, 1.2, 0.03), 0x5a5540, { x: x + 3.5, y: heightAt(x + 3.5, z) + 1.1, z }));
   }
@@ -301,9 +343,11 @@ export function addScenery(scene, world, { shadows, mat }) {
       if (world.smokes) world.smokes.push({ x, z }); else world.smokes = [{ x, z }];
     }
   }
-  // cọc buộc ngựa dọc đường vào cổng (bật làn đánh: bỏ cọc rơi vào hào thành, hàng cự mã)
+  // cọc buộc ngựa dọc đường vào cổng (bật làn đánh: bỏ cọc rơi vào hào thành, hàng cự mã); hai khúc đầu mỗi bên có ngựa Nguyên buộc (đồ thêm, dưới)
+  const rails = [];
   for (const zz of [-60, 60]) for (let t = 0; t < 6; t++) {
     if (blocked(440 + t * 3, zz, 0.3) || blocked(443 + t * 3, zz, 0.3)) continue;
+    rails.push({ x: 441.5 + t * 3, z: zz });
     const env = envPart("ENV_coc_buoc_ngua", { x: 441.5 + t * 3, y: heightAt(441.5 + t * 3, zz) - 0.05, z: zz, ry: Math.PI / 2 });     // khúc 3 m, hai cọc đầu
     if (env) { statics.push(env); continue; }
     statics.push(part(box(0.14, 1.2, 0.14), PAL.go, { x: 440 + t * 3, y: heightAt(440 + t * 3, zz) + 0.6, z: zz }), part(box(3, 0.1, 0.1), PAL.go, { x: 441.5 + t * 3, y: heightAt(441.5 + t * 3, zz) + 1.05, z: zz }));
@@ -330,6 +374,23 @@ export function addScenery(scene, world, { shadows, mat }) {
     if (KE_SACH.muiTenThu.bundles.some((b) => Math.hypot(b.x - x, b.z - z) < 3)) continue;
     areca.put(x, heightAt(x, z) - 0.1, z, rng.range(0, 6.28), rng.range(0.8, 1.15));
   }
+
+  // ---- đồ thêm từ mẫu nướng (không có khối code tương ứng: chưa nạp mô hình thì bỏ, như vật đầm B17) ---------------------------
+  // Toạ độ cố định (VILLAGE_PROPS, WORLD_PROPS; không rút rng của cảnh), không va chạm, gộp vào lưới tĩnh; chân đặt ở chỗ đất thấp nhất dưới vật.
+  // world.envProps ghi từng vật đã đặt (mã, x, z, bán kính chân foot) cho tests/env.test.mjs: nằm trên đất, không đè đường làn, vòng chiếm, bó tên.
+  world.envProps = [];
+  const prop = ({ id, x, z, ry = 0, s = 1, sy = 1, foot }) => {
+    const b = envBounds(id); if (!b) return;
+    const r = Math.hypot(Math.max(-b.lo[0], b.hi[0]), Math.max(-b.lo[2], b.hi[2])) * s;
+    let y = gy(x, z); for (let k = 0; k < 8; k++) y = Math.min(y, gy(x + Math.cos(k * 0.785) * r * 0.7, z + Math.sin(k * 0.785) * r * 0.7));
+    statics.push(envPart(id, { x, y: y - 0.04, z, ry, sx: s, sy: s * sy, sz: s }));
+    world.envProps.push({ id, x, z, y: y - 0.04, r, foot: foot ?? r });
+  };
+  for (const p of VILLAGE_PROPS) prop({ ...p, x: VILLAGE.x + p.dx, z: VILLAGE.z + p.dz });
+  for (const p of WORLD_PROPS) prop(p);
+  // ngựa Nguyên buộc ở hai khúc cọc đầu mỗi bên đường vào cổng: đứng phía ngoài (xa làn), đầu quay vào cọc (mẫu đầu ở −x)
+  for (const zz of [-60, 60]) rails.filter((q) => q.z === zz).slice(0, 2).forEach((q, i) =>
+    prop({ id: "MOUNT_ngua_nguyen", x: q.x + (i ? 0.6 : -0.5), z: zz - Math.sign(zz) * 1.5, ry: Math.sign(zz) * Math.PI / 2 + (i ? 0.12 : -0.08) }));
 
   // dấu chiến trận trên hai làn (rng riêng: tắt làn đánh thì chuỗi ngẫu nhiên của cảnh cũ không đổi)
   if (LANES) addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blocked, gy });
@@ -428,11 +489,13 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   // khiên nhật son quân Trần (như SHIELD.nhat trong soldiers.js): mặt hướng +z, mép dưới ở gốc
   const nhat = merge([part(box(0.5, 0.74, 0.05), PAL.sonDam, { y: 0.37 }), part(box(0.54, 0.06, 0.07), PAL.then, { y: 0.03 }),
     part(box(0.54, 0.06, 0.07), PAL.then, { y: 0.71 }), part(ico(0.1, 0), PAL.vang, { y: 0.37, z: 0.05 })]);
-  // mũ Nguyên (chóp sắt xám, vành lông, khăn chàm che gáy) và nón tre quân Trần; vành ở gốc
-  const helmNg = merge([part(cone(0.17, 0.32, 7), PAL.xam, { y: 0.23 }), part(cyl(0.2, 0.21, 0.07, 8), PAL.long, { y: 0.035 }), part(box(0.3, 0.2, 0.05), PAL.cham, { y: -0.02, z: -0.17, rx: -0.4 })]);
-  const helmDv = merge([part(cone(0.32, 0.15, 8), PAL.vai, { y: 0.075 }), part(cyl(0.1, 0.12, 0.05, 6), PAL.then, { y: 0.03 })]);
-  // sọt đất: sọt tre đan, đai sẫm, miệng đầy đất
-  const basket = merge([part(cyl(0.3, 0.2, 0.42, 8), 0xab9661, { y: 0.21 }), part(cyl(0.31, 0.31, 0.04, 8), WICKER_D, { y: 0.41 }),   // sọt tre loe miệng, nẹp vành
+  // mũ Nguyên (chóp sắt xám, vành lông, khăn chàm che gáy) và nón tre quân Trần; vành ở gốc. Mẫu: ENV_mu_nguyen_roi (mũ đứng, vành ở gốc như code),
+  // ENV_non_tre_roi (nón đã nằm nghiêng sẵn — không lật thêm)
+  const helmNg = envPart("ENV_mu_nguyen_roi") || merge([part(cone(0.17, 0.32, 7), PAL.xam, { y: 0.23 }), part(cyl(0.2, 0.21, 0.07, 8), PAL.long, { y: 0.035 }), part(box(0.3, 0.2, 0.05), PAL.cham, { y: -0.02, z: -0.17, rx: -0.4 })]);
+  const hatEnv = envPart("ENV_non_tre_roi");
+  const helmDv = hatEnv || merge([part(cone(0.32, 0.15, 8), PAL.vai, { y: 0.075 }), part(cyl(0.1, 0.12, 0.05, 6), PAL.then, { y: 0.03 })]);
+  // sọt đất: sọt tre đan, đai sẫm, miệng đầy đất (mẫu ENV_so_dat: Ø 0,6 m, cao 0,48, đáy ở gốc như code)
+  const basket = envPart("ENV_so_dat") || merge([part(cyl(0.3, 0.2, 0.42, 8), 0xab9661, { y: 0.21 }), part(cyl(0.31, 0.31, 0.04, 8), WICKER_D, { y: 0.41 }),   // sọt tre loe miệng, nẹp vành
     part(cyl(0.255, 0.24, 0.05, 8), WICKER_D, { y: 0.13 }), part(ico(0.27, 0), 0x5e4b35, { y: 0.43, sy: 0.42 })]);                    // đai đáy, đất vun trên miệng
   // khóm lau sậy quanh hố ngập
   const reeds = merge([0, 1, 2, 3, 4].map((k) => part(blade(0.05, 1.2 + (k % 3) * 0.22), k % 2 ? 0x8f8a4a : 0x76843e,
@@ -445,7 +508,8 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
     bar(p, PAL.trung, -0.6, 0.03, -0.07, 0.6, 0.03, -0.07, 0.012, 0.012);
     return merge(p);
   })();
-  const quiver = (() => {
+  // ống tên: mẫu PROP_ong_ten (dựng đứng, miệng trên) đặt nằm, miệng về +x như code
+  const quiver = envPart("PROP_ong_ten", { rz: -Math.PI / 2, y: 0.1 }) || (() => {
     const p = [part(cyl(0.075, 0.065, 0.55, 6), PAL.nau, { y: 0.075, rz: -Math.PI / 2 }), part(cyl(0.082, 0.082, 0.06, 6), PAL.trung, { x: 0.25, y: 0.075, rz: -Math.PI / 2 })];
     for (let k = 0; k < 4; k++) {
       const a = k * 1.6, cy = Math.sin(a), cz = Math.cos(a);
@@ -458,7 +522,8 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   const torn = merge([part(flagShape([[0, 0], [0.72, 0], [0.72, -0.5], [0.6, -0.66], [0.68, -0.88], [0.47, -0.78], [0.4, -1.02], [0.26, -0.86], [0.12, -1.1], [0, -0.98]]), CHAM, { z: -0.0125 }),
     part(box(0.76, 0.08, 0.04), PAL.thep, { x: 0.36, y: -0.04 }), part(box(0.05, 0.9, 0.04), PAL.thep, { x: 0.025, y: -0.5 })]);
   const pennant = merge([part(flagShape([[0, 0], [1.0, -0.16], [0.7, -0.27], [1.0, -0.4], [0, -0.52]]), PAL.son, { z: -0.0125 }), part(box(0.05, 0.54, 0.04), PAL.vang, { x: 0.025, y: -0.26 })]);
-  const bale = merge([part(cyl(0.32, 0.32, 0.8, 7), 0xc2a560, { y: 0.3, rz: Math.PI / 2, sx: 0.95 }), part(cyl(0.33, 0.33, 0.05, 7), ROPE, { x: -0.2, y: 0.3, rz: Math.PI / 2 }), part(cyl(0.33, 0.33, 0.05, 7), ROPE, { x: 0.2, y: 0.3, rz: Math.PI / 2 })]);
+  // bó rơm nằm dọc x (mẫu ENV_bo_rom cùng chiều, đáy ở gốc)
+  const bale = envPart("ENV_bo_rom") || merge([part(cyl(0.32, 0.32, 0.8, 7), 0xc2a560, { y: 0.3, rz: Math.PI / 2, sx: 0.95 }), part(cyl(0.33, 0.33, 0.05, 7), ROPE, { x: -0.2, y: 0.3, rz: Math.PI / 2 }), part(cyl(0.33, 0.33, 0.05, 7), ROPE, { x: 0.2, y: 0.3, rz: Math.PI / 2 })]);
   const disk = new THREE.CircleGeometry(0.72, 7).rotateX(-Math.PI / 2);
 
   // Xác ngựa nằm nghiêng (không máu me): thân trống, cổ và đầu sát đất ngoẹo về phía lưng, bốn chân duỗi cứng.
@@ -516,6 +581,11 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   // ngựa; tên cắm mái trước. Chỗ vỡ: gốc cọc gãy hai mép, cọc đổ ngổn ngang, ván kè bong dưới chân, đất lở.
   const LEAN = 0.37;
   function rampart({ f, ux, uz, wx, wz, P, gd }) {
+    // khúc ~3 m bám đỉnh lũy, xa chỗ vỡ (≥ 2,4 m): hai nẹp ngang buộc hàng cọc; có mẫu ENV_coc_luy_nguyen (khúc 3 m: hàng cọc nhọn, hai nẹp) thì mẫu
+    // thay cả cọc lẫn nẹp trong khúc — cọc mép chỗ vỡ, cọc gãy vẫn bằng code, vòng cọc vẫn rút rng như cũ
+    const runs = [], luy = !!model("env/ENV_coc_luy_nguyen");
+    for (let s = 0.4; s < f.len - 0.5; s += 3) { const e = Math.min(s + 3, f.len - 0.4); if (gd(s) >= 2.4 && gd(e) >= 2.4 && gd((s + e) / 2) >= 2.4) runs.push([s, e]); }
+    const inRun = (s) => luy && runs.some(([a, b]) => s >= a && s <= b);
     let k = 0;
     for (let s = 0.35; s < f.len - 0.3; s += 0.4 + rng.range(-0.05, 0.07), k++) {
       const g = gd(s); if (g < 0) continue;
@@ -526,11 +596,15 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
       const j = edge ? rng.range(-0.35, 0.35) : rng.range(-0.1, 0.1);
       const tx = x + (wx * Math.sin(th) + ux * j) * len, ty = y + Math.cos(th) * len, tz = z + (wz * Math.sin(th) + uz * j) * len;
       if (len < 1.5) { rod(big, rng.pick(WOOD), x, y, z, tx, ty, tz, 0.075, { sides: 5, cap: true }); splinter(big, tx, ty, tz); }
-      else rod(big, rng.pick(WOOD), x, y, z, tx, ty, tz, 0.075, { sides: 5, tip: 0.38, tipCol: FRESH });
+      else { const col = rng.pick(WOOD); if (!inRun(s)) rod(big, col, x, y, z, tx, ty, tz, 0.075, { sides: 5, tip: 0.38, tipCol: FRESH }); }
     }
-    // hai nẹp ngang buộc hàng cọc, từng khúc ~3 m bám đỉnh lũy; bỏ gần chỗ vỡ
-    for (let s = 0.4; s < f.len - 0.5; s += 3) {
-      const e = Math.min(s + 3, f.len - 0.4); if (gd(s) < 2.4 || gd(e) < 2.4 || gd((s + e) / 2) < 2.4) continue;
+    for (const [s, e] of runs) {
+      if (luy) {
+        // mẫu dài dọc z, cọc ngả nhẹ về −x mẫu: −x mẫu quay về tây (w), nghiêng thêm 0,23 rad cho đủ độ ngả LEAN của cọc code; cao ×1,35 (mẫu 1,44 m)
+        const [cx, cz] = P((s + e) / 2, -0.25);
+        big.push(envPart("ENV_coc_luy_nguyen", { x: cx, y: gy(cx, cz) - 0.3, z: cz, ry: Math.atan2(wz, -wx), rz: LEAN - 0.14, sy: 1.35, sz: (e - s) / 2.98 }));
+        continue;
+      }
       const [bx0, bz0] = P(s, -0.25), [bx1, bz1] = P(e, -0.25), y0 = gy(bx0, bz0) - 0.3, y1 = gy(bx1, bz1) - 0.3;
       for (const l of [0.75, 1.45]) {
         const off = -0.25 + l * Math.sin(LEAN), [x0, z0] = P(s, off), [x1, z1] = P(e, off);
@@ -618,10 +692,21 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   // Ụ đất quân ta: cọc tre vót chĩa về phía Nguyên (đông), sọt đất trên đỉnh (vài sọt chồng, vài sọt đổ), khiên
   // nhật dựng tựa sườn sau (phía tây, mặt son hướng về quân ta), cờ đuôi nheo son
   function earthwork({ f, ux, uz, wx, wz, P }, flag) {
+    const tre = !!model("env/ENV_coc_tre_tran");
     for (let s = 0.4; s < f.len - 0.3; s += 0.5 + rng.range(-0.05, 0.08)) {
       if (rng.chance(0.14)) continue;
       const [x, z] = P(s, -(f.crest + 0.3)), y = gy(x, z) - 0.25, th = rng.range(0.5, 0.78), len = rng.range(1.25, 1.7), j = rng.range(-0.12, 0.12);
-      rod(big, rng.pick(BAMBOO), x, y, z, x + (-wx * Math.sin(th) + ux * j) * len, y + Math.cos(th) * len, z + (-wz * Math.sin(th) + uz * j) * len, 0.045, { sides: 5, tip: 0.3, tipCol: BAMBOO_TIP });
+      const col = rng.pick(BAMBOO);
+      if (!tre) rod(big, col, x, y, z, x + (-wx * Math.sin(th) + ux * j) * len, y + Math.cos(th) * len, z + (-wz * Math.sin(th) + uz * j) * len, 0.045, { sides: 5, tip: 0.3, tipCol: BAMBOO_TIP });
+    }
+    // mẫu ENV_coc_tre_tran (khúc 3 m dọc z mẫu, chân cọc ở +x mẫu cách tim 0,45 m, mũi chĩa −x): chia đều dọc ụ, −x mẫu quay về đông (−w); chân trên
+    // đường chân cọc code (d = −(crest + 0.3)). Vòng trên vẫn rút rng như cũ.
+    if (tre) {
+      const n = Math.max(1, Math.round((f.len - 0.7) / 3)), L = (f.len - 0.7) / n, ry = Math.atan2(-wz, wx);
+      for (let q = 0; q < n; q++) {
+        const s = 0.4 + (q + 0.5) * L, [bx, bz] = P(s, -(f.crest + 0.3)), [cx, cz] = P(s, -(f.crest + 0.3) - 0.45);
+        big.push(envPart("ENV_coc_tre_tran", { x: cx, y: gy(bx, bz) - 0.25, z: cz, ry, sz: L / 3 }));
+      }
     }
     for (let s = 0.8; s < f.len - 0.6; s += 1.2) {
       if (rng.chance(0.2)) continue;
@@ -706,11 +791,16 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   for (const p of TERRAIN_FEATURES) {
     if (p.type !== "pit") continue;
     if (p.kind === "chong") {
+      // mẫu ENV_ho_chong (cụm Ø 3,2 m = 0,66 × bán kính hố hai bên; mẫu cao 2,83 m → hạ ×0,42: chông ~1,1 m từ đáy hố) thay các cọc tre; vòng dưới
+      // vẫn rút rng như cũ
+      const chong = envPart("ENV_ho_chong", { x: p.x, y: gy(p.x, p.z) - 0.12, z: p.z, ry: p.x, sx: p.r * 1.32 / 3.17, sz: p.r * 1.32 / 3.17, sy: 0.42 });
+      if (chong) big.push(chong);
       for (let i = 0, n = Math.round(p.r * 8); i < n; i++) {
         const a = rng.range(0, 6.28), rr = Math.sqrt(rng.next()) * p.r * 0.66, x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr, y = gy(x, z) - 0.12;
         const len = rng.range(0.65, 1.05), b = rng.range(0, 6.28), th = rng.range(0, 0.22), broken = rng.chance(0.12);
         const tx = x + Math.cos(b) * Math.sin(th) * len, ty = y + Math.cos(th) * len * (broken ? 0.6 : 1), tz = z + Math.sin(b) * Math.sin(th) * len;
-        rod(big, rng.pick(BAMBOO), x, y, z, tx, ty, tz, 0.042, broken ? { sides: 4, cap: true } : { sides: 4, tip: 0.26, tipCol: BAMBOO_TIP });
+        const col = rng.pick(BAMBOO);
+        if (!chong) rod(big, col, x, y, z, tx, ty, tz, 0.042, broken ? { sides: 4, cap: true } : { sides: 4, tip: 0.26, tipCol: BAMBOO_TIP });
       }
       // tấm phên che hố bị giẫm sụt: một mép còn vắt trên miệng, mép kia chúi xuống tì lên đầu chông
       const a = rng.range(0, 6.28), ca = Math.cos(a), sa = Math.sin(a);
@@ -826,9 +916,13 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   // ---- xác ngựa (vài con yên son của quân Ta ở bãi giằng co), đồ của kỵ sĩ ngã cạnh con có rider ------------------
   const COAT = [PAL.ngua, 0x7a4a2a, 0x4a3a2e, 0x8a8274, 0x9a7a52, 0x5a4232];          // nâu, hồng, hạt dẻ sẫm, xám, vàng đất
   const NG = [[CHAM, PAL.xam], [PAL.thep, CHAM], [0x3d5a78, PAL.xam], [PAL.long, CHAM]];
+  // mẫu ENV_xac_ngua (dài 4 m kể cả đuôi; mẫu: đầu −x, lưng −z, chân +z) xoay −90°: chân về −x, lưng về +x như khối code (đoạn va chạm lệch về phía
+  // chân, đồ kỵ sĩ văng về phía lưng vẫn đúng), đầu về −z (khối code: +z; ry mỗi xác là tuỳ ý). Khối code vẫn dựng để rút rng (tên cắm sườn) như cũ.
+  const horseEnv = envPart("ENV_xac_ngua", { ry: -Math.PI / 2 });
   LANE_TERRAIN.horses.forEach((h, i) => {
     const tran = !h.rider && h.x < 275 && i % 2 === 1, [cloth, trim] = tran ? [PAL.son, PAL.vang] : NG[i % NG.length];
-    drop(big, horseGeo(COAT[i % COAT.length], cloth, trim), h.x, h.z, h.ry, { dy: -0.05 });
+    const code = horseGeo(COAT[i % COAT.length], cloth, trim);
+    drop(big, horseEnv || code, h.x, h.z, h.ry, { dy: horseEnv ? -0.02 : -0.05 });
     // va chạm: đoạn dọc thân lệch về phía chân (lx, lz: hướng −x cục bộ; fx, fz: hướng đầu)
     const fx = Math.sin(h.ry), fz = Math.cos(h.ry), lx = -Math.cos(h.ry), lz = Math.sin(h.ry);
     solid(h.x - fx * 0.55 + lx * 0.3, h.z - fz * 0.55 + lz * 0.3, h.x + fx * 0.75 + lx * 0.3, h.z + fz * 0.75 + lz * 0.3, 1.0);
@@ -890,7 +984,10 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
     each(78, (x, z) => arrows.put(x, gy(x, z) - 0.1, z, rng.range(0, 6.28), 1, 1, null, rng.range(-0.35, 0.35), rng.range(-0.35, 0.35)), 0.3, 0.6);
     each(30, (x, z) => shields.put(x, gy(x, z) + 0.04, z, rng.range(0, 6.28), rng.range(0.9, 1.1), 1, rng.pick([PAL.nau, PAL.long, PAL.cham, 0x5a4a3a]), rng.range(-0.12, 0.12), rng.range(-0.12, 0.12)));
     each(14, (x, z) => drop(small, helmNg, x, z, rng.range(0, 6.28), rng.chance(0.55) ? { rz: 1.3, dy: 0.16 } : { dy: -0.02 }));
-    each(5, (x, z) => drop(small, helmDv, x, z, rng.range(0, 6.28), rng.chance(0.5) ? { rx: Math.PI, dy: 0.16 } : { rx: 0.35, dy: 0.02 }));
+    each(5, (x, z) => {                                                               // mẫu nón đã nằm nghiêng: không lật (vẫn rút rng như cũ)
+      const ry = rng.range(0, 6.28), o = rng.chance(0.5) ? { rx: Math.PI, dy: 0.16 } : { rx: 0.35, dy: 0.02 };
+      drop(small, helmDv, x, z, ry, hatEnv ? { dy: -0.01 } : o);
+    });
     each(16, (x, z) => brokenSpear(x, z, rng.chance(0.4) ? PAL.son : PAL.long));
     each(5, (x, z) => drop(small, nhat, x, z, rng.range(0, 6.28), { rx: -Math.PI / 2, dy: 0.03 }));
     each(9, (x, z) => straw(x, z), 0.8);
@@ -1052,7 +1149,10 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
   const flameGeo = merge([part(cone(0.55, 1.5, 6), 0xe2541c, { y: 0.75 }), part(cone(0.36, 1.25, 5), 0xff9a2a, { y: 0.62, x: 0.06 }), part(cone(0.18, 0.8, 5), 0xffd76a, { y: 0.4 })]);
   for (let k = 0; k < 4; k++) for (const s of [-1, 1]) {
     const [x, z] = at(k * Math.PI / 2 + s * 0.095, R + 2.2);
-    statics.push(part(cyl(0.12, 0.2, 1.3, 6), PAL.then, { x, y: 0.95, z }), part(cyl(0.7, 0.35, 0.55, 8), 0x7a5a2a, { x, y: 1.85, z }), part(cyl(0.72, 0.72, 0.08, 8), PAL.vang, { x, y: 2.12, z }));
+    // mẫu ENV_vac_lua (cao 2,18 m, bát Ø 1,2) ×0,85: miệng bát 2,12 m như vành vạc code, lửa đặt ở 2,15 như cũ
+    const env = envPart("ENV_vac_lua", { x, y: heightAt(x, z) - 0.03, z, s: 0.85, ry: k + s });
+    if (env) statics.push(env);
+    else statics.push(part(cyl(0.12, 0.2, 1.3, 6), PAL.then, { x, y: 0.95, z }), part(cyl(0.7, 0.35, 0.55, 8), 0x7a5a2a, { x, y: 1.85, z }), part(cyl(0.72, 0.72, 0.08, 8), PAL.vang, { x, y: 2.12, z }));
     const f = new THREE.Mesh(flameGeo, flameMat);
     f.position.set(x, 2.15, z); scene.add(f); flames.push(f);
   }

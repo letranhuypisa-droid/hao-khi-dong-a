@@ -15,9 +15,11 @@
 //
 // Mô hình môi trường nướng (glb.js envPart: màu phẳng, gộp vào cùng lưới tĩnh / InstancedMesh, không thêm lượt vẽ) thay khối code khi đã
 // nạp (B20_ENV, màn tải nạp trước): tháp canh tre (mức xa 996 tam giác, có trống báo), đầu bến chữ T (cọc nối dài xuống đáy và thang nước
-// ròng vẫn bằng code), tời neo phao chặn luồng, bè cỏ, lùm cây ven sông. Giữ code (design/glb-prompts.md mục K–N: giảm về số tam giác code
-// thì hỏng dáng, hoặc mẫu không khớp): cọc Bạch Đằng và cọc gãy, phao mốc, nhịp cầu bến (cọc mẫu chỉ 1,4 m), giá chèo (chưa có mẫu), sú vẹt,
-// cột đá vôi, đá. Đường code và đường mẫu rút rng y hệt nhau, vật va chạm không đổi.
+// ròng vẫn bằng code), tời neo phao chặn luồng, bè cỏ, lùm cây ven sông, chòi tranh ở gốc bến và chân tháp, nhà bạt chỉ huy và trống đồng của bản
+// doanh, cột đá vôi và đảo đá (mức xa, nhuộm lại sắc đá vôi), hai cụm núi đá vôi xa. Giữ code (design/glb-prompts.md mục K–N: giảm về số tam giác code thì hỏng dáng,
+// hoặc mẫu không khớp): cọc Bạch Đằng và cọc gãy (900 bản: mẫu 120 / 296 tam giác, code 25), phao mốc, nhịp cầu bến (cọc mẫu chỉ 1,4 m), giá
+// chèo (chưa có mẫu), sú vẹt, rào bản doanh (≈ 36 khúc ENV_rao_coc, 17 nghìn tam giác), đá tảng. Đường code và đường mẫu rút rng y hệt nhau,
+// vật va chạm không đổi.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -27,14 +29,39 @@ import { STAKE_FIELDS, STAKE_TOP, RAFT } from "../data/river-b20.js";
 import { MAP } from "../data/battle-b20.js";
 import { box, cyl, cone, ico, blade, unit, spanM, rod, bar, placeParts, colorByY, makeInst, solidAdder, groveGeo, reedGeo, rockGeo,
   tintTrees, karstGeo, addSkyKit, flagBatch } from "./kit.js";
-import { envPart } from "./glb.js";
+import { envPart, envLOD } from "./glb.js";
 import { ENV_HULL } from "./boats.js";
 
 // Mô hình môi trường cảnh B20 (scenery-b20.js) và thuyền K1–K5 (boats.js ENV_HULL): màn tải nạp trước (main.js loadModels); tests/env.test.mjs
 // giữ danh sách khớp với các lời gọi envPart.
-export const B20_ENV = ["ENV_be_co", "ENV_cau_tau_dau", "ENV_lum_cay_ven_song", "ENV_thap_canh_tran", "ENV_toi_neo", ...Object.values(ENV_HULL).map((e) => e.id)];
+export const B20_ENV = ["ENV_be_co", "ENV_cau_tau_dau", "ENV_choi_tranh", "ENV_day_nui_xa", "ENV_lum_cay_ven_song", "ENV_nha_bat_chi_huy", "ENV_nui_da_a",
+  "ENV_nui_da_b", "ENV_nui_da_c", "ENV_thap_canh_tran", "ENV_toi_neo", "ENV_trong_dong", ...Object.values(ENV_HULL).map((e) => e.id)];
 
 const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+// Nhuộm mẫu cột đá vôi (nướng nâu ô liu) về bảng màu cột code (kit.js karstGeo: đá xám KROCK, rêu cây KGREEN): mặt xanh của mẫu, mặt ngửa ở nửa trên
+// và mặt hơi ngửa gần đỉnh thành rêu cây (mũ xanh của đá vôi Hạ Long); mặt đá về xám đá vôi, giữ vân sáng tối của mẫu (độ sáng so với trung bình mặt
+// đá), chân ướt sẫm. Màu tuyến tính (glb.js envPart). null → null.
+const LIME_ROCK = new THREE.Color(0xa7a295), LIME_MOSS = [new THREE.Color(0x4e6a34), new THREE.Color(0x5c7a3c), new THREE.Color(0x466030)];
+function limestone(g) {
+  if (!g) return g;
+  const P = g.attributes.position.array, N = g.attributes.normal.array, C = g.attributes.color.array;
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 1; i < P.length; i += 3) { lo = Math.min(lo, P[i]); hi = Math.max(hi, P[i]); }
+  const lum = (i) => 0.3 * C[i] + 0.59 * C[i + 1] + 0.11 * C[i + 2];
+  const moss = (i) => { const k = ((P[i + 1] + P[i + 4] + P[i + 7]) / 3 - lo) / (hi - lo || 1), ny = N[i + 1];
+    return (C[i + 1] > C[i] * 1.04 && C[i + 1] > C[i + 2] * 1.15) || (ny > 0.45 && k > 0.5) || (ny > 0.15 && k > 0.82); };
+  let sum = 0, n = 0;
+  for (let i = 0; i < C.length; i += 9) if (!moss(i)) { sum += lum(i); n++; }
+  const avg = sum / (n || 1) || 1;
+  for (let i = 0, f = 0; i < C.length; i += 9, f++) {
+    const k = ((P[i + 1] + P[i + 4] + P[i + 7]) / 3 - lo) / (hi - lo || 1);
+    let r, gg, b;
+    if (moss(i)) { const m = LIME_MOSS[f % 3]; r = m.r; gg = m.g; b = m.b; }
+    else { const q = Math.min(1.35, Math.max(0.55, lum(i) / avg)) * (k < 0.12 ? 0.6 : 1); r = LIME_ROCK.r * q; gg = LIME_ROCK.g * q; b = LIME_ROCK.b * q; }
+    for (let v = 0; v < 9; v += 3) { C[i + v] = r; C[i + v + 1] = gg; C[i + v + 2] = b; }
+  }
+  return g;
+}
 
 // ---- hằng số (ĐỀ XUẤT BẢN THỬ trừ chỗ ghi nguồn) --------------------------------------------------------------------
 export const SCN = {
@@ -318,7 +345,9 @@ function rackParts() {
   for (let k = 0; k < 5; k++) p.push(part(cyl(0.025, 0.025, 2.8, 4), PAL.go, { x: -0.9 + k * 0.45, y: 1.35, z: 0.25, rx: -0.18 }), part(cone(0.06, 0.28, 4), PAL.sat, { x: -0.9 + k * 0.45, y: 2.78, z: 0.5, rx: -0.18 }));
   return p;
 }
-// Chòi tranh mở bốn phía (bến, chân tháp)
+// Chòi tranh mở bốn phía (bến, chân tháp). hutGeo: mẫu ENV_choi_tranh (mái tranh hai dốc trên bốn cột, 3,3 × 4 m, nóc 3 m; nóc dọc z mẫu → xoay
+// 90° cho nóc dọc x như khối code), không có thì khối code
+const hutGeo = (s, x, y, z, ry) => envPart("ENV_choi_tranh", { x, y: y - 0.05, z, ry: ry + Math.PI / 2, s: s * 0.95 }) || placeParts(hutParts(s), x, y, z, ry);
 function hutParts(s = 1) {
   const p = [];
   for (const [dx, dz] of [[-1.5, -1.1], [1.5, -1.1], [-1.5, 1.1], [1.5, 1.1]]) p.push(part(cyl(0.09, 0.11, 2.3 * s, 5), BAMBOO_D, { x: dx * s, y: 1.15 * s, z: dz * s }));
@@ -344,7 +373,13 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   const flags = [];                                   // { x, y, z, w, h, yaw, cell } — cell 0 "陳", 1 cờ lệnh
 
   // -- cột đá vôi: ba InstancedMesh (A cột mảnh, B hai đỉnh, C đảo đá có hàm ếch)
-  const KG = { A: karstGeo({ seed: 11, h: 3.4 }), B: karstGeo({ seed: 23, h: 2.3, twin: true }), C: karstGeo({ seed: 37, h: 3.0, notch: true }) };
+  // mẫu ENV_nui_da_a / b / c mức xa (~300 tam giác; code 233 / 464 / 269) co về khối đơn vị như karstGeo (bán kính chân ~1, chân chôn tới −1,2; đảo
+  // đá C chỉ chôn −0,4 để hàm ếch gần mặt nước), nhuộm lại (limestone) cho cùng sắc đá vôi xám, rêu xanh như cột code; không có thì cột code
+  const KG = {
+    A: limestone(envPart("ENV_nui_da_a", { lod: 1, sx: 1.05 / 6.2, sz: 1.05 / 6.05, sy: 4.6 / 34, y: -1.2 })) || karstGeo({ seed: 11, h: 3.4 }),
+    B: limestone(envPart("ENV_nui_da_b", { lod: 1, sx: 1.4 / 12.65, sz: 1.2 / 11.5, sy: 3.5 / 23, y: -1.2 })) || karstGeo({ seed: 23, h: 2.3, twin: true }),
+    C: limestone(envPart("ENV_nui_da_c", { lod: 1, sx: 1.0 / 10.65, sz: 1.0 / 10.75, sy: 3.4 / 29.9, y: -0.4 })) || karstGeo({ seed: 37, h: 3.0, notch: true }),
+  };
   const KI = {};
   for (const kind of ["A", "B", "C"]) { geos.push(KG[kind]); KI[kind] = track(inst(KG[kind], LO.karst.filter((k) => k.kind === kind).length, { cast: true })); KI[kind].name = "karst-" + kind; }
   for (const k of LO.karst) {
@@ -460,7 +495,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
       for (let y = ga + 0.4; y < Y; y += 0.45) bar(statics, WOOD, a.x, y, a.z, b.x, y, b.z, 0.08, 0.08); }
     // chòi tranh, giá mái chèo, thúng, cờ trên cột ở gốc bến
     const hut = at(-6, p.w + 3.2), hy = minG(hut.x, hut.z, 2.2, 6);
-    statics.push(placeParts(hutParts(1), hut.x, hy, hut.z, yaw + Math.PI / 2)); solid(hut.x, hut.z, 2.1);
+    statics.push(hutGeo(1, hut.x, hy, hut.z, yaw + Math.PI / 2)); solid(hut.x, hut.z, 2.1);
     const rk2 = at(-3.5, -(p.w + 2.2)), ry2 = gy(rk2.x, rk2.z);
     statics.push(placeParts([part(box(0.1, 1.4, 0.1), WOOD, { x: -0.9, y: 0.7 }), part(box(0.1, 1.4, 0.1), WOOD, { x: 0.9, y: 0.7 }), part(box(2.0, 0.08, 0.08), WOOD, { y: 1.3 }),
       ...[0, 1, 2, 3].map((k) => part(box(0.12, 2.6, 0.04), 0x8a6a44, { x: -0.6 + k * 0.4, y: 1.1, z: 0.18, rx: -0.2 }))], rk2.x, ry2, rk2.z, yaw));
@@ -479,7 +514,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     if (tw) {
       statics.push(tw);
       const hx = t.x + 6, hz = t.z + towardLand * 4, hy = minG(hx, hz, 2, 6);
-      statics.push(placeParts(hutParts(0.9), hx, hy, hz, 0)); solid(hx, hz, 1.9);
+      statics.push(hutGeo(0.9, hx, hy, hz, 0)); solid(hx, hz, 1.9);
       rod(statics, PAL.then, t.x - 1.2, y + 7.3, t.z - 1.2, t.x - 1.2, y + H + 4.6, t.z - 1.2, 0.06, { sides: 5 });
       flags.push({ x: t.x - 1.2, y: y + H + 4.5, z: t.z - 1.2, w: 0.9, h: 1.9, yaw: Math.PI * 0.75, cell: 0 });
       solid(t.x, t.z, 2.2);
@@ -500,7 +535,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     for (let k = 1; k < 18; k++) { const q = k / 18, zz = lz + (t.z + towardLand * 1.6 - lz) * q; bar(statics, BAMBOO, t.x - 0.35, y + q * H, zz, t.x + 0.35, y + q * H, zz, 0.05, 0.05); }
     // chòi dưới chân, trống báo trên sàn, cờ
     const hx = t.x + 6, hz = t.z + towardLand * 4, hy = minG(hx, hz, 2, 6);
-    statics.push(placeParts(hutParts(0.9), hx, hy, hz, 0)); solid(hx, hz, 1.9);
+    statics.push(hutGeo(0.9, hx, hy, hz, 0)); solid(hx, hz, 1.9);
     statics.push(part(cyl(0.4, 0.4, 0.6, 8), 0x8a5a3a, { x: t.x + 0.8, y: y + H + 0.45, z: t.z + 0.6, rz: Math.PI / 2 }));
     rod(statics, PAL.then, t.x - 1.2, y + H, t.z - 1.2, t.x - 1.2, y + H + 4.6, t.z - 1.2, 0.06, { sides: 5 });
     flags.push({ x: t.x - 1.2, y: y + H + 4.5, z: t.z - 1.2, w: 0.9, h: 1.9, yaw: Math.PI * 0.75, cell: 0 });
@@ -528,9 +563,14 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     const g0 = { x: Q.x + gx * Q.palR + tx * gw, z: Q.z + gz * Q.palR + tz * gw }, g1 = { x: Q.x + gx * Q.palR - tx * gw, z: Q.z + gz * Q.palR - tz * gw };
     for (const g of [g0, g1]) { const y = gy(g.x, g.z); rod(statics, PAL.sonDam, g.x, y - 0.4, g.z, g.x, y + 5.2, g.z, 0.2, { sides: 6, cap: true }); flags.push({ x: g.x, y: y + 7.6, z: g.z, w: 1.2, h: 2.6, yaw: Math.atan2(-gz, gx) + (g === g0 ? -1.2 : 1.2), cell: 0 }); rod(statics, PAL.then, g.x, y + 5.2, g.z, g.x, y + 7.8, g.z, 0.07, { sides: 5 }); }
     { const y0 = gy(g0.x, g0.z) + 4.6, y1 = gy(g1.x, g1.z) + 4.6; bar(statics, PAL.son, g0.x, y0, g0.z, g1.x, y1, g1.z, 0.35, 0.3); bar(statics, PAL.vang, g0.x, y0 + 0.22, g0.z, g1.x, y1 + 0.22, g1.z, 0.4, 0.08); }
-    // nhà bạt chỉ huy quay mặt ra cổng
+    // nhà bạt chỉ huy quay mặt ra cổng: mẫu ENV_nha_bat_chi_huy (sàn gỗ có bậc, cột son, mái vải son, án thư — làm cho đúng chỗ này; nướng kèm texture
+    // 1024) ×1,15 cho gần cỡ sàn code 9,4 × 7,2 m, là lưới riêng (envLOD: có texture, camera lọc khi ngoài khung) như cổng Hàm Tử; không có thì khối
+    // code, cũng lưới riêng cùng tên (hai nhánh cùng số lưới)
     const fy = Math.atan2(gx, gz);                                                // yaw để +z cục bộ hướng ra cổng
-    statics.push(placeParts(pavilionParts(), Q.x - gx * 4, Y, Q.z - gz * 4, fy)); solid(Q.x - gx * 4, Q.z - gz * 4, 4.6);
+    const pav = { x: Q.x - gx * 4, z: Q.z - gz * 4 }, pm = envLOD("ENV_nha_bat_chi_huy", mat, { cast: shadows });
+    if (pm) { pm.position.set(pav.x, Y - 0.05, pav.z); pm.rotation.y = fy; pm.scale.setScalar(1.15); pm.levels[0].object.name = "hq-pavilion"; pm.levels[0].object.receiveShadow = true; scene.add(track(pm)); }
+    else { const g = placeParts(pavilionParts(), pav.x, Y, pav.z, fy); geos.push(g); const m = track(new THREE.Mesh(g, mat)); m.name = "hq-pavilion"; m.castShadow = shadows; m.receiveShadow = true; scene.add(m); }
+    solid(pav.x, pav.z, 4.6);
     // cờ lệnh cao trước nhà bạt
     const cf = { x: Q.x + gx * 3 + tx * 3.2, z: Q.z + gz * 3 + tz * 3.2 };
     rod(statics, PAL.then, cf.x, Y - 0.3, cf.z, cf.x, Y + 12.5, cf.z, 0.1, { sides: 6 }); statics.push(part(ico(0.22, 0), PAL.vang, { x: cf.x, y: Y + 12.6, z: cf.z }));
@@ -546,7 +586,8 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     });
     // trống trận, giá vũ khí hai bên đường vào
     const dp = { x: Q.x + gx * 11 - tx * 5, z: Q.z + gz * 11 - tz * 5 };
-    statics.push(placeParts(drumParts(), dp.x, gy(dp.x, dp.z), dp.z, fy)); solid(dp.x, dp.z, 1.3);
+    // trống: mẫu ENV_trong_dong (trống đồng Đông Sơn, nướng Ø 1,9 m) ×0,85 đặt trên đất thay trống trận trên giá (Hư cấu: trống đồng ở bản doanh)
+    statics.push(envPart("ENV_trong_dong", { x: dp.x, y: gy(dp.x, dp.z) - 0.04, z: dp.z, ry: fy, s: 0.85 }) || placeParts(drumParts(), dp.x, gy(dp.x, dp.z), dp.z, fy)); solid(dp.x, dp.z, 1.3);
     for (const s of [1, -1]) { const q = { x: Q.x + gx * 8 + tx * 6 * s, z: Q.z + gz * 8 + tz * 6 * s }; statics.push(placeParts(rackParts(), q.x, gy(q.x, q.z), q.z, fy + Math.PI / 2)); }
     for (let k = 0; k < 5; k++) { const a = Q.gate + Math.PI + (k - 2) * 0.3, x = Q.x + Math.cos(a) * 16.5, z = Q.z + Math.sin(a) * 16.5; statics.push(part(box(0.9, 0.7, 0.9), 0x7a6040, { x, y: gy(x, z) + 0.35, z, ry: k }), part(box(0.95, 0.08, 0.95), PAL.then, { x, y: gy(x, z) + 0.72, z, ry: k })); }
   }
@@ -557,13 +598,15 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   const fb = flagBatch(scene, [{ bg: "#9b2d20", fg: "#f1d98a", text: "陳" }, { bg: "#a3281c", fg: "#c9a14a", text: "", border: 12, inner: true }], flags);
   track(fb.mesh);
 
-  // -- núi đá vôi xa (ngoài sương), mây. Bắc, nam: dãy núi đá dốc; tây: núi đất xa; đông: đảo đá ngoài vịnh (Hạ Long).
+  // -- núi đá vôi xa (ngoài sương), mây. Bắc, nam: dãy núi đá dốc; tây: núi đất xa; đông: đảo đá ngoài vịnh (Hạ Long). Thêm hai cụm mẫu ENV_day_nui_xa
+  //    (600 × 536 m, đỉnh 138 m) sau dãy bắc và nam, tô cùng sắc núi code (kit.js addSkyKit extra), gộp vào cùng lưới núi xa.
   const sky = addSkyKit(scene, makeRng(seed + 99), [
     [560, -700, 26, 900, 60, 150, 0x5a6670, { radMul: [0.38, 0.62], shape: "karst", spreadZ: 90 }],
     [560, 700, 26, 900, 55, 140, 0x5a6670, { radMul: [0.38, 0.62], shape: "karst", spreadZ: 90 }],
     [-720, 0, 10, 360, 40, 90, 0x5a6560, { radMul: [1.6, 2.4] }],
     [1750, 0, 44, 480, 18, 70, 0x76828a, { radMul: [0.34, 0.55], shape: "karst", spreadZ: 560, sink: 4 }],
-  ], { x0: -700, span: 2600, z: 700, n: 12, y0: 170, y1: 260 }, { x0: BOUNDS.minX, x1: BOUNDS.maxX, z0: BOUNDS.minZ, z1: BOUNDS.maxZ, pad: 40 });
+  ], { x0: -700, span: 2600, z: 700, n: 12, y0: 170, y1: 260 }, { x0: BOUNDS.minX, x1: BOUNDS.maxX, z0: BOUNDS.minZ, z1: BOUNDS.maxZ, pad: 40 },
+  { extra: [{ geo: envPart("ENV_day_nui_xa", { x: 520, y: -6, z: -800 }), tone: 0x5a6670 }, { geo: envPart("ENV_day_nui_xa", { x: 640, y: -6, z: 800, ry: Math.PI }), tone: 0x5a6670 }] });
   objs.push(sky.hills, sky.clouds);
 
   for (const o of [KI.A, KI.B, KI.C, trees, mang, reeds, rocks, stW, stB, raftIM, ropeIM, buoyIM, boomIM]) o.done();
@@ -644,7 +687,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
 
   const info = () => {
     let tris = 0, draws = 0;
-    const count = (o) => { if (!o.visible) return; const g = o.geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; tris += n * (o.isInstancedMesh ? o.count : 1); draws++; };
+    const count = (o) => { if (!o.visible) return; const g = (o.isLOD ? o.levels[0].object : o).geometry, n = (g.index ? g.index.count : g.attributes.position.count) / 3; tris += n * (o.isInstancedMesh ? o.count : 1); draws++; };
     for (const o of objs) count(o);
     return { draws, tris: Math.round(tris), colliders: world.colliders.length, karst: LO.karst.length, trees: LO.trees.length, mangroves: LO.mangroves.length, reeds: LO.reeds.length, rocks: LO.rocks.length, stakes: all.length };
   };

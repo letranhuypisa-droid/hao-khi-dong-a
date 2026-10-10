@@ -193,8 +193,11 @@ export function karstGeo({ seed = 1, h = 3.2, segs = 9, notch = false, twin = fa
 //   radMul: bán kính chân = cao × [a, b] (scenery.js: 2,2–3,4 núi đất; đá vôi dốc đứng ~0,35–0,7).
 //   shape "cone" (nón như cũ) | "karst" (trụ vai tròn, đỉnh bằng gồ ghề — dáng đảo đá vôi).
 // clouds: vùng mây trôi theo trục x ({x0, span, z, n, zc?, y0?, y1?, detail?}). keepOut {x0, x1, z0, z1, pad}: chân núi cách vùng chơi ít nhất pad m.
+// extra: { geo, tone } lưới núi dựng sẵn (không chỉ số, có position, normal, color — vd. mẫu nướng ENV_day_nui_xa qua glb.js envPart) gộp thêm vào
+// cùng lưới núi xa (không thêm lượt vẽ); tô như núi code: sắc tone theo độ sáng màu mẫu, bóng giả theo pháp tuyến mặt (vật liệu không chiếu sáng),
+// trộn về màu chân trời haze.
 // Không tự đẩy vào world.animated: trả { hills, clouds, update(t), dispose() } để trận gọi update mỗi khung.
-export function addSkyKit(scene, rng, ridges, clouds = { x0: -500, span: 1600, z: 600, n: 14 }, keepOut = null, { horizon = 0xe8c894 } = {}) {
+export function addSkyKit(scene, rng, ridges, clouds = { x0: -500, span: 1600, z: 600, n: 14 }, keepOut = null, { horizon = 0xe8c894, extra = [], haze = 0.22 } = {}) {
   const far = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
   const hills = [];
   const HORIZ = new THREE.Color(horizon);
@@ -235,6 +238,15 @@ export function addSkyKit(scene, rng, ridges, clouds = { x0: -500, span: 1600, z
     }
   };
   for (const r of ridges) ridge(...r);
+  for (const { geo: g, tone } of extra) {
+    if (!g) continue;
+    const N = g.attributes.normal.array, C = g.attributes.color.array, T = new THREE.Color(tone);
+    for (let i = 0; i < C.length; i += 3) {
+      const sh = (0.85 + 0.2 * Math.min(1, 0.3 * C[i] + 0.59 * C[i + 1] + 0.11 * C[i + 2])) * (0.8 + 0.25 * Math.max(0, -0.5 * N[i] + 0.8 * N[i + 1] + 0.33 * N[i + 2]));
+      _c.copy(T).multiplyScalar(sh).lerp(HORIZ, haze); C[i] = _c.r; C[i + 1] = _c.g; C[i + 2] = _c.b;
+    }
+    hills.push(g);
+  }
   const hm = new THREE.Mesh(merge(hills), far); hm.name = "far-ridges"; scene.add(hm);
   const cd = clouds.detail ?? 1;                                                  // 0: mây khối thô (60 tam giác)
   const cloudGeo = merge([part(ico(14, cd), 0xf4ead6, { sy: 0.45 }), part(ico(10, cd), 0xefe2c8, { x: 13, y: -1, sy: 0.45 }), part(ico(9, cd), 0xf8f0e0, { x: -12, y: -2, z: 4, sy: 0.4 })]);

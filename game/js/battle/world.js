@@ -3,9 +3,10 @@
 // Địa hình faceted (flat shading), nước phẳng dập dềnh, đạo cụ ghép khối. Mọi thứ tĩnh được
 // gộp hoặc instanced để giữ trần draw call (mục 15.7: T2 ≤ 150 draw).
 // Mô hình môi trường nướng (assets/models/env, glb.js envPart: màu phẳng, gộp được vào lưới tĩnh; envLOD: vật riêng lẻ hai mức gần / xa)
-// thay khối code cho cột cờ, tháp canh, cổng Hàm Tử, thuyền chiến Nguyên trên sông, cây; chưa nạp (Node, lỗi mạng) thì dựng khối code như
-// cũ. Hai đường rút world rng y hệt nhau và không đổi vật va chạm, nên mô phỏng (ctx.rng riêng) không phụ thuộc mô hình có nạp hay không.
-// Võ trường (buildArena, ARENA_ENV): giá binh khí, hình nộm, trống trên lầu trống; khán đài, đài chỉ huy, bia ở scenery.js addArenaScenery.
+// thay khối code cho cột cờ, tháp canh, cổng Hàm Tử, tường đất Hàm Tử quan, rào cọc đồn và doanh trại, thuyền chiến Nguyên trên sông, cây; chưa
+// nạp (Node, lỗi mạng) thì dựng khối code như cũ. Hai đường rút world rng y hệt nhau và không đổi vật va chạm, nên mô phỏng (ctx.rng riêng) không
+// phụ thuộc mô hình có nạp hay không. Rào bản doanh ta (vòng cọc thưa 1,5 m cho camera nhìn qua) giữ code: mẫu ENV_rao_coc hạ thấp thành vách gỗ kín.
+// Võ trường (buildArena, ARENA_ENV): giá binh khí, hình nộm, trống trên lầu trống; khán đài, đài chỉ huy, bia, vạc lửa ở scenery.js addArenaScenery.
 
 import * as THREE from "three";
 import { MAP, FRONTS, BASES, BASE_RING, FORT, lineToX, VILLAGE } from "../data/battle-b15.js";
@@ -62,14 +63,18 @@ function gable(w, h, len) {
   return g;
 }
 
-// Mô hình môi trường mà cảnh Hàm Tử dùng (world.js, scenery.js, director-b16.js trên cùng đất): màn tải nạp trước (main.js loadModels);
-// tests/env.test.mjs giữ danh sách khớp với các lời gọi envPart / envLOD.
-export const WORLD_ENV = ["ENV_bao_gao", "ENV_ben_go", "ENV_bep_lua", "ENV_canh_cong", "ENV_cay_da", "ENV_cay_tan_tron", "ENV_co_duoi_ngua", "ENV_coc_buoc_ngua",
-  "ENV_cong_ham_tu", "ENV_cot_co", "ENV_cu_ma", "ENV_cum_cau", "ENV_hom_go", "ENV_khung_leu_chay", "ENV_thap_canh_nguyen", "ENV_thung_cau", "ENV_thung_go",
-  "ENV_thuyen_mui", "ENV_thuyen_song_nguyen", "ENV_xe_luong", "ENV_xe_luong_vo"];
+// Mô hình môi trường mà cảnh Hàm Tử dùng (world.js, scenery.js, director-b16.js, kesach.js trên cùng đất): màn tải nạp trước (main.js loadModels);
+// tests/env.test.mjs giữ danh sách khớp với các lời gọi envPart / envLOD / model và danh sách đồ thêm (scenery.js VILLAGE_PROPS, WORLD_PROPS).
+export const WORLD_ENV = ["ENV_bao_gao", "ENV_ben_go", "ENV_bep_lua", "ENV_bo_rom", "ENV_canh_cong", "ENV_cay_da", "ENV_cay_gao", "ENV_cay_tan_tron",
+  "ENV_choi_tranh", "ENV_co_duoi_ngua", "ENV_coc_buoc_ngua", "ENV_coc_luy_nguyen", "ENV_coc_tre_tran", "ENV_coc_troi", "ENV_cong_ham_tu", "ENV_cot_co", "ENV_cu_ma",
+  "ENV_cum_cau", "ENV_da_b", "ENV_da_c", "ENV_ho_chong", "ENV_hom_go", "ENV_khom_chuoi", "ENV_khung_leu_chay", "ENV_luoi_phoi", "ENV_mieu", "ENV_mu_nguyen_roi",
+  "ENV_non_tre_roi", "ENV_rao_coc", "ENV_rao_tre", "ENV_so_dat", "ENV_thap_canh_nguyen", "ENV_thung_cau", "ENV_thung_go", "ENV_thuyen_mui", "ENV_thuyen_song_nguyen",
+  "ENV_thuyen_tong", "ENV_tuong_dat", "ENV_xac_ngua", "ENV_xe_luong", "ENV_xe_luong_vo", "MOUNT_ngua_nguyen", "MOUNT_ngua_tuong", "PROP_non_la", "PROP_ong_ten",
+  "PROP_quang_ganh", "PROP_tay_nai"];
 // Mô hình môi trường của Võ trường (buildArena, scenery.js addArenaScenery): khán đài (có texture), đài chỉ huy, giá binh khí, hình nộm, bia rơm,
-// trống trên lầu trống. Lầu trống, cây, rào, vạc lửa giữ code (lầu trống chưa có mẫu; cây mẫu 40 tam giác mất thân, Võ trường giữ số code).
-export const ARENA_ENV = ["ENV_bia_rom", "ENV_dai_chi_huy", "ENV_gia_binh_khi", "ENV_hinh_nom", "ENV_khan_dai", "ENV_trong_tran"];
+// trống trên lầu trống, vạc lửa. Lầu trống, cây, rào giữ code (lầu trống chưa có mẫu; cây mẫu 40 tam giác mất thân; rào 220 cọc thành ~88 khúc
+// ENV_rao_coc ≈ 44 nghìn tam giác cho một vòng rào — Võ trường giữ số code).
+export const ARENA_ENV = ["ENV_bia_rom", "ENV_dai_chi_huy", "ENV_gia_binh_khi", "ENV_hinh_nom", "ENV_khan_dai", "ENV_trong_tran", "ENV_vac_lua"];
 
 // forts: đồn và doanh trại (Cứ Điểm "don", "doanh_trai") dựng có tường, hai cổng, tháp góc và vật va chạm (fort.js) thay vòng cọc; B15 chiến dịch (battles/b15.js) và nhiệm vụ Tự do
 // (td.js) đều bật; tắt thì vòng cọc cũ (không có vật va chạm).
@@ -332,6 +337,15 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       const dx = sg.x1 - sg.x0, dz = sg.z1 - sg.z0, len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz), mx = (sg.x0 + sg.x1) / 2, mz = (sg.z0 + sg.z1) / 2;
       const y0 = Math.min(heightAt(sg.x0, sg.z0), heightAt(sg.x1, sg.z1), heightAt(mx, mz)), top = y0 + 0.9;
       staticParts.push(box(2.1, 1.5, len, EARTH, mx, y0 + 0.15, mz, ang));                        // nền đất đắp (chìm 0,6 m để theo dốc)
+      // mẫu ENV_rao_coc (khúc 3,3 m: cọc vót sát nhau, hai nẹp buộc; cao 3,03 m) ×0,75 cao trên nền đất: đỉnh cọc ~3 m trên đất như cọc code
+      if (model("env/ENV_rao_coc")) {
+        const k = Math.max(1, Math.round(len / 3.3));
+        for (let i = 0; i < k; i++) {
+          const t = (i + 0.5) / k;
+          staticParts.push(envPart("ENV_rao_coc", { x: sg.x0 + dx * t, y: top - 0.2, z: sg.z0 + dz * t, ry: ang, sy: 0.75, sz: len / k / 3.3 }));
+        }
+        continue;
+      }
       const n = Math.max(2, Math.round(len / 0.42));
       for (let i = 0; i < n; i++) {                                                                   // hàng cọc vót nhọn
         const t = (i + 0.5) / n, x = sg.x0 + dx * t, z = sg.z0 + dz * t, h = 1.9 + ((i * 7) % 5) * 0.1;
@@ -424,6 +438,18 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   const wallSeg = (x0, z0, x1, z1) => {
     const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0);
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, y = heightAt(cx, cz);
+    // mẫu ENV_tuong_dat (khúc 10 m tường đất nện có lỗ châu mai, mẫu rộng 2,07 cao 2,34): chia đoạn thành khúc ~10 m, giãn rộng 2,9 m (tường 2,6 + mũ
+    // 3,0 của khối code), cao 5,5 m như đỉnh lỗ châu mai code; chân hạ 0,2 m theo chỗ đất thấp nhất của khúc. Vật va chạm như cũ.
+    if (model("env/ENV_tuong_dat")) {
+      const n = Math.max(1, Math.round(len / 10));
+      for (let k = 0; k < n; k++) {
+        const t0 = k / n, t1 = (k + 1) / n, px = x0 + (x1 - x0) * (t0 + t1) / 2, pz = z0 + (z1 - z0) * (t0 + t1) / 2;
+        const py = Math.min(heightAt(px, pz), heightAt(x0 + (x1 - x0) * t0, z0 + (z1 - z0) * t0), heightAt(x0 + (x1 - x0) * t1, z0 + (z1 - z0) * t1));
+        staticParts.push(envPart("ENV_tuong_dat", { x: px, y: py - 0.2, z: pz, ry: ang, sx: 2.9 / 2.07, sy: 5.5 / 2.34, sz: len / n / 10 }));
+      }
+      world.colliders.push({ x0, z0, x1, z1, r: 1.6 });
+      return;
+    }
     staticParts.push(P(new THREE.BoxGeometry(2.6, 4.6, len), 0x7a6a50, { x: cx, y: y + 2.1, z: cz, ry: ang }));
     staticParts.push(P(new THREE.BoxGeometry(3.0, 0.5, len), PAL.go, { x: cx, y: y + 4.5, z: cz, ry: ang }));
     const n = Math.floor(len / 2.2);

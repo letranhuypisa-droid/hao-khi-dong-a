@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { KE_SACH, lineToX, FRONTS } from "../data/battle-b15.js";
 import { merge, part, lambert, flagTexture, PAL } from "./models.js";
 import { heightAt } from "./world.js";
+import { envPart } from "./glb.js";
 import { BigUnit } from "./units.js";
 import { g } from "../data/tuning.js";
 
@@ -65,8 +66,11 @@ export class KeSachManager {
     const ctx = this.ctx, def = k.def;
     for (const b of this.boats) ctx.scene.remove(b.mesh);
     this.boats = [];
+    // mẫu ENV_thuyen_tong (thuyền quân Tống dài 9 m, gốc ở mớn nước, mũi +z, cột buồm ở z +1,35 cao 3,8 m) thay khối hộp; cờ "宋" treo dưới đỉnh
+    // cột mẫu. Chưa nạp thì khối code như cũ. Thuyền chỉ là hình: trúng đòn, dừng, cập bến theo toạ độ (b.x, b.z) như trước.
+    const hull = envPart("ENV_thuyen_tong");
     for (let i = 0; i < def.boats; i++) {
-      const mesh = new THREE.Mesh(merge([
+      const mesh = new THREE.Mesh(hull || merge([
         part(new THREE.BoxGeometry(2.8, 1.0, 9), PAL.nau, { y: 0.5 }),
         part(new THREE.BoxGeometry(2.2, 0.8, 2.6), PAL.go, { y: 1.3, z: -2.6 }),
         part(new THREE.CylinderGeometry(0.1, 0.12, 6, 5), PAL.then, { y: 3.5, z: 0.8 }),
@@ -74,7 +78,8 @@ export class KeSachManager {
       ]), lambert());
       mesh.castShadow = true;
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.8), new THREE.MeshLambertMaterial({ map: flagTexture("宋", "#b0752c", "#1d1a17"), side: THREE.DoubleSide }));
-      flag.position.set(0.65, 5.4, 0.8); flag.rotation.y = Math.PI / 2; mesh.add(flag);
+      if (hull) flag.position.set(0.65, 2.85, 1.35); else flag.position.set(0.65, 5.4, 0.8);
+      flag.rotation.y = Math.PI / 2; mesh.add(flag);
       ctx.scene.add(mesh); ctx.view?.track(mesh, true);    // thuyền, cờ chạy theo bước mô phỏng: vẽ nội suy (battle/view.js)
       const p0 = def.route[0];
       this.boats.push({
@@ -175,6 +180,8 @@ export class KeSachManager {
   spawnBundles(k) {
     const ctx = this.ctx;
     for (const b of this.bundles) ctx.scene.remove(b.mesh);
+    // khối code (ba mũi tên, thư trắng, khay đỏ), không dùng mẫu ENV_bo_ten_thu: bản nướng 296 tam giác thành một que nâu dày 0,11 m, mất mũi tên và
+    // lá thư — vật Kế Sách phải nhận ra để nhặt
     this.bundles = k.def.bundles.map((p) => {
       const m = new THREE.Group();
       const bundle = new THREE.Mesh(merge([
