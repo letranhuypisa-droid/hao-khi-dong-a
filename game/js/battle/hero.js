@@ -644,6 +644,11 @@ export class Hero {
         const t = segHit(s.x, s.z, s.fx, s.fz, len, u.x, u.z, u.radius + ARROW_R + s.w);
         if (t >= 0) cand.push({ t, o: u, k: 1 });
       }
+      // đích ngoài ctx.units (B17: thuyền tàn quân bị Móc Tên — director.hookTarget trả vật thay thế có cờ proxy); trận khác không có
+      if (s.only?.proxy && s.only.alive && !s.hit.has(s.only)) {
+        const t = segHit(s.x, s.z, s.fx, s.fz, len, s.only.x, s.only.z, s.only.radius + ARROW_R + s.w);
+        if (t >= 0) cand.push({ t, o: s.only, k: 1 });
+      }
       if (!s.only) {
         for (const id in ctx.world.gates) {
           const gt = ctx.world.gates[id];

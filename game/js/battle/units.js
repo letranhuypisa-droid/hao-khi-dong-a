@@ -17,6 +17,7 @@
 // Trạng thái khống chế (đợt B17-B2, kỹ năng H40 — hero-skills.js): applyStatus("pin", giây) ghim tại chỗ (Tên Xuyên Hàng),
 // applyStatus("pull", { x, z, sec }) kéo về điểm đó rồi applyStatus("bind", giây) trói (Móc Tên Trói Thuyền): đứng yên, không
 // ra đòn, vẫn nhận đòn. this.status = null khi không có gì — B15 / B20 không ai gọi applyStatus nên nhánh này không chạy.
+// Tướng đồng minh B17 (director-b17.js, đợt A2): this.noFight (vua lui về bản doanh, sứ giả) — chỉ đi về post, không đánh; this.postK hệ số tốc đi về post.
 // B15 không có các trường này nên mọi nhánh mới không chạy.
 
 import { makeRig, disposeRig, RIGS } from "./models.js";
@@ -363,6 +364,12 @@ export class BigUnit {
         }
       }
       if (u >= 1) { this.state = "idle"; this.atkCd = this.T.every; }
+      return;
+    }
+    // noFight (B17: vua lui về bản doanh, sứ giả): chỉ đi về post (this.postK: hệ số tốc), không đánh — trận khác không đặt nên nhánh này không chạy
+    if (this.noFight) {
+      const pd = Math.hypot(this.post.x - this.x, this.post.z - this.z);
+      if (pd > 1.2) this.moveToward(this.post.x, this.post.z, dt, this.postK ?? (pd > 10 ? 1 : 0.5)); else this.setPose(A.idle(this.animT), 0.15);
       return;
     }
     const range = this.rigKey === "H40" ? 16 : 2.8;

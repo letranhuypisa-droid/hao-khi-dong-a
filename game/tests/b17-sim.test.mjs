@@ -18,7 +18,7 @@ const D = await import("../js/data/battle-b17.js");
 const { MAP, BASES, FRONTS, lineToX, BASE_RING } = await import("../js/data/battle-b15.js");
 const G = await import("../js/battle/ground.js");
 const { speedFactor, perchNear } = await import("../js/sim/terrain-rules.js");
-const { createB17, tickB17, sideB17, snapshotB17, restoreB17, along, routeS, OUT_S, STOP_S, BED_S, ROUTE_LEN, columnHead } = S;
+const { createB17, tickB17, sideB17, snapshotB17, restoreB17, along, routeS, OUT_S, STOP_S, BED_S, ROUTE_LEN, columnHead, PIER_LEN, ENVOY_LEN, envoyPos, kingGoal } = S;
 
 let pass = 0, fail = 0;
 async function t(name, fn) {
@@ -27,8 +27,9 @@ async function t(name, fn) {
 }
 
 // đầu vào giả: tướng ở p, địch theo bảng foes [{ x, z }], cờ của director
-const inp = (p, { foes = [], alive = true, engaged = false, bossHalf = false, bossDown = false, wingsHold = true, heroToBoss = 999, ksPress = false, pick = null } = {}) => ({
-  hero: { x: p.x, z: p.z, alive }, engaged, bossHalf, bossDown, wingsHold, heroToBoss, ksPress, pick,
+const inp = (p, { foes = [], alive = true, engaged = false, bossHalf = false, bossDown = false, wingsHold = true, heroToBoss = 999, ksPress = false, pick = null,
+  king = undefined, landUp = 0, omaDown = false, envoyDown = false } = {}) => ({
+  hero: { x: p.x, z: p.z, alive }, engaged, bossHalf, bossDown, wingsHold, heroToBoss, ksPress, pick, king, landUp, omaDown, envoyDown,
   foesAt: (x, z, r) => foes.filter((f) => Math.hypot(f.x - x, f.z - z) < r).length,
 });
 const FAR = { x: 30, z: 150 };                                 // tướng đứng xa mọi vòng, xa Toa Đô
@@ -48,7 +49,9 @@ await t("5 pha có goal, tip, par; par = tổng; 3 đồn, 2 bãi lau (mỗi bã
   assert.equal(D.OUTPOSTS.length, 3); assert.equal(D.BEDS.length, 2);
   for (const B of D.BEDS) { assert.equal(B.wings.length, 2, B.id); assert.equal(B.mounds.length, 3, B.id); }
   assert.ok(D.HISTORY_NOTES.length >= 3 && D.HISTORY_NOTES.every((n) => n.label && n.text));
-  assert.deepEqual(D.KS_ORDER, ["phucKich"]); assert.equal(D.KE_SACH.phucKich.hk, 20); assert.equal(D.KE_SACH.phucKich.window, 30);
+  assert.deepEqual(D.KS_ORDER, ["phucKich", "hoiKe"]); assert.equal(D.KE_SACH.phucKich.hk, 20); assert.equal(D.KE_SACH.phucKich.window, 30);
+  assert.equal(D.KE_SACH.hoiKe.hk, 10); assert.equal(D.KE_SACH.hoiKe.quyMo, "nho");
+  assert.deepEqual(D.SIDE_MISSIONS.map((m) => m.id), ["S_AMBUSH", "S_OMA", "S_BOATS"]);
 });
 await t("ba đồn trùng đồn A1, doanh trại A2, cổng A3 của world.js (vị trí, vòng chiếm); lộ trình đi qua cả ba", () => {
   for (const O of D.OUTPOSTS) {
@@ -140,13 +143,14 @@ await t("Toa Đô vào bãi đã chọn, tướng ngoài 40 m: P3, cửa sổ 30
   assert.ok(types(ev).includes("bedEnter") && types(ev).includes("ksOpen")); assert.equal(st.phase, 2);
   assert.equal(st.ks.phucKich.state, "sansang"); assert.ok(st.ks.phucKich.left <= 22.5 && st.ks.phucKich.left > 21);
   const ev2 = run(st, 0.1, inp(FAR, { ksPress: true, wingsHold: true }));
-  assert.deepEqual(types(ev2).filter((x) => ["keSach", "stand", "phase"].includes(x)), ["keSach", "stand", "phase"]);
+  assert.deepEqual(ev2.filter((e) => (e.type === "keSach" && e.id === "phucKich") || ["stand", "phase"].includes(e.type)).map((e) => e.type), ["keSach", "stand", "phase"]);
+  assert.ok(ev2.some((e) => e.type === "keSach" && e.id === "hoiKe" && !e.ok && e.why === "muon"), "phục kích nổ trước khi sứ giả tới: Kế Sách Nhỏ hỏng");
   assert.equal(st.ks.phucKich.state, "thanhcong"); assert.equal(st.col.stood, true); assert.equal(st.col.standWhy, "broken");
   assert.equal(st.col.morale, D.COLUMN.morale - D.KE_SACH.phucKich.morale); assert.equal(st.phase, 3); assert.equal(st.main[0], true);
   assert.ok(st.arena && st.arena.mound && st.arena.mound.bed === "W", JSON.stringify(st.arena));
   const s = st.col.s; run(st, 20, inp(FAR)); assert.equal(st.col.s, s, "đứng lại thì cánh thôi đi");
   const ev3 = run(st, 0.1, inp(FAR, { ksPress: true })); assert.deepEqual(types(ev3), ["ksIdle"], "Kế Sách thành công tối đa một lần");
-  assert.deepEqual(sideB17(st), { S_AMBUSH: true });
+  assert.deepEqual(sideB17(st), { S_AMBUSH: true, S_OMA: false, S_BOATS: false });
 });
 await t("Phục kích thất bại: lộ (tướng trong 40 m lúc Toa Đô vào bãi), cánh không giữ vững, hết cửa sổ; G trước khi mở cửa sổ chỉ nhắc", () => {
   const a = createB17(); toP2(a);
@@ -156,24 +160,28 @@ await t("Phục kích thất bại: lộ (tướng trong 40 m lúc Toa Đô vào
   const b = createB17(); toP2(b); run(b, BED_S.W / D.COLUMN.speed + 0.5, inp(FAR));
   run(b, 0.1, inp(FAR, { ksPress: true, wingsHold: false })); assert.equal(b.ks.phucKich.state, "thatbai"); assert.equal(b.ks.phucKich.why, "canh");
   const c = createB17(); toP2(c); run(c, BED_S.W / D.COLUMN.speed + 0.5, inp(FAR)); run(c, 31, inp(FAR));
-  assert.equal(c.ks.phucKich.state, "thatbai"); assert.equal(c.ks.phucKich.why, "muon"); assert.deepEqual(sideB17(c), { S_AMBUSH: false });
+  assert.equal(c.ks.phucKich.state, "thatbai"); assert.equal(c.ks.phucKich.why, "muon"); assert.equal(sideB17(c).S_AMBUSH, false);
 });
 await t("bãi đông: cánh qua bãi tây không mở cửa sổ; vào bãi đông mới mở", () => {
   const st = createB17(); toP2(st, "E");
   run(st, (BED_S.W + 5) / D.COLUMN.speed, inp(FAR)); assert.equal(st.ks.phucKich.state, "khadung"); assert.equal(st.phase, 1);
   run(st, (BED_S.E - BED_S.W) / D.COLUMN.speed, inp(FAR)); assert.equal(st.ks.phucKich.state, "sansang"); assert.equal(st.phase, 2);
 });
-await t("Toa Đô chạm sàn nửa Sinh lực khi cánh còn đi: đứng lại (P2 → P4 thẳng), lên gò gần nhất; hạ → P5; P5 hết địch (≥ 2 s) hoặc 20 s thì thắng", () => {
-  const st = createB17(); toP2(st); run(st, 100, inp(FAR)); assert.equal(st.phase, 1);
-  const ev = run(st, 0.1, inp(FAR, { bossHalf: true }));
-  assert.ok(types(ev).includes("stand")); assert.equal(st.col.standWhy, "half"); assert.equal(st.phase, 3); assert.equal(st.ks.phucKich.state, "khadung");
+await t("nửa Sinh lực (đợt A5): ở P2 chỉ là khóa — cánh vẫn đi; vào bãi mà cửa sổ đang mở cũng chưa; cửa sổ hỏng thì đứng lại, lên gò; hạ → P5; P5 hết địch (≥ 2 s) hoặc 20 s thì thắng", () => {
+  const st = createB17(); toP2(st); run(st, 100, inp(FAR, { bossHalf: true }));
+  assert.equal(st.phase, 1); assert.equal(st.col.stood, false); assert.ok(near(st.col.s, 100 * D.COLUMN.speed, 0.2), "P2: cánh vẫn đi " + st.col.s);
+  run(st, (BED_S.W - st.col.s) / D.COLUMN.speed + 0.5, inp(FAR, { bossHalf: true }));
+  assert.equal(st.phase, 2); assert.equal(st.ks.phucKich.state, "sansang"); assert.equal(st.col.stood, false, "cửa sổ đang mở: phục kích được ưu tiên");
+  const ev = run(st, st.ks.phucKich.window + 0.5, inp(FAR, { bossHalf: true }));
+  assert.ok(types(ev).includes("stand")); assert.equal(st.ks.phucKich.state, "thatbai"); assert.equal(st.col.standWhy, "half"); assert.equal(st.phase, 3);
   const head = columnHead(st), A = st.arena;
   assert.ok(Math.hypot(A.x - head.x, A.z - head.z) <= D.COLUMN.standSeek);
   run(st, 0.1, inp(FAR, { bossDown: true })); assert.equal(st.phase, 4); assert.equal(st.main[2], true);
   const foe = [{ x: A.x, z: A.z }];
   run(st, 5, inp(FAR, { foes: foe })); assert.equal(st.over, false);
   const ev2 = run(st, 0.2, inp(FAR)); assert.ok(types(ev2).includes("win")); assert.equal(st.won, true);
-  const b = createB17(); toP2(b); run(b, 100, inp(FAR)); run(b, 0.1, inp(FAR, { bossHalf: true })); run(b, 0.1, inp(FAR, { bossDown: true }));
+  const b = createB17(); toP2(b); run(b, BED_S.W / D.COLUMN.speed + 0.5, inp(FAR)); run(b, 0.1, inp(FAR, { ksPress: true, wingsHold: false }));
+  run(b, 0.1, inp(FAR, { bossHalf: true })); assert.equal(b.phase, 3); run(b, 0.1, inp(FAR, { bossDown: true }));
   run(b, D.REMNANTS.sec + 0.2, inp(FAR, { foes: [b.arena] })); assert.equal(b.won, true, "giữ đủ 20 s");
 });
 await t("đầu cánh tới mốc cửa sông là thua; quá giờ là thua; trận kết thúc thì tick không làm gì", () => {
@@ -200,6 +208,134 @@ await t("Quân Viễn Chinh: cứ 180 s Sĩ Khí cánh −10; về 0 thì đội
   st.col.morale = D.COLUMN.moraleDrop;
   const ev2 = run(st, D.COLUMN.moraleEvery, inp(FAR, { engaged: true }));
   assert.ok(types(ev2).includes("stand")); assert.equal(st.col.standWhy, "morale"); assert.ok(S.routed(st)); assert.equal(st.phase, 3);
+});
+
+console.log("Đợt A2: đổ bộ, bến tàn quân, Ô Mã Nhi, sứ giả, vua, Yết Kiêu");
+// tướng đứng gần bờ bắc (44 m), ngoài mọi vòng đồn, xa đường sứ giả
+const BANK = { x: 300, z: -120 };
+await t("Phá Trận Thủy Bộ: từ P2 cứ 30 s 2 thuyền × 5 lính đổ bộ ở điểm bờ gần tướng; tướng xa bờ > 100 m thì không; trần lính đổ bộ còn sống; P1 không đổ bộ", () => {
+  const a = createB17(); run(a, 40, inp(BANK)); assert.equal(a.phase, 0); assert.equal(a.land.n, 0, "P1 không đổ bộ");
+  const st = createB17(); toP2(st);
+  const ev = run(st, D.LANDING.every + 0.05, inp(BANK)), L = ev.filter((e) => e.type === "landing");
+  assert.equal(L.length, 1); assert.deepEqual([L[0].x, L[0].z, L[0].boats, L[0].sunk, L[0].troops], [300, D.LANDING.bank.z, 2, 0, 10]);
+  assert.equal(run(st, 60, inp(BANK)).filter((e) => e.type === "landing").length, 2, "cứ 30 s");
+  assert.equal(run(st, 30, inp(BANK, { landUp: 15 })).find((e) => e.type === "landing").troops, 5, "trần cap: còn chỗ 5");
+  assert.equal(run(st, 30, inp(BANK, { landUp: D.LANDING.cap })).filter((e) => e.type === "landing").length, 0, "đủ trần: lượt đó bỏ");
+  assert.equal(run(st, 30, inp(FAR)).filter((e) => e.type === "landing").length, 0, "tướng xa bờ");
+  assert.deepEqual(D.bankPoint({ x: 10, z: 50 }), { x: D.LANDING.bank.x0, z: D.LANDING.bank.z }); assert.deepEqual(D.bankPoint({ x: 900, z: -170 }), { x: D.LANDING.bank.x1, z: D.LANDING.bank.z });
+});
+await t("Phá Trận Thủy Bộ mất khi phục kích thành công (landingOff); không đổ bộ nữa", () => {
+  const st = createB17({ ksWin: 0.75 }); toP2(st);
+  run(st, BED_S.W / D.COLUMN.speed + 0.5, inp(FAR));
+  const ev = run(st, 0.1, inp(FAR, { ksPress: true }));
+  assert.ok(types(ev).includes("landingOff")); assert.equal(st.land.off, true);
+  assert.equal(run(st, 90, inp(BANK)).filter((e) => e.type === "landing").length, 0);
+});
+await t("bến tàn quân: từ P2 cứ 60 s một thuyền rời bến (lần đầu sau 60 s), chạy 1,8 m/s ra mốc cửa sông; qua mốc thì đếm, hỏng nhiệm vụ phụ", () => {
+  const st = createB17(); toP2(st);
+  assert.ok(PIER_LEN.every((L) => L > 35), JSON.stringify(PIER_LEN));            // ≥ ~20 s trên sông
+  for (const r of S.PIER_ROUTES) for (let s = 2; s < S.routeLen(r); s += 3) { const p = along(r, s); assert.ok(G.waterDist(p.x, p.z) < -1, "đường thuyền trên sông " + JSON.stringify(p)); }
+  const ev = run(st, D.PIER.first - 0.2, inp(FAR)); assert.ok(!types(ev).includes("boatLaunch"));
+  const e1 = run(st, 0.3, inp(FAR)); assert.deepEqual(e1.filter((e) => e.type === "boatLaunch").map((e) => e.i), [0]); assert.equal(st.pier.boats[0].state, "sail");
+  const e2 = run(st, PIER_LEN[0] / D.PIER.speed + 0.2, inp(FAR));
+  assert.ok(e2.some((e) => e.type === "boatPassed" && e.i === 0)); assert.equal(st.pier.passed, 1); assert.equal(st.pier.boats[0].state, "passed");
+  const p = S.boatPos(st, 0); assert.ok(Math.hypot(p.x - D.PIER.mark.x, p.z - D.PIER.mark.z) < 0.01);
+  assert.equal(st.pier.boats[1].state, "dock"); run(st, D.PIER.first + D.PIER.every - st.t + st.p2T + 0.05, inp(FAR));
+  assert.equal(st.pier.boats[1].state, "sail", "60 s sau thuyền thứ hai");
+  st.won = true; assert.equal(sideB17(st).S_BOATS, false);
+});
+await t("thuyền tàn quân: đánh chìm (độ bền), Chặn Dòng giữ lại, Móc Tên kéo mắc cạn, đốt lúc còn neo (đứng sát 2,5 s, không địch); thắng mà không thuyền nào qua mốc", () => {
+  const st = createB17({ boatHp: 100 }); toP2(st);
+  run(st, D.PIER.first + 0.1, inp(FAR)); assert.equal(st.pier.boats[0].state, "sail");
+  const ev = []; assert.equal(S.damageBoat(st, 0, 60, ev), 60); assert.equal(st.pier.boats[0].state, "sail");
+  S.damageBoat(st, 0, 60, ev); assert.equal(st.pier.boats[0].state, "sunk"); assert.deepEqual(types(ev), ["boatSunk"]); assert.equal(S.damageBoat(st, 0, 10), 0, "chìm rồi");
+  run(st, 60, inp(FAR)); assert.equal(st.pier.boats[1].state, "sail");
+  const s1 = st.pier.boats[1].s; S.holdBoat(st, 1, 15); run(st, 14.5, inp(FAR)); assert.ok(near(st.pier.boats[1].s, s1, 1e-9), "Chặn Dòng: đứng lại");
+  run(st, 1, inp(FAR)); assert.ok(st.pier.boats[1].s > s1, "hết giờ thì đi tiếp");
+  const ev2 = []; assert.equal(S.catchBoat(st, 1, { x: 540, z: -170 }, ev2), true); assert.equal(st.pier.boats[1].state, "caught"); assert.deepEqual(types(ev2), ["boatCaught"]);
+  const s2 = S.boatPos(st, 1); run(st, 20, inp(FAR)); assert.deepEqual(S.boatPos(st, 1), s2, "mắc cạn: không chạy nữa");
+  // đốt thuyền còn neo (thuyền 3): có địch quanh mình thì không cháy
+  const D3 = D.PIER.docks[3], at = { x: D3.x, z: D.PIER.z };
+  run(st, 2, inp(at, { foes: [{ x: at.x + 2, z: at.z }] })); assert.equal(st.pier.boats[3].burn, 0); assert.ok(st.prompt.text.includes("Địch"));
+  const ev3 = run(st, D.PIER.burnSec + 0.1, inp(at)); assert.ok(ev3.some((e) => e.type === "boatBurnt" && e.i === 3)); assert.equal(st.pier.boats[3].state, "burnt");
+  assert.equal(st.pier.lost, 3); assert.equal(st.pier.passed, 0);
+  st.won = true; assert.equal(sideB17(st).S_BOATS, true);
+});
+await t("Ô Mã Nhi: đuổi trước 8:00 → nhiệm vụ phụ, bến thôi xuất thuyền; đuổi muộn thì không tính; vào P4 chưa bị đuổi thì bỏ bến (bến cũng thôi)", () => {
+  const a = createB17(); toP2(a); run(a, 10, inp(FAR));
+  const ev = run(a, 0.1, inp(FAR, { omaDown: true }));
+  assert.deepEqual(ev.filter((e) => e.type === "omaDriven").map((e) => e.inTime), [true]); assert.equal(a.oma.state, "driven"); assert.equal(sideB17(a).S_OMA, true);
+  assert.equal(run(a, 200, inp(FAR)).filter((e) => e.type === "boatLaunch").length, 0, "bến thôi xuất thuyền");
+  const b = createB17({ timeout: 2000 }); toP2(b); b.t = D.OMA.deadline + 1; run(b, 0.1, inp(FAR, { omaDown: true }));
+  assert.equal(b.oma.state, "driven"); assert.equal(sideB17(b).S_OMA, false, "quá 8:00");
+  const c = createB17(); toP2(c); run(c, BED_S.W / D.COLUMN.speed + 0.5, inp(FAR));
+  const ev2 = run(c, 0.1, inp(FAR, { ksPress: true }));
+  assert.ok(types(ev2).includes("omaLeft")); assert.equal(c.oma.state, "left"); assert.equal(sideB17(c).S_OMA, false);
+  const launched = c.pier.boats.filter((x) => x.state !== "dock").length;
+  run(c, 130, inp(FAR)); assert.equal(c.pier.boats.filter((x) => x.state !== "dock").length, launched, "bỏ bến: thôi xuất thuyền");
+});
+await t("sứ giả (Kế Sách Nhỏ): chỉ đi khi tướng trong 15 m; hai toán chặn lao ra ở mốc; về bản doanh trước phục kích → thành công, bãi còn lại có phục binh", () => {
+  const st = createB17(); toP2(st, "W");
+  run(st, 20, inp(FAR)); assert.equal(st.envoy.s, 0); assert.equal(st.envoy.state, "wait");
+  const p0 = envoyPos(st); assert.ok(Math.hypot(p0.x - D.ENVOY.route[0].x, p0.z - D.ENVOY.route[0].z) < 1e-6);
+  run(st, 5, inp(along(D.ENVOY.route, 6))); assert.ok(near(st.envoy.s, 5 * D.ENVOY.speed, 0.01), "tướng trong 15 m: đi " + st.envoy.s); assert.equal(st.envoy.state, "walk");
+  assert.ok(st.prompt && st.prompt.text.includes("sứ giả"));
+  const s1 = st.envoy.s; run(st, 5, inp({ x: p0.x + 40, z: p0.z })); assert.equal(st.envoy.s, s1, "tướng xa: đứng chờ");
+  const ev = run(st, ENVOY_LEN / D.ENVOY.speed, (s) => inp(envoyPos(s)));
+  const I = ev.filter((e) => e.type === "intercept"); assert.equal(I.length, 2); assert.deepEqual(I.map((e) => e.n), [6, 6]);
+  for (const e of I) assert.ok(G.waterDist(e.x, e.z) > 10, JSON.stringify(e));
+  assert.ok(ev.some((e) => e.type === "keSach" && e.id === "hoiKe" && e.ok)); assert.equal(st.ks.hoiKe.state, "thanhcong"); assert.equal(st.envoy.state, "done");
+  assert.ok(types(ev).includes("bed2")); assert.equal(st.bed2, "E"); assert.deepEqual(S.armedBeds(st), ["W", "E"]);
+  const end = D.ENVOY.route.at(-1), hq = D.HQ; assert.ok(Math.hypot(end.x - hq.x, end.z - hq.z) < hq.r + 12, "điểm cuối ở bản doanh");
+});
+await t("sứ giả gục → Kế Sách Nhỏ hỏng (chet); phục kích nổ trước → hỏng (muon), sứ giả thôi đi", () => {
+  const a = createB17(); toP2(a); run(a, 3, (s) => inp(envoyPos(s)));
+  const ev = run(a, 0.1, inp(envoyPos(a), { envoyDown: true }));
+  assert.ok(ev.some((e) => e.type === "keSach" && e.id === "hoiKe" && !e.ok && e.why === "chet")); assert.equal(a.envoy.state, "lost"); assert.equal(a.bed2, null);
+  const b = createB17(); toP2(b); run(b, 3, (s) => inp(envoyPos(s))); run(b, BED_S.W / D.COLUMN.speed, inp(FAR)); run(b, 0.1, inp(FAR, { ksPress: true }));
+  assert.equal(b.ks.hoiKe.state, "thatbai"); assert.equal(b.ks.hoiKe.why, "muon"); assert.equal(b.envoy.state, "late");
+  const s = b.envoy.s; run(b, 5, (x) => inp(envoyPos(x))); assert.equal(b.envoy.s, s, "thôi đi");
+});
+await t("bãi thứ hai (nhờ Kế Sách Nhỏ): phục kích bãi đầu hỏng thì về Khả dụng, vào bãi thứ hai mở cửa sổ lần nữa; thành công tối đa một lần", () => {
+  const st = createB17({ ksWin: 0.75 }); toP2(st, "W");
+  run(st, ENVOY_LEN / D.ENVOY.speed + 0.5, (s) => inp(envoyPos(s))); assert.equal(st.bed2, "E");
+  run(st, (BED_S.W - st.col.s) / D.COLUMN.speed + 0.5, inp(FAR)); assert.equal(st.ks.phucKich.state, "sansang"); assert.equal(st.ks.phucKich.bed, "W");
+  const ev = run(st, 23, inp(FAR));
+  assert.ok(ev.some((e) => e.type === "keSach" && e.id === "phucKich" && !e.ok && e.why === "muon" && e.rearm)); assert.equal(st.ks.phucKich.state, "khadung");
+  assert.equal(st.ks.phucKich.tries, 1); assert.equal(S.nextBed(st), "E"); assert.equal(st.phase, 2);
+  const ev2 = run(st, (BED_S.E - st.col.s) / D.COLUMN.speed + 0.5, inp(FAR));
+  assert.ok(ev2.some((e) => e.type === "ksOpen" && e.bed === "E")); assert.equal(st.ks.phucKich.bed, "E");
+  run(st, 0.1, inp(FAR, { ksPress: true })); assert.equal(st.ks.phucKich.state, "thanhcong"); assert.equal(st.col.standWhy, "broken");
+  assert.equal(st.arena.mound.bed, "E"); assert.deepEqual(types(run(st, 0.1, inp(FAR, { ksPress: true }))), ["ksIdle"]);
+  // không có bãi thứ hai: hỏng là hỏng hẳn
+  const b = createB17(); toP2(b, "W"); run(b, BED_S.W / D.COLUMN.speed + 31, inp(FAR)); assert.equal(b.ks.phucKich.state, "thatbai");
+});
+await t("vua Nhân Tông (AI): dưới 30% lui về bản doanh, tới nơi hồi 40 s rồi quay lại; vua gục là thua; vua đứng trong vòng đồn không địch thì chiếm", () => {
+  const st = createB17(); toP2(st);
+  const K = (hpPct, p = { x: 120, z: -60 }, alive = true) => ({ x: p.x, z: p.z, alive, hpPct });
+  run(st, 1, inp(FAR, { king: K(80) })); assert.equal(st.king.mode, "fight");
+  const g0 = kingGoal(st, { x: 120, z: -60 }); assert.equal(g0.id, "A1");
+  const e1 = run(st, 0.1, inp(FAR, { king: K(25) })); assert.deepEqual(types(e1).filter((x) => x.startsWith("king")), ["kingFall"]);
+  assert.deepEqual(kingGoal(st, { x: 120, z: -60 }), { ...D.KING.home, id: "home" });
+  run(st, 5, inp(FAR, { king: K(25) })); assert.equal(st.king.mode, "fall", "chưa tới bản doanh");
+  const e2 = run(st, 0.1, inp(FAR, { king: K(28, D.KING.home) })); assert.ok(types(e2).includes("kingHeal")); assert.equal(st.king.mode, "heal");
+  run(st, D.KING.healSec - 0.5, inp(FAR, { king: K(60, D.KING.home) })); assert.equal(st.king.mode, "heal");
+  const e3 = run(st, 0.6, inp(FAR, { king: K(95, D.KING.home) })); assert.ok(types(e3).includes("kingBack")); assert.equal(st.king.mode, "fight");
+  const O = D.OUTPOSTS[0], e4 = run(st, O.capSec + 0.2, inp(FAR, { king: K(95, O) }));
+  assert.ok(e4.some((e) => e.type === "outpostTaken" && e.id === "A1" && e.by === "king")); assert.equal(kingGoal(st, O).id, "A2");
+  const e5 = run(st, 0.1, inp(FAR, { king: K(0, O, false) }));
+  assert.ok(types(e5).includes("lose")); assert.equal(st.won, false); assert.ok(st.why.includes("Vua"));
+  // không có vua (thiếu inp.king): không luật vua
+  const b = createB17(); toP2(b); run(b, 5, inp(FAR)); assert.equal(b.over, false); assert.equal(b.king.mode, "fight");
+});
+await t("Yết Kiêu (Tương truyền): hai lần trồi lên bên sườn cánh (70 s, 160 s sau đầu P2), đục một thuyền của lượt đổ bộ kế", () => {
+  const st = createB17(); toP2(st);
+  const ev = run(st, D.YET_KIEU.at[0] + 0.05, inp(FAR)), Y = ev.filter((e) => e.type === "yetKieu");
+  assert.equal(Y.length, 1); const h = columnHead(st); assert.ok(Math.hypot(Y[0].x - h.x, Y[0].z - h.z) < D.YET_KIEU.side + 3); assert.ok(G.waterDist(Y[0].x, Y[0].z) > 2);
+  assert.equal(st.land.skip, 1);
+  const L = run(st, 30, inp(BANK)).find((e) => e.type === "landing"); assert.equal(L.sunk, 1); assert.equal(L.troops, D.LANDING.perBoat); assert.equal(st.land.skip, 0);
+  const ev2 = run(st, D.YET_KIEU.at[1] - st.t + st.p2T + 0.05, inp(FAR)); assert.equal(ev2.filter((e) => e.type === "yetKieu").length, 1);
+  assert.equal(run(st, 200, inp(FAR)).filter((e) => e.type === "yetKieu").length, 0, "chỉ hai lần");
 });
 
 console.log("Lớp phủ đầm lầy, gò");
@@ -305,6 +441,13 @@ await t("B17.buildWorld bật lớp phủ (gò cao lên, bùn ở bãi lau), gi�
   B17.buildWorld(new THREE.Scene(), { shadows: false }); assert.ok(G.overlay());
   B15.buildWorld(new THREE.Scene(), { shadows: false });
   assert.equal(G.overlay(), null); assert.equal(G.heightAt, h0); assert.equal(G.mudAt, m0); assert.deepEqual(snap(), before);
+});
+await t("BattleDef B17 khớp danh mục (đợt A5): H40 dựng sẵn cấp 16 — battle.js đọc preset của BattleDef; par = PAR_B17; rig mượn của vua, sứ giả có trong RIGS", async () => {
+  const B17 = (await import("../js/battles/b17.js")).default, { BATTLES } = await import("../js/data/battles.js"), { RIGS } = await import("../js/battle/models.js");
+  assert.deepEqual(B17.preset, BATTLES.B17.preset); assert.deepEqual(B17.preset, { level: 16 }); assert.deepEqual(BATTLES.B17.playable, ["H40"]);
+  assert.equal(B17.par.nhanh, D.PAR_B17); assert.equal(BATTLES.B17.par.nhanh, D.PAR_B17);
+  for (const k of B17.rigs) assert.ok(RIGS[k], k);
+  assert.equal(RIGS.B17_H30.model, RIGS.photuong.model, "vua mượn mô hình Phó tướng (luôn nạp)");
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

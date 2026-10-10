@@ -424,7 +424,7 @@ function openSheet(cls, label, draw) {
 const LEAD = {
   B15: () => `Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.`,
   B16: () => "Gọi dân binh ở các làng ven sông, đánh úp bến Chương Dương đốt 12 thuyền neo, hộ tống xe húc phá cổng nam kinh thành, đánh lui Thoát Hoan rồi chiếm điện chính. Bản thử: dựng tạm trên đất Hàm Tử.",
-  B17: () => "Toa Đô chưa biết Thoát Hoan đã rút, kéo cánh quân dọc đường đê ra biển. Chọn bãi lau đặt phục binh, hạ 3 đồn để làm chậm cánh, đứng xa khi Toa Đô vào bãi rồi phát lệnh phục kích, hạ Toa Đô trên gò. Bản thử: dựng tạm trên đất Hàm Tử, Trần Quốc Toản đứng thay Nguyễn Khoái.",
+  B17: () => "Toa Đô chưa biết Thoát Hoan đã rút, kéo cánh quân dọc đường đê ra biển. Nguyễn Khoái chọn bãi lau đặt phục binh, cùng vua Nhân Tông hạ 3 đồn để làm chậm cánh, đứng xa khi Toa Đô vào bãi rồi phát lệnh phục kích, hạ Toa Đô trên gò; giữ vua an toàn, chặn thuyền tàn quân của Ô Mã Nhi. Bản thử: dựng tạm trên đất Hàm Tử.",
   B20: () => "Dụ hạm đội Nguyên vào khúc sông đã đóng cọc lúc triều lên, giữ chân chúng tới khi nước ròng, rồi lên boong chiến thuyền mắc cạn. Sáu pha theo con nước.",
 };
 async function openBattleInfo(id) {

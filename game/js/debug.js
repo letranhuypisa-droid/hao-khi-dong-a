@@ -263,6 +263,9 @@ function smartBot(getTarget, opts) {
       dbg.b20 = obj.why || "";
     }
     const L0 = Math.hypot(obj.x - h.x, obj.z - h.z);
+    // obj.flee (B17: phục kích còn treo, Toa Đô sắp vào bãi — tướng phải ở ngoài 40 m): chỉ chạy tới chỗ chờ, không đánh, không bắn, không dùng kỹ năng
+    // (bot tầm xa cứ đứng bắn lính hộ tống trong 20 m là lộ phục binh). Phòng thủ (né, đỡ) ở trên vẫn chạy. B15, B16, B20 không đặt cờ này.
+    if (obj.flee) { dropLock(); travel(obj.x, obj.z, L0, L0 > 6); mode("giữ xa (phục kích)"); return; }
     let baseId = null, gateId = null;
     for (const id in sim.bases) {
       const b = sim.bases[id], p = c.world.bases[id];

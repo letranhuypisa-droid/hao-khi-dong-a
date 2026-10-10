@@ -2,8 +2,8 @@
 //
 // Dựng trên đất Hàm Tử của B15 như B16 (battles/b16.js): world.js buildWorld (đồn, doanh trại có tường, Hàm Tử quan) rồi tắt vòng Cứ Điểm, cờ tuyến của
 // B15 (B17 bật lại vòng của 3 đồn A1, A2, A3). Thêm lớp phủ đầm lầy và gò (ground.js setOverlay — chỉ B17; dispose và runBattle gỡ), tô màu đầm lên mặt
-// đất, dựng gò (một lưới) và lau sậy ở hai bãi (một InstancedMesh). Luật ở sim/b17.js (thuần) + battle/director-b17.js. Tướng: H35 Trần Quốc Toản của
-// người chơi đứng tạm (H40 Nguyễn Khoái chờ lớp Cung WC09, H30 Trần Nhân Tông "sắp có"). Toa Đô dùng mô hình X19.
+// đất, dựng gò (một lưới) và lau sậy ở hai bãi (một InstancedMesh). Luật ở sim/b17.js (thuần) + battle/director-b17.js. Tướng: H40 Nguyễn Khoái (lớp Cung
+// WC09, dựng sẵn cấp 16 — đợt A5; H30 Trần Nhân Tông "sắp có", trong trận là tướng AI). Toa Đô dùng mô hình X19, Ô Mã Nhi X20, Yết Kiêu H38.
 
 import * as THREE from "three";
 import { buildWorld } from "../battle/world.js";
@@ -14,8 +14,9 @@ import { ATMO_B15 } from "../battle/atmosphere.js";
 import { DirectorB17 } from "../battle/director-b17.js";
 import { MAP } from "../data/battle-b15.js";
 import B15 from "./b15.js";
-import { overlayB17, mudB17, moundDh, along, columnHead, routeS, BED_S, bedOf } from "../sim/b17.js";
-import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, ROUTE, MOUTH, OUTPOSTS, BEDS, MUD, AMBUSH, PAR_B17, MARSH_PROPS } from "../data/battle-b17.js";
+import { overlayB17, mudB17, moundDh, along, columnHead, routeS, BED_S, bedOf, nextBed, armedBeds, envoyPos, boatPos, ENVOY_LEN } from "../sim/b17.js";
+import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, ROUTE, MOUTH, OUTPOSTS, BEDS, MUD, AMBUSH, PAR_B17, MARSH_PROPS, PIER, ENVOY, KING,
+  COLUMN } from "../data/battle-b17.js";
 
 const COL = { land: "#cdb888", water: "#2f5d62", city: "#b39a6a", wall: "#5a4632", gold: "#f1d98a", dich: "#3d5a78", ta: "#c0392b", ink: "#1d1a17", marsh: "rgba(86,96,52,.55)", reed: "rgba(110,128,62,.8)" };
 
@@ -95,6 +96,10 @@ function drawBase({ c, W, H, X, Z }) {
   const label = (t, x, z) => { c.strokeStyle = "rgba(255,248,230,.9)"; c.strokeText(t, X(x), Z(z)); c.fillStyle = COL.ink; c.fillText(t, X(x), Z(z)); };
   for (const B of BEDS) label(B.name, (B.x0 + B.x1) / 2, B.z1 + 12);
   label("Cửa sông", MOUTH.x - 14, MOUTH.z + 16);
+  c.strokeStyle = "rgba(29,26,23,.4)"; c.lineWidth = 1; c.setLineDash([2, 3]); c.beginPath();                                          // đường sứ giả
+  ENVOY.route.forEach((p, i) => (i ? c.lineTo(X(p.x), Z(p.z)) : c.moveTo(X(p.x), Z(p.z)))); c.stroke(); c.setLineDash([]);
+  c.fillStyle = "#6a4a2e"; c.fillRect(X(PIER.x) - 1.5, Z(PIER.z - PIER.len), 3, Z(PIER.z) - Z(PIER.z - PIER.len));                       // bến tàn quân
+  label("Bến", PIER.x, PIER.z + 12);
   c.textAlign = "start";
 }
 const baseKey = () => "b17";
@@ -108,6 +113,11 @@ function drawTop({ c, X, Z, t, sx }, ctx) {
   c.fillStyle = "#ff5a3a"; c.beginPath(); c.moveTo(X(MOUTH.x), Z(MOUTH.z) - 5); c.lineTo(X(MOUTH.x) + 4, Z(MOUTH.z) + 3); c.lineTo(X(MOUTH.x) - 4, Z(MOUTH.z) + 3); c.fill();
   // phục binh
   for (const list of d.wings) for (const r of list) if (d.live(r)) { c.fillStyle = "#e8b04a"; c.fillRect(X(r.a.x) - 1, Z(r.a.z) - 1, 2, 2); }
+  // bãi thứ hai (Kế Sách Nhỏ): viền nét đứt
+  const B2 = bedOf(st.bed2); if (B2 && st.phase < 3) { c.strokeStyle = COL.gold; c.lineWidth = 1.2; c.setLineDash([3, 2]); c.strokeRect(X(B2.x0), Z(B2.z0), X(B2.x1) - X(B2.x0), Z(B2.z1) - Z(B2.z0)); c.setLineDash([]); }
+  // thuyền tàn quân (neo, đang chạy), sứ giả
+  st.pier.boats.forEach((b, i) => { if (b.state !== "dock" && b.state !== "sail") return; const p = boatPos(st, i); c.fillStyle = b.state === "sail" ? "#ff8a6a" : "#3d5a78"; c.fillRect(X(p.x) - 2.5, Z(p.z) - 1.5, 5, 3); });
+  if (d.envoyTask?.()) { const p = d.envoy; c.fillStyle = "#7fd06a"; c.beginPath(); c.arc(X(p.x), Z(p.z), 3, 0, 7); c.fill(); }
   // đầu cánh, Toa Đô
   const h = columnHead(st); if (!st.col.stood) { c.strokeStyle = "#ff8a6a"; c.lineWidth = 1.5; c.beginPath(); c.arc(X(h.x), Z(h.z), 5, 0, 7); c.stroke(); }
   const u = d.boss; if (u && u.alive && !u.dead) { c.fillStyle = "#ff8a6a"; c.beginPath(); c.arc(X(u.x), Z(u.z), 3.5, 0, 7); c.fill(); }
@@ -121,25 +131,40 @@ function frontsHTML(ctx) {
   const rows = [`<div class="front here"><b>Cánh Toa Đô</b><span class="vs">${Math.round(C.s / C.len * 100)}% đường ra biển · ${halt} · tốc ×${C.mult.toFixed(2).replace(".", ",")} · Sĩ Khí ${C.morale}</span></div>`,
     `<div class="front"><b>Phục binh</b><span class="ta">${d.wingsUp()}</span><span class="vs">${B ? B.name : "chưa đặt"} · ${d.wingsHold() ? "Giữ vững" : d.wingOrder === "giucho" ? "chưa vào chỗ" : "đã xuất"}</span></div>`,
     `<div class="front reinf">Gọi tiếp viện: ${d.reinf.charges} lượt${d.reinf.cd > 0 ? ` · hồi ${Math.ceil(d.reinf.cd)}s` : ""}</div>`];
+  const kg = d.king, kp = kg && kg.alive && !kg.dead ? Math.round(kg.hp / kg.maxHp * 100) : 0, km = st.king.mode;
+  rows.push(`<div class="front"><b>Vua Nhân Tông</b><span class="ta">${kp}%</span><span class="vs">${km === "fall" ? "lui về bản doanh" : km === "heal" ? `hồi sức · ${Math.ceil(st.king.healT)} s` : "dẫn cánh chính đánh đồn"} · vua gục là thua</span></div>`);
+  const E = st.envoy, H = st.ks.hoiKe;
+  rows.push(`<div class="front"><b>Sứ giả</b><span class="vs">${H.state === "thanhcong" ? "đã về bản doanh" : H.state === "thatbai" ? (H.why === "chet" ? "đã gục" : "không kịp") : E.state === "walk" ? `đang về · ${Math.round(E.s / ENVOY_LEN * 100)}%` : "chờ ở làng phía nam"}</span></div>`);
+  const P = st.pier, left = P.boats.filter((b) => b.state === "dock").length;
+  rows.push(`<div class="front"><b>Bến tàn quân</b><span class="vs">${st.oma.state === "hold" ? "Ô Mã Nhi giữ bến" : st.oma.state === "driven" ? "Ô Mã Nhi đã bị đuổi" : "Ô Mã Nhi bỏ bến"} · ${left} thuyền neo · ${P.passed} thuyền qua mốc</span></div>`);
   return rows.join("");
 }
 
 // ---- bot (debug.js __objective) ------------------------------------------------------------------------------------------------------
-// P1 chọn bãi tây; lính còn chặn vòng chiếm trước; phục kích còn treo mà Toa Đô sắp vào bãi thì giữ xa ông (sau ông 55 m nếu đang ở sau, không thì
-// ngoài chỗ ông vào bãi 60 m); đánh Toa Đô thì trả chính đơn vị (bot coi là boss).
+// P1 chọn bãi tây; lính còn chặn vòng chiếm trước; phục kích còn treo mà Toa Đô sắp vào bãi kế thì giữ xa ông (flee: chỉ chạy — sau ông 55 m nếu đang ở
+// sau, không thì ngoài chỗ ông vào bãi 62 m); hộ tống sứ giả (Kế Sách Nhỏ) khi còn kịp trước lúc cánh vào bãi; hạ đồn; đánh Toa Đô thì trả chính đơn vị
+// (bot coi là boss). Bot không làm nhiệm vụ phụ bến tàn quân.
 function botObjective(ctx) {
   const d = ctx.director, st = d.st, h = ctx.hero;
   if (st.phase === 0) { d.pickBed(AMBUSH.defaultBed); return { x: h.x, z: h.z }; }
   const b = d.blockers()[0]; if (b) return { x: b.x, z: b.z, ref: b.ref };
-  const K = st.ks.phucKich, B = bedOf(st.bed), C = st.col;
-  if (K.state === "khadung" && B && !C.entered && !C.stood && BED_S[B.id] != null && BED_S[B.id] - C.s < 85) {
-    const entry = alongPt(BED_S[B.id]), hs = routeS(ROUTE, h);
+  const K = st.ks.phucKich, C = st.col, nb = nextBed(st);
+  if (K.state === "khadung" && nb && !C.stood && BED_S[nb] - C.s < 85) {
+    const entry = alongPt(BED_S[nb]), hs = routeS(ROUTE, h);
     if (Math.hypot(h.x - entry.x, h.z - entry.z) < 62 || d.inp.heroToBoss < 50) {
-      const p = hs < C.s ? alongPt(Math.max(0, C.s - 55)) : alongPt(Math.max(hs, BED_S[B.id] + 62));
-      return { x: p.x, z: p.z };
+      const p = hs < C.s ? alongPt(Math.max(0, C.s - 55)) : alongPt(Math.max(hs, BED_S[nb] + 62));
+      return { x: p.x, z: p.z, flee: true };
     }
   }
-  const o = d.objectives()[0]; if (!o) return { x: h.x, z: h.z };
+  // sứ giả: đi tới ông rồi đi trước ông vài mét trên đường về bản doanh (ông đi khi tướng trong 15 m). Chỉ nhận việc khi cánh còn xa bãi kế (≥ 70 s).
+  if (d.envoyTask() && st.phase <= 1) {
+    const E = st.envoy, eta = nb ? (BED_S[nb] - C.s) / Math.max(0.3, COLUMN.speed * C.mult) : 999, need = (ENVOY_LEN - E.s) / ENVOY.speed + Math.hypot(h.x - d.envoy.x, h.z - d.envoy.z) / 6;
+    if (E.state === "walk" || eta > need + 10) {
+      const p = along(ENVOY.route, Math.min(ENVOY_LEN, E.s + 6)), u = d.envoy;
+      return Math.hypot(h.x - u.x, h.z - u.z) > 12 ? { x: u.x, z: u.z } : { x: p.x, z: p.z };
+    }
+  }
+  const o = d.objectives().find((x) => x.id !== "SUGIA"); if (!o) return { x: h.x, z: h.z };
   if (o.id === "X19" && d.boss && d.boss.alive && !d.boss.dead) return d.boss;
   return { x: o.x, z: o.z };
 }
@@ -170,7 +195,8 @@ export const B17 = {
   music: (d, hk) => (hk.tpc || d.phase >= 2 && d.phase <= 3 ? "boss" : "battle"),
   hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, baseKey, drawTop, frontsHTML, pinTip: true },
   par: { nhanh: PAR_B17, chuan: PAR_B17 },
-  rigs: ["X19", "H31"],
+  preset: { level: 16 },                                   // H40 dựng sẵn cấp 16 (= R; data/battles.js preset — battle.js heroStats đọc của BattleDef)
+  rigs: ["X19", "H31", "X20", "H38", "B17_H30", "B17_SUGIA"],           // Toa Đô, Hưng Đạo vương, Ô Mã Nhi, Yết Kiêu, vua (mô hình mượn), sứ giả
   debug: { objective: botObjective, state: (ctx) => ({ ...ctx.director.st, hero: { x: ctx.hero.x, z: ctx.hero.z, hp: ctx.hero.hp }, boss: ctx.director.boss ? { x: ctx.director.boss.x, z: ctx.director.boss.z, hp: ctx.director.boss.hp } : null }) },
   dispose: (ctx) => { setOverlay(null); ctx.director?.dispose?.(); },
 };

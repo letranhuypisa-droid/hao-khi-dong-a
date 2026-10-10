@@ -2,12 +2,86 @@
 
 Chương thứ tư theo thứ tự Quyển VI (VI·6, ngay sau Chương Dương). Canon: `design/canon.json` → `battles` B17, `heroes` H30 và H40, `enemies` X19 và X20.
 
-Trạng thái (2026-10-10), đã gộp vào `main` 94d19cc:
-- **Mạch A**: đợt A1 (greybox), phần boss của A2, phần rẻ của A4. Nhánh `claude/happy-lichterman-f0e557`.
-- **Mạch B**: B1 và B2 (lớp Cung WC09, H40 chơi được). Nhánh `claude/practical-ishizaka-a22c2c`.
-- **Chưa làm**: phần còn lại của A2, A3, phần còn lại của A4, A5, A6, B3.
+Trạng thái (2026-10-10):
+- **Đã gộp vào `main` 94d19cc**:
+  - mạch A: đợt A1 (greybox), phần boss của A2, phần rẻ của A4 (nhánh `claude/happy-lichterman-f0e557`);
+  - mạch B: B1 và B2, lớp Cung WC09, H40 chơi được (nhánh `claude/practical-ishizaka-a22c2c`).
+- **Xong trên nhánh `claude/affectionate-zhukovsky-f38e20`, chưa gộp**: phần còn lại của A2, và A5 (H40 là tướng chơi của B17, cân bằng, par).
+- **Chưa làm**: A3, phần còn lại của A4, A6, B3.
 
 ## Đã làm
+
+### Đợt A2 phần còn lại và đợt A5 (2026-10-10, nhánh `claude/affectionate-zhukovsky-f38e20`, chưa gộp)
+
+Luật thuần ở `sim/b17.js` (test trong `tests/b17-sim.test.mjs`, 34 mục), dựng và sinh lính ở `battle/director-b17.js`, số ở `data/battle-b17.js`.
+
+- **Phá Trận Thủy Bộ** (`LANDING`):
+  - Từ P2 tới khi Toa Đô bị hạ, cứ 30 s có 2 thuyền × 5 lính đổ bộ ở điểm bờ bắc gần tướng nhất (`bankPoint`).
+  - Tướng xa bờ quá 100 m thì lượt đó bỏ. Lính đổ bộ còn sống tối đa 20.
+  - Mất khi phục kích thành công.
+- **Bến tàn quân và Ô Mã Nhi** (`PIER`, `OMA`):
+  - Cầu gỗ ở (530, −166), 4 thuyền neo. Ô Mã Nhi (X20) có Sinh lực riêng (1 700 gốc thay cho 4 200 của bậc tướng), dây 16 m quanh bến, 12 lính giữ bến.
+  - Từ P2, cứ 60 s một thuyền rời bến (lần đầu sau 60 s), chạy 1,8 m/s ra mốc cửa sông.
+  - Cách chặn thuyền:
+    - bắn hay chém: `director.strikeables`, tên × 0,3 như vào cổng, độ bền 600 × g(R);
+    - Móc Tên: kéo dạt vào bờ, mắc cạn. `director.hookTarget` trả một vật thay thế; `hero.js updateShots` thêm đúng một nhánh cho đích có cờ `proxy` ngoài `ctx.units`, chỉ Móc Tên của H40 tạo nên B15 không chạy;
+    - Chặn Dòng: thả trên sông (giữa chuỗi dưới nước, hoặc cắt luồng thuyền) thì `director.onBoom` dựng chuỗi phao `ENV_phao_moc`, thuyền chạm phải đứng tới hết giờ. Thả trên đất vẫn là hàng cọc;
+    - đốt thuyền còn neo: đứng cách thuyền ≤ 7 m, không địch trong 6 m quanh mình, đủ 2,5 s.
+  - Ô Mã Nhi về 0 Sinh lực thì rút theo nhánh rút sẵn có của BigUnit; bến thôi xuất thuyền, quân giữ bến xuống thuyền rời trận. Vào P4 mà chưa bị đuổi thì ông bỏ bến (bến cũng thôi).
+  - Nhiệm vụ phụ mới: `S_OMA` (đuổi trước 8:00), `S_BOATS` (thắng mà không thuyền nào qua mốc).
+- **Sứ giả, Kế Sách Nhỏ "Hỏi kế Quốc công"** (`ENVOY`, `KE_SACH.hoiKe`):
+  - Đi từ làng (160, 128) về bản doanh, 2,2 m/s, chỉ khi tướng trong 15 m. Đường dài ~181 m.
+  - Qua 20% và 55% đường thì một toán 6 lính lao ra chặn sứ giả (vây đồng minh: `anchor.target`).
+  - Tới trước khi phục kích nổ: +10 Hào Khí, bãi còn lại có thêm 2 cánh phục binh (`bed2`). Sứ giả gục: hỏng ("chet"). Phục kích nổ trước: hỏng ("muon").
+  - Phục kích lần đầu hỏng mà còn bãi có phục binh phía trước thì Kế Sách về Khả dụng: cánh vào bãi thứ hai mở cửa sổ lần nữa. Thành công tối đa một lần.
+  - Lệnh phục binh theo nhóm bãi (`groupOrder`): nhóm đã nổ thì xung trận, nhóm còn chờ giữ lệnh riêng.
+- **Vua Nhân Tông, tướng AI** (`KING`):
+  - Dẫn 16 lính, đi tới đồn chưa chiếm gần nhất (`kingGoal`). Vua đứng trong vòng mà không còn địch thì chiếm như tướng ta.
+  - Dưới 30% thì lui về bản doanh, tới nơi hồi 40 s (+70% Sinh lực) rồi quay lại. Vua gục là thua.
+  - Mô hình mượn `OFF_photuongh`, nhuộm vàng ở shader (giữ sáng tối của texture). Chỉ thân đổ bóng.
+  - `units.js` thêm `noFight` và `postK` tùy chọn cho tướng đồng minh (đi về post, không đánh); sứ giả cũng dùng.
+- **Yết Kiêu** (H38h, Tương truyền; `YET_KIEU`): 70 s và 160 s sau đầu P2, trồi lên cách đầu cánh 20 m về phía sông. Hạ 3 lính hộ tống, đục một thuyền của lượt đổ bộ kế (thuyền chìm giữa đường), đánh 14 s rồi lặn.
+- **Thuyền**: mọi thuyền của trận (4 thuyền tàn quân, tới 6 thuyền đổ bộ) là một InstancedMesh `ENV_thuyen_song_nguyen`, tức 2 lượt vẽ kể cả bóng.
+- **HUD**:
+  - Thanh "Đường ra biển" nay hai dòng (ô hẹp tới ~126 px ở màn nhỏ), có Sinh lực vua và số thuyền thoát.
+  - Bảng dưới bản đồ thêm Vua, Sứ giả, Bến tàn quân.
+  - Bản đồ nhỏ vẽ bến, thuyền, sứ giả, đường sứ giả, bãi thứ hai.
+
+**A5**:
+- `data/battles.js` B17: `playable: ["H40"]`, `preset: { level: 16 }` như B20 (bỏ `ownHero`, bỏ H35); BattleDef cũng có `preset`, vì `battle.js` đọc của BattleDef. Hai Kế Sách, 3 nhiệm vụ phụ.
+- **Chặn đường tắt**: sàn 50% của Toa Đô vẫn khóa khi cánh còn đi, nhưng "đứng lại vì nửa Sinh lực" chỉ tính từ P3 và khi cửa sổ Kế Sách không mở. Ở P2 bắn ông chỉ khóa ông ở nửa Sinh lực, cánh vẫn đi. Trước đó bot H40 thắng trong 94 s.
+- **Bot tầm xa giữ luật 40 m**: mục tiêu có cờ `flee` thì bot chỉ chạy, không bắn, không dùng kỹ năng (`debug.js`; B15, B16, B20 không đặt cờ). Bot hộ tống sứ giả khi cánh còn xa bãi kế.
+- **Tốc cánh 1,8 → 1,5 m/s**: với 1,8 cánh vào bãi tây lúc ~140 s, khi bot vừa xong sứ giả và mới hạ một đồn.
+- **Ẩn rig đơn vị lớn xa camera quá 140 m** (`cullFar`, chỉ trình bày): Ô Mã Nhi ở bến bị vẽ khi tướng ở đồn đầu nhìn dọc đường.
+- **Đo bot** (H40 cấp 16, Trận nhanh, seed 1001 / 2002 / 3003; không tải lại, cả hai Kế Sách thành công):
+
+| Độ khó | Thời gian thắng | Tướng thấp nhất | Vua thấp nhất |
+|---|---|---|---|
+| Quân sĩ | 252 / 246 / 252 s | 44 / 77 / 64% | 84 / 82 / 80% |
+| Tướng quân | 249 / 292 / 281 s | 3 / 65 / 1% | 83 / 83 / 87% |
+
+- Từng pha: P1 5 s (bot chọn ngay), P2 ~173 s (cánh vào bãi tây lúc ~178 s), P3 ~0 s (bot bấm G ngay khi mở cửa sổ), P4 47–96 s, P5 3–20 s.
+- **Par mới**: P1 20, P2 180, P3 20, P4 80, P5 20, tức `PAR_B17` = 320 s (trước là 600 s, đề xuất chưa đo). Registry `par.nhanh` = 320.
+- **Kiểm chứng**:
+  - `node game/tools/run-tests.mjs` xanh.
+  - Vết bot B15 (Quân sĩ, Trận nhanh, seed 1001, `Date.now` / `Math.random` ghim, 40 × 5 s) trùng mã băm với `main` 36262a5 ở cả 4 mốc: hero, lính, `__state()`; 267 KO.
+  - Bot B16 vẫn thắng (528 s).
+  - Lệnh vẽ B17: tab đang hiện, khung nhìn giả lập 1024 × 768 (canvas 1024 × 768, tỉ lệ 1,333), bot seed 1001 có vẽ. Tối đa 148 mỗi khung, trung bình 89, 0/7852 khung quá 150; mẫu mỗi 5 s tối đa 144.
+  - Trước `cullFar` và bớt bóng của vua, đỉnh là 159 ở giây 114.
+- **Kịch bản kiểm trong khung trình duyệt** (đều không lỗi console):
+  - vua 25% → lui, hồi, quay lại 95%;
+  - sứ giả gục → Kế Sách Nhỏ hỏng;
+  - bắn chìm thuyền;
+  - Móc Tên kéo thuyền mắc cạn;
+  - Chặn Dòng trên sông giữ thuyền 10 s;
+  - đuổi Ô Mã Nhi trước 8:00;
+  - vua gục → thua → tải lại đầu pha;
+  - phục kích bãi tây hỏng ("canh") → bãi đông mở lần hai và thành công (thắng 400 s).
+- **Việc còn thấy**:
+  - Vua và cánh chính chặn đường cánh ở đồn đầu, nên tới ~160 s cả 24 lính hộ tống đã chết. Phục kích lúc đó chỉ còn làm Toa Đô đứng lại. Có thể giữ vua sau cánh hoặc tăng hộ tống.
+  - Bot không làm nhiệm vụ phụ bến (mỗi lượt 2 thuyền qua mốc) và chưa hạ đồn cổng A3 lúc thắng (2/3 đồn).
+  - Toa Đô ở R 16 đổ trong ~1 phút trước cung H40 cấp 16. Máu Toa Đô chưa chỉnh, chờ người chơi thử.
+  - Màu áo vua là nhuộm tạm, cần mô hình H30.
 
 ### Gộp hai mạch vào `main` (2026-10-10, 94d19cc)
 

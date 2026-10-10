@@ -113,15 +113,15 @@ await t("danh mục: B16 bản thử (R 13 cố định, H35 của người chơ
   assert.equal(B.result.missionsTotal, D.PHASES.length); assert.equal(B.result.sideTotal, D.SIDE_MISSIONS.length);
   assert.deepEqual(await B.marks(), ["Đánh úp bến thuyền", "Dân binh các lộ"]);
 });
-await t("danh mục: B17 bản thử (R 16 cố định, H35 của người chơi đứng tạm, H30 / H40 sắp có, chỉ Trận nhanh, par = tổng par pha, mô hình X19 X20 H31 H38)", async () => {
+await t("danh mục: B17 bản thử (R 16 cố định, H40 Nguyễn Khoái dựng sẵn cấp 16, H30 sắp có, chỉ Trận nhanh, par = tổng par pha, mô hình X19 X20 H31 H38)", async () => {
   const B = BATTLES.B17, D = await import("../js/data/battle-b17.js");
-  assert.equal(B.fixedR, 16); assert.equal(B.preset, undefined); assert.equal(B.ownHero, true); assert.equal(B.wip, true); assert.equal(B.noComic, true);
-  assert.deepEqual(B.heroes, ["H30", "H40"]); assert.deepEqual(B.playable, ["H35"]); assert.deepEqual(B.modes, ["nhanh"]);
+  assert.equal(B.fixedR, 16); assert.deepEqual(B.preset, { level: 16 }); assert.equal(B.ownHero, undefined); assert.equal(B.wip, true); assert.equal(B.noComic, true);
+  assert.deepEqual(B.heroes, ["H30", "H40"]); assert.deepEqual(B.playable, ["H40"]); assert.deepEqual(B.modes, ["nhanh"]);
   assert.deepEqual(B.models, ["X19", "X20", "H31", "H38"]);
   assert.equal(B.par.nhanh, D.PAR_B17);
   assert.equal(B.result.missionsTotal, 3); assert.equal(B.result.sideTotal, D.SIDE_MISSIONS.length);
   assert.equal(B.keSach.nhanh, D.KS_ORDER.length);
-  assert.deepEqual(await B.marks(), ["Phục kích bãi lau"]);
+  assert.deepEqual(await B.marks(), ["Phục kích bãi lau", "Hỏi kế Quốc công"]);
   assert.ok(BATTLE_ORDER.indexOf("B17") === BATTLE_ORDER.indexOf("B16") + 1 && BATTLE_ORDER.indexOf("B17") < BATTLE_ORDER.indexOf("B20"));
   // B17 theo luật B20: thẻ Kế Sách chỉ mở khi thành công
   assert.deepEqual(C.battleUnlockKeys({ battle: "B17", won: false, keSachList: [{ id: "phucKich", state: "thatbai" }] }), []);
