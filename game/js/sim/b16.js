@@ -58,6 +58,9 @@ function holdRing(o, c, r, sec, inp, dt) {
   return o.p >= 1 ? "done" : "in";
 }
 
+// giây còn phải đứng trong vòng (làm tròn lên, tối thiểu 1 khi chưa xong)
+export const secLeft = (o, sec) => Math.max(1, Math.ceil((1 - o.p) * sec - 1e-9));
+
 function setPhase(st, i, ev) { st.phase = i; st.phaseT = 0; ev.push({ type: "phase", phase: i }); }
 
 export function tickB16(st, inp, dt) {
@@ -73,7 +76,7 @@ export function tickB16(st, inp, dt) {
       const r = holdRing(v, V, V.r, V.hold, inp, dt);
       v.blocked = r === "blocked";
       if (r === "blocked") st.prompt = { text: `Lính Nguyên còn trong ${V.name} — dẹp chúng để dân binh tập hợp`, p: v.p };
-      else if (r === "in") st.prompt = { text: `Dân binh ${V.name} đang tập hợp`, p: v.p };
+      else if (r === "in") st.prompt = { text: `Dân binh ${V.name} đang tập hợp · còn ${secLeft(v, V.hold)} s`, p: v.p };
       else if (r === "done") {
         v.done = true; st.rallied++;
         ev.push({ type: "villageRallied", id: V.id, n: st.rallied });
@@ -117,7 +120,7 @@ export function tickB16(st, inp, dt) {
     if (st.burnt >= BOATS.length) {
       const r = holdRing(st.landing, LANDING, LANDING.r, LANDING.capSec, inp, dt);
       if (r === "blocked") st.prompt = { text: "Quân Nguyên còn trên bến — dẹp chúng để chiếm bến", p: st.landing.p };
-      else if (r === "in") st.prompt = { text: "Chiếm bến Chương Dương", p: st.landing.p };
+      else if (r === "in") st.prompt = { text: `Chiếm bến Chương Dương · còn ${secLeft(st.landing, LANDING.capSec)} s`, p: st.landing.p };
       else if (r === "done") {
         st.landing.taken = true; st.landing.takenT = st.t; st.main[1] = true;
         st.allVillagesBeforeLanding = st.rallied >= VILLAGES.length;
@@ -165,7 +168,7 @@ export function tickB16(st, inp, dt) {
   if (st.phase === 4) {
     const r = holdRing(st.palace, PALACE, PALACE.r, PALACE.capSec, inp, dt);
     if (r === "blocked") st.prompt = { text: "Quân Nguyên còn giữ điện — dẹp chúng để cắm cờ", p: st.palace.p };
-    else if (r === "in") st.prompt = { text: "Cắm cờ trên điện chính", p: st.palace.p };
+    else if (r === "in") st.prompt = { text: `Cắm cờ trên điện chính · còn ${secLeft(st.palace, PALACE.capSec)} s`, p: st.palace.p };
     else if (r === "done") { st.palace.taken = true; st.main[4] = true; finish(st, true, "Quân Trần thu hồi kinh thành Thăng Long.", ev); }
   }
 

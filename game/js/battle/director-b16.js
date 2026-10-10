@@ -14,7 +14,7 @@ import { flagTexture } from "./models.js";
 import { gateTarget as pickGate, gatePct } from "./gatebar.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
 import { HAO_KHI, TIERS, MODES, HERO, S } from "../data/tuning.js";
-import { createB16, tickB16, damageGateB16, damageBannerB16, bossFloorB16, noteSquadCleared, sideB16, snapshotB16, restoreB16, along, finish as simFinish } from "../sim/b16.js";
+import { createB16, tickB16, damageGateB16, damageBannerB16, bossFloorB16, noteSquadCleared, sideB16, snapshotB16, restoreB16, along, secLeft, finish as simFinish } from "../sim/b16.js";
 import { VILLAGES, BOATS, BOAT_RULE, LANDING, RAM, GATES, GATE_SOUTH, GATE_EAST, PALACE, BOSS_B16, PHASES, KE_SACH, KS_ORDER, REINF, PAR_B16,
   REEDS, DYKE, DEPOTS, DEPOT_RULE, SQUADS, COUNTER, BANNERS, BANNER_RULE } from "../data/battle-b16.js";
 
@@ -118,6 +118,20 @@ export class DirectorB16 {
     m.rotation.x = -Math.PI / 2; m.position.set(c.x, heightAt(c.x, c.z) + 0.14, c.z); this.props.add(m);
     return m;
   }
+  // cung tiến độ vàng trên đất, chạy vòng trong vòng chiếm (như vòng Cứ Điểm B15 — world.js setBaseProgress): đầy dần khi đứng giữ
+  arcMesh(c, r) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r - 1.3, r - 0.5, 56, 1, Math.PI / 2, 0.001),
+      new THREE.MeshBasicMaterial({ color: COL.gold, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(c.x, heightAt(c.x, c.z) + 0.16, c.z); this.props.add(m);
+    m.userData = { r, p: 0 }; m.visible = false;
+    return m;
+  }
+  setArc(m, p, on) {
+    m.visible = on && p > 0.005;
+    if (!m.visible || Math.abs(p - m.userData.p) < 0.01) return;
+    m.userData.p = p; m.geometry.dispose();
+    m.geometry = new THREE.RingGeometry(m.userData.r - 1.3, m.userData.r - 0.5, 56, 1, Math.PI / 2, Math.max(0.001, Math.min(1, p) * Math.PI * 2));
+  }
   flag(p, color, h = 7, text = null) {
     const g = new THREE.Group(), y = heightAt(p.x, p.z);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
@@ -134,6 +148,7 @@ export class DirectorB16 {
     const box = (w, h, d, m, x, y, z, ry = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.rotation.y = ry; b.castShadow = true; return b; };
     // làng: vòng, cờ, mấy nếp nhà (làng V2 đã có nhà của world.js)
     this.vRings = VILLAGES.map((V) => this.ringMesh(V, V.r, COL.gold, 0.7));
+    this.vArcs = VILLAGES.map((V) => this.arcMesh(V, V.r));
     this.vFlags = VILLAGES.map((V) => this.flag({ x: V.x + V.r * 0.4, z: V.z - V.r * 0.4 }, 0x8a6a3a, 6));
     for (const V of VILLAGES) {
       if (V.id === "V2") continue;
@@ -154,6 +169,7 @@ export class DirectorB16 {
       return g;
     });
     this.landRing = this.ringMesh(LANDING, LANDING.r, COL.ring, 0.45);
+    this.landArc = this.arcMesh(LANDING, LANDING.r);
     this.landFlag = this.flag({ x: LANDING.x + 4, z: LANDING.z + 4 }, COL.dich, 9);
     // xe húc: thân gỗ có mái, cây gỗ húc
     const ram = new THREE.Group();
@@ -170,6 +186,7 @@ export class DirectorB16 {
     const r1 = new THREE.Mesh(new THREE.ConeGeometry(14, 3.2, 4), tile); r1.position.set(pc.x, py + 7.6, pc.z - 10); r1.rotation.y = Math.PI / 4; r1.scale.set(1.35, 1, 0.75); r1.castShadow = true; P.add(r1);
     const r2 = new THREE.Mesh(new THREE.ConeGeometry(9, 2.4, 4), tile); r2.position.set(pc.x, py + 9.6, pc.z - 10); r2.rotation.y = Math.PI / 4; r2.scale.set(1.35, 1, 0.75); r2.castShadow = true; P.add(r2);
     this.palRing = this.ringMesh(PALACE, PALACE.r, COL.ring, 0.45);
+    this.palArc = this.arcMesh(PALACE, PALACE.r);
     this.palFlag = this.flag({ x: PALACE.x + 6, z: PALACE.z + 5 }, COL.dich, 11);
     this.ctx.world.colliders.push({ x0: pc.x - 9, z0: pc.z - 10, x1: pc.x + 9, z1: pc.z - 10, r: 5.2 });      // thân điện (đoạn dày 10,4 m)
     // lau sậy dày hai bên cầu bến (lối lẻn vào), đê đất phía nam bến (đi trên đê là bị thấy)
@@ -216,6 +233,7 @@ export class DirectorB16 {
     VILLAGES.forEach((V, i) => {
       const v = st.villages[i], on = !v.done && st.phase <= 1;
       this.vRings[i].visible = on; this.vRings[i].material.color.set(v.blocked ? 0xff5a3a : COL.gold);
+      this.setArc(this.vArcs[i], v.p, on);
       this.vFlags[i].cloth.material.color.set(v.done ? COL.ta : 0x8a6a3a);
     });
     BOATS.forEach((B, i) => {
@@ -226,6 +244,7 @@ export class DirectorB16 {
       for (const m of g.children) if (m !== g.sail) m.material = burnt ? this.charMat : m.userData.mat0;
     });
     this.landRing.visible = st.phase === 1 && st.burnt >= BOATS.length;
+    this.setArc(this.landArc, st.landing.p, this.landRing.visible);
     this.landFlag.cloth.material.color.set(st.landing.taken ? COL.ta : COL.dich);
     DEPOTS.forEach((D, i) => {
       const g = this.depotMesh[i], burnt = st.depots[i].burnt;
@@ -235,6 +254,7 @@ export class DirectorB16 {
     });
     BANNERS.forEach((B, i) => { const g = this.bannerMesh[i], b = st.banners[i]; g.visible = st.phase >= 3 && !b.down; });
     this.palRing.visible = st.phase === 4;
+    this.setArc(this.palArc, st.palace.p, this.palRing.visible);
     this.palFlag.cloth.material.color.set(st.palace.taken ? COL.ta : COL.dich);
     this.ramMesh.visible = st.phase >= 2;
     for (const id of [GATE_SOUTH, GATE_EAST]) if (st.gates[id].open && !this.ctx.openGates[id]) this.openGateVisual(id, true);
@@ -508,6 +528,11 @@ export class DirectorB16 {
   }
   hint() {
     const st = this.st;
+    // đang giữ một làng (hoặc đã giữ dở): thẻ nhiệm vụ đếm ngược giây — người chơi thử: "không biết mình đang làm nhiệm vụ đó"
+    if (st.phase <= 1) {
+      const h = this.hero, i = VILLAGES.findIndex((V, k) => !st.villages[k].done && this.dist(h, V) <= V.r);
+      if (i >= 0) { const V = VILLAGES[i], v = st.villages[i]; return v.blocked ? `${V.name}: dẹp lính Nguyên trong vòng` : `${V.name}: dân binh tập hợp · còn ${secLeft(v, V.hold)} s`; }
+    }
     if (st.phase === 0) return `Dân binh: ${st.rallied}/3 làng (cần 2 để đánh bến)`;
     if (st.phase === 1) return st.burnt < BOATS.length ? `Thuyền neo đã đốt ${st.burnt}/12${st.rallied < 3 ? ` · làng ${st.rallied}/3` : ""}` : "Chiếm bến Chương Dương";
     const keep = st.counter.state === "run" ? `Sức giữ bến ${Math.ceil(st.counter.keep)}% · ` : "";

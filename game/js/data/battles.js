@@ -37,7 +37,7 @@ export const BATTLES = {
     heroes: ["H32", "H35"], playable: ["H35"], fixedR: 13, modes: ["nhanh"], wip: true, ownHero: true, noComic: true,
     models: [],                                           // Thoát Hoan mượn mô hình tướng Nguyên chung (OFF_tuong, luôn nạp)
     keSach: { nhanh: 2, chuan: 2 },                       // Đánh úp bến thuyền (Lớn), Dân binh các lộ (Nhỏ)
-    par: { nhanh: 720 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha, theo đo bot 2026-10-10)
+    par: { nhanh: 690 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha, theo đo bot 2026-10-10)
     loading: { title: "Bến Chương Dương · 1285" },
     result: { title: "Giải phóng Thăng Long", missionsTotal: 5, sideTotal: 3, eventNames: {}, cLabel: "Thuyền, bến, cổng, điện" },
     marks: () => import("./battle-b16.js").then((m) => m.KS_ORDER.map((id) => m.KE_SACH[id].name)),

@@ -22,9 +22,10 @@ const inp = (p, { foes = [], ramMoving = false, bossDown = false, alive = true, 
 function run(st, sec, I, dt = 0.1) { const ev = []; for (let i = 0; i < Math.round(sec / dt); i++) ev.push(...tickB16(st, typeof I === "function" ? I(st) : I, dt)); return ev; }
 const types = (ev) => ev.map((e) => e.type);
 
+const VH = D.VILLAGES[0].hold;                                // giây giữ làng
 // đưa trận tới đầu một pha bằng đúng luật (không đặt thẳng trạng thái)
 function toPhase(st, k) {
-  if (k >= 1) { run(st, 31, inp(D.VILLAGES[0])); run(st, 31, inp(D.VILLAGES[1])); }
+  if (k >= 1) { run(st, VH + 1, inp(D.VILLAGES[0])); run(st, VH + 1, inp(D.VILLAGES[1])); }
   if (k >= 2) { for (const B of D.BOATS) run(st, 2.6, inp(B)); run(st, D.LANDING.capSec + 0.2, inp(D.LANDING)); }
   if (k >= 3) run(st, 400, inp({ x: 0, z: 0 }, { ramMoving: true }));
   if (k >= 4) run(st, 0.1, inp({ x: 0, z: 0 }, { bossDown: true }));
@@ -64,11 +65,16 @@ await t("trạng thái đầu: pha 0, cổng hp gốc × S, chưa xong gì", () 
   assert.equal(st.gates.B3.hp, D.GATES.B3.hp * 2); assert.equal(st.gates.A3.hp0, D.GATES.A3.hp * 2);
   assert.deepEqual(st.main, [false, false, false, false, false]);
 });
-await t("làng tập hợp sau 30 s đứng trong vòng; có địch trong vòng thì đứng yên tiến độ", () => {
+await t("làng tập hợp sau V.hold giây (12) đứng trong vòng, nhắc đếm ngược giây; có địch thì đứng yên; ra khỏi vòng giữ tiến độ", () => {
   const st = createB16(), V = D.VILLAGES[0];
+  assert.ok(VH <= 15, "người chơi thấy 30 s quá lâu");
   let ev = run(st, 15, inp(V, { foes: [{ x: V.x + 2, z: V.z }] }));
   assert.equal(st.villages[0].p, 0); assert.ok(st.villages[0].blocked); assert.match(st.prompt.text, /dẹp/);
-  ev = run(st, 29.5, inp(V));
+  run(st, 2, inp(V));
+  assert.match(st.prompt.text, new RegExp(`còn ${VH - 2} s`));                                // đếm ngược trên nhắc tương tác
+  run(st, 3, inp({ x: V.x + V.r + 3, z: V.z }));                                              // ra khỏi vòng: tiến độ giữ nguyên
+  assert.ok(Math.abs(st.villages[0].p - 2 / VH) < 1e-6);
+  ev = run(st, VH - 2.5, inp(V));
   assert.ok(!st.villages[0].done);
   ev = run(st, 0.6, inp(V));
   assert.ok(st.villages[0].done); assert.deepEqual(types(ev), ["villageRallied"]); assert.equal(st.rallied, 1);
@@ -77,10 +83,10 @@ await t("làng tập hợp sau 30 s đứng trong vòng; có địch trong vòng
 });
 await t("đủ 2 làng thì sang pha 1; làng thứ ba vẫn gọi được tới khi chiếm bến", () => {
   const st = createB16();
-  run(st, 31, inp(D.VILLAGES[0]));
-  const ev = run(st, 31, inp(D.VILLAGES[1]));
+  run(st, VH + 1, inp(D.VILLAGES[0]));
+  const ev = run(st, VH + 1, inp(D.VILLAGES[1]));
   assert.deepEqual(types(ev), ["villageRallied", "phase"]); assert.equal(st.phase, 1); assert.ok(st.main[0]);
-  run(st, 31, inp(D.VILLAGES[2]));
+  run(st, VH + 1, inp(D.VILLAGES[2]));
   assert.equal(st.rallied, 3);
 });
 await t("thuyền: đứng sát 2,5 s thì cháy; địch kề bên thì chặn; thuyền đầu tiên cháy là báo động (lửa)", () => {
@@ -215,7 +221,7 @@ await t("quá 30 phút chưa mở cổng nam thì thua; đã mở thì không", 
   assert.ok(!s2.over);
 });
 await t("nhiệm vụ phụ: đủ 3 làng trước khi chiếm bến (allVillagesBeforeLanding), không gục", () => {
-  const st = createB16(); toPhase(st, 1); run(st, 31, inp(D.VILLAGES[2]));
+  const st = createB16(); toPhase(st, 1); run(st, VH + 1, inp(D.VILLAGES[2]));
   for (const B of D.BOATS) run(st, 2.6, inp(B));
   const ev = run(st, D.LANDING.capSec + 0.2, inp(D.LANDING));
   assert.equal(ev.find((e) => e.type === "landingTaken").allVillages, true); assert.ok(st.allVillagesBeforeLanding);

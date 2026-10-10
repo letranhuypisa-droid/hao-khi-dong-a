@@ -8,12 +8,13 @@
 //
 // Luật trận thuần ở sim/b16.js (kiểm trong Node), phần dựng / sinh lính ở battle/director-b16.js.
 
-// Ba làng dân binh (pha 1): đứng trong vòng `hold` giây khi không có địch trong vòng thì dân binh tập hợp; mỗi làng +hk Hào Khí và
+// Ba làng dân binh (pha 1): đứng trong vòng `hold` giây khi không có địch trong vòng thì dân binh tập hợp (ra khỏi vòng thì tiến độ giữ nguyên);
+// canon ghi 30 s, người chơi thử thấy quá lâu (2026-10-10) → 12 s. Mỗi làng +hk Hào Khí và
 // `militia` dân binh theo tướng. Mỗi làng có một toán lính Nguyên đi lùng (`foes`).
 export const VILLAGES = [
-  { id: "V1", name: "Làng Đông Kết", x: 96, z: -128, r: 11, hold: 30, hk: 4, militia: 6, foes: 5 },
-  { id: "V2", name: "Làng ven bãi", x: 172, z: 144, r: 12, hold: 30, hk: 4, militia: 6, foes: 6 },
-  { id: "V3", name: "Làng Thường Tín", x: 262, z: 148, r: 11, hold: 30, hk: 4, militia: 6, foes: 7 },
+  { id: "V1", name: "Làng Đông Kết", x: 96, z: -128, r: 11, hold: 12, hk: 4, militia: 6, foes: 5 },
+  { id: "V2", name: "Làng ven bãi", x: 172, z: 144, r: 12, hold: 12, hk: 4, militia: 6, foes: 6 },
+  { id: "V3", name: "Làng Thường Tín", x: 262, z: 148, r: 11, hold: 12, hk: 4, militia: 6, foes: 7 },
 ];
 export const VILLAGES_TO_ADVANCE = 2;          // canon: pha 2 mở khi đã có ≥ 2 làng (làng thứ ba vẫn gọi được tới khi chiếm bến)
 
@@ -79,8 +80,8 @@ export const BOSS_B16 = {
 // 554 / 594 s, Tướng quân 3003: 622 s + 2 lần tải lại; pha 3 tốn nhất 190–295 s, pha 5 chỉ 4–9 s vì quân giữ điện đã bị dọn lúc đánh Thoát Hoan).
 // Câu tip viết {Act:cmd}… để data/controls.js đổi sang phím của thiết bị.
 export const PHASES = [
-  { id: "P1", name: "Hiệu triệu dân binh", goal: "Gọi dân binh ở 2 làng", par: 150, target: { villages: true },
-    tip: "Tới làng có vòng vàng, dẹp toán lính Nguyên đi lùng rồi đứng trong vòng 30 giây để dân binh tập hợp. Có 2 làng là đủ đánh bến; gọi cả 3 làng trước khi chiếm bến thì có thêm dân binh." },
+  { id: "P1", name: "Hiệu triệu dân binh", goal: "Gọi dân binh ở 2 làng", par: 120, target: { villages: true },
+    tip: "Tới làng có vòng vàng, dẹp toán lính Nguyên đi lùng rồi đứng trong vòng 12 giây để dân binh tập hợp (vòng vàng trên đất đầy dần, ra khỏi vòng thì giữ nguyên tiến độ). Có 2 làng là đủ đánh bến; gọi cả 3 làng trước khi chiếm bến thì có thêm dân binh." },
   { id: "P2", name: "Đánh úp bến", goal: "Đốt 12 thuyền neo, chiếm bến Chương Dương", par: 210, target: { boats: true },
     tip: "Đi trong lau sậy ven sông để lính canh khó thấy; bước lên đê là bến báo động. Đứng sát thuyền neo (không có địch kề bên) để châm lửa. Báo động rồi thì quân Nguyên chạy đi đốt kho: hạ lính cầm đuốc. Đủ 12 thuyền thì đứng trong vòng bến để chiếm." },
   { id: "P3", name: "Cổng nam", goal: "Hộ tống xe húc, phá Cổng nam", par: 240, target: { gate: "B3" },
