@@ -114,8 +114,9 @@ t("tụ lực có lời so với chém chuỗi N trong thời gian giữ (MV th�
 });
 
 console.log("Kỹ năng, Tuyệt Kỹ (dữ liệu)");
-t("mọi kỹ năng có hiện thực trong hero-skills.js (H35, H31)", () => {
-  for (const id of ["H35", "H31"]) {
+t("mọi kỹ năng có hiện thực trong hero-skills.js (H35, H31, H40); nội tại H40 có móc chạy", () => {
+  assert.ok(SKILL_IMPL[HEROES.H40.skills.passive]?.tick, "Thánh Dực Dũng Nghĩa");
+  for (const id of ["H35", "H31", "H40"]) {
     const S = HEROES[id].skills;
     for (const s of ["sk1", "sk2", "ult"]) if (S[s]) { const I = SKILL_IMPL[S[s]]; assert.ok(I && I.start && I.update && (s === "ult" || I.hud), `${id}.${s} = ${S[s]}`); }
   }
@@ -336,6 +337,18 @@ t("Tuyệt Kỹ H35 (Bóp Nát) vẫn qua ultImpl: 24 đòn trong 4,2 s, cắm c
   const h = new Hero(ctx, statsFor("H35")); h.ki = 200;
   const inp = input(); inp.pressed.ult = true; run(h, 4.3, inp);
   assert.equal(h.ultHits, 24); assert.equal(flags, 1); assert.deepEqual(ctx.calls.ultQ, [20]);
+});
+t("H40 (đợt B17): WC09 Cung, chỉ số canon, 3 vạch Khí Lực ở cấp 14, không vệt lưỡi, tên cầm tay; ô E Tên Xuyên Hàng, T Chặn Dòng, Tuyệt Kỹ Móc Tên", () => {
+  const D = HEROES.H40, s = P.heroStats(P.newSave(), 16, "H40"), h = new Hero(makeCtx(), s, D);
+  assert.deepEqual(D.stats, { cong: 3, thu: 3, toc: 3, tam: 5, thong: 3 }); assert.equal(Object.values(D.stats).reduce((a, b) => a + b, 0), 17);
+  const d = deriveStats(D.stats); for (const k of ["cong1", "hp1", "giap1", "move", "atkSpeed", "rangeMul"]) assert.equal(D[k], d[k], k);
+  assert.equal(s.level, 14); assert.equal(s.kiBars, 3); assert.equal(s.cong, Math.round(D.cong1 * (1 + 0.1 * 13) * s.weaponMult));
+  assert.equal(h.cls.id, "WC09"); assert.equal(h.M, MOVESETS.WC09); assert.equal(h.A, ANIMS.WC09); assert.equal(h.poisePerMv, 12);
+  assert.equal(h.trails.length, 0); assert.ok(h.handArrow); assert.ok(h.ranged); assert.equal(h.superArmor, false); assert.equal(h.lienHoanOn, false);
+  assert.deepEqual(h.skillSlots().map((x) => [x.key, x.name]), [["E", "Tên Xuyên Hàng"], ["T", "Chặn Dòng Dụ Địch"]]);
+  h.ki = 120; assert.deepEqual([h.ultInfo().name, h.ultInfo().ready], ["Móc Tên Trói Thuyền", true]);
+  assert.equal(h.nextHeavyInfo().label, "C1 Tên Phá Khiên");
+  assert.equal(moveInfoOf(D).skill.name, "Tên Xuyên Hàng"); assert.equal(moveInfoOf(D).dodge, MOVE_INFO.dodge);
 });
 t("nextHeavy theo cờ: H31 đang N5 → C6 (cấp 25), đang N6 → C1", () => {
   const h = new Hero(makeCtx({ agents: [soldier(0, 3)] }), statsFor("H31"), HEROES.H31);

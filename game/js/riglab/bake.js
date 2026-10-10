@@ -1,5 +1,5 @@
 // riglab/bake.js — cho mô hình đã gắn xương (autorig.js) chạy đúng hoạt ảnh của game: dựng một rig tướng của game (ẩn) làm
-// "người diễn", đặt tư thế bằng chính các hàm của anim.js / anim-wc01.js / hero-anim.js, chạy rig-motion.js (chân bám đất, tay
+// "người diễn", đặt tư thế bằng chính các hàm của anim.js / anim-wc01.js / anim-wc09.js / hero-anim.js, chạy rig-motion.js (chân bám đất, tay
 // nắm chuôi đại kiếm), rồi chép góc từng khớp sang xương cùng tên của mô hình. Xương mô hình nghỉ ở cùng quy ước với rig game
 // (góc 0 = tay chân buông thẳng) nên chép nguyên quaternion là đúng; hông chép độ lệch so với độ cao nghỉ.
 // Nướng (bakeClips): lấy mẫu 30 khung/giây thành THREE.AnimationClip để GLTFExporter ghi vào GLB.
@@ -8,10 +8,12 @@ import * as THREE from "three";
 import { makeRig, disposeRig, RIGS } from "../battle/models.js";
 import * as A from "../battle/anim.js";
 import * as W1 from "../battle/anim-wc01.js";
+import * as W9 from "../battle/anim-wc09.js";
 import { ANIMS } from "../battle/hero-anim.js";
 import { RigMotion } from "../battle/rig-motion.js";
 import { MOVES } from "../data/tuning.js";
 import { MOVES_WC01 } from "../data/moves-wc01.js";
+import { MOVES_WC09 } from "../data/moves-wc09.js";
 import { JOINTS, GAME } from "./autorig.js";
 
 // Bộ đòn theo lớp vũ khí: rig game làm người diễn, tốc chạy (như lab.js rigSpeed), bảng đòn, tư thế ngoài đòn, thời lượng.
@@ -20,6 +22,9 @@ export const SETS = {
     idle: (t) => A.idle(t), run: A.run, block: () => A.block(), hit: (u) => A.hitReact(u), dodge: (u) => A.dodgeRoll(u), down: (u) => A.knockdown(u) },
   WC01: { label: "Đại kiếm (Trần Hưng Đạo)", rig: "H31", speed: 6.0, anims: ANIMS.WC01, moves: MOVES_WC01,
     idle: (t) => W1.idle(t), run: W1.run, block: () => W1.block(), hit: (u) => W1.hitReact(u), dodge: (u) => W1.dodgeRoll(u), down: (u) => W1.knockdown(u) },
+  // Cung (đợt B17-B1): tư thế thủ tục kéo dây, ngắm, buông (anim-wc09.js) — nướng ra để so với clip Mixamo đợt B3
+  WC09: { label: "Cung (Nguyễn Khoái)", rig: "H40", speed: 6.25, anims: ANIMS.WC09, moves: MOVES_WC09,
+    idle: (t) => W9.idle(t), run: W9.run, block: () => W9.block(), hit: (u) => W9.hitReact(u), dodge: (u) => W9.dodgeRoll(u), down: (u) => W9.knockdown(u) },
 };
 const MOVE_KEYS = ["N1", "N2", "N3", "N4", "N5", "N6", "C1", "C2", "C3", "C4", "C5", "C6"];
 

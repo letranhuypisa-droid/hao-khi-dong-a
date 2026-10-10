@@ -210,6 +210,16 @@ details summary { cursor: pointer; color: var(--muted); font-size: .85rem; margi
 .fx-banner { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font-family: var(--serif); font-weight: 900; font-size: 1.7rem; letter-spacing: .14em; white-space: nowrap; animation: banner 1.4s ease-out forwards; text-shadow: 0 0 14px rgba(0,0,0,.9), 0 2px 0 #000; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, 10px) scale(1.2); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -8px); } }
 .lockmark { position: absolute; left: 0; top: 0; color: #ff6a4a; font-size: 1.2rem; text-shadow: 0 0 6px #000; }
+/* tâm ngắm lớp cung WC09 (hud.js): vòng mảnh + 4 vạch giữa màn; .aim = căng dây, ngắm chính xác (thu nhỏ, đỏ son). aimmark: người tự nhắm */
+.reticle { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 1.5px solid rgba(241,217,138,.75); border-radius: 50%;
+  box-shadow: 0 0 3px rgba(0,0,0,.8); pointer-events: none; transition: width .15s, height .15s, margin .15s, border-color .15s; }
+.reticle i { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: #f1d98a; box-shadow: 0 0 2px #000; }
+.reticle::before, .reticle::after { content: ""; position: absolute; background: rgba(241,217,138,.85); box-shadow: 0 0 2px #000; }
+.reticle::before { left: 50%; top: -7px; bottom: -7px; width: 1.5px; margin-left: -.75px; clip-path: polygon(0 0, 100% 0, 100% 8px, 0 8px, 0 calc(100% - 8px), 100% calc(100% - 8px), 100% 100%, 0 100%); }
+.reticle::after { top: 50%; left: -7px; right: -7px; height: 1.5px; margin-top: -.75px; clip-path: polygon(0 0, 8px 0, 8px 100%, 0 100%, calc(100% - 8px) 0, 100% 0, 100% 100%, calc(100% - 8px) 100%); }
+.reticle.aim { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-color: rgba(255,106,74,.95); }
+.aimmark { position: absolute; left: 0; top: 0; width: 22px; height: 22px; border: 2px solid rgba(255,106,74,.85); border-radius: 50%; box-shadow: 0 0 4px #000; pointer-events: none; }
+.aimmark.big { width: 34px; height: 34px; }
 .overlay { position: absolute; inset: 0; display: none; place-items: center; background: rgba(10,8,6,.62); z-index: 5; }
 .overlay.on { display: grid; }
 .panel { background: linear-gradient(var(--then2), #1b1613); border: 2px solid var(--vang); border-radius: 14px; padding: 18px 22px; width: min(720px, 94vw); max-height: 90vh; overflow: auto; }

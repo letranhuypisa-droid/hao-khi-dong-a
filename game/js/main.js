@@ -510,7 +510,7 @@ function huanluyen() {
       <button class="primary" data-tutgo>${done ? "Tập lại" : "Vào huấn luyện"}</button></section>
     <section class="card"><div class="row" style="justify-content:space-between"><h3>Bảng đòn và điều khiển</h3>
       <div class="row">${["Bàn phím", "Cảm ứng", "Tay cầm"].map((l, i) => `<button data-gdev="${i}" class="${guideDevNow() === i ? "primary" : ""}">${l}</button>`).join("")}</div></div>
-      <div class="row" style="margin:2px 0 8px"><span class="small">Tướng</span>${["H35", "H31"].map((h) => `<button data-ghero="${h}" class="${guideHero === h ? "primary" : ""}">${esc(HEROES[h].name)}</button>`).join("")}</div>
+      <div class="row" style="margin:2px 0 8px"><span class="small">Tướng</span>${["H35", "H31", "H40"].map((h) => `<button data-ghero="${h}" class="${guideHero === h ? "primary" : ""}">${esc(HEROES[h].name)}</button>`).join("")}</div>
       ${movesGuideHTML({ dev: guideDevNow(), hero: guideHero })}</section>`;
 }
 

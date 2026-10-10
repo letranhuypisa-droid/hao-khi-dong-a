@@ -109,7 +109,8 @@ export class HUD {
       <div class="hud-wp alt" data-k="wp2" hidden><div class="wp-in"><div class="wp-box"><i class="wp-dir" data-k="wp2dir"></i><div><b data-k="wp2name"></b><span data-k="wp2dist"></span></div></div><i class="wp-tip"></i></div></div>
       <div class="hud-lockhint" data-k="lockhint" hidden></div>
       <div class="cine" data-k="cine"></div>
-      <div class="lockmark" data-k="lockmark">◆</div>`;
+      <div class="lockmark" data-k="lockmark">◆</div>
+      <div class="reticle" data-k="reticle" hidden><i></i></div><div class="aimmark" data-k="aimmark" hidden></div>`;
     this.el = {};
     root.querySelectorAll("[data-k]").forEach((n) => (this.el[n.dataset.k] = n));
     this.sk1Key = this.el.sk1?.querySelector("b")?.textContent ?? "";           // chữ phím ô kỹ năng 1, trả lại khi lớp cảm ứng tắt
@@ -345,7 +346,7 @@ export class HUD {
     if (hero.buffs.atk) buff(`Cờ lệnh ${Math.ceil(hero.buffs.atkT)}s`);
     if (hero.buffs.flag) buff(`Dưới cờ: đánh lính +${Math.round(hero.buffs.flag * 100)}%`);   // cờ Tuyệt Kỹ không cộng vào đòn lên sĩ quan, Toa Đô (đợt 9)
     if (hero.lienHoan) buff(`Liên hoàn ×${hero.lienHoan}`);
-    if (hero.chargeLevel > 0) buff(`Tụ lực ${hero.chargeLevel}`);
+    if (hero.chargeLevel > 0) buff(`${hero.ranged ? "Căng dây" : "Tụ lực"} ${hero.chargeLevel}`);
     if (hero.invuln > 0 && hero.state === "ult") buff("Bất tử");
     if (hero.combo > 4) buff(`${hero.combo} đòn`);
     setText(E.buffs, buffs);
@@ -408,6 +409,16 @@ export class HUD {
       setShow(E.lockmark, p ? "" : "none");
       if (p) setTf(E.lockmark, `translate(${p.x}px, ${p.y}px) translate(-50%,-50%)`);
     } else setShow(E.lockmark, "none");
+    // tầm xa (WC09): tâm ngắm giữa màn khi chơi bằng bàn phím + chuột (§3.3 — camera nhìn trước mặt tướng, battle.js), thu nhỏ khi căng
+    // dây (ngắm chính xác); dấu tự nhắm trên người mũi tên sẽ bay tới (mọi thiết bị). Tướng cận chiến: hai phần tử này ẩn mãi.
+    if (hero.ranged) {
+      const pc = !ctx.touch && !ctx.input?.pad;
+      if (E.reticle.hidden !== !(pc && hero.alive)) E.reticle.hidden = !(pc && hero.alive);
+      E.reticle.classList.toggle("aim", !!hero.aiming);
+      const t = hero.aimMark, p = t && hero.alive ? ctx.project(t.x, hero.aimMarkY ?? 1.2, t.z) : null;
+      if (E.aimmark.hidden !== !p) E.aimmark.hidden = !p;
+      if (p) { setTf(E.aimmark, `translate(${p.x}px, ${p.y}px) translate(-50%,-50%)`); E.aimmark.classList.toggle("big", !!t.isBig); }
+    }
     // vòng lệnh
     if (this.ringOpen) {
       if (d.ringTargets) {

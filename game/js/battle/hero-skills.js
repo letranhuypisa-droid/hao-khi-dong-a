@@ -9,6 +9,9 @@
 // Đợt 15b: mọi vòng sát thương của tướng lên đám lính (Phá Trận, Bóp Nát, Bạch Đằng) dùng crowd.strikeable + crowd.enlist — lính diễn phe địch bị
 // chạm thì thành lính thật rồi nhận đòn, như nhát chém thường (hero.js applyHits).
 // H31 (B20): hichTuongSi, binhThu, bachDang — cơ chế Hư cấu theo systems §4.1 / §4.5 (số ở data/heroes.js SKILLS).
+// H40 (B17, đợt B17-B2): tenXuyenHang, chanDong, thanhDuc (nội tại, hero.passive.tick), mocTen — mũi tên qua lõi tên của hero.js;
+// móc director tuỳ chọn: director.onBoom?.({ x0, z0, x1, z1, until, src, hero }) → true nếu trận tự lo chuỗi phao (sông);
+// director.hookTarget?.(hero, range) → đơn vị thay thế để móc (thuyền chỉ huy). Không có móc: hàng cọc trên đất, chỉ móc tướng / sĩ quan.
 // Hiệu ứng toàn quân đi qua móc của director (B20 dựng; director B15 không có thì dùng bản dự phòng gọn ở đây):
 //   director.onArmyBuff?.({ src, skAll, congPct, sec, x, z })          — Hịch Tướng Sĩ đọc xong
 //   director.onMark?.(target, { src, sec, mult })                      — Binh Thư đánh dấu (target: đơn vị; B20 tự lo Cứ Điểm)
@@ -21,8 +24,9 @@
 import * as A from "./anim.js";
 import { heightAt } from "./world.js";
 import { turn } from "./crowd.js";
-import { HERO, POISE_PER_MV, C_POISE_MULT, HAO_KHI, AI, ultBigDamage, ultBigNote, hitPad } from "../data/tuning.js";
-import { SKILLS } from "../data/heroes.js";
+import { HERO, POISE_PER_MV, C_POISE_MULT, HAO_KHI, AI, ultBigDamage, ultBigNote, hitPad, hitRadius } from "../data/tuning.js";
+import { SKILLS, moveFlags } from "../data/heroes.js";
+import { stakeRow, ropeLine } from "./models.js";
 
 // ---- H35 · Phá Trận: 3 lần lao 18 m trong 6 s, choáng lính 1 s (nguyên văn hero.js) -----------------------------------
 const phaTran = {
@@ -380,5 +384,204 @@ function bachDangEnd(h) {
   ctx.fx.banner("TOÀN QUÂN TIẾN CÔNG", "#f1d98a", 1.4); ctx.audio.play("horn", h.x, h.z);
 }
 
+// ---- H40 Nguyễn Khoái (WC09 Cung, đợt B17-B2) -------------------------------------------------------------------------------
+// Số ở data/heroes.js SKILLS (canon H40 + ĐỀ XUẤT BẢN THỬ). Mũi tên đi qua lõi tên của hero.js (fireArrow / updateShots / landHit):
+// bay thật, xuyên, trúng trễ. nock(h): tên cầm tay hiện lúc kéo dây (hero.js nocked).
+const XH_M = { mv: 0.9, range: 30, pierce: 4, speed: 55, knock: 4, stop: 67, heavy: true };      // một mũi Tên Xuyên Hàng (khoá "xuyenHang")
+const HOOK_M = { mv: 3, range: 37, pierce: 1, speed: 45, knock: 0, stop: 100, heavy: true };     // mũi móc dây (khoá "mocTen")
+const cdOf = (id) => ({
+  tick(h, dt) { h.skillCd[id] = Math.max(0, (h.skillCd[id] || 0) - dt); },
+  ready(h) { return !(h.skillCd[id] > 0); },
+  hud(h) { const cd = h.skillCd[id] || 0; return { ready: cd <= 0, cd: cd > 0 ? Math.ceil(cd) : "" }; },
+});
+// Hướng ra chiêu của cung: mục tiêu khoá (trong tầm) → tự nhắm (nón ±30° quanh hướng ngắm) → hướng ngắm → hướng mặt.
+function bowAim(h, range = 30) {
+  const lk = h.lock?.alive && !h.lock.dead && Math.hypot(h.lock.x - h.x, h.lock.z - h.z) <= range ? h.lock : null;
+  const t = lk || h.aimTarget?.() || null;
+  return t ? Math.atan2(t.x - h.x, t.z - h.z) : h.aimYaw ?? h.yaw;
+}
+
+// ô 1 Tên Xuyên Hàng: kéo dây castSec × release rồi buông 5 tên nặng tỏa spread rad, tầm 30 m, mỗi tên xuyên 4 người; người thứ 4
+// trên đường mỗi tên bị ghim 1,5 s (lính: choáng có sẵn của crowd; sĩ quan / tướng: units.js applyStatus("pin")).
+const tenXuyenHang = {
+  slot: 1, ...cdOf("tenXuyenHang"),
+  nock(h) { const S = SKILLS.tenXuyenHang; return h.st < S.castSec * S.release; },
+  armored(h, hit) { return !hit.heavy && !hit.red; },
+  start(h) {
+    const S = SKILLS.tenXuyenHang, ctx = h.ctx;
+    if (h.skillCd.tenXuyenHang > 0) return false;
+    h.skillCd.tenXuyenHang = S.cd;
+    h.state = "skill"; h.st = 0; h.swingId++; h.skillActive = tenXuyenHang; h.xhFired = false;
+    h.F.xuyenHang ||= moveFlags("xuyenHang", XH_M);
+    h.yaw = bowAim(h, S.range);
+    ctx.director.onHeroAction?.("skill");
+    ctx.fx.banner("TÊN XUYÊN HÀNG", "#e6dcc3", 0.7); ctx.audio.play("whooshHeavy", h.x, h.z);
+    return true;
+  },
+  update(h, dt) {
+    const S = SKILLS.tenXuyenHang, ctx = h.ctx;
+    h.st += dt; const u = h.st / S.castSec;
+    h.setPose(h.A.xuyenHang(Math.min(1, u)), 0.7);
+    if (!h.xhFired && u < S.release && h.aimYaw !== null && !h.lock) h.yaw = turn(h.yaw, bowAim(h, S.range), dt * 6);
+    if (!h.xhFired && u >= S.release) {
+      h.xhFired = true;
+      for (let i = 0; i < S.arrows; i++) {
+        const da = (i - (S.arrows - 1) / 2) * (S.spread / (S.arrows - 1));
+        h.fireArrow("xuyenHang", XH_M, h.yaw + da, S.mv, null, { pierce: S.pierce, range: S.range, speed: S.speed, pin: { at: S.pinAt, sec: S.pin } });
+      }
+      ctx.audio.play("crossbow", h.x, h.z); ctx.audio.play("bow", h.x, h.z);
+      ctx.fx.kick(-Math.sin(h.yaw), -Math.cos(h.yaw), 0.2); ctx.fx.shake(0.15);
+    }
+    if (u >= 1) { h.state = "free"; h.skillActive = null; }
+  },
+};
+
+// ô 2 Chặn Dòng Dụ Địch: thả chuỗi chặn dài len m ngang hướng ngắm, tâm cách tướng ahead m, trong dur s. Trận có móc director.onBoom
+// (sông, thuyền — trả true nếu director tự lo) thì giao cho director; không có: thuyền địch của lớp thủy chiến (ctx.naval) chạm chuỗi thì
+// dừng (Boat.stop), và trên đất là hàng cọc — lính, sĩ quan địch không vượt qua được (đẩy ra khỏi dải dày thick m mỗi bước), phải đi vòng.
+function fenceTick(h) {
+  const F = h.fence, ctx = h.ctx;
+  if (ctx.clock >= F.until) { F.mesh?.parent?.remove(F.mesh); h.fence = null; return; }
+  const push = (o, r) => {
+    const px = o.x - F.cx, pz = o.z - F.cz, al = px * F.tx + pz * F.tz;
+    if (Math.abs(al) > F.half + r) return;
+    const s = px * F.nx + pz * F.nz, w = F.th + r;
+    if (Math.abs(s) >= w) return;
+    const ns = s >= 0 ? w : -w;
+    o.x += F.nx * (ns - s); o.z += F.nz * (ns - s);
+  };
+  for (const a of ctx.crowd.agents) if (a.side === "dich" && a.alive && a.state !== "dead") push(a, hitRadius(a));
+  for (const u of ctx.units) if (u.side === "dich" && u.alive && !u.dead && !u.retreating && !u.script) push(u, u.radius);
+  for (const b of ctx.naval?.boats || []) {
+    if (b.side === "ta") continue;
+    const px = b.x - F.cx, pz = b.z - F.cz;
+    if (Math.abs(px * F.tx + pz * F.tz) <= F.half + 3 && Math.abs(px * F.nx + pz * F.nz) < 7) b.stop?.();
+  }
+}
+const chanDong = {
+  slot: 2,
+  tick(h, dt) { h.skillCd.chanDong = Math.max(0, (h.skillCd.chanDong || 0) - dt); if (h.fence) fenceTick(h); },
+  ready(h) { return !(h.skillCd.chanDong > 0); },
+  hud(h) { const cd = h.skillCd.chanDong || 0; return { ready: cd <= 0, cd: h.fence ? `${Math.ceil(h.fence.until - h.ctx.clock)}s` : cd > 0 ? Math.ceil(cd) : "" }; },
+  start(h) {
+    const S = SKILLS.chanDong, ctx = h.ctx;
+    if (h.skillCd.chanDong > 0) return false;
+    h.skillCd.chanDong = S.cd;
+    h.state = "skill"; h.st = 0; h.swingId++; h.skillActive = chanDong; h.cdPlaced = false;
+    h.yaw = h.aimYaw ?? h.yaw;
+    ctx.director.onHeroAction?.("skill2"); ctx.audio.play("whooshHeavy", h.x, h.z);
+    return true;
+  },
+  update(h, dt) {
+    const S = SKILLS.chanDong, ctx = h.ctx;
+    h.st += dt; const u = h.st / S.castSec;
+    h.setPose(h.A.chanDong(Math.min(1, u)), 0.6);
+    if (!h.cdPlaced && u >= 0.5) {
+      h.cdPlaced = true;
+      const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw), cx = h.x + fx * S.ahead, cz = h.z + fz * S.ahead, tx = fz, tz = -fx;
+      const until = ctx.clock + S.dur, ends = { x0: cx - tx * S.len / 2, z0: cz - tz * S.len / 2, x1: cx + tx * S.len / 2, z1: cz + tz * S.len / 2 };
+      if (h.fence) { h.fence.mesh?.parent?.remove(h.fence.mesh); h.fence = null; }
+      if (!ctx.director.onBoom?.({ ...ends, until, src: "chanDong", hero: h })) {
+        const mesh = stakeRow(S.len);
+        mesh.position.set(cx, 0, cz); mesh.rotation.y = h.yaw;
+        for (const c of mesh.children) { const wx = cx + tx * c.position.x, wz = cz + tz * c.position.x; c.position.y = heightAt(wx, wz) - 0.15; }
+        ctx.scene?.add(mesh);
+        h.fence = { cx, cz, nx: fx, nz: fz, tx, tz, half: S.len / 2, th: S.thick / 2, until, mesh };
+      }
+      for (const k of [-0.5, -0.25, 0, 0.25, 0.5]) ctx.fx.dust(cx + tx * S.len * k, cz + tz * S.len * k, 0.7);
+      ctx.fx.banner("CHẶN DÒNG DỤ ĐỊCH", "#e6dcc3", 0.8); ctx.audio.play("slam", cx, cz);
+    }
+    if (u >= 1) { h.state = "free"; h.skillActive = null; }
+  },
+};
+
+// Nội tại Thánh Dực Dũng Nghĩa: đứng trên boong (h.deck) thì tầm bắn × (1 + deckRange) (hero.rangeBonus nhân vào tầm tên và nón tự
+// nhắm); mỗi thuyền địch mắc cạn (lớp thủy chiến: state "stranded") trong strandedR m: +kiPerBoat Khí Lực/s.
+const thanhDuc = {
+  slot: "passive",
+  tick(h, dt) {
+    const S = SKILLS.thanhDuc, boats = h.ctx.naval?.boats;
+    h.rangeBonus = h.deck ? 1 + S.deckRange : 1;
+    if (!boats) return;
+    let n = 0;
+    for (const b of boats) if (b.side !== "ta" && b.state === "stranded" && (b.x - h.x) ** 2 + (b.z - h.z) ** 2 < S.strandedR * S.strandedR) n++;
+    if (n) h.addKi(S.kiPerBoat * n * dt);
+  },
+};
+
+// Tuyệt Kỹ Móc Tên Trói Thuyền: một mũi móc dây vào tướng / sĩ quan địch trong range m (khoá trước, rồi người gần tâm ngắm, rồi gần
+// nhất); trúng thì kéo về phía tướng pull m (không gần hơn 3 m) trong pullSec s rồi trói bind s (units.js applyStatus); boss (bậc
+// "tuong") mất poiseCut × thanh Phá Thế (đủ thì Vỡ Thế, không kết thúc pha). Bất tử invuln s; cắt máy ngắn (ctx.cinematic, mẫu "lướt theo
+// đòn" của §4.5 là việc của trình bày). Không có tướng địch trong tầm: không tốn Khí Lực. Thuyền chỉ huy (B20): director.hookTarget?.(h, range)
+// trả { x, z, isBig: true, … } đơn vị thay thế — chưa trận nào dựng.
+function hookTarget(h, range) {
+  const ok = (u) => u.side === "dich" && u.alive && !u.dead && !u.retreating && !u.script && Math.hypot(u.x - h.x, u.z - h.z) <= range + u.radius;
+  if (h.lock && h.lock.isBig && ok(h.lock)) return h.lock;
+  const dir = h.aimYaw ?? h.yaw;
+  let best = null, bs = 1e9;
+  for (const u of h.ctx.units) {
+    if (!ok(u)) continue;
+    let da = Math.atan2(u.x - h.x, u.z - h.z) - dir; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const s = Math.abs(da) + Math.hypot(u.x - h.x, u.z - h.z) / range;
+    if (s < bs) { bs = s; best = u; }
+  }
+  return best || h.ctx.director.hookTarget?.(h, range) || null;
+}
+const mocTen = {
+  slot: "ult",
+  nock(h) { const S = SKILLS.mocTen; return h.st < S.release; },
+  start(h) {
+    const S = SKILLS.mocTen, ctx = h.ctx;
+    const hkUlt = h.inTPC && h.hkUltReady;
+    if (!hkUlt && h.ki < S.cost) return false;
+    const t = hookTarget(h, S.range);
+    if (!t) { ctx.fx.text(h.x, h.z, `Không có tướng địch trong ${S.range} m`, "#c9bfae"); return false; }
+    if (hkUlt) h.hkUltReady = false;
+    else {
+      h.ki -= S.cost;
+      if (h.mods.ultRefund && ctx.rng.chance(h.mods.ultRefund)) { h.addKi(50); ctx.fx.text(h.x, h.z, "+50 Khí Lực", "#f1d98a"); }
+    }
+    h.state = "ult"; h.st = 0; h.invuln = S.invuln; h.ultId = (h.ultId || 0) + 1; h.ultHK = hkUlt;
+    h.F.mocTen ||= moveFlags("mocTen", HOOK_M);
+    h.ultS = { t, fired: false, hooked: null, rope: null, shot: null };
+    h.yaw = Math.atan2(t.x - h.x, t.z - h.z);
+    ctx.cinematic(hkUlt ? "MÓC TÊN · HÀO KHÍ" : "MÓC TÊN TRÓI THUYỀN", h);
+    ctx.audio.play("ult", h.x, h.z);
+    ctx.director.onUlt(hkUlt, { id: "mocTen", r: S.range }); ctx.director.onHeroAction?.("ult"); ctx.hud?.speedLines?.(0.6);
+    return true;
+  },
+  update(h, dt) {
+    const S = SKILLS.mocTen, U = h.ultS, ctx = h.ctx, t = U.t;
+    h.st += dt;
+    h.setPose(h.A.mocTen(Math.min(1, h.st / S.clip)), 0.7);
+    if (!U.fired && t.alive && !t.dead) h.yaw = turn(h.yaw, Math.atan2(t.x - h.x, t.z - h.z), dt * 10);
+    if (!U.fired && h.st >= S.release) {
+      U.fired = true;
+      U.shot = h.fireArrow("mocTen", HOOK_M, h.yaw, HOOK_M.mv * (h.ultHK ? 1.5 : 1 + h.mods.ultPct), t, { speed: S.speed, range: S.range + 2 });
+      U.shot.hook = U;
+      U.onHook = (tg) => {                                            // landHit gọi khi móc cắm vào tướng
+        U.hooked = tg;
+        const d = Math.hypot(tg.x - h.x, tg.z - h.z) || 1, pd = Math.max(0, Math.min(S.pull, d - 3));
+        tg.applyStatus?.("pull", { x: tg.x - (tg.x - h.x) / d * pd, z: tg.z - (tg.z - h.z) / d * pd, sec: S.pullSec });
+        tg.applyStatus?.("bind", S.bind);
+        ctx.fx.text(tg.x, tg.z, `${tg.name || "Tướng địch"} bị móc · trói ${S.bind} s`, "#ffb08a");
+        ctx.fx.flash(0.2, "255,220,160"); ctx.fx.shake(0.35); ctx.audio.play("hitHeavy", tg.x, tg.z); ctx.hitstop(90);
+        U.rope = ropeLine(); ctx.scene?.add(U.rope);
+      };
+      ctx.audio.play("crossbow", h.x, h.z);
+    }
+    if (U.rope) {                                                     // dây căng từ tay phải tướng tới người bị móc
+      const tg = U.hooked, hy = h.y + 1.4 * h.rig.scale;
+      U.rope.set(h.x + Math.sin(h.yaw) * 0.4, hy, h.z + Math.cos(h.yaw) * 0.4, tg.x, tg.y + 1.3 * (tg.rig?.scale || 1), tg.z);
+    }
+    if (h.st >= S.clip) {
+      h.state = "free";
+      if (U.rope) { U.rope.parent?.remove(U.rope); U.rope.geometry.dispose(); U.rope = null; }
+      if (!U.hooked) ctx.fx.text(h.x, h.z, "Móc trượt", "#c9bfae");
+    }
+  },
+};
+
 // Khoá: id kỹ năng của data/heroes.js; ultBopNat / ultBachDang là tên gọi trong hợp đồng lõi.
-export const SKILL_IMPL = { phaTran, bopNat, hichTuongSi, binhThu, bachDang, ultBopNat: bopNat, ultBachDang: bachDang };
+export const SKILL_IMPL = { phaTran, bopNat, hichTuongSi, binhThu, bachDang, ultBopNat: bopNat, ultBachDang: bachDang,
+  tenXuyenHang, chanDong, thanhDuc, mocTen, ultMocTen: mocTen };

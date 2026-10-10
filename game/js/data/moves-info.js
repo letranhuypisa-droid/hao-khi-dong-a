@@ -4,9 +4,11 @@
 // File này chỉ import các file thuần (moves-wc01.js, controls.js: nhãn phím theo thiết bị) nên chạy được trong Node để kiểm thử.
 //
 // Theo tướng (đợt 9, lõi nhiều tướng): moveInfoOf(def) — H35 (WC03) dùng MOVE_INFO như cũ; H31 (WC01) = MOVE_INFO đè bằng
-// MOVE_INFO_WC01 (tên đòn đại kiếm, Hịch Tướng Sĩ ở ô "skill", Binh Thư ở ô "skill2", Bạch Đằng Quyết Chiến ở "ult").
+// MOVE_INFO_WC01 (tên đòn đại kiếm, Hịch Tướng Sĩ ở ô "skill", Binh Thư ở ô "skill2", Bạch Đằng Quyết Chiến ở "ult"); H40 (WC09) =
+// MOVE_INFO đè bằng MOVE_INFO_WC09 (tên phát bắn, Tên Xuyên Hàng, Chặn Dòng Dụ Địch, Móc Tên Trói Thuyền).
 
 import { MOVE_INFO_WC01 } from "./moves-wc01.js";
+import { MOVE_INFO_WC09 } from "./moves-wc09.js";
 import { guideKeys } from "./controls.js";
 
 export const ICON = (id) => `./assets/icons/${id}.webp`;
@@ -40,10 +42,11 @@ export const MOVE_INFO = {
 };
 
 // Bảng tên đòn / kỹ năng theo tướng (def: HEROES[id] hoặc id). Tướng WC01 thiếu mục nào thì lấy mục chung của MOVE_INFO.
-const BY_CLS = { WC03: MOVE_INFO, WC01: { ...MOVE_INFO, ...MOVE_INFO_WC01 } };
+const BY_CLS = { WC03: MOVE_INFO, WC01: { ...MOVE_INFO, ...MOVE_INFO_WC01 }, WC09: { ...MOVE_INFO, ...MOVE_INFO_WC09 } };
+// Lớp bảng đòn của tướng (def: HEROES[id] hoặc id): "WC03" | "WC01" | "WC09" — ui/guide.js chọn chữ theo lớp.
+export const moveClsOf = (def) => (typeof def === "string" ? ({ H31: "WC01", H34: "WC01", H40: "WC09" }[def] || "WC03") : (def?.moves || def?.cls || "WC03"));
 export function moveInfoOf(def) {
-  const cls = typeof def === "string" ? ({ H31: "WC01", H34: "WC01" }[def] || "WC03") : (def?.moves || def?.cls || "WC03");
-  return BY_CLS[cls] || MOVE_INFO;
+  return BY_CLS[moveClsOf(def)] || MOVE_INFO;
 }
 
 // Đòn C sẽ ra nếu bấm C ngay bây giờ (HUD hiện icon đòn kế). hero: Hero; cKey: hàm chọn C theo cấp đã mở. hero.F (cờ đòn,

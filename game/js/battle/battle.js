@@ -129,7 +129,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
     if (location.search.includes("debug")) { window.__hk = ctx; watchLateFirstUse(renderer, ctx); }   // chỉ để kiểm thử bằng script
     ctx.hitstopT = 0;
     ctx.hitstop = (ms) => { ctx.hitstopT = Math.max(ctx.hitstopT, ms / 1000); };
-    const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: def.camDist ?? 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0 };
+    const cam = ctx.cam = { yaw: def.camYaw ?? Math.PI / 2, pitch: 0.42, dist: def.camDist ?? 10.5, idle: 0, x: 0, y: 0, z: 0, pull: 0, ahead: 0, aimK: 0 };
     let slowT = 0, slowK = 1;
     ctx.cinematic = (text, unit, big) => {
       ctx.hud.cinematic(text);
@@ -288,10 +288,22 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         outroT += dt; const k = Math.min(1, outroT / 3.2), e = k * k * (3 - 2 * k);
         cam.pull = Math.max(cam.pull, OUTRO.pull * e); cam.pitch += (OUTRO.pitch - cam.pitch) * Math.min(1, dt * 1.2); cam.yaw += dt * 0.05;
       }
-      const dist = cam.dist + cam.pull * 5, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
+      let dist = cam.dist + cam.pull * 5, pitch = cam.pitch;
+      const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
       view.pos(h, hp);
-      const tx = hp.x, ty = hp.y + 1.6, tz = hp.z;
-      let cx = tx - fx * dist * Math.cos(cam.pitch), cz = tz - fz * dist * Math.cos(cam.pitch), cy = ty + dist * Math.sin(cam.pitch);
+      let tx = hp.x, ty = hp.y + 1.6, tz = hp.z;
+      // Tướng tầm xa (WC09, hero.ranged) trên bàn phím + chuột: camera nhìn trước mặt tướng ranged.ahead m để tâm màn (tâm ngắm, hud.js)
+      // nằm trên đường tên; đang căng dây (ngắm chính xác, hero.aiming) thì dí vai — nhìn xa aimAhead m, kéo gần, hạ thấp, lệch sang vai
+      // phải, thu FOV. Chỉ là trình bày: mô phỏng chỉ đọc cam.yaw như cũ. Tướng khác không vào nhánh này (camera y như cũ).
+      if (h.ranged) {
+        const R = h.ranged, pc = !ctx.touch && !input.pad, kk = Math.min(1, dt * 7);
+        cam.aimK += ((pc && h.aiming ? 1 : 0) - cam.aimK) * kk;
+        cam.ahead += ((pc ? (h.aiming ? R.aimAhead : R.ahead) : 0) - cam.ahead) * kk;
+        const a = cam.aimK;
+        tx += fx * cam.ahead - fz * 1.2 * a; tz += fz * cam.ahead + fx * 1.2 * a; ty -= 0.2 * a;
+        dist *= 1 - 0.45 * a; pitch += (0.12 - pitch) * a;
+      }
+      let cx = tx - fx * dist * Math.cos(pitch), cz = tz - fz * dist * Math.cos(pitch), cy = ty + dist * Math.sin(pitch);
       // Cần camera cắt tường / tháp cổng / cửa Hàm Tử quan (hộp 2D, cắt cần theo phương ngang): kéo camera về phía
       // tướng tới trước mặt tường CAM_WALL.pad m và nâng lên (cần giữ dài ≥ keep × dist) → nhìn chếch xuống qua đầu
       // tướng thay vì đứng sau cửa tối, sau lưng tường. Chỉ số vô hướng, không cấp phát.
@@ -323,7 +335,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const fxk = ctx.fx;
       camera.position.set(cam.x + fxk.shakeX + fxk.kickX, cam.y + fxk.shakeY + fxk.kickY, cam.z + fxk.kickZ);
       camera.lookAt(tx + fxk.kickX * 0.5, ty, tz + fxk.kickZ * 0.5);
-      const fov = 55 - fxk.fovPunch;
+      const fov = 55 - fxk.fovPunch - (h.ranged ? 10 * cam.aimK : 0);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       ctx.world.fadeOccluders(camera.position, tx, tz, dt);
       const sun = ctx.world.sun, sd = ctx.atmo.sunDir; sun.position.set(tx + sd.x * 120, sd.y * 120, tz + sd.z * 120); sun.target.position.set(tx, 0, tz);

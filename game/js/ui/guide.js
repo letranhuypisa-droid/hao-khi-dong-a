@@ -1,8 +1,9 @@
 // ui/guide.js — bảng hướng dẫn có icon: đòn đánh, phòng thủ, kỹ năng, chỉ huy, các khái niệm của trận.
 // Dùng ở thẻ Huấn luyện (Doanh trại), bảng tạm dừng, màn Huấn luyện. Chỉ dựng chuỗi HTML.
-// hero (đợt 9): id tướng ("H35" mặc định — bảng như cũ, "H31" đại kiếm + Hịch Tướng Sĩ + Binh Thư + Bạch Đằng Quyết Chiến).
+// hero (đợt 9): id tướng ("H35" mặc định — bảng như cũ, "H31" đại kiếm + Hịch Tướng Sĩ + Binh Thư + Bạch Đằng Quyết Chiến,
+// "H40" cung WC09 + Tên Xuyên Hàng + Chặn Dòng Dụ Địch + Móc Tên Trói Thuyền — đợt B17-B1).
 
-import { MOVE_INFO, ICON, moveInfoOf } from "../data/moves-info.js";
+import { MOVE_INFO, ICON, moveInfoOf, moveClsOf } from "../data/moves-info.js";
 import { guideKeys, seqFor, short } from "../data/controls.js";
 import { GLOSS, CONCEPT_ORDER } from "../data/glossary.js";
 
@@ -23,21 +24,24 @@ const CONCEPTS = CONCEPT_ORDER.map((id) => ({ icon: GLOSS[id].icon, name: GLOSS[
 // "N", "C" là tên hai nút đánh; dòng này nói rõ phím thật để người chơi bàn phím không đi tìm phím C.
 const bindNote = (dev) => (dev === 1 ? `<p class="gbind">N và C là hai nút đánh ở góc phải màn hình.</p>`
   : `<p class="gbind"><kbd>N</kbd> = ${kbd(guideKeys("n")[dev])} <span>·</span> <kbd>C</kbd> = ${kbd(guideKeys("c")[dev])}</p>`);
-const padNote = (wc01) => { const P = (a) => short(a, 2);
-  return `Tay cầm: ${P("n")} đòn N · ${P("c")} đòn C${wc01 ? " (giữ để tụ lực)" : ""} · ${P("dodge")} né · ${P("block")} đỡ · ${P("skill")} ${wc01 ? "Hịch Tướng Sĩ" : "Phá Trận"}${wc01 ? ` · ${P("skill2")} Binh Thư` : ""} · ${P("ult")} Tuyệt Kỹ · ${P("cmd")} giữ = Mệnh Lệnh · ${P("tpc")} Tổng Phản Công · ${P("kesach")} Kế Sách. `; };
+// cls: lớp bảng đòn của tướng (moveClsOf) — chữ của nút C, ô kỹ năng 1, 2
+const PAD = { WC03: ["", "Phá Trận", ""], WC01: [" (giữ để tụ lực)", "Hịch Tướng Sĩ", "Binh Thư"], WC09: [" (giữ để căng dây, ngắm)", "Tên Xuyên Hàng", "Chặn Dòng"] };
+const padNote = (cls) => { const P = (a) => short(a, 2), [cn, s1, s2] = PAD[cls] || PAD.WC03;
+  return `Tay cầm: ${P("n")} đòn N · ${P("c")} đòn C${cn} · ${P("dodge")} né · ${P("block")} đỡ · ${P("skill")} ${s1}${s2 ? ` · ${P("skill2")} ${s2}` : ""} · ${P("ult")} Tuyệt Kỹ · ${P("cmd")} giữ = Mệnh Lệnh · ${P("tpc")} Tổng Phản Công · ${P("kesach")} Kế Sách. `; };
+const WEAPON_NAME = { WC03: "song đao", WC01: "đại kiếm", WC09: "cung" };
 
 export function movesGuideHTML({ dev = 0, compact = false, hero = "H35" } = {}) {
-  const I = moveInfoOf(hero), wc01 = I !== MOVE_INFO, c = (k) => card(k, dev, "", I);
+  const I = moveInfoOf(hero), cls = moveClsOf(hero), c = (k) => card(k, dev, "", I);
   const mv = guideKeys("move")[dev];
   const cam = dev === 0 ? "chuột (bấm vào màn để khóa chuột) · ← →" : guideKeys("cam")[dev];
   return `<div class="guide${compact ? " compact" : ""}">
     <h4>Di chuyển</h4>
     <div class="gcards">
-      <div class="gcard"><img src="${ICON("dash")}" alt=""><div><b>Chạy</b>${kbd(mv)}<small>Đòn đánh tự xoay về địch gần nhất theo hướng bạn đang đẩy.</small></div></div>
+      <div class="gcard"><img src="${ICON("dash")}" alt=""><div><b>Chạy</b>${kbd(mv)}<small>${cls === "WC09" ? (dev === 0 ? "Cung bắn theo tâm ngắm giữa màn (xoay bằng chuột), tự nhắm người gần tâm trong ±30°, 25 m." : "Cung bắn theo hướng bạn đang đẩy (không đẩy thì theo camera), tự nhắm người gần nhất trong ±30°, 25 m.") : "Đòn đánh tự xoay về địch gần nhất theo hướng bạn đang đẩy."}</small></div></div>
       <div class="gcard"><img src="${ICON("lock")}" alt=""><div><b>Camera</b>${kbd(cam)}<small>Đứng yên một lúc thì camera tự xoay theo hướng chạy.</small></div></div>
       ${c("lock")}
     </div>
-    <h4>Đòn đánh · ${wc01 ? "đại kiếm" : "song đao"}</h4>
+    <h4>Đòn đánh · ${WEAPON_NAME[cls] || "song đao"}</h4>
     ${bindNote(dev)}
     <div class="gcards">${["N", "C1", "C2", "C3", "C4", "C5", "C6", "D", "DQ", "CT"].map(c).join("")}</div>
     <h4>Phòng thủ và kỹ năng</h4>
@@ -45,6 +49,6 @@ export function movesGuideHTML({ dev = 0, compact = false, hero = "H35" } = {}) 
     <h4>Chỉ huy</h4>
     <div class="gcards">${["cmd", "tiencong", "giuvung", "theota", "tiepvien", "kesach"].map((k) => card(k, dev)).join("")}</div>
     ${compact ? "" : `<h4>Trong trận</h4><div class="gcards">${CONCEPTS.map((c) => `<div class="gcard"><img src="${ICON(c.icon)}" alt=""><div><b>${c.name}</b><small>${c.text}</small></div></div>`).join("")}</div>`}
-    <p class="small">${dev === 2 ? "" : padNote(wc01)}M bản đồ lớn · Esc tạm dừng.</p>
+    <p class="small">${dev === 2 ? "" : padNote(cls)}M bản đồ lớn · Esc tạm dừng.</p>
   </div>`;
 }
