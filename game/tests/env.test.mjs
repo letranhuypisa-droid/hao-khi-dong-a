@@ -3,7 +3,12 @@
 // (2) glb.js envPart: lưới không chỉ số gộp được với models.js merge, tint, cut tách đúng.
 // (3) đất Hàm Tử (world.js buildWorld, cả đồn có tường) dựng khi đã nạp mô hình và khi chưa nạp (Node, lỗi mạng) ra cùng vật va chạm,
 //     Cứ Điểm, cổng — mô phỏng không phụ thuộc mô hình; khi đã nạp thì thuyền, cây, cổng thật sự dùng mô hình.
-// (4) danh sách nạp trước world.js WORLD_ENV khớp các mã mà world.js, scenery.js, director-b16.js gọi (envPart, envLOD).
+// (4) danh sách nạp trước world.js WORLD_ENV, ARENA_ENV, scenery-b20.js B20_ENV khớp các mã mà world.js, scenery.js, director-b16.js,
+//     scenery-b20.js, world-b20.js gọi (envPart, envLOD) và boats.js ENV_HULL.
+// (5) B20 (world-b20.js buildWorldB20, scenery-b20.js) và Võ trường (world.js buildArena) dựng khi đã nạp / chưa nạp ra cùng vật va chạm, cùng
+//     xếp chỗ (rng thế giới rút y hệt), cùng số lưới (không thêm lượt vẽ); khi đã nạp thì tháp canh, bè, cây, khán đài… thật sự dùng mẫu.
+// (6) thuyền B20 (boats.js): mẫu K1–K5 thay LOD0 trong TRI_BUDGET, LOD1 / hình thay thế vẫn code; mặt boong mẫu đã nắn nằm đúng độ cao các mặt
+//     đi được của HULLS (bắn tia xuống), cầu thang kỳ hạm khớp mặt dốc.
 //   node game/tests/env.test.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
@@ -21,6 +26,7 @@ const { parseHKM, putModel, envPart, envBounds, model } = await import("../js/ba
 const { merge } = await import("../js/battle/models.js");
 const { ENV } = await import("../../design/tools/bake/catalog.mjs");
 const W = await import("../js/battle/world.js");
+const B20 = await import("../js/battle/scenery-b20.js"), WB = await import("../js/battle/world-b20.js"), BT = await import("../js/battle/boats.js");
 
 let pass = 0, fail = 0;
 function t(name, fn) {
@@ -125,15 +131,96 @@ t("đã nạp: 7 thuyền sông, 260 cây, nhà cổng dùng mô hình (Node kh�
   assert.ok(house, "nhà cổng mô hình (LOD) ở chỗ cổng");
 });
 
-console.log("Danh sách nạp trước");
-t("WORLD_ENV = các mã ENV_ trong lời gọi envPart / envLOD của world.js, scenery.js, director-b16.js; mã nào cũng có trong index", () => {
-  const used = new Set();
-  for (const f of ["world.js", "scenery.js", "director-b16.js"]) {
-    const src = readFileSync(join(here, "../js/battle", f), "utf8");
-    for (const m of src.matchAll(/env(?:Part|LOD|Mesh)\(([^)]*)\)/g)) for (const id of m[1].matchAll(/"(ENV_[a-z_]+)"/g)) used.add(id[1]);
+console.log("Đất B20, Võ trường có / không có mô hình");
+// dựng cảnh khi chưa nạp mô hình (gỡ khỏi đệm) rồi khi đã nạp, cùng một hàm
+const twice = (build) => {
+  const saved = envIds.map((id) => [id, model("env/" + id)]);
+  for (const [id] of saved) putModel("env/" + id, undefined);
+  BT.disposeHullGeometries();
+  const off = build();
+  for (const [id, m] of saved) putModel("env/" + id, m);
+  BT.disposeHullGeometries();
+  return [off, build()];
+};
+const meshes = (scene) => { const out = []; scene.traverse((o) => { if (o.isMesh && !(o.parent && o.parent.isLOD && o.parent.levels[0].object !== o)) out.push(o); }); return out; };
+const triOf = (m) => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+const b20 = twice(() => { const scene = new THREE.Scene(), w = WB.buildWorldB20(scene, { shadows: false }); return { scene, w }; });
+t("B20: cùng vật va chạm, xếp chỗ cảnh, bè, phao chặn luồng, boong bến, Cứ Điểm; cùng số lưới, cùng tên lưới", () => {
+  const snap = ({ w }) => JSON.stringify({ col: w.colliders, rafts: w.scenery.rafts.list.map((r) => [r.id, r.x0, r.z0, r.anchors]), boom: w.boom.layout,
+    stakes: w.scenery.stakes.layout, piers: w.pierDecks.map((d) => d.rects), bases: Object.values(w.bases).map((b) => [b.id, b.x, b.z, b.r]) });
+  assert.equal(snap(b20[1]), snap(b20[0]));
+  assert.deepEqual(meshes(b20[1].scene).map((m) => m.name || m.type), meshes(b20[0].scene).map((m) => m.name || m.type));
+});
+t("B20 đã nạp: tháp canh, đầu bến, tời neo vào b20-statics, bè mẫu ENV_be_co mức xa, cây ENV_lum_cay_ven_song mức xa; tổng cảnh ≤ 120 nghìn tam giác, b20-statics ≤ 8.553 + 1.500", () => {
+  const by = (k, n) => meshes(b20[k].scene).find((m) => m.name === n);
+  assert.equal(triOf(by(1, "rafts")), index["env/ENV_be_co"].lods[1]);
+  assert.equal(triOf(by(1, "trees")), index["env/ENV_lum_cay_ven_song"].lods[1]);
+  const st = [triOf(by(0, "b20-statics")), triOf(by(1, "b20-statics"))];
+  assert.ok(st[1] > st[0] && st[1] <= 8553 + 1500, `b20-statics ${st[0]} → ${st[1]}`);
+  const info = b20[1].w.scenery.info();
+  assert.ok(info.tris <= 120000, `cảnh B20 ${info.tris}`);
+  assert.ok(st[1] - st[0] <= (by(0, "trees").count * (triOf(by(0, "trees")) - triOf(by(1, "trees")))), "phần tăng của b20-statics phải bù ở chỗ khác (cây)");
+});
+const arena = twice(() => { const scene = new THREE.Scene(), w = W.buildArena(scene, { shadows: false }); return { scene, w }; });
+t("Võ trường: cùng vật va chạm, chỗ khán giả, cổng; cùng số lưới; đã nạp: 10 gian khán đài là THREE.LOD mẫu ENV_khan_dai (gần có texture)", () => {
+  const snap = ({ w }) => JSON.stringify({ col: w.colliders, spots: w.spectatorSpots, gates: w.gatePoints });
+  assert.equal(snap(arena[1]), snap(arena[0]));
+  assert.equal(meshes(arena[1].scene).length, meshes(arena[0].scene).length);
+  const lods = []; arena[1].scene.traverse((o) => { if (o.isLOD) lods.push(o); });
+  assert.equal(lods.length, 10);
+  for (const l of lods) assert.equal(triOf(l.levels[0].object), index["env/ENV_khan_dai"].lods[0]);
+});
+
+console.log("Thuyền B20 (mẫu K1–K5)");
+BT.disposeHullGeometries();
+t("LOD0 mẫu trong TRI_BUDGET, khác hình code; LOD1 và hình thay thế vẫn là hình code", () => {
+  for (const type of Object.keys(BT.HULLS)) {
+    const g = BT.hullGeometry(type, 0), code = BT.hullGeometry(type, 0, false), n = g.attributes.position.count / 3;
+    assert.ok(n <= (type === "flagship" ? BT.TRI_BUDGET.flagship0 : BT.TRI_BUDGET.lod0), `${type} ${n}`);
+    assert.notEqual(g, code); assert.ok(n > code.attributes.position.count / 3, type);
+    assert.ok(n >= index["env/" + BT.ENV_HULL[BT.HULLS[type].base || type].id].tris * 0.97, type + ": mẫu bị cắt quá nhiều");
+    for (const lod of [1, 2]) assert.equal(BT.hullGeometry(type, lod), BT.hullGeometry(type, lod, false), `${type} LOD${lod}`);
   }
-  assert.deepEqual([...used].sort(), [...W.WORLD_ENV].sort());
-  for (const id of W.WORLD_ENV) assert.ok(index["env/" + id], id);
+});
+// tia thẳng đứng từ trên mặt đi được 0,6 m xuống: chạm mẫu ở đúng độ cao mặt (±0,3 m) — lưới điểm 0,5 m trong mặt, tránh tường cao hơn mặt
+// 0,4 m. Đồ trên boong (nắp hầm, thanh ngang, ghế dọc mạn) và mép mũi hẹp hơn mặt code làm trượt vài điểm: cả thân ≥ 85%, mỗi mặt ≥ 60%.
+t("mặt boong mẫu đã nắn trùng độ cao các mặt đi được của HULLS (kể cả cầu thang và mặt lầu kỳ hạm)", () => {
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), rows = [];
+  for (const type of Object.keys(BT.HULLS)) {
+    const H = BT.HULLS[type], mesh = new THREE.Mesh(BT.hullGeometry(type, 0), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    let all = 0, allOk = 0;
+    for (const r of H.deck.rects) {
+      let ok = 0, n = 0;
+      for (let x = r.x0 + 0.25; x < r.x1; x += 0.5) for (let z = r.z0 + 0.25; z < r.z1; z += 0.5) {
+        if (H.deck.walls.some((w) => w.h > r.y + 0.3 && x > w.x0 - 0.4 && x < w.x1 + 0.4 && z > w.z0 - 0.4 && z < w.z1 + 0.4)) continue;
+        const y = r.y + (r.sx || 0) * (x - r.x0) + (r.sz || 0) * (z - r.z0);
+        ray.set(new THREE.Vector3(x, y + 0.6, z), down); ray.far = 1.2;
+        const hit = ray.intersectObject(mesh)[0]; n++;
+        if (hit && Math.abs(hit.point.y - y) <= 0.3) ok++;
+      }
+      assert.ok(n === 0 || ok / n >= 0.6, `${type} mặt y ${r.y} z ${r.z0}…${r.z1}: ${ok}/${n} điểm khớp`);
+      all += n; allOk += ok;
+    }
+    rows.push(`${type} ${Math.round(100 * allOk / all)}%`);
+    assert.ok(allOk / all >= 0.85, `${type}: ${allOk}/${all} điểm khớp`);
+  }
+  console.log("       " + rows.join(" · "));
+});
+
+console.log("Danh sách nạp trước");
+const callIds = (src) => { const used = new Set(); for (const m of src.matchAll(/env(?:Part|LOD|Mesh)\(([^)]*)\)/g)) for (const id of m[1].matchAll(/"(ENV_[a-z_]+)"/g)) used.add(id[1]); return used; };
+const srcOf = (f) => readFileSync(join(here, "../js/battle", f), "utf8");
+t("WORLD_ENV = các mã ENV_ trong lời gọi envPart / envLOD của world.js, scenery.js (trừ phần Võ trường), director-b16.js; ARENA_ENV = phần Võ trường (buildArena, addArenaScenery); mã nào cũng có trong index", () => {
+  const split = (f, fn) => { const s = srcOf(f), i = s.indexOf("export function " + fn + "("); assert.ok(i > 0, fn); return [s.slice(0, i), s.slice(i)]; };
+  const [w0, w1] = split("world.js", "buildArena"), [s0, s1] = split("scenery.js", "addArenaScenery");
+  assert.deepEqual([...new Set([...callIds(w0), ...callIds(s0), ...callIds(srcOf("director-b16.js"))])].sort(), [...W.WORLD_ENV].sort());
+  assert.deepEqual([...new Set([...callIds(w1), ...callIds(s1)])].sort(), [...W.ARENA_ENV].sort());
+  for (const id of [...W.WORLD_ENV, ...W.ARENA_ENV]) assert.ok(index["env/" + id], id);
+});
+t("B20_ENV = các mã trong lời gọi envPart / envLOD của scenery-b20.js, world-b20.js cộng mẫu thuyền boats.js ENV_HULL; mã nào cũng có trong index", () => {
+  const used = new Set([...callIds(srcOf("scenery-b20.js")), ...callIds(srcOf("world-b20.js")), ...Object.values(BT.ENV_HULL).map((e) => e.id)]);
+  assert.deepEqual([...used].sort(), [...B20.B20_ENV].sort());
+  for (const id of B20.B20_ENV) assert.ok(index["env/" + id], id);
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

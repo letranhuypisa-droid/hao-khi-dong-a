@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Soát khớp boong thuyền B20 (mẫu K1–K5 với HULLS)</title>
+<!-- Soát mẫu thuyền nướng (env/ENV_chien_thuyen_nguyen … thuyen_chien_tran, design/glb-prompts.md mục K) với boong code (battle/boats.js HULLS): mỗi loại
+     một tờ, cột trái hình code LOD0, cột phải hình mẫu (hullGeometry: đã khớp độ cao boong, cán cờ code; &raw: mẫu thô envPart chưa khớp), hàng trên
+     nhìn ngang (mũi bên phải), hàng dưới nhìn từ trên, &persp thêm hàng nhìn chéo. Phủ lên: mặt đi được (xanh lá, đúng độ cao, cầu thang dốc), tường
+     (đỏ trong suốt, cột buồm chỉ vẽ 3 m), lá cờ chữ (vàng, flagAt / flagSize), đường mớn nước (xanh), kẻ ngang mỗi mét. Gửi JPEG về
+     design/glb/_raw/sheets/ (design/tools/serve.mjs /__save).
+     Mở qua serve.mjs:  /design/glb/boat-fit.html?type=junk|flagship|escort|scout|light|lead&cell=820&raw&persp&zr=z0,z1&yr=y0,y1 -->
+<script type="importmap">
+  { "imports": { "three": "../../game/vendor/three/three.module.js", "three/addons/": "../../game/vendor/three/addons/" } }
+</script>
+<style>body { margin: 0; background: #e9e5dc; font: 12px system-ui } #log { padding: 6px }</style>
+</head>
+<body>
+<div id="log">đang chạy…</div>
+<script type="module">
+import * as THREE from "three";
+import { preloadModels, envPart } from "../../game/js/battle/glb.js";
+import { HULLS, hullGeometry, ENV_HULL } from "../../game/js/battle/boats.js";
+import { lambert } from "../../game/js/battle/models.js";
+
+const q = new URLSearchParams(location.search);
+const type = q.get("type") || "junk", cell = +(q.get("cell") || 820), raw = q.has("raw"), persp = q.has("persp");
+const H = HULLS[type], base = H.base || type, E = ENV_HULL[base];
+await preloadModels(["env/" + E.id], 60000);
+const views = ["side", "top", ...(persp ? ["persp"] : [])], cols = 2;
+const L = H.len, cellH = Math.round(cell * 0.42);
+const sheet = document.createElement("canvas"); sheet.width = cols * cell; sheet.height = views.length * (cellH + 18);
+const sc = sheet.getContext("2d"); sc.fillStyle = "#e9e5dc"; sc.fillRect(0, 0, sheet.width, sheet.height); sc.font = "bold 12px system-ui";
+document.body.appendChild(sheet);
+
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(cell, cellH); R.setClearColor(0xd9d4c8); R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffe6c0, 0x3a3020, 1.15));
+const sun = new THREE.DirectionalLight(0xffd29a, 2.1); sun.position.set(-60, 90, 50); scene.add(sun);
+const mat = lambert();
+
+// lớp phủ: mặt đi được, tường, cờ, kẻ ngang
+const over = new THREE.Group();
+const green = new THREE.MeshBasicMaterial({ color: 0x20c040, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthTest: false });
+const red = new THREE.MeshBasicMaterial({ color: 0xd02020, transparent: true, opacity: 0.25, depthTest: false });
+const yellow = new THREE.MeshBasicMaterial({ color: 0xf0c020, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthTest: false });
+for (const r of H.deck.rects) {
+  const h = (x, z) => r.y + (r.sx || 0) * (x - r.x0) + (r.sz || 0) * (z - r.z0), g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute([r.x0, h(r.x0, r.z0), r.z0, r.x1, h(r.x1, r.z0), r.z0, r.x1, h(r.x1, r.z1), r.z1,
+    r.x0, h(r.x0, r.z0), r.z0, r.x1, h(r.x1, r.z1), r.z1, r.x0, h(r.x0, r.z1), r.z1], 3));
+  const m = new THREE.Mesh(g, green); m.renderOrder = 3; over.add(m);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: 0x0a6020, depthTest: false })); e.renderOrder = 4; over.add(e);
+}
+for (const w of H.deck.walls) {
+  const top = Math.min(w.h, H.deckY + 3), m = new THREE.Mesh(new THREE.BoxGeometry(w.x1 - w.x0, top - H.deckY + 0.02, w.z1 - w.z0), red);
+  m.position.set((w.x0 + w.x1) / 2, (H.deckY + top) / 2, (w.z0 + w.z1) / 2); m.renderOrder = 2; over.add(m);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x801010, depthTest: false })); e.position.copy(m.position); e.renderOrder = 4; over.add(e);
+}
+{ const [fx, fy, fz] = H.flagAt, { w, h } = H.flagSize, m = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateY(Math.PI / 2), yellow);
+  m.position.set(fx, fy - h / 2, fz - w / 2); m.renderOrder = 3; over.add(m); }
+{ const pts = [], ext = L * 0.6;
+  for (let y = -3; y <= 24; y++) pts.push(0, y, -ext, 0, y, ext);
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  const grid = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x9a948a, transparent: true, opacity: 0.6 })); grid.position.x = -12; over.add(grid);
+  const wl = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 2 * ext), new THREE.MeshBasicMaterial({ color: 0x2060c0, depthTest: false })); wl.position.x = -12; wl.renderOrder = 5; over.add(wl); }
+scene.add(over);
+
+const geos = { code: hullGeometry(type, 0, false), env: raw ? envPart(E.id, { s: H.scale || 1 }) : hullGeometry(type, 0) };
+const box = new THREE.Box3().setFromBufferAttribute(geos.code.attributes.position).union(new THREE.Box3().setFromBufferAttribute(geos.env.attributes.position));
+if (q.has("zr")) { const [z0, z1] = q.get("zr").split(",").map(Number); box.min.z = Math.max(box.min.z, z0); box.max.z = Math.min(box.max.z, z1); }   // &zr=z0,z1: khung một khúc thân
+if (q.has("yr")) { const [y0, y1] = q.get("yr").split(",").map(Number); box.min.y = y0; box.max.y = y1; }
+const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+const tris = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
+views.forEach((view, row) => ["code", "env"].forEach((k, col) => {
+  const mesh = new THREE.Mesh(geos[k], mat); scene.add(mesh);
+  let cam;
+  const asp = cell / cellH;
+  if (view === "persp") {
+    cam = new THREE.PerspectiveCamera(30, asp, 0.1, 2000); const r = Math.max(sz.z / asp, sz.y) * 0.62 / Math.tan(THREE.MathUtils.degToRad(15));
+    cam.position.set(c.x - r * 0.55, c.y + r * 0.45, c.z + r * 0.7); cam.lookAt(c);
+  } else {
+    const hw = Math.max(sz.z * 0.54, (view === "side" ? sz.y : sz.x) * 0.54 * asp), hh = hw / asp;
+    cam = new THREE.OrthographicCamera(-hw, hw, hh, -hh, 0.1, 400);
+    if (view === "side") { cam.position.set(c.x - 100, c.y, c.z); cam.up.set(0, 1, 0); }
+    else { cam.position.set(c.x, c.y + 100, c.z); cam.up.set(1, 0, 0); }
+    cam.lookAt(c.x, c.y, c.z);
+  }
+  over.visible = view !== "persp" || q.has("overp");
+  R.render(scene, cam);
+  const x = col * cell, y = row * (cellH + 18);
+  sc.drawImage(R.domElement, x, y, cell, cellH);
+  sc.fillStyle = "#1d1a17";
+  sc.fillText(`${type} ${view} · ${k === "code" ? "code LOD0" : raw ? "mẫu thô " + E.id : "mẫu " + E.id} · ${tris(geos[k])} tam giác`, x + 4, y + cellH + 13);
+  scene.remove(mesh);
+}));
+const blob = await new Promise((r) => sheet.toBlob(r, "image/jpeg", 0.9));
+const out = `boatfit-${type}${raw ? "-raw" : ""}${persp ? "-p" : ""}${q.has("zr") ? "-z" : ""}.jpg`;
+const resp = await fetch(`/__save?name=${out}`, { method: "POST", body: blob });
+document.getElementById("log").textContent = "xong: " + await resp.text();
+window.__done = true;
+</script>
+</body>
+</html>

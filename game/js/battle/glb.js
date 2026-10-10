@@ -75,7 +75,8 @@ export const putModel = (id, m) => (m ? CACHE.set(id, m) : CACHE.delete(id));
 // ---- vật tĩnh của cảnh (env/<mã>) ------------------------------------------------------------------------------------------
 // Khung nướng (bake/env.mjs): mét, gốc giữa đáy (thuyền: mặt nước), vật dài dọc +Z. envPart trả BufferGeometry không chỉ số (position,
 // normal theo mặt, color tuyến tính theo mặt) đã đặt như models.js part: { x, y, z, rx, ry, rz, s, sx, sy, sz }, lod (0 gần, 1 xa —
-// mã không có LOD1 thì dùng LOD0), tint (nhân màu), cut ({ y0, y1 }: chỉ giữ tam giác có trọng tâm trong khoảng — tách buồm khỏi thân).
+// mã không có LOD1 thì dùng LOD0), tint (nhân màu), cut ({ y0, y1 }: chỉ giữ tam giác có trọng tâm trong khoảng — tách buồm khỏi thân),
+// drop ([[|x| <, z0, z1, y0, y1], …]: bỏ tam giác có trọng tâm trong hộp, khung mẫu trước khi đặt — thang, cầu thang mẫu mà code dựng lại).
 // Chưa nạp (Node, lỗi mạng) → null: nơi gọi dựng khối code như cũ.
 const srgb = new Float32Array(256).map((_, i) => { const c = i / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
 const FLAT = new Map();            // "id/lod" → BufferGeometry gốc đã bung
@@ -101,12 +102,17 @@ function flatGeo(id, lod) {
   return out;
 }
 const _em = new THREE.Matrix4(), _ev = new THREE.Vector3(), _eq = new THREE.Quaternion(), _ee = new THREE.Euler(), _es = new THREE.Vector3();
-export function envPart(id, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1, sx = s, sy = s, sz = s, lod = 0, tint = null, cut = null } = {}) {
+export function envPart(id, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1, sx = s, sy = s, sz = s, lod = 0, tint = null, cut = null, drop = null } = {}) {
   const base = flatGeo(id, lod); if (!base) return null;
   let g = base.clone();
-  if (cut) {
+  if (cut || drop) {
     const P = g.attributes.position.array, keep = [];
-    for (let t = 0; t < P.length; t += 9) { const cy = (P[t + 1] + P[t + 4] + P[t + 7]) / 3; if (cy >= (cut.y0 ?? -Infinity) && cy < (cut.y1 ?? Infinity)) keep.push(t / 9); }
+    for (let t = 0; t < P.length; t += 9) {
+      const cx = Math.abs(P[t] + P[t + 3] + P[t + 6]) / 3, cy = (P[t + 1] + P[t + 4] + P[t + 7]) / 3, cz = (P[t + 2] + P[t + 5] + P[t + 8]) / 3;
+      if (cut && !(cy >= (cut.y0 ?? -Infinity) && cy < (cut.y1 ?? Infinity))) continue;
+      if (drop && drop.some(([xm, z0, z1, y0, y1]) => cx < xm && cz > z0 && cz < z1 && cy > y0 && cy < y1)) continue;
+      keep.push(t / 9);
+    }
     const out = new THREE.BufferGeometry();
     for (const k of ["position", "normal", "color"]) {
       const A = g.attributes[k].array, B = new Float32Array(keep.length * 9);

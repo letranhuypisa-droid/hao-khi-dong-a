@@ -290,18 +290,20 @@ function tudoIntro(c) {
 }
 // Mô hình GLB (battle/glb.js) và ảnh fx (battle/fx.js) trong lúc màn tải hiện: chờ mọi thứ trận dùng — tướng người chơi, tướng đồng minh và
 // boss của trận (data/battles.js models: ra giữa trận cũng nạp trước, đợt 19c — trước đây tải ngầm khi trận đã chạy nên tướng đồng minh
-// trận đầu là hình khối, việc đọc mô hình rơi vào mấy giây đầu trận), lính đám đông, vũ khí, cận vệ, sĩ quan, vật môi trường của đất Hàm Tử
-// (world.js WORLD_ENV: thuyền, bến, cổng, tháp, cây…). Tối đa 12 s; mạng chậm, lỗi:
+// trận đầu là hình khối, việc đọc mô hình rơi vào mấy giây đầu trận), lính đám đông, vũ khí, cận vệ, sĩ quan, vật môi trường của đất trận
+// (env: hàm trả danh sách mã — data/battles.js env, world.js ARENA_ENV của Võ trường; thiếu thì đất Hàm Tử, world.js WORLD_ENV: thuyền, bến,
+// cổng, tháp, cây…). Tối đa 12 s; mạng chậm, lỗi:
 // trận vẫn chạy với hình dựng bằng code. Mô hình của trận khác không tải ngầm giữa trận nữa: màn tải của trận đó tự nạp.
 // chars: mã tướng / boss (heroes.js, data/battles.js models) hoặc mã mô hình (lính Tự do LINH_*); mã tướng đổi qua RIGS thành mô hình đã nướng (H35 → H35h).
-async function loadModels(chars = []) {
+async function loadModels(chars = [], env = null) {
   try {
-    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }, { WORLD_ENV }] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js"), import("./battle/world.js")]);
-    await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + (RIGS[HEROES[c]?.rig || c]?.model || modelOf(c))), ...kitFiles().map((k) => "kit/" + k), "wpn/*", ...WORLD_ENV.map((id) => "env/" + id),
+    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }, { WORLD_ENV }, envIds] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js"), import("./battle/world.js"), env ? env() : null]);
+    await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + (RIGS[HEROES[c]?.rig || c]?.model || modelOf(c))), ...kitFiles().map((k) => "kit/" + k), "wpn/*", ...(envIds || WORLD_ENV).map((id) => "env/" + id),
       ...["CV_khien", "CV_giao", "CV_cung", "CV_songdao", "CV_daidao", "OFF_tuong", "OFF_photuong", "OFF_doitruong"].map((c) => "char/" + modelOf(c))], 12000), preloadFx(), loadClips()]),
       new Promise((r) => setTimeout(r, 12000))]);
   } catch (e) { console.warn("mô hình", e); }
 }
+const arenaEnv = () => import("./battle/world.js").then((m) => m.ARENA_ENV);     // mô hình môi trường Võ trường (khán đài, đài chỉ huy…)
 // Khung trận (đợt 19c): dựng ẩn sau màn tải; battle.js / arena.js gọi onReady khi đã làm nóng (biên dịch shader, nạp texture — battle/gfx.js)
 // thì mới hiện khung trận và ẩn màn tải, nên khung đầu nhìn thấy không khựng vì biên dịch. Lỗi trước lúc đó: nơi gọi gỡ stage, hiện lại app.
 function makeStage() {
@@ -514,7 +516,7 @@ function huanluyen() {
 async function startTutorial() {
   app.innerHTML = `<div class="loading"><h2>Võ trường · Huấn luyện</h2><p>Trần Quốc Toản luyện song đao trước khi ra bến Hàm Tử.</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
+  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"], arenaEnv)]);
   const { stage, onReady } = makeStage();
   let res = null;
   try { res = await runArena({ container: stage, save, R: Math.max(1, Math.min(...save.ladder.unlocked)), difficulty: "danbinh", music, opts: { mode: "huanluyen" }, onSettings: () => persist(), onReady }); }
@@ -967,7 +969,7 @@ async function startBattle(battleId = pick.battle) {
   app.innerHTML = `<div class="loading ld-art b-${B.id}"><i class="ld-img" aria-hidden="true"></i><h2>${esc(B.loading.title)}</h2><p><span class="label ${note.label === "Chính sử" ? "cs" : note.label === "Tương truyền" && B.id !== "B15" ? "tt" : "hc"}">${note.label}</span> ${esc(note.text)}</p><div class="spin"></div><p class="small">Bấm vào màn hình để khóa chuột và điều khiển camera. Esc để tạm dừng.</p></div>`;
   await new Promise((r) => setTimeout(r, 60));
   if (DEBUG_RIGMODEL) { const M = await import("./battle/models.js"); if (DEBUG_RIGMODEL === "meshy") M.useMeshy(); else M.RIGS.hero.model = DEBUG_RIGMODEL; }
-  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id), loadModels([heroFor(B), ...(B.models || [])])]);
+  const [{ runBattle }, def] = await Promise.all([import("./battle/battle.js"), loadBattleDef(B.id), loadModels([heroFor(B), ...(B.models || [])], B.env)]);
   const { stage, onReady } = makeStage();
   let res;
   try {
@@ -1031,7 +1033,7 @@ async function startArena() {
   const opts = { ...arenaPick, week, seed: arenaPick.mode === "seedtuan" ? seedFromKey(week) : arenaPick.seed };
   app.innerHTML = `<div class="loading"><h2>Võ trường</h2><p>${ARENA_MODES[opts.mode].text}</p><div class="spin"></div></div>`;
   await new Promise((r) => setTimeout(r, 60));
-  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"])]);
+  const [{ runArena }] = await Promise.all([import("./battle/arena.js"), loadModels(["H35"], arenaEnv)]);
   const { stage, onReady } = makeStage();
   let res = null;
   try { res = await runArena({ container: stage, save, R: pick.R, difficulty: pick.difficulty, music, opts, onSettings: () => persist(), onReady }); }

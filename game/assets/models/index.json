@@ -244,9 +244,10 @@
   "file": "env/ENV_be_co.hkm",
   "tris": 792,
   "lods": [
-   792
+   792,
+   382
   ],
-  "bytes": 12696
+  "bytes": 18704
  },
  "env/ENV_ben_go": {
   "kind": "env",
@@ -271,9 +272,10 @@
   "file": "env/ENV_bia_rom.hkm",
   "tris": 592,
   "lods": [
-   592
+   592,
+   296
   ],
-  "bytes": 9916
+  "bytes": 14876
  },
  "env/ENV_bo_rom": {
   "kind": "env",
@@ -307,9 +309,10 @@
   "file": "env/ENV_cau_tau_dau.hkm",
   "tris": 1198,
   "lods": [
-   1198
+   1198,
+   270
   ],
-  "bytes": 19608
+  "bytes": 24112
  },
  "env/ENV_cau_tau_nhip": {
   "kind": "env",
@@ -542,18 +545,20 @@
   "file": "env/ENV_gia_binh_khi.hkm",
   "tris": 800,
   "lods": [
-   800
+   800,
+   298
   ],
-  "bytes": 13424
+  "bytes": 18508
  },
  "env/ENV_hinh_nom": {
   "kind": "env",
   "file": "env/ENV_hinh_nom.hkm",
   "tris": 390,
   "lods": [
-   390
+   390,
+   144
   ],
-  "bytes": 6600
+  "bytes": 9196
  },
  "env/ENV_ho_chong": {
   "kind": "env",
@@ -588,9 +593,10 @@
   "tex": "env/ENV_khan_dai.webp",
   "tris": 2474,
   "lods": [
-   2474
+   2474,
+   562
   ],
-  "bytes": 175190
+  "bytes": 183090
  },
  "env/ENV_khom_chuoi": {
   "kind": "env",
@@ -627,9 +633,9 @@
   "tris": 782,
   "lods": [
    782,
-   60
+   72
   ],
-  "bytes": 13968
+  "bytes": 14152
  },
  "env/ENV_luoi_phoi": {
   "kind": "env",
@@ -767,9 +773,10 @@
   "file": "env/ENV_thap_canh_tran.hkm",
   "tris": 1800,
   "lods": [
-   1800
+   1800,
+   996
   ],
-  "bytes": 28340
+  "bytes": 43488
  },
  "env/ENV_thung_cau": {
   "kind": "env",
@@ -854,9 +861,10 @@
   "file": "env/ENV_toi_neo.hkm",
   "tris": 800,
   "lods": [
-   800
+   800,
+   172
   ],
-  "bytes": 13424
+  "bytes": 16384
  },
  "env/ENV_trong_dong": {
   "kind": "env",
@@ -872,9 +880,10 @@
   "file": "env/ENV_trong_tran.hkm",
   "tris": 1196,
   "lods": [
-   1196
+   1196,
+   298
   ],
-  "bytes": 20052
+  "bytes": 25276
  },
  "env/ENV_tuong_dat": {
   "kind": "env",

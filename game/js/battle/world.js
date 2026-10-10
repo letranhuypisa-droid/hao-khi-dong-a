@@ -5,6 +5,7 @@
 // Mô hình môi trường nướng (assets/models/env, glb.js envPart: màu phẳng, gộp được vào lưới tĩnh; envLOD: vật riêng lẻ hai mức gần / xa)
 // thay khối code cho cột cờ, tháp canh, cổng Hàm Tử, thuyền chiến Nguyên trên sông, cây; chưa nạp (Node, lỗi mạng) thì dựng khối code như
 // cũ. Hai đường rút world rng y hệt nhau và không đổi vật va chạm, nên mô phỏng (ctx.rng riêng) không phụ thuộc mô hình có nạp hay không.
+// Võ trường (buildArena, ARENA_ENV): giá binh khí, hình nộm, trống trên lầu trống; khán đài, đài chỉ huy, bia ở scenery.js addArenaScenery.
 
 import * as THREE from "three";
 import { MAP, FRONTS, BASES, BASE_RING, FORT, lineToX, VILLAGE } from "../data/battle-b15.js";
@@ -66,6 +67,9 @@ function gable(w, h, len) {
 export const WORLD_ENV = ["ENV_bao_gao", "ENV_ben_go", "ENV_bep_lua", "ENV_canh_cong", "ENV_cay_da", "ENV_cay_tan_tron", "ENV_co_duoi_ngua", "ENV_coc_buoc_ngua",
   "ENV_cong_ham_tu", "ENV_cot_co", "ENV_cu_ma", "ENV_cum_cau", "ENV_hom_go", "ENV_khung_leu_chay", "ENV_thap_canh_nguyen", "ENV_thung_cau", "ENV_thung_go",
   "ENV_thuyen_mui", "ENV_thuyen_song_nguyen", "ENV_xe_luong", "ENV_xe_luong_vo"];
+// Mô hình môi trường của Võ trường (buildArena, scenery.js addArenaScenery): khán đài (có texture), đài chỉ huy, giá binh khí, hình nộm, bia rơm,
+// trống trên lầu trống. Lầu trống, cây, rào, vạc lửa giữ code (lầu trống chưa có mẫu; cây mẫu 40 tam giác mất thân, Võ trường giữ số code).
+export const ARENA_ENV = ["ENV_bia_rom", "ENV_dai_chi_huy", "ENV_gia_binh_khi", "ENV_hinh_nom", "ENV_khan_dai", "ENV_trong_tran"];
 
 // forts: đồn và doanh trại (Cứ Điểm "don", "doanh_trai") dựng có tường, hai cổng, tháp góc và vật va chạm (fort.js) thay vòng cọc; B15 chiến dịch (battles/b15.js) và nhiệm vụ Tự do
 // (td.js) đều bật; tắt thì vòng cọc cũ (không có vật va chạm).
@@ -744,17 +748,25 @@ export function buildArena(scene, { shadows = true } = {}) {
     flag.position.set(x, heightAt(x, z) - 0.1, z); flag.castShadow = shadows; scene.add(flag);
     world.addFadeable(flag, 0.9);
   }
+  // giá binh khí (mẫu ENV_gia_binh_khi mức xa 298 tam giác: hai trụ, đòn, năm ngọn giáo) và hình nộm rơm (ENV_hinh_nom mức xa 144) cạnh nhau
   for (let k = 0; k < 6; k++) {
     const a = rng.range(0, 6.28), x = Math.cos(a) * (ARENA_R + 12 + rng.range(0, 10)), z = Math.sin(a) * (ARENA_R + 12 + rng.range(0, 10));
     const y = heightAt(x, z), y2 = heightAt(x + 3, z);
-    parts.push(P(new THREE.BoxGeometry(3, 0.2, 0.6), PAL.go, { x, y: y + 1.2, z, ry: a }), P(new THREE.BoxGeometry(0.2, 1.6, 0.6), PAL.go, { x, y: y + 0.5, z, ry: a }));
-    parts.push(P(new THREE.CylinderGeometry(0.35, 0.3, 1.5, 6), 0xc8b070, { x: x + 3, y: y2 + 1.0, z }), P(new THREE.SphereGeometry(0.3, 6, 4), 0xc8b070, { x: x + 3, y: y2 + 2.0, z }));
+    const rack = envPart("ENV_gia_binh_khi", { x, y: y - 0.05, z, ry: a, lod: 1 }), dummy = envPart("ENV_hinh_nom", { x: x + 3, y: y2 - 0.05, z, ry: a, lod: 1 });
+    if (rack) parts.push(rack);
+    else parts.push(P(new THREE.BoxGeometry(3, 0.2, 0.6), PAL.go, { x, y: y + 1.2, z, ry: a }), P(new THREE.BoxGeometry(0.2, 1.6, 0.6), PAL.go, { x, y: y + 0.5, z, ry: a }));
+    if (dummy) parts.push(dummy);
+    else parts.push(P(new THREE.CylinderGeometry(0.35, 0.3, 1.5, 6), 0xc8b070, { x: x + 3, y: y2 + 1.0, z }), P(new THREE.SphereGeometry(0.3, 6, 4), 0xc8b070, { x: x + 3, y: y2 + 2.0, z }));
   }
   const tower = (x, z) => {
     const y = heightAt(x, z) - 0.3;
     for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) parts.push(P(new THREE.BoxGeometry(0.25, 7, 0.25), PAL.go, { x: x + dx, y: y + 3.8, z: z + dz }));
-    parts.push(P(new THREE.BoxGeometry(4, 0.3, 4), PAL.go, { x, y: y + 7.3, z }), P(new THREE.ConeGeometry(3.4, 2, 4), PAL.son, { x, y: y + 9.3, z, ry: Math.PI / 4 }));
-    parts.push(P(new THREE.CylinderGeometry(1, 1, 1.2, 12), PAL.son, { x, y: y + 8.2, z, rz: Math.PI / 2 }));
+    // trống: mẫu ENV_trong_tran (trống trên giá, mức xa 298 tam giác) ×0,82 cao 1,84 m đứng trên sàn (mặt sàn y + 7,45) — mái nâng 0,9 m trên bốn
+    // cột góc cho vừa trống (khối code: trống nằm Ø 2 m, mái nón đặt sát sàn)
+    const drum = envPart("ENV_trong_tran", { x, y: y + 7.45, z, s: 0.82, ry: Math.atan2(-x, -z), lod: 1 }), roofY = y + (drum ? 10.2 : 9.3);
+    parts.push(P(new THREE.BoxGeometry(4, 0.3, 4), PAL.go, { x, y: y + 7.3, z }), P(new THREE.ConeGeometry(3.4, 2, 4), PAL.son, { x, y: roofY, z, ry: Math.PI / 4 }));
+    if (drum) { parts.push(drum); for (const [dx, dz] of [[-1.75, -1.75], [1.75, -1.75], [-1.75, 1.75], [1.75, 1.75]]) parts.push(P(new THREE.BoxGeometry(0.16, roofY - 1 - y - 7.45, 0.16), PAL.go, { x: x + dx, y: (y + 7.45 + roofY - 1) / 2, z: z + dz })); }
+    else parts.push(P(new THREE.CylinderGeometry(1, 1, 1.2, 12), PAL.son, { x, y: y + 8.2, z, rz: Math.PI / 2 }));
   };
   tower(-ARENA_R - 8, -ARENA_R + 10); tower(ARENA_R + 8, ARENA_R - 10);
   const m = new THREE.Mesh(merge(parts), lambert()); m.castShadow = shadows; m.receiveShadow = true; scene.add(m);

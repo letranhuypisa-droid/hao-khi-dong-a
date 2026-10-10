@@ -13,6 +13,7 @@
 // Mô hình môi trường nướng (glb.js envPart, màu phẳng gộp vào cùng lưới tĩnh / InstancedMesh) thay khối code khi đã nạp: bến gỗ, thuyền
 // mui, thúng câu, xe lương, hòm, thùng, khung lều cháy, bếp lửa, cọc buộc ngựa, cây đa, cau, cự mã nguyên, cờ đuôi ngựa; thuyền mui và cây
 // đa đặt riêng nên dùng envLOD (gần / xa). Đường code và đường mẫu rút rng y hệt nhau (vị trí mọi thứ khác không đổi), vật va chạm không đổi.
+// Võ trường (addArenaScenery, world.js ARENA_ENV): khán đài (envLOD, gần có texture), đài chỉ huy, bia rơm.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -983,17 +984,24 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
   const place = (geoParts, x, z, ry, y0 = heightAt(x, z)) => { const g = merge(geoParts); g.applyMatrix4(new THREE.Matrix4().compose(_v.set(x, y0, z), _q.setFromEuler(_e.set(0, ry, 0)), _s.set(1, 1, 1))); return g; };
   world.spectatorSpots = [];
 
-  // khán đài: 3 bậc gỗ, mái ngói son trên hàng cột, mỗi gian 6 m quay mặt vào sân
+  // khán đài: 3 bậc gỗ, mái ngói son trên hàng cột, mỗi gian 6 m quay mặt vào sân. Mẫu ENV_khan_dai (gần: texture, từ 45 m mức xa 562 tam
+  // giác màu phẳng; mỗi gian vẫn một lưới tự mờ): ba bậc mẫu cao 0,75 / 1,40 / 1,95 m ở z 1,0 / 0,2 / −0,85, sâu ~0,9 m mỗi bậc → giãn dọc
+  // ×1,73, dời ra sau 1,72 m, hạ 0,25 m cho ba hàng khán giả (z 0, −1,6, −3,2; cao 0,5 / 1,1 / 1,7 như bậc code) đứng đúng trên bậc
   const bay = (a, r) => {
     const [x, z] = at(a, r), ry = -a - Math.PI / 2;          // mặt gian hướng về tâm sân
-    const p = [];
-    for (let s = 0; s < 3; s++) p.push(part(box(6, 0.5 + s * 0.6, 1.6), s % 2 ? 0x7a5a3a : PAL.go, { y: 0.25 + s * 0.3, z: -s * 1.6 }));
-    for (const dx of [-2.9, 2.9]) for (const dz of [0.6, -4.2]) p.push(part(cyl(0.12, 0.14, 4.6, 6), PAL.sonDam, { x: dx, y: 2.3, z: dz }));
-    p.push(part(box(6.8, 0.25, 5.8), PAL.then, { y: 4.65, z: -1.8 }));
-    p.push(part(box(7.2, 0.9, 3.4), PAL.son, { y: 5.1, z: -0.4, rx: 0.42 }), part(box(7.2, 0.9, 3.4), PAL.son, { y: 5.1, z: -3.2, rx: -0.42 }));
-    p.push(part(box(7.4, 0.2, 0.3), PAL.vang, { y: 5.55, z: -1.8 }));
     const [fx, fz] = at(a, r - 1), y0 = heightAt(fx, fz);       // chân mép trước (thấp nhất)
-    const g = new THREE.Mesh(merge(p), mat); g.position.set(x, y0, z); g.rotation.y = ry; g.castShadow = shadows; g.receiveShadow = true;
+    const env = envLOD("ENV_khan_dai", mat, { far: 45, cast: shadows }), p = [];
+    if (!env) {
+      for (let s = 0; s < 3; s++) p.push(part(box(6, 0.5 + s * 0.6, 1.6), s % 2 ? 0x7a5a3a : PAL.go, { y: 0.25 + s * 0.3, z: -s * 1.6 }));
+      for (const dx of [-2.9, 2.9]) for (const dz of [0.6, -4.2]) p.push(part(cyl(0.12, 0.14, 4.6, 6), PAL.sonDam, { x: dx, y: 2.3, z: dz }));
+      p.push(part(box(6.8, 0.25, 5.8), PAL.then, { y: 4.65, z: -1.8 }));
+      p.push(part(box(7.2, 0.9, 3.4), PAL.son, { y: 5.1, z: -0.4, rx: 0.42 }), part(box(7.2, 0.9, 3.4), PAL.son, { y: 5.1, z: -3.2, rx: -0.42 }));
+      p.push(part(box(7.4, 0.2, 0.3), PAL.vang, { y: 5.55, z: -1.8 }));
+    }
+    const g = env || new THREE.Mesh(merge(p), mat);
+    if (env) { const oz = -1.72; g.position.set(x + Math.sin(ry) * oz, y0 - 0.25, z + Math.cos(ry) * oz); g.scale.set(1, 1, 1.73); }
+    else g.position.set(x, y0, z);
+    g.rotation.y = ry; g.castShadow = shadows; g.receiveShadow = true;
     scene.add(g); world.addFadeable(g, 3.2);
     for (let s = 0; s < 3; s++) for (let k = 0; k < 4; k++) {
       if (rng.next() < 0.18) continue;
@@ -1014,7 +1022,12 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
     p.push(part(cyl(0.05, 0.05, 4, 4), PAL.then, { y: 3.9, z: -1.1 }), part(cone(1.9, 0.9, 10), PAL.vang, { y: 5.9, z: -1.1 }), part(cyl(1.9, 1.9, 0.35, 10), PAL.vang, { y: 5.35, z: -1.1 }));
     p.push(part(cyl(0.95, 0.9, 0.9, 12), 0x6a5a3a, { x: 2.2, y: 2.9, z: 1.2 }), part(cyl(1.0, 1.0, 0.08, 12), 0x8f7a4a, { x: 2.2, y: 3.36, z: 1.2 }), part(ico(0.25, 0), PAL.vang, { x: 2.2, y: 3.42, z: 1.2, sy: 0.2 }));
     for (const dx of [1.4, 3.0]) p.push(part(box(0.1, 1.2, 0.1), PAL.go, { x: dx, y: 2.3, z: 1.2 }));
-    statics.push(place(p, x, z, ry, heightAt(...at(a, R + 9)))); solid(x, z, 4.2);
+    // mẫu ENV_dai_chi_huy (bệ 5,5 × 7 m, sàn 1,3 m, lan can son, bậc góc trước trái, ghế, lọng vàng, giá trống): mức gần 2.480 tam giác — mức
+    // thấp hơn mất cán lọng. Đất sau đài dốc lên ~0,4 m mỗi mét (gờ ngoài sân): chân bệ giãn dọc cho sàn lên 2,4 m trên chân mép trước (bệ code
+    // 1,8 m cũng lút phần sau vào dốc), ghế, lọng, lan can dời theo — không thì nửa sau sàn chìm, ghế và lọng như mọc trên đất
+    const env = envPart("ENV_dai_chi_huy");
+    if (env) { const P = env.attributes.position.array; for (let i = 1; i < P.length; i += 3) P[i] = P[i] <= 1.3 ? P[i] * (2.4 / 1.3) : P[i] + 1.1; }
+    statics.push(place(env ? [env] : p, x, z, ry, heightAt(...at(a, R + 9)))); solid(x, z, 4.2);
   }
 
   // bia đá "Sát Thát" (Chính sử: quân Trần thích hai chữ Sát Thát lên cánh tay — bia là Hư cấu)
@@ -1053,9 +1066,14 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
     const a = Math.PI * 1.25 + 0.55, base = R + 20;
     for (let k = 0; k < 5; k++) {
       const [x, z] = at(a + (k - 2) * 0.07, base + 16), ry = Math.atan2(-Math.cos(a), -Math.sin(a));
-      const tg = [part(box(0.12, 2.2, 0.12), PAL.go, { x: -0.6, y: 1.1 }), part(box(0.12, 2.2, 0.12), PAL.go, { x: 0.6, y: 1.1 })];
-      [[1.0, 0xe6dcc3], [0.75, PAL.son], [0.5, 0xe6dcc3], [0.25, PAL.son]].forEach(([r, col], i) => tg.push(part(cyl(r, r, 0.1, 14), col, { y: 1.8, z: 0.08 + i * 0.02, rx: Math.PI / 2 })));
+      // bia: mẫu ENV_bia_rom (mức xa 296 tam giác, khung hai trụ, mặt rơm vòng đỏ) thay trụ và vòng; tên cắm vẫn bằng code
+      const env = envPart("ENV_bia_rom", { x, y: heightAt(x, z), z, ry: ry + Math.PI, lod: 1 }), tg = [];
+      if (!env) {
+        tg.push(part(box(0.12, 2.2, 0.12), PAL.go, { x: -0.6, y: 1.1 }), part(box(0.12, 2.2, 0.12), PAL.go, { x: 0.6, y: 1.1 }));
+        [[1.0, 0xe6dcc3], [0.75, PAL.son], [0.5, 0xe6dcc3], [0.25, PAL.son]].forEach(([r, col], i) => tg.push(part(cyl(r, r, 0.1, 14), col, { y: 1.8, z: 0.08 + i * 0.02, rx: Math.PI / 2 })));
+      }
       for (let n = 0; n < 3; n++) tg.push(part(cyl(0.012, 0.012, 0.8, 3), PAL.go, { x: rng.range(-0.5, 0.5), y: 1.8 + rng.range(-0.5, 0.5), z: 0.45, rx: Math.PI / 2 + rng.range(-0.2, 0.2) }));
+      if (env) statics.push(env);
       statics.push(place(tg, x, z, ry + Math.PI));
     }
     for (let k = -3; k <= 3; k++) { const [x, z] = at(a + k * 0.05, base); statics.push(part(box(0.9, 0.06, 0.2), 0xe6dcc3, { x, y: heightAt(x, z) + 0.03, z, ry: -a })); }
