@@ -5,7 +5,8 @@
 // bị kéo theo thanh "hiệu ứng"), hạ nhạc và hiệu ứng (duck) khi đang nói, và phụ đề qua director.say (chữ + nhãn Chính sử / Hư cấu).
 //
 // Bộ nhớ: mỗi dòng ~2 s giải mã ra ~0,4 MB, nên chỉ nạp dòng của tướng đang chơi và tướng địch của chương này (preload), mỗi trận một bộ,
-// bỏ cùng trận. Tệp nén (vài chục KB) giữ chung giữa các trận (BYTES). Thứ tự chọn dòng là vòng tròn, không ngẫu nhiên.
+// bỏ cùng trận. Tệp nén (vài chục KB) giữ chung giữa các trận (BYTES). Lời chiêu chọn theo vòng tròn; lời giáp mặt chọn theo đồng hồ máy
+// (cho mỗi lần chơi một câu khác); không dòng nào dùng Math.random (giọng không được động vào dãy số của mô phỏng).
 import { VOICE_BY_ID, VOICE_CAST, VOICE_LINES, voiceLinesFor } from "../data/voice.js";
 
 const BYTES = {};                                                      // id → Promise<ArrayBuffer|null>, dùng chung các trận
@@ -20,7 +21,7 @@ export class Voice {
   constructor(audio, { music = null, say = null, volume = 0.9 } = {}) {
     this.audio = audio; this.music = music; this.sayFn = say;
     this.ready = new Map();                                           // id → AudioBuffer đã giải mã
-    this.cur = null;                                                  // { id, prio, src, gain, left }
+    this.cur = null;                                                  // { id, prio, src, gain }
     this.gap = 0; this.met = new Set(); this.turn = {};
     this.setVolume(volume);
   }
@@ -36,7 +37,8 @@ export class Voice {
     const c = this.audio?.ctx;
     if (!c || !VOICE_BY_ID[id]) return Promise.resolve(null);
     if (this.ready.has(id)) return Promise.resolve(this.ready.get(id));
-    BYTES[id] ||= fetch(urlOf(id)).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+    BYTES[id] ||= fetch(urlOf(id)).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+      .then((ab) => { if (!ab) delete BYTES[id]; return ab; });            // lỗi tải không bị nhớ cả phiên: lần nạp sau thử lại
     return BYTES[id].then((ab) => (ab ? new Promise((res, rej) => c.decodeAudioData(ab.slice(0), res, rej)) : null))
       .then((b) => { if (b) this.ready.set(id, b); return b; }).catch(() => null);
   }
@@ -46,9 +48,9 @@ export class Voice {
     if (!this.on || !this.running()) return false;
     const lines = voiceLinesFor(heroId, skillId);
     if (!lines.length || (!ult && this.gap > 0)) return false;
-    const key = heroId + ":" + skillId, n = this.turn[key] = (this.turn[key] ?? -1) + 1;
+    const key = heroId + ":" + skillId, n = this.turn[key] ?? 0;
     const ok = this.play(lines[n % lines.length].id, ult ? PRIO.ult : PRIO.skill);
-    if (ok && !ult) this.gap = SKILL_GAP;
+    if (ok) { this.turn[key] = n + 1; if (!ult) this.gap = SKILL_GAP; }     // chỉ khi đã phát mới sang dòng kế (không bỏ sót dòng bị chặn)
     return ok;
   }
 
@@ -69,7 +71,7 @@ export class Voice {
   play(id, prio, x = null, z = null) {
     const a = this.audio, c = a.ctx, b = this.ready.get(id);
     if (!b || !this.running()) return false;                          // chưa giải mã xong thì thôi, không chờ (lời nói trễ là lời nói lạc)
-    if (this.cur) { if (this.cur.prio >= prio) return false; this.stop(0.12); }
+    if (this.cur) { if (this.cur.prio >= prio) return false; this.stop(0.12, true); }     // thay lời cũ: giữ nguyên mức hạ nhạc, không thả rồi hạ lại
     const src = c.createBufferSource(); src.buffer = b;
     const gain = c.createGain(); gain.gain.value = 1;
     let node = src.connect(gain);
@@ -83,18 +85,19 @@ export class Voice {
     }
     node.connect(a.voiceBus || a.master);
     src.start();
-    this.cur = { id, prio, src, gain, left: b.duration + 0.2 };
+    this.cur = { id, prio, src, gain };
+    src.onended = () => { if (this.cur?.src === src) { this.cur = null; this.release(); } };      // hết lời theo giờ âm thanh (tạm dừng thì đứng cùng ngữ cảnh âm thanh)
     a.duck?.(DUCK.sfx, 0.05); this.music?.duck?.(DUCK.music, 0.15);
     this.subtitle(id, b.duration);
     return true;
   }
 
-  // Cắt lời đang nói (nhỏ dần fade giây rồi dừng)
-  stop(fade = 0.1) {
+  // Cắt lời đang nói (nhỏ dần fade giây rồi dừng). keepDuck: sắp phát lời khác ngay, không thả nhạc / hiệu ứng ra
+  stop(fade = 0.1, keepDuck = false) {
     const k = this.cur; if (!k) return; this.cur = null;
     const c = this.audio?.ctx;
     try { const t = c.currentTime; k.gain.gain.setValueAtTime(k.gain.gain.value, t); k.gain.gain.linearRampToValueAtTime(0, t + fade); k.src.stop(t + fade + 0.02); } catch (_) { /* đã dừng */ }
-    this.release();
+    if (!keepDuck) this.release();
   }
   release() { this.audio?.duck?.(1, 0.3); this.music?.duck?.(1, 0.5); }
 
@@ -106,11 +109,7 @@ export class Voice {
     this.sayFn?.(`${tag}${name}: “${L.text}”`, Math.max(3.2, dur + 1.6), L.zh ? "bad" : "info");
   }
 
-  // mỗi bước mô phỏng (battle.js / arena.js): hết lời thì thả nhạc và hiệu ứng ra
-  update(dt) {
-    if (this.gap > 0) this.gap -= dt;
-    const k = this.cur;
-    if (k && (k.left -= dt) <= 0) { this.cur = null; this.release(); }
-  }
+  // mỗi bước mô phỏng (battle.js / arena.js): chỉ đếm thời gian chờ giữa hai lời chiêu thường (hết lời xử lý ở src.onended)
+  update(dt) { if (this.gap > 0) this.gap -= dt; }
   dispose() { this.cur = null; this.ready.clear(); this.release(); }
 }

@@ -20,7 +20,7 @@ export class Music {
     const retry = () => {
       const el = this.pending;
       if (!el || el !== this.cur || this.held) return;
-      this.pending = null; el.volume = 0; this.start(el); this.fadeTo(el, this.volume, this.fade);
+      this.pending = null; el.volume = 0; this.start(el); this.fadeTo(el, this.volume * (this.duckF ?? 1), this.fade);
     };
     for (const ev of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) window.addEventListener(ev, retry);
   }
@@ -34,7 +34,7 @@ export class Music {
     const old = this.cur;
     this.cur = el; this.name = name; this.pending = null; this.held = false; this.fade = fade;
     this.start(el);
-    this.fadeTo(el, this.volume, fade);
+    this.fadeTo(el, this.volume * (this.duckF ?? 1), fade);              // đang hạ nhạc cho giọng nói thì bài mới vào ở mức đã hạ
     if (old) this.fadeTo(old, 0, fade, () => { old.pause(); old.src = ""; });
     if (!loop) el.onended = () => { if (this.cur === el) { this.name = null; opts.then && this.play(opts.then); } };
   }
@@ -57,9 +57,11 @@ export class Music {
   pause() { this.held = true; this.cur?.pause(); }
   resume() { this.held = false; if (this.cur && this.cur.paused) { this.pending = null; this.start(this.cur); } }
 
+  // Mỗi phần tử một fade tại một lúc: fade mới huỷ fade cũ (hạ nhạc rồi thả ra liền nhau không giằng co nhau). Fade bị huỷ không gọi done.
   fadeTo(el, target, sec, done) {
-    const start = el.volume, t0 = performance.now();
+    const start = el.volume, t0 = performance.now(), id = el.fadeId = (el.fadeId || 0) + 1;
     const step = () => {
+      if (el.fadeId !== id) return;
       const u = Math.min(1, (performance.now() - t0) / (sec * 1000));
       el.volume = Math.max(0, Math.min(1, start + (target - start) * u));
       if (u < 1) setTimeout(step, 50); else done?.();

@@ -1,5 +1,5 @@
 // tests/voice.test.mjs — lồng tiếng (đợt 16): dữ liệu lời thoại khớp tệp trên đĩa và khớp chiêu / tướng của game; động cơ battle/voice.js
-// (ưu tiên, thời gian chờ, mỗi tướng địch một lần, hạ nhạc / hiệu ứng, tắt tiếng, không động vào Math.random của mô phỏng).
+// (ưu tiên, thời gian chờ, mỗi tướng địch một lần, hạ nhạc / hiệu ứng kể cả với Music thật, tắt tiếng, dispose, không động vào Math.random của mô phỏng).
 //   node game/tests/voice.test.mjs
 import assert from "node:assert/strict";
 import { existsSync, statSync } from "node:fs";
@@ -64,19 +64,20 @@ t("không hard-code tên phím (key-strings): chữ không có \"(R)\", \"bấm 
 });
 
 console.log("\nĐộng cơ giọng (battle/voice.js)");
-// Audio giả: ctx chạy, nút giả ghi lại nguồn phát; duck ghi mức
-function fake({ state = "running" } = {}) {
-  const log = { started: [], duck: [], stopped: [], subs: [], musicDuck: [] };
+// Audio giả: ctx chạy, nguồn phát giả ghi lại (log.srcs) và kết thúc bằng end() như src.onended của trình duyệt; duck ghi mức
+function fake({ state = "running", music = null } = {}) {
+  const log = { started: [], duck: [], stopped: [], subs: [], musicDuck: [], srcs: [] };
   const node = () => ({ connect(n) { return n || this; }, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} }, pan: { value: 0 } });
   const ctx = { state, currentTime: 0,
-    createBufferSource() { const n = node(); n.start = () => log.started.push(n.buffer); n.stop = () => log.stopped.push(n.buffer); return n; },
+    createBufferSource() { const n = node(); n.start = () => { log.started.push(n.buffer); log.srcs.push(n); }; n.stop = () => log.stopped.push(n.buffer); return n; },
     createGain: node, createStereoPanner: node };
   const audio = { ctx, voiceBus: node(), master: node(), listener: { x: 0, z: 0, yaw: 0 }, vol: 0.9,
     setVoiceVolume(v) { this.vv = v; }, duck(l) { log.duck.push(l); } };
-  const music = { duck(f) { log.musicDuck.push(f); } };
+  music ||= { duck(f) { log.musicDuck.push(f); } };
   const v = new Voice(audio, { music, say: (text, T, kind) => log.subs.push({ text, T, kind }), volume: 0.9 });
   for (const l of VOICE_LINES) v.ready.set(l.id, { duration: 2, _id: l.id });
-  return { v, log, ctx, audio };
+  const end = () => log.srcs.at(-1)?.onended?.();                  // lời phát hết theo giờ âm thanh
+  return { v, log, ctx, audio, end };
 }
 const orig = Math.random;
 const noRandom = () => { Math.random = () => { throw new Error("Voice không được gọi Math.random"); }; };
@@ -93,35 +94,52 @@ t("tướng ta tung chiêu: phát đúng dòng của chiêu, hạ nhạc + hiệ
   } finally { restore(); }
 });
 t("lời chiêu thường có thời gian chờ 3,2 s; xoay vòng qua các dòng (không ngẫu nhiên); Tuyệt Kỹ không bị chờ chặn", () => {
-  const { v, log } = fake();
+  const { v, log, end } = fake();
   assert.equal(v.skill("H35", "phaTran"), true);
-  v.update(2.5); assert.equal(v.cur, null);                      // 2 s lời + 0,2 s đã hết
-  assert.equal(v.skill("H35", "phaTran"), false);                // còn trong 3,2 s chờ
-  v.update(1); assert.equal(v.skill("H35", "phaTran"), true);
-  v.update(5); v.update(5); assert.equal(v.skill("H35", "phaTran"), true);
-  const order = log.started.map((b) => b._id);
-  assert.deepEqual(order, ["H35-phaTran-1", "H35-phaTran-2", "H35-phaTran-3"]);
-  v.update(2.5); assert.equal(v.skill("H35", "bopNat", true), true);   // vừa tung chiêu thường xong vẫn hô được Tuyệt Kỹ
+  end(); assert.equal(v.cur, null);                              // hết lời
+  v.update(1); assert.equal(v.skill("H35", "phaTran"), false);   // còn trong 3,2 s chờ
+  v.update(3); assert.equal(v.skill("H35", "phaTran"), true); end();
+  v.update(5); assert.equal(v.skill("H35", "phaTran"), true); end();
+  assert.deepEqual(log.started.map((b) => b._id), ["H35-phaTran-1", "H35-phaTran-2", "H35-phaTran-3"]);
+  assert.equal(v.skill("H35", "bopNat", true), true);             // vừa tung chiêu thường xong vẫn hô được Tuyệt Kỹ
+});
+t("dòng bị chặn (còn lời khác đang nói) không bị bỏ sót: lần sau vẫn là dòng chưa phát", () => {
+  const { v, log, end } = fake();
+  assert.equal(v.skill("H31", "bachDang", true), true);
+  assert.equal(v.skill("H31", "binhThu"), false);                 // chặn bởi Tuyệt Kỹ đang nói
+  end(); v.update(0);
+  assert.equal(v.skill("H31", "binhThu"), true);
+  assert.equal(log.started.at(-1)._id, "H31-binhThu-1");
 });
 t("Tuyệt Kỹ không bị chiêu thường cắt; lời giáp mặt cắt lời chiêu thường; hết lời thì thả nhạc và hiệu ứng", () => {
-  const { v, log } = fake();
+  const { v, log, end } = fake();
   assert.equal(v.skill("H31", "bachDang", true), true);
   assert.equal(v.skill("H31", "binhThu"), false);
   assert.equal(v.meet("X20", "b20"), false);                     // prio meet (2) < ult (3): không cắt
-  v.update(3); assert.equal(v.cur, null); assert.deepEqual(log.duck.at(-1), 1); assert.deepEqual(log.musicDuck.at(-1), 1);
+  end(); assert.equal(v.cur, null); assert.deepEqual(log.duck.at(-1), 1); assert.deepEqual(log.musicDuck.at(-1), 1);
   assert.equal(v.skill("H31", "binhThu"), true);
   assert.equal(v.meet("X20", "b20"), true);                      // cắt lời chiêu thường
   assert.equal(log.stopped.length, 1);
+  assert.deepEqual(log.duck.slice(-2), [0.5, 0.5]);              // cắt để nói lời khác: không thả rồi hạ lại (nhạc không nhấp nhô)
 });
-t("tướng địch giáp mặt: mỗi (tướng, chương) một lần mỗi trận; phụ đề ghi tiếng Trung + bản dịch, kiểu \"bad\"", () => {
+t("lời bị cắt rồi kết thúc muộn (onended của nguồn cũ) không thả nhạc đang hạ cho lời mới", () => {
   const { v, log } = fake();
-  const u = { x: 30, z: 0 };
-  assert.equal(v.meet("X19", "b15", u), true);
-  v.update(3);
-  assert.equal(v.meet("X19", "b15", u), false);
-  assert.equal(v.meet("X19", "b17", u), true);                   // chương khác: nói lại
-  assert.match(log.subs[0].text, /Toa Đô/); assert.match(log.subs[0].text, /tiếng Trung/); assert.equal(log.subs[0].kind, "bad");
-  assert.equal(v.meet("X99", "b15"), false);                     // không có lời
+  v.skill("H31", "binhThu"); const first = log.srcs[0];
+  v.meet("X20", "b20");                                          // cắt lời đầu
+  first.onended?.();                                             // trình duyệt báo nguồn cũ đã dừng
+  assert.notEqual(v.cur, null); assert.deepEqual(log.duck.at(-1), 0.5);
+});
+t("tướng địch giáp mặt: mỗi (tướng, chương) một lần mỗi trận; phụ đề ghi tiếng Trung + bản dịch, kiểu \"bad\"; không Math.random", () => {
+  const { v, log, end } = fake(); noRandom();
+  try {
+    const u = { x: 30, z: 0 };
+    assert.equal(v.meet("X19", "b15", u), true);
+    end();
+    assert.equal(v.meet("X19", "b15", u), false);
+    assert.equal(v.meet("X19", "b17", u), true);                 // chương khác: nói lại
+    assert.match(log.subs[0].text, /Toa Đô/); assert.match(log.subs[0].text, /tiếng Trung/); assert.equal(log.subs[0].kind, "bad");
+    assert.equal(v.meet("X99", "b15"), false);                   // không có lời
+  } finally { restore(); }
 });
 t("tắt giọng (âm lượng 0), ctx chưa chạy, dòng chưa giải mã: không phát, không phụ đề, không lỗi", () => {
   const a = fake(); a.v.setVolume(0);
@@ -130,6 +148,12 @@ t("tắt giọng (âm lượng 0), ctx chưa chạy, dòng chưa giải mã: kh�
   const b = fake({ state: "suspended" }); assert.equal(b.v.skill("H35", "bopNat", true), false);
   const c = fake(); c.v.ready.clear(); assert.equal(c.v.skill("H35", "bopNat", true), false); assert.equal(c.log.subs.length, 0);
   const d = new Voice(null); assert.equal(d.skill("H35", "bopNat"), false);   // không có Audio (thử nghiệm / Node)
+});
+t("rời trận khi đang nói: dispose() thả hiệu ứng và nhạc ra (không kẹt ở mức hạ)", () => {
+  const { v, log } = fake();
+  v.skill("H35", "bopNat", true); assert.deepEqual(log.duck.at(-1), 0.5);
+  v.dispose();
+  assert.deepEqual(log.duck.at(-1), 1); assert.deepEqual(log.musicDuck.at(-1), 1); assert.equal(v.cur, null); assert.equal(v.ready.size, 0);
 });
 t("chiêu không có lời (H34, Tự do…) và người lạ: bỏ qua im lặng", () => {
   const { v, log } = fake();
@@ -142,6 +166,33 @@ t("preload chỉ nạp lời của tướng ra trận và tướng địch của
   assert.deepEqual(asked.sort(), VOICE_LINES.filter((l) => l.who === "H40" || l.on === "b17").map((l) => l.id).sort());
   asked.length = 0; v.preload("H35", null);
   assert.deepEqual(asked.sort(), VOICE_LINES.filter((l) => l.who === "H35").map((l) => l.id).sort());
+});
+
+console.log("\nHạ nhạc với Music thật (core/music.js)");
+// Music thật + <audio> giả (như music.test.mjs): hạ, thả, hạ lại liền nhau thì fade cũ bị huỷ, mức cuối đúng; bài mới vào theo mức đang hạ.
+globalThis.window = { addEventListener() {} };
+globalThis.Audio = class { constructor(src) { this.src = src; this.paused = true; this.volume = 1; this.loop = false; } play() { this.paused = false; return Promise.resolve(); } pause() { this.paused = true; } };
+const { Music } = await import("../js/core/music.js");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function ta(name, fn) { try { await fn(); pass++; console.log("  ok  " + name); } catch (e) { fail++; console.log("  FAIL " + name + "\n       " + (e.stack || e.message).split("\n").slice(0, 4).join("\n       ")); } }
+await ta("hạ nhạc, thả, hạ lại ngay (lời kế tiếp): mức cuối là mức đã hạ, không nhạc bật lại giữa lời", async () => {
+  const m = new Music(0.5); m.play("battle", { fade: 0.05 }); await sleep(120);
+  assert.ok(Math.abs(m.cur.volume - 0.5) < 0.01);
+  m.duck(0.45, 0.15); await sleep(30);
+  m.duck(1, 0.5);                                                // lời hết
+  m.duck(0.45, 0.15);                                            // lời kế tiếp bắt đầu trong 0,5 s
+  await sleep(700);
+  assert.ok(Math.abs(m.cur.volume - 0.5 * 0.45) < 0.01, "volume " + m.cur.volume);
+  m.duck(1, 0.2); await sleep(350);
+  assert.ok(Math.abs(m.cur.volume - 0.5) < 0.01, "volume " + m.cur.volume);
+});
+await ta("bài mới (vd nhạc boss ở Tổng Phản Công) bắt đầu khi đang hạ thì vào theo mức đã hạ; setVolume giữ mức hạ", async () => {
+  const m = new Music(0.5); m.play("battle", { fade: 0.05 }); await sleep(120);
+  m.duck(0.45, 0.05); await sleep(120);
+  m.play("boss", { fade: 0.1 }); await sleep(300);
+  assert.ok(Math.abs(m.cur.volume - 0.5 * 0.45) < 0.01, "volume " + m.cur.volume);
+  m.setVolume(0.8); assert.ok(Math.abs(m.cur.volume - 0.8 * 0.45) < 0.01);
+  m.duck(1, 0.05); await sleep(150); assert.ok(Math.abs(m.cur.volume - 0.8) < 0.01);
 });
 
 console.log("\n" + pass + " đạt, " + fail + " trượt");
