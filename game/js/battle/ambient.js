@@ -473,6 +473,7 @@ export class Ambient {
   // ---- quạ ----------------------------------------------------------------------------------------------
   alarmCrows(F) {
     if (F.mode !== F_GROUND) return;
+    this.ctx.audio?.play("crow", F.x, F.z);                         // đợt 16: bầy quạ giật mình bay lên (tiếng theo chỗ đàn quạ)
     F.mode = F_CLIMB; F.modeT = 0; F.lx = F.x; F.lz = F.z; F.alt = 1; F.ly = heightAt(F.x, F.z) + 1; F.hd = this.rng.range(0, TAU); F.fleeHd = F.hd; F.sp = 2;
     F.calmT = 0; F.busyT = 0; F.dest = null;
     for (const b of F.birds) { b.st = B_WAIT; b.delay = this.rng.range(0, 0.35); b.ox = this.rng.range(-3, 3); b.oz = this.rng.range(-3, 3); b.oy = this.rng.range(-1, 1.5); }
@@ -806,6 +807,7 @@ export class Ambient {
     B.alarmT = this.t;
     if (!this.pickFlee(B, tx, tz)) { B.look = 3; B.headYT = clamp(wrapA(Math.atan2(tx - B.x, tz - B.z) - B.yaw), -0.7, 0.7); return; }
     B.mode = B.sink > 0.1 ? M_RISE : M_TROT; B.t = 25;
+    this.ctx.audio?.play("buffalo", B.x, B.z);                      // đợt 16: trâu giật mình chạy / đứng dậy
   }
   pickFlee(B, tx, tz) {
     const base = Math.atan2(B.x - tx, B.z - tz);

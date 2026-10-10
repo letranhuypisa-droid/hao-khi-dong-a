@@ -303,7 +303,7 @@ const bachDang = {
     if (t) h.yaw = Math.atan2(t.x - h.x, t.z - h.z);
     ctx.crowd?.rout(h.x, h.z, AI.rout.ultR);
     ctx.cinematic(hkUlt ? "BẠCH ĐẰNG · HÀO KHÍ" : "BẠCH ĐẰNG QUYẾT CHIẾN", h);
-    ctx.audio.play("ult", h.x, h.z); ctx.audio.play("drum", h.x, h.z);
+    ctx.audio.play("ult", h.x, h.z); ctx.audio.play("drum", h.x, h.z); ctx.audio.play("wave", h.x, h.z);
     ctx.director.onUlt(hkUlt, { id: "bachDang", escort: S.escort, r: h.ultS.r });
     ctx.director.onHeroAction?.("ult"); ctx.hud?.speedLines?.(0.8);
     ctx.fx.ring(h.x, h.z, 6, 0xf1d98a, 0.5); ctx.fx.flash(0.25, "255,200,140");
@@ -429,7 +429,7 @@ const tenXuyenHang = {
         const da = (i - (S.arrows - 1) / 2) * (S.spread / (S.arrows - 1));
         h.fireArrow("xuyenHang", XH_M, h.yaw + da, S.mv, null, { pierce: S.pierce, range: S.range, speed: S.speed, pin: { at: S.pinAt, sec: S.pin } });
       }
-      ctx.audio.play("crossbow", h.x, h.z); ctx.audio.play("bow", h.x, h.z);
+      ctx.audio.play("crossbow", h.x, h.z); ctx.audio.play("bow", h.x, h.z); ctx.audio.play("bowHeavy", h.x, h.z);
       ctx.fx.kick(-Math.sin(h.yaw), -Math.cos(h.yaw), 0.2); ctx.fx.shake(0.15);
     }
     if (u >= 1) { h.state = "free"; h.skillActive = null; }
@@ -546,7 +546,7 @@ const mocTen = {
     h.ultS = { t, fired: false, hooked: null, rope: null, shot: null };
     h.yaw = Math.atan2(t.x - h.x, t.z - h.z);
     ctx.cinematic(hkUlt ? "MÓC TÊN · HÀO KHÍ" : "MÓC TÊN TRÓI THUYỀN", h);
-    ctx.audio.play("ult", h.x, h.z);
+    ctx.audio.play("ult", h.x, h.z); ctx.audio.play("grapple", h.x, h.z);
     ctx.director.onUlt(hkUlt, { id: "mocTen", r: S.range }); ctx.director.onHeroAction?.("ult"); ctx.hud?.speedLines?.(0.6);
     return true;
   },

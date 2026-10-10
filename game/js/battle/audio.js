@@ -3,7 +3,8 @@
 //
 // Đồ thị: nguồn → (panner trái/phải theo camera) → bus SFX ─┬─→ bộ nén → master → loa
 //                                                          └─→ vang (convolver, gửi ít) ─┘
-// Bus Nhạc riêng (15.9). AudioContext mở ở lần chạm đầu tiên (luật autoplay). Mỗi sự kiện (play("hit")) là một
+// Bus Nhạc riêng (15.9). Bus Giọng (voiceBus, đợt 16) đi thẳng vào bộ nén, không qua master: thanh "hiệu ứng" không kéo giọng theo; battle/voice.js
+// phát lên bus này và gọi duck() hạ hiệu ứng khi đang nói. AudioContext mở ở lần chạm đầu tiên (luật autoplay). Mỗi sự kiện (play("hit")) là một
 // "công thức": một hoặc vài lớp mẫu, mỗi lần chọn ngẫu nhiên một biến thể và lệch cao độ ±6% cho khỏi lặp tai.
 
 // Mẫu có trong assets/sfx (tên → số biến thể; 1 = file không hậu tố). Hậu kỳ: tools/post-assets-2.py.
@@ -11,9 +12,12 @@ export const SFX_FILES = {
   swing: 3, swingheavy: 2, slice: 3, clang: 3, hitheavy: 3, fall: 2, grunt: 2, kiai: 2, bow: 2,
   parry: 1, finisher: 1, slam: 1, dash: 1, roll: 1, arrowhit: 1, volley: 1, crossbow: 1, horn: 1, drum: 1,
   drumroll: 1, gong: 1, gatehit: 1, gatebreak: 1, cheer: 1, roar: 1, charge: 1, pickup: 1, ui: 1, warn: 1, ultstart: 1,
+  // đợt 16 (ai33 / ElevenLabs sound-effect, design/audio/sfx.json): lửa, cờ, sông nước, thuyền, quân reo, chim muông, hiệu thua
+  ignite: 1, flag: 1, oar: 2, hullcreak: 1, splash: 1, stakecrash: 1, chain: 1, grapple: 1, warcry: 1, crow: 1,
+  buffalo: 1, stingloss: 1, bowheavy: 1, wave: 1,
 };
-const LOOPS = { ambience: "ambience.m4a", fire: "fire.m4a" };
-const EXT = { drumroll: "m4a", horn: "m4a", cheer: "m4a", volley: "m4a", gong: "m4a", gatebreak: "m4a" };   // mẫu dài (> 2,5 s) mã hoá AAC, còn lại WAV
+const LOOPS = { ambience: "ambience.m4a", fire: "fire.m4a", river: "river.m4a" };
+const EXT = { drumroll: "m4a", horn: "m4a", cheer: "m4a", volley: "m4a", gong: "m4a", gatebreak: "m4a", warcry: "m4a", stingloss: "m4a", wave: "m4a" };   // mẫu dài (> 2,5 s) mã hoá AAC, còn lại WAV
 
 // công thức: [mẫu, âm lượng, xác suất (mặc định 1)]; synth: tiếng tổng hợp cộng thêm (lực cú đánh) hoặc dự phòng
 const RECIPES = {
@@ -28,6 +32,11 @@ const RECIPES = {
   pickup: [["pickup", 0.5]], gate: [["gatehit", 0.85]], gateBreak: [["gatebreak", 1]], ui: [["ui", 0.35]],
   kiai: [["kiai", 0.55]], grunt: [["grunt", 0.4]], fall: [["fall", 0.4]], finisher: [["finisher", 1]], slam: [["slam", 0.85]],
   dash: [["dash", 0.7]], charge: [["charge", 0.65]], kill: [["grunt", 0.32, 0.35], ["fall", 0.3, 0.6]],
+  // đợt 16: "fire" và "gong" trước đây được gọi mà không có công thức (câm)
+  fire: [["ignite", 0.7]], gong: [["gong", 0.6]], flag: [["flag", 0.75]], oar: [["oar", 0.5]], hullCreak: [["hullcreak", 0.55]], splash: [["splash", 0.6]],
+  stakeCrash: [["stakecrash", 0.9]], chain: [["chain", 0.7]], grapple: [["grapple", 0.7]],
+  warcry: [["warcry", 0.6]], crow: [["crow", 0.4]], buffalo: [["buffalo", 0.45]], bowHeavy: [["bowheavy", 0.8]], wave: [["wave", 0.85]],
+  defeat: [["stingloss", 0.8]],      // thua: nhạc tắt, chỉ còn hồi trầm này (thắng giữ âm tổng hợp ngắn, nhạc victory.m4a lo phần còn lại)
 };
 // trần số tiếng cùng lúc của một công thức (lính chém lính cả chục người không được nuốt tiếng tướng)
 const CAP = { hitSoft: 4, swingSoft: 3, block: 4, bow: 4, fall: 3, kill: 3, grunt: 2, hit: 6, whoosh: 3 };
@@ -42,8 +51,8 @@ function loadBuf(ctx, file) {
 const fileOf = (name, v) => `${name}${SFX_FILES[name] > 1 ? "-" + v : ""}.${EXT[name] || "wav"}`;
 
 export class Audio {
-  constructor(volume = 0.7) {
-    this.vol = volume; this.ctx = null; this.listener = { x: 0, z: 0, yaw: 0 }; this.last = {}; this.active = {};
+  constructor(volume = 0.7, voice = 0.9) {
+    this.vol = volume; this.voiceVol = voice; this.ctx = null; this.listener = { x: 0, z: 0, yaw: 0 }; this.last = {}; this.active = {};
     this.amb = null;
   }
   unlock() {
@@ -55,12 +64,18 @@ export class Audio {
       const comp = c.createDynamicsCompressor();
       comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.18;
       this.master.connect(comp).connect(c.destination);
+      this.comp = comp;
       this.sfx = c.createGain(); this.sfx.connect(this.master);
       this.music = c.createGain(); this.music.gain.value = 0.5; this.music.connect(this.master);
       // vang ngắn (xung đáp dựng bằng nhiễu tắt dần): bãi sông rộng, gửi rất ít
       this.verb = c.createConvolver(); this.verb.buffer = this.impulse(1.4);
       this.verbSend = c.createGain(); this.verbSend.gain.value = 0.16;
       this.sfx.connect(this.verbSend).connect(this.verb).connect(this.master);
+      // bus Giọng (battle/voice.js): vào thẳng bộ nén (không qua master), vang riêng nhỏ cho giọng có chút không gian
+      this.voiceBus = c.createGain(); this.voiceBus.gain.value = this.voiceVol; this.voiceBus.connect(comp);
+      this.verbV = c.createConvolver(); this.verbV.buffer = this.verb.buffer;
+      this.voiceSend = c.createGain(); this.voiceSend.gain.value = 0.1;
+      this.voiceBus.connect(this.voiceSend).connect(this.verbV).connect(comp);
       const len = c.sampleRate; this.noise = c.createBuffer(1, len, c.sampleRate);
       const d = this.noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.preload();
@@ -77,28 +92,34 @@ export class Audio {
     return b;
   }
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
+  setVoiceVolume(v) { this.voiceVol = v; if (this.voiceBus) this.voiceBus.gain.value = v; }
+  // Hạ tiếng binh khí / nền khi có người nói (battle/voice.js): level 1 = thả ra; sec = hằng số thời gian của đường cong
+  duck(level, sec = 0.1) { const c = this.ctx; if (c && this.sfx) this.sfx.gain.setTargetAtTime(level, c.currentTime, sec); }
   suspend() { this.ctx?.suspend(); }
   // Rời trận: đóng hẳn AudioContext (trình duyệt giới hạn số context; suspend thì mỗi trận rò một cái).
   // ctx = null để unlock() lần sau dựng context mới thay vì resume một context đã đóng.
   close() { const c = this.ctx; this.ctx = null; this.amb = null; c?.close?.().catch?.(() => {}); }
 
   // ---- nền: tiếng giao chiến xa, lửa trại cháy -------------------------------------------------------
-  // k 0..1: độ dữ dội quanh tướng (số lính đang đánh nhau gần, khoảng cách tới tuyến); fire 0..1: có đám cháy gần.
-  setBed(k, fire = 0) {
+  // k 0..1: độ dữ dội quanh tướng (số lính đang đánh nhau gần, khoảng cách tới tuyến); fire 0..1: có đám cháy gần; river 0..1: gần mặt sông
+  // (đợt 16: sóng vỗ thuyền, battle.js tính từ ground.waterDist; vòng này nạp riêng nên thiếu tệp thì nền cũ vẫn chạy).
+  setBed(k, fire = 0, river = 0) {
     const c = this.ctx; if (!c || c.state !== "running") return;
+    const loop = (key) => {
+      const b = BUF[LOOPS[key]].buf;
+      const s = c.createBufferSource(); s.buffer = b; s.loop = true;
+      const g = c.createGain(); g.gain.value = 0; s.connect(g).connect(this.sfx); s.start(0, Math.random() * b.duration);
+      return g;
+    };
     if (!this.amb) {
       if (!BUF[LOOPS.ambience]?.buf || !BUF[LOOPS.fire]?.buf) return;      // chờ nạp đủ cả hai rồi mới dựng (không dựng dở)
-      this.amb = {};
-      for (const key of ["ambience", "fire"]) {
-        const b = BUF[LOOPS[key]].buf;
-        const s = c.createBufferSource(); s.buffer = b; s.loop = true;
-        const g = c.createGain(); g.gain.value = 0; s.connect(g).connect(this.sfx); s.start(0, Math.random() * b.duration);
-        this.amb[key] = g;
-      }
+      this.amb = { ambience: loop("ambience"), fire: loop("fire") };
     }
+    if (!this.amb.river && BUF[LOOPS.river]?.buf) this.amb.river = loop("river");
     const t = c.currentTime;
     this.amb.ambience.gain.setTargetAtTime(0.1 + 0.32 * k, t, 0.8);
     this.amb.fire.gain.setTargetAtTime(0.35 * fire, t, 1.2);
+    this.amb.river?.gain.setTargetAtTime(0.4 * river, t, 1.5);
   }
 
   // ---- phát ------------------------------------------------------------------------------------------

@@ -53,7 +53,7 @@ const joinRel = (fromFile, spec) => {
 export function checkDeploy(root) {
   const R = resolve(root), files = walk(R).map((p) => posix(R, p));
   const exact = new Set(files), lower = new Map(files.map((f) => [f.toLowerCase(), f]));
-  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, fx: 0, comic: 0, icon: 0, model: 0, clip: 0 };
+  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, voice: 0, fx: 0, comic: 0, icon: 0, model: 0, clip: 0 };
   const need = (rel, kind, from) => {
     checked[kind]++;
     const path = rel.replace(/^\.\//, "").replace(/\/+/g, "/");
@@ -85,6 +85,9 @@ export function checkDeploy(root) {
     for (const [n, k] of Object.entries(sfx)) for (let v = 1; v <= k; v++) need(`assets/sfx/${n}${k > 1 ? "-" + v : ""}.${ext[n] || "wav"}`, "sfx", "audio.js SFX_FILES");
     for (const f of Object.values(loops)) need(`assets/sfx/${f}`, "sfx", "audio.js LOOPS");
   }
+  // lồng tiếng (đợt 16): mỗi dòng trong data/voice.js VOICE_LINES là một tệp assets/voice/<id>.m4a
+  const vids = [...(jsSrc.get("js/data/voice.js") || "").matchAll(/\bid:\s*"([A-Za-z0-9_-]+)"/g)].map((m) => m[1]);
+  if (!vids.length) unreadable("voice", "js/data/voice.js", "không thấy dòng lồng tiếng (id: \"…\")"); else for (const id of vids) need(`assets/voice/${id}.m4a`, "voice", "data/voice.js");
   const tracks = [...(jsSrc.get("js/core/music.js") || "").matchAll(/\.\/assets\/music\/([A-Za-z0-9_-]+\.m4a)/g)];
   if (!tracks.length) unreadable("music", "js/core/music.js", "không thấy đường dẫn nhạc ./assets/music/…"); else for (const m of tracks) need(`assets/music/${m[1]}`, "music", "music.js");
 

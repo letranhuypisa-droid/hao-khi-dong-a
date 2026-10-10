@@ -428,7 +428,7 @@ export class DirectorB16 {
     if (!tpcReady(ctx.hk)) { this.say(`Hào Khí ${Math.floor(ctx.hk.value)}/100 — chưa đủ để kích Tổng Phản Công.`, 2); return false; }
     const T = hkActivate(ctx.hk);
     h.hkUltReady = true; this.plantFlag(h.x, h.z, 30, 0.3, T, true);
-    ctx.cinematic?.("TỔNG PHẢN CÔNG", h, true); ctx.audio.play("drums3"); ctx.audio.play("horn");
+    ctx.cinematic?.("TỔNG PHẢN CÔNG", h, true); ctx.audio.play("drums3"); ctx.audio.play("horn"); ctx.audio.play("warcry");
     ctx.crowd.rout(h.x, h.z, 14, (e) => e.tier === "thuong");
     return true;
   }
@@ -436,7 +436,7 @@ export class DirectorB16 {
     const g = this.flag({ x, z }, COL.ta, 5, "破強敵報皇恩");
     this.flags.push({ x, z, r, atk, t: dur, g });
     this.ctx.fx.ring(x, z, r, COL.gold, 0.8);
-    if (!quiet) { this.ctx.audio.play("drum"); this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good"); }
+    if (!quiet) { this.ctx.audio.play("drum"); this.ctx.audio.play("flag"); this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good"); }
   }
   // cờ cắm (Tổng Phản Công, Tuyệt Kỹ) tạo hình, vật liệu, texture mới mỗi lần: gỡ thì giải phóng luôn (trước đây chỉ remove → rò GPU cả trận)
   dropProp(g) {
@@ -750,7 +750,7 @@ export class DirectorB16 {
     ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1.2);
     ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
   }
-  onOfficerAwake(u) { if (u === this.boss) { this.ctx.fx.banner("TRẤN NAM VƯƠNG THOÁT HOAN", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); } }
+  onOfficerAwake(u) { if (u === this.boss) { this.ctx.fx.banner("TRẤN NAM VƯƠNG THOÁT HOAN", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); return this.ctx.voice?.meet("X18", "b16", u); } }
   onBossDefeated(u) {
     if (u !== this.boss) return;
     this.bossDown = true; this.ko++;
