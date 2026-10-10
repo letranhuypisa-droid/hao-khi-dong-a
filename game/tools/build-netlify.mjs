@@ -124,6 +124,9 @@ export function checkDeploy(root) {
   // 6) clip hoạt ảnh xương người nướng sẵn (battle/clips.js đọc assets/anim/clips.json; tools/bake-clips.mjs). Thiếu thì game vẫn chạy bằng hoạt ảnh thủ tục,
   // nhưng đó là lỗi của bản dựng nên báo.
   if (jsSrc.get("js/battle/clips.js")) need("assets/anim/clips.json", "clip", "js/battle/clips.js");
+  // 7) texture địa hình (battle/terrain-tex.js loadTex("dirt_d.webp"…) → assets/terrain/…; tools/bake-terrain-tex.py). Thiếu thì địa hình giữ màu đỉnh như cũ, nhưng đó là lỗi của bản dựng.
+  { const src = jsSrc.get("js/battle/terrain-tex.js");
+    if (src) { const names = [...src.matchAll(/loadTex\("([A-Za-z0-9_]+\.webp)"/g)]; if (!names.length) unreadable("terrain", "js/battle/terrain-tex.js", "không thấy lời gọi loadTex trong terrain-tex.js"); else for (const m of names) need(`assets/terrain/${m[1]}`, "terrain", "js/battle/terrain-tex.js"); } }
   return { files: files.length, checked, problems };
 }
 

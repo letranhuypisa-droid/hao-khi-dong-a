@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { MAP, FRONTS, BASES, BASE_RING, FORT, lineToX, VILLAGE } from "../data/battle-b15.js";
 import { fortLayout, fortColliders } from "./fort.js";
 import { PAL, merge, lambert, flagTexture, part } from "./models.js";
+import { terrainMaterial, splatAttribute } from "./terrain-tex.js";
 import { makeRng } from "../core/rng.js";
 import { addScenery, addArenaScenery, tintTrees } from "./scenery.js";
 import { envPart, envLOD, model } from "./glb.js";
@@ -142,15 +143,17 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   const cPaddy = [new THREE.Color(0x587a66), new THREE.Color(0x7c9c3e), new THREE.Color(0xb7a043), new THREE.Color(0x8e7a4c)];
   const cRock = new THREE.Color(0x857d6c), cBurnt = new THREE.Color(0x3d3326), cMarsh = new THREE.Color(0x4f6238);
   const c = new THREE.Color(), fronts = Object.values(FRONTS);
+  const spD = new Float32Array(pos.count), spR = new Float32Array(pos.count);     // trọng số hoa văn đất / đá của từng tam giác (terrain-tex.js aSplat)
   for (let i = 0; i < pos.count; i += 3) {
+    let dirtW = 0, rockW = 0;
     const o = i * 3, cx = (pa[o] + pa[o + 3] + pa[o + 6]) / 3, cz = (pa[o + 2] + pa[o + 5] + pa[o + 8]) / 3;
     const d = waterDist(cx, cz);
     // cỏ: ba sắc (tươi, thường, khô) trộn theo nhiễu mượt, lốm đốm đất trống
     const n1 = fbm(cx * 0.018, cz * 0.018), n2 = fbm(cx * 0.05 + 40, cz * 0.05 - 12);
     if (n1 < 0.5) c.copy(cLush).lerp(cGrass, smooth(0.3, 0.5, n1)); else c.copy(cGrass).lerp(cDry, smooth(0.5, 0.72, n1));
-    if (n2 > 0.66) c.lerp(cDirt, smooth(0.66, 0.8, n2) * 0.7);
+    if (n2 > 0.66) { c.lerp(cDirt, smooth(0.66, 0.8, n2) * 0.7); dirtW = smooth(0.66, 0.8, n2) * 0.7; }
     // gò đá: sườn lộ đá xám
-    for (const k of ZONES.knolls) { const kd = Math.hypot(cx - k.x, cz - k.z) / k.r; if (kd < 0.9) c.lerp(cRock, smooth(0.9, 0.35, kd) * (0.45 + 0.4 * n2)); }
+    for (const k of ZONES.knolls) { const kd = Math.hypot(cx - k.x, cz - k.z) / k.r; if (kd < 0.9) { const kf = smooth(0.9, 0.35, kd) * (0.45 + 0.4 * n2); c.lerp(cRock, kf); rockW = Math.max(rockW, Math.min(1, kf * 1.25)); } }
     // đầm lầy ven sông phía bắc
     const wd = waterDist(cx, cz);
     if (wd > 5 && wd < 34 && cx < MAP.fortWallX) c.lerp(cMarsh, smooth(34, 12, wd) * 0.6);
@@ -162,21 +165,23 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
     if (cx > S.x0 && cx < S.x1 && Math.abs(cz) < 150) { const b = fbm(cx * 0.06, cz * 0.06); if (b > 0.55) c.lerp(cBurnt, smooth(0.55, 0.75, b) * smooth(S.x0, S.x0 + 25, cx) * 0.8); }
     let road = 0; for (const f of fronts) road = Math.max(road, smooth(9, 3, Math.abs(cz - f.laneZ)) * (cx > 50 && cx < 470 ? 1 : 0));
     road = Math.max(road, smooth(14, 5, Math.abs(cx - 60)) * (Math.abs(cz) < 80 ? 1 : 0));
-    c.lerp(cRoad, road * 0.85);
-    if (grid) featureTint(c, cx, cz, n2, cRoad, (pa[o + 1] + pa[o + 4] + pa[o + 7]) / 3);   // lũy, hào, hố, gò, vệt giẫm
-    if (cx > MAP.fortWallX) c.lerp(cFort, 0.7);
-    if (d < 16) c.lerp(cSand, smooth(16, 5, d));
+    c.lerp(cRoad, road * 0.85); dirtW = Math.max(dirtW, road * 0.9);
+    if (grid) dirtW = Math.max(dirtW, featureTint(c, cx, cz, n2, cRoad, (pa[o + 1] + pa[o + 4] + pa[o + 7]) / 3));   // lũy, hào, hố, gò, vệt giẫm
+    if (cx > MAP.fortWallX) { c.lerp(cFort, 0.7); dirtW = Math.max(dirtW, 0.7); }
+    if (d < 16) { c.lerp(cSand, smooth(16, 5, d)); dirtW = Math.max(dirtW, smooth(16, 5, d) * 0.5); }
     if (d < 1.5) c.lerp(cMud, 0.6);
     if (Math.hypot(cx - MAP.beach.x, cz - MAP.beach.z) < MAP.beach.r) c.lerp(cSand, 0.75);
     const shade = 0.92 + 0.08 * ((i * 2654435761) % 97) / 97;
     c.multiplyScalar(shade);
     for (let k = 0; k < 9; k += 3) { col[o + k] = c.r; col[o + k + 1] = c.g; col[o + k + 2] = c.b; }
+    spD[i] = spD[i + 1] = spD[i + 2] = Math.min(1, dirtW); spR[i] = spR[i + 1] = spR[i + 2] = rockW;
   }
   tg.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  tg.setAttribute("aSplat", splatAttribute(spD, spR));
   const tCol = performance.now();
   if (grid) tg = addRuts(tg, grid);                                              // vết bánh xe: dải mỏng dán sát mặt lưới
   tg.computeVertexNormals();
-  const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const terrain = new THREE.Mesh(tg, terrainMaterial());
   terrain.receiveShadow = true;
   scene.add(terrain);
   world.terrain = terrain;                         // trận dựng trên đất Hàm Tử tô lại màu đỉnh (B17: vùng đầm) — chỉ đọc ở đó
@@ -680,7 +685,9 @@ function featureTint(c, x, z, n2, cRoad, y) {
   if (tr > 0) c.lerp(F_TRAIL, tr * 0.7);
   if (L.gap > 0) c.lerp(cRoad, L.gap * 0.85);
   if (L.rim > 0) c.lerp(F_CHURN, Math.min(1, L.rim) * 0.65);
-  if (L.lip > 0) c.lerp(F_SPOIL, Math.min(1, L.lip) * 0.7);       // gờ đất đào quanh miệng hố: sáng rõ quanh lòng tối
+  if (L.lip > 0) c.lerp(F_SPOIL, Math.min(1, L.lip) * 0.7);
+  // trọng số hoa văn đất (terrain-tex.js aSplat.x): vệt giẫm, lối vỡ, gờ đất, mái lũy, lòng hào / hố
+  const dirt = Math.max(tr * 0.9, L.gap * 0.85, Math.min(1, L.rim) * 0.8, Math.min(1, L.lip) * 0.8, L.bank, L.sink);       // gờ đất đào quanh miệng hố: sáng rõ quanh lòng tối
   if (L.bank > 0) {
     // lũy Nguyên mới đắp: đất phủ tới chân (chân sau lởm chởm cỏ; chân trước liền vách hào, không để dải cỏ
     // giữa hào và lũy); ụ ta đắp đã lâu: cỏ bò lên gần nửa mái
@@ -698,6 +705,7 @@ function featureTint(c, x, z, n2, cRoad, y) {
     const dep = bareHeightAt(x, z) - y;
     if (dep > 0) c.multiplyScalar(L.pit ? 1 - 0.66 * smooth(0.02, 0.6, dep / L.pd) : 1 - 0.32 * smooth(0.03, 1.0, dep));
   }
+  return Math.min(1, dirt);
 }
 
 // ---- vết bánh xe: dải mỏng 0,22 m dán cao 3 cm trên mặt lưới, gộp vào lưới địa hình (không thêm draw) -------
@@ -725,10 +733,11 @@ function addRuts(tg, grid) {
   }
   for (let i = 0; i < P.length / 3; i++) C.push(RUT_COL.r, RUT_COL.g, RUT_COL.b);
   const p0 = tg.attributes.position.array, c0 = tg.attributes.color.array;
-  const pos = new Float32Array(p0.length + P.length), col = new Float32Array(c0.length + C.length);
+  const pos = new Float32Array(p0.length + P.length), col = new Float32Array(c0.length + C.length), spl = new Float32Array((p0.length + P.length) / 3 * 2);
   pos.set(p0); pos.set(P, p0.length); col.set(c0); col.set(C, c0.length);
+  spl.set(tg.attributes.aSplat.array); for (let i = p0.length / 3; i < pos.length / 3; i++) spl[i * 2] = 1;      // vết bánh xe: đất hoàn toàn
   const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("aSplat", new THREE.BufferAttribute(spl, 2));
   return g;
 }
 
@@ -809,27 +818,27 @@ export function buildArena(scene, { shadows = true } = {}) {
   const parts = [];
   // nền: sân cát nện trong, cỏ ngoài, gờ đất quanh
   const ground = new THREE.PlaneGeometry(260, 260, 104, 104).toNonIndexed(); ground.rotateX(-Math.PI / 2);
-  const gp = ground.attributes.position, gc = new Float32Array(gp.count * 3);
+  const gp = ground.attributes.position, gc = new Float32Array(gp.count * 3), gsD = new Float32Array(gp.count), gsR = new Float32Array(gp.count);   // gsD: trọng số hoa văn đất (terrain-tex.js)
   for (let i = 0; i < gp.count; i++) gp.setY(i, heightAt(gp.getX(i), gp.getZ(i)));
   const cIn = new THREE.Color(0x8f6d4a), cOut = new THREE.Color(0x6f7a3c), cRim = new THREE.Color(0x5a4230);
   const cLushA = new THREE.Color(0x5c7234), cDryA = new THREE.Color(0x97905a), cPath = new THREE.Color(0x9a7b4f);
   for (let i = 0; i < gp.count; i += 3) {
     const x = (gp.getX(i) + gp.getX(i + 1) + gp.getX(i + 2)) / 3, z = (gp.getZ(i) + gp.getZ(i + 1) + gp.getZ(i + 2)) / 3, d = Math.hypot(x, z);
-    let col;
-    if (d < ARENA_R) col = cIn.clone();                                          // đất nện sẫm, tách khỏi màu sương
+    let col, dw = 0;
+    if (d < ARENA_R) { col = cIn.clone(); dw = 0.9; }                           // đất nện sẫm, tách khỏi màu sương
     else {
       const n = fbm(x * 0.03, z * 0.03);
       col = cOut.clone().lerp(n < 0.5 ? cLushA : cDryA, Math.abs(n - 0.5) * 1.6);
       const gate = Math.min(Math.abs(x), Math.abs(z));                         // đường đất từ 4 cổng ra trại
-      if (gate < 4.5) col.lerp(cPath, smooth(4.5, 1.5, gate) * 0.85);
+      if (gate < 4.5) { col.lerp(cPath, smooth(4.5, 1.5, gate) * 0.85); dw = smooth(4.5, 1.5, gate) * 0.85; }
     }
     if (d < ARENA_R && ((Math.floor(x / 6) + Math.floor(z / 6)) & 1)) col.multiplyScalar(0.9);
-    if (d > ARENA_R - 3 && d < ARENA_R + 1) col.lerp(cRim, 0.6);
+    if (d > ARENA_R - 3 && d < ARENA_R + 1) { col.lerp(cRim, 0.6); dw = Math.max(dw, 0.8); }
     col.multiplyScalar(0.94 + 0.06 * (((i * 2654435761) >>> 0) % 97) / 97);
-    for (let k = 0; k < 3; k++) gc.set([col.r, col.g, col.b], (i + k) * 3);
+    for (let k = 0; k < 3; k++) { gc.set([col.r, col.g, col.b], (i + k) * 3); gsD[i + k] = dw; }
   }
-  ground.setAttribute("color", new THREE.BufferAttribute(gc, 3)); ground.computeVertexNormals();
-  const gm = new THREE.Mesh(ground, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })); gm.receiveShadow = true; scene.add(gm);
+  ground.setAttribute("color", new THREE.BufferAttribute(gc, 3)); ground.setAttribute("aSplat", splatAttribute(gsD, gsR)); ground.computeVertexNormals();
+  const gm = new THREE.Mesh(ground, terrainMaterial()); gm.receiveShadow = true; scene.add(gm);
   // vành đất phẳng bên ngoài (gờ đã lên tới 6,3 m) để chân trời không lộ mép lưới 260 m
   const outer = new THREE.RingGeometry(126, 1100, 48, 3); outer.rotateX(-Math.PI / 2); outer.translate(0, 6.27, 0);
   scene.add(new THREE.Mesh(outer, new THREE.MeshLambertMaterial({ color: 0x6b763c })));

@@ -68,3 +68,16 @@ Sinh bằng API ai33 (OpenSpeaker, khoá của người dùng, không lưu trong
 Lồng tiếng (29 dòng giọng ElevenLabs) từng được làm trong cùng đợt rồi gỡ theo ý người dùng ngày 10/10/2026; mã và tệp giọng còn trong lịch sử git (commit `b03f2fc`, `c01dfe2`).
 
 **Chưa xác nhận:** điều khoản sử dụng thương mại và ghi công của ElevenLabs / ai33 cho tiếng động — cần kiểm trước khi phát hành.
+
+## Texture địa hình (11/10/2026)
+
+Hai gói `dirt_1k.blend` và `rocky_terrain_1k.blend` do người dùng thả vào `ANIMATION PACKS/` ở gốc kho (ngoài git). Tên tệp và cấu trúc (`_diff`, `_disp`, `_nor_gl`, `_rough`, cảnh xem trước một mặt phẳng + một cầu) là của Poly Haven (https://polyhaven.com, CC0), nhưng trang tải gốc chưa được xác nhận. Công cụ: `../tools/bake-terrain-tex.py` (Blender, nén 1k → 512 px WebP).
+
+| Tệp | Nguồn | Ghi chú |
+| --- | --- | --- |
+| `terrain/dirt_d.webp`, `terrain/dirt_n.webp` | dirt_1k: diffuse (JPG), pháp tuyến OpenGL (EXR) | đất nâu có sỏi; ô 2 m ngoài đời, trong game 5,5 m; WebP q88 / q92 |
+| `terrain/rock_d.webp`, `terrain/rock_n.webp` | rocky_terrain_1k: diffuse, pháp tuyến OpenGL | phiến đá xen cỏ và đất đỏ; ô 90 m ngoài đời, trong game 26 m |
+
+Không dùng: displacement, độ nhám (vật liệu Lambert không có phản chiếu), độ cao đưa vào hình học (lưới thấp poly).
+
+**Chưa xác nhận:** trang tải gốc và giấy phép của hai gói đất (nếu đúng là Poly Haven thì CC0) — cần kiểm trước khi phát hành.

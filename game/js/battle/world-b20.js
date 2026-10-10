@@ -30,6 +30,7 @@ import { STAKE_FIELDS } from "../data/river-b20.js";
 import { MAP } from "../data/battle-b20.js";
 import { lambert } from "./models.js";
 import { Water, wetBandMaterialPatch } from "./water.js";
+import { terrainMaterial } from "./terrain-tex.js";
 import { addSceneryB20, layoutB20, SCN } from "./scenery-b20.js";
 import { Deck, DeckSet } from "./deck.js";
 
@@ -104,10 +105,13 @@ const C = {
 };
 for (const k in C) C[k] = new THREE.Color(C[k]);
 const _c = new THREE.Color();
+const W = [0, 0];       // trọng số hoa văn (đất, đá) của tam giác groundColor vừa tô — terrain-tex.js aSplat
 // Màu một tam giác: tâm (x, z), độ cao y, pháp tuyến ny, ngữ cảnh ctx { karst[], paths[] } (thuần theo toạ độ).
 function groundColor(out, x, z, y, ny, ctx) {
   const n1 = fbm(x * 0.018, z * 0.018), n2 = fbm(x * 0.05 + 40, z * 0.05 - 12);
+  W[0] = W[1] = 0;
   if (y < TIDE.high) {
+    W[0] = 0.7;
     // lòng sông và bãi bùn triều: sẫm dưới sâu, sáng dần lên mép triều cao; vệt bùn kéo dài theo dòng chảy (dọc x)
     const k = sstep(-4.6, TIDE.high, y);
     out.copy(C.deep).lerp(C.mudLo, sstep(0, 0.45, k)).lerp(C.mudHi, sstep(0.45, 1, k));
@@ -119,44 +123,47 @@ function groundColor(out, x, z, y, ny, ctx) {
   } else if (y < 2.05) {
     // dải cát ướt ngay trên mép triều cao (bọt sóng để lại), loang theo nhiễu
     out.copy(C.wetSand).lerp(C.sand, sstep(TIDE.high, 2.0, y) * (0.5 + 0.5 * n2));
+    W[0] = 0.45;
   } else if (y < 3.3) {
     // dải bờ phẳng: lau sậy vàng xanh, lốm đốm cỏ
     out.copy(C.reed).lerp(C.reedDry, sstep(0.45, 0.75, n2)).lerp(C.grass, sstep(2.4, 3.3, y) * 0.6);
+    W[0] = 0.3;
   } else {
     // cỏ bờ → nền rừng dưới tán (sẫm) theo độ cao, trảng cỏ theo nhiễu
     if (n1 < 0.5) out.copy(C.lush).lerp(C.grass, sstep(0.3, 0.5, n1)); else out.copy(C.grass).lerp(C.dry, sstep(0.5, 0.72, n1) * 0.7);
     const fk = sstep(4, 16, y) * (1 - 0.7 * sstep(0.62, 0.78, n2));
-    out.lerp(n1 > 0.52 ? C.forest2 : C.forest, fk * 0.85);
+    out.lerp(n1 > 0.52 ? C.forest2 : C.forest, fk * 0.85); W[0] = fk * 0.3;
     if (fk > 0.5 && n2 > 0.66) out.lerp(C.glade, 0.4);
     // sườn dốc và đỉnh đồi cao: lộ đá vôi xám
     const rk = Math.max(sstep(0.9, 0.7, ny), sstep(34, 60, y) * sstep(0.45, 0.65, n2));
-    if (rk > 0) out.lerp(n2 > 0.55 ? C.rock2 : C.rock, rk * 0.85);
+    if (rk > 0) { out.lerp(n2 > 0.55 ? C.rock2 : C.rock, rk * 0.85); W[1] = Math.min(1, rk * 0.9); }
   }
   // chân cột đá vôi trên bờ: đá vụn, sẫm ướt ở sát chân
   for (const k of ctx.karst) {
     const dx = x - k.x, dz = z - k.z; if (dx * dx + dz * dz > k.r * k.r * 2.4) continue;
     const d = Math.sqrt(dx * dx + dz * dz) / k.r;
-    out.lerp(d < 1.05 ? C.rockDark : C.rock, sstep(1.55, 1.0, d) * 0.75);
+    out.lerp(d < 1.05 ? C.rockDark : C.rock, sstep(1.55, 1.0, d) * 0.75); W[1] = Math.max(W[1], sstep(1.55, 1.0, d) * 0.9);
   }
   // gò bản doanh (đất nện), lối từ cổng xuống bến sông, gốc cầu bến
   for (const p of ctx.paths) {
     const dx = p.bx - p.ax, dz = p.bz - p.az, L2 = dx * dx + dz * dz;
     let t = L2 ? ((x - p.ax) * dx + (z - p.az) * dz) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
     const d = Math.hypot(x - p.ax - dx * t, z - p.az - dz * t);
-    if (d < p.w) out.lerp(p.col, sstep(p.w, p.w * 0.45, d) * p.k * (0.75 + 0.25 * n2));
+    if (d < p.w) { out.lerp(p.col, sstep(p.w, p.w * 0.45, d) * p.k * (0.75 + 0.25 * n2)); W[0] = Math.max(W[0], sstep(p.w, p.w * 0.45, d) * p.k); }
   }
   return out;
 }
 
 // ---- dựng mesh từ danh sách tam giác (không chỉ mục, màu phẳng mỗi mặt) -------------------------------------------------
-function triGeo(pos, col) {
+function triGeo(pos, col, spl = null) {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  if (spl) g.setAttribute("aSplat", new THREE.BufferAttribute(spl, 2));
   g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
   return g;
 }
 // Tô màu mọi tam giác của mảng vị trí (ghi thẳng vào col); jitter: xê sáng tối nhẹ từng mặt như B15.
-function paint(pos, col, ctx, seed = 0) {
+function paint(pos, col, ctx, seed = 0, spl = null) {
   for (let o = 0; o < pos.length; o += 9) {
     const ax = pos[o], ay = pos[o + 1], az = pos[o + 2], bx = pos[o + 3], by = pos[o + 4], bz = pos[o + 5], cx = pos[o + 6], cy = pos[o + 7], cz = pos[o + 8];
     const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
@@ -164,6 +171,7 @@ function paint(pos, col, ctx, seed = 0) {
     groundColor(_c, (ax + bx + cx) / 3, (az + bz + cz) / 3, (ay + by + cy) / 3, ny, ctx);
     _c.multiplyScalar(0.93 + 0.07 * (((((o / 9) + seed) * 2654435761) >>> 0) % 97) / 97);
     for (let k = 0; k < 9; k += 3) { col[o + k] = _c.r; col[o + k + 1] = _c.g; col[o + k + 2] = _c.b; }
+    if (spl) for (let k = 0; k < 3; k++) { spl[(o / 3 + k) * 2] = W[0]; spl[(o / 3 + k) * 2 + 1] = W[1]; }
   }
 }
 
@@ -240,7 +248,7 @@ export function buildWorldB20(scene, { shadows = true, tide = 100, seed = SCN.se
       ...LO.towers.map((t) => ({ ax: t.x, az: t.z, bx: t.x + 6, bz: t.z + t.side * 4, w: 5, col: C.dirt, k: 0.5 })),
     ],
   };
-  const tmat = wetBandMaterialPatch(lambert(), () => world.tideY);
+  const tmat = wetBandMaterialPatch(terrainMaterial(), () => world.tideY);        // hoa văn đất / đá (terrain-tex.js) rồi dải bùn triều
   world.terrainMat = tmat;
   const chunks = [], nChunk = WB20.chunks, colsPer = Math.ceil((NX - 1) / nChunk);
   let tris = 0;
@@ -254,8 +262,8 @@ export function buildWorldB20(scene, { shadows = true, tide = 100, seed = SCN.se
       if (diag[j * (NX - 1) + i] === 0) { put(i, j); put(i, j + 1); put(i + 1, j + 1); put(i, j); put(i + 1, j + 1); put(i + 1, j); }
       else { put(i, j); put(i, j + 1); put(i + 1, j); put(i, j + 1); put(i + 1, j + 1); put(i + 1, j); }
     }
-    const col = new Float32Array(pos.length); paint(pos, col, ctx, ch * 7919);
-    const m = new THREE.Mesh(triGeo(pos, col), tmat);
+    const col = new Float32Array(pos.length), spl = new Float32Array(pos.length / 3 * 2); paint(pos, col, ctx, ch * 7919, spl);
+    const m = new THREE.Mesh(triGeo(pos, col, spl), tmat);
     m.name = "terrain-b20-" + ch; m.receiveShadow = true; scene.add(m); chunks.push(m);
     tris += pos.length / 9;
   }

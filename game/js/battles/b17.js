@@ -10,6 +10,7 @@ import { buildWorld } from "../battle/world.js";
 import { setOverlay, heightAt } from "../battle/ground.js";
 import { envPart } from "../battle/glb.js";
 import { merge, lambert } from "../battle/models.js";
+import { terrainMaterial } from "../battle/terrain-tex.js";
 import { ATMO_B15 } from "../battle/atmosphere.js";
 import { DirectorB17 } from "../battle/director-b17.js";
 import { MAP } from "../data/battle-b15.js";
@@ -25,14 +26,16 @@ const COL = { land: "#cdb888", water: "#2f5d62", city: "#b39a6a", wall: "#5a4632
 function tintMarsh(world) {
   const g = world.terrain?.geometry, pos = g?.attributes.position, col = g?.attributes.color;
   if (!pos || !col) return;
+  const sp = g.attributes.aSplat?.array;          // hoa văn đất (terrain-tex.js): bùn đầm nhận lớp đất mịn đậm hơn cỏ
   const pa = pos.array, ca = col.array, wet = new THREE.Color(0x4a4a2c), c = new THREE.Color();
   for (let i = 0; i < pos.count; i += 3) {
     const o = i * 3, cx = (pa[o] + pa[o + 3] + pa[o + 6]) / 3, cz = (pa[o + 2] + pa[o + 5] + pa[o + 8]) / 3;
     const m = mudB17(cx, cz) / MUD.level; if (m <= 0.01) continue;
     c.setRGB(ca[o], ca[o + 1], ca[o + 2]).lerp(wet, 0.55 * m);
     for (let k = 0; k < 9; k += 3) { ca[o + k] = c.r; ca[o + k + 1] = c.g; ca[o + k + 2] = c.b; }
+    if (sp) for (let k = 0; k < 3; k++) sp[(i + k) * 2] = Math.max(sp[(i + k) * 2], 0.6 * Math.min(1, m));
   }
-  col.needsUpdate = true;
+  col.needsUpdate = true; if (sp) g.attributes.aSplat.needsUpdate = true;
 }
 // Gò: mỗi gò một đĩa lưới cực (vòng × tia) đặt đúng heightAt (đã có lớp phủ: đất + gò), nổi 3 cm và polygonOffset để không chớp với đất; gộp một lưới.
 function buildMounds(scene) {
@@ -48,8 +51,9 @@ function buildMounds(scene) {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute("color", new THREE.Float32BufferAttribute(C, 3));
+  geo.setAttribute("aSplat", new THREE.Float32BufferAttribute(Array.from({ length: P.length / 3 * 2 }, (_, i) => (i % 2 ? 0 : 0.55)), 2));      // gò đất: hoa văn đất vừa phải (terrain-tex.js)
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  const mesh = new THREE.Mesh(geo, terrainMaterial({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
   mesh.receiveShadow = true; scene.add(mesh);
   return mesh;
 }

@@ -297,9 +297,9 @@ function tudoIntro(c) {
 // chars: mã tướng / boss (heroes.js, data/battles.js models) hoặc mã mô hình (lính Tự do LINH_*); mã tướng đổi qua RIGS thành mô hình đã nướng (H35 → H35h).
 async function loadModels(chars = [], env = null) {
   try {
-    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }, { WORLD_ENV }, envIds] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js"), import("./battle/world.js"), env ? env() : null]);
+    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }, { WORLD_ENV }, envIds, { loadTerrainTextures }] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js"), import("./battle/world.js"), env ? env() : null, import("./battle/terrain-tex.js")]);
     await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + (RIGS[HEROES[c]?.rig || c]?.model || modelOf(c))), ...kitFiles().map((k) => "kit/" + k), "wpn/*", ...(envIds || WORLD_ENV).map((id) => "env/" + id),
-      ...["CV_khien", "CV_giao", "CV_cung", "CV_songdao", "CV_daidao", "OFF_tuong", "OFF_photuong", "OFF_doitruong"].map((c) => "char/" + modelOf(c))], 12000), preloadFx(), loadClips()]),
+      ...["CV_khien", "CV_giao", "CV_cung", "CV_songdao", "CV_daidao", "OFF_tuong", "OFF_photuong", "OFF_doitruong"].map((c) => "char/" + modelOf(c))], 12000), preloadFx(), loadClips(), loadTerrainTextures()]),
       new Promise((r) => setTimeout(r, 12000))]);
   } catch (e) { console.warn("mô hình", e); }
 }
