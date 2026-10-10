@@ -74,6 +74,22 @@ await t("lộ trình, bãi lau, gò, mốc cửa sông ở trên đất; mốc �
   assert.ok(BED_S.W < BED_S.E, "bãi tây trước bãi đông");
 });
 
+await t("vật đầm (MARSH_PROPS, mẫu ENV): trên đất, cách đường cánh đi ≥ 9 m, không đè chỗ phục binh, gò, đồn; mã có trong assets/models; B17 nạp trước đất Hàm Tử + mã đầm", async () => {
+  const { readFileSync } = await import("node:fs");
+  const index = JSON.parse(readFileSync(join(here, "../assets/models/index.json"), "utf8"));
+  const routeD = (p) => { const q = along(D.ROUTE, routeS(D.ROUTE, p)); return Math.hypot(q.x - p.x, q.z - p.z); };
+  for (const p of D.MARSH_PROPS) {
+    const k = `${p.id}@${p.x},${p.z}`;
+    assert.ok(index["env/" + p.id], k);
+    assert.ok(G.waterDist(p.x, p.z) > 4, k + " trên đất");
+    assert.ok(routeD(p) >= 9, k + " sát đường " + routeD(p).toFixed(1));
+    for (const B of D.BEDS) { for (const w of B.wings) assert.ok(Math.hypot(w.x - p.x, w.z - p.z) > 12, k + " chỗ phục"); for (const m of B.mounds) assert.ok(Math.hypot(m.x - p.x, m.z - p.z) > m.r + 3, k + " gò"); }
+    for (const O of D.OUTPOSTS) assert.ok(Math.hypot(O.x - p.x, O.z - p.z) > 25, k + " đồn");
+  }
+  const { BATTLES } = await import("../js/data/battles.js"), W = await import("../js/battle/world.js");
+  assert.deepEqual(await BATTLES.B17.env(), [...W.WORLD_ENV, ...D.ENV_B17]);
+});
+
 console.log("Luật B17 (sim/b17.js)");
 await t("trạng thái đầu: P1, cánh ở đầu đường, chưa chọn bãi, Kế Sách khả dụng; cửa sổ × ksWin", () => {
   const st = createB17({ ksWin: 0.75 });
@@ -277,6 +293,14 @@ await t("B17.buildWorld bật lớp phủ (gò cao lên, bùn ở bãi lau), gi�
   assert.equal(G.overlay(), null); assert.equal(G.heightAt, h0); assert.equal(G.mudAt, m0);
   assert.deepEqual(snap(), before);
   assert.ok(!D.BEDS[0].mounds.includes(perchNear(m.x + 5, m.z, m.x + 11, m.z, 16)), "gỡ lớp phủ: gò B17 không còn");
+  assert.equal(w.b17.marsh, null, "chưa nạp mô hình: không có vật đầm (lau, gò code vẫn có)");
+  // đã nạp mẫu ENV đầm và cột cờ (như màn tải): vật đầm gộp một lưới
+  const { readFileSync } = await import("node:fs"), { parseHKM, putModel } = await import("../js/battle/glb.js");
+  const index = JSON.parse(readFileSync(join(here, "../assets/models/index.json"), "utf8"));
+  for (const id of [...D.ENV_B17, "ENV_cot_co"]) { const b = readFileSync(join(here, "../assets/models", index["env/" + id].file)); putModel("env/" + id, parseHKM(b.buffer.slice(b.byteOffset, b.byteOffset + b.length))); }
+  const w2 = B17.buildWorld(new THREE.Scene(), { shadows: false });
+  assert.ok(w2.b17.marsh && w2.b17.marsh.geometry.attributes.position.count > 1000, "vật đầm từ mẫu");
+  B17.dispose({});
   // trận trước vỡ giữa chừng (không dispose): buildWorld của trận sau (setTerrain) cũng gỡ lớp phủ
   B17.buildWorld(new THREE.Scene(), { shadows: false }); assert.ok(G.overlay());
   B15.buildWorld(new THREE.Scene(), { shadows: false });

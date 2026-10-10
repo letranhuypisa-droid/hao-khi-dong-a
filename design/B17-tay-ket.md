@@ -6,6 +6,20 @@ Trạng thái: **đợt A1 (greybox) và phần boss của A2 đã dựng** trê
 
 ## Đã làm
 
+### Gộp main (mô hình ENV) và phần rẻ của A4 (2026-10-10)
+
+- **Gộp `main` cd6832b** vào nhánh (mô hình ENV nướng ở đất Hàm Tử, B16, B20, Võ trường): không xung đột.
+- **Vết bot B15** trên nhánh sau khi gộp trùng mã băm với `main` cd6832b ở cả 6 mốc (cùng cách đo, `main` phục vụ từ `git archive`).
+- **A4, phần rẻ**:
+  - B17 nạp trước đất Hàm Tử cùng 3 mẫu đầm: `env` ở `data/battles.js`, danh sách `ENV_B17`.
+  - Đước ở góc hai bãi lau, bè cỏ trên bãi lầy bờ bắc, lùm cây ven sông gần cửa sông (`MARSH_PROPS`): gộp một lưới, không va chạm. Chưa nạp mô hình thì bỏ.
+  - Cột cờ mốc cửa sông dùng `ENV_cot_co` như B16.
+- **Lệnh vẽ sau khi gộp** (đo có bóng, bot seed 1001, mỗi 5 s):
+  - B17: đỉnh 162 ở giây 5, trung bình 123, 3/61 mẫu quá 150. Ở khung đỉnh, phần đất Hàm Tử là 125; phần riêng B17 là 37 (7 đơn vị lớn, vật trận, lau, gò, vật đầm).
+  - Cùng cách đo sau khi gộp ENV: B15 đỉnh 206, B16 đỉnh 219 (trung bình 135). Trước khi gộp, B17 đỉnh 121.
+  - Việc cần làm chung cho đất Hàm Tử, không riêng B17: gộp hoặc instancing vật ENV, bớt bóng của vật xa.
+- Bot B17 sau khi gộp vẫn thắng 298 s; bot B16 528 s.
+
 ### Đợt A2, phần boss (2026-10-10, cùng nhánh)
 
 - **`BigUnit`** (`units.js`, tùy chọn; không đặt thì như cũ, có test trong `b17-sim.test.mjs`):

@@ -59,6 +59,18 @@ export const AMBUSH = { wingN: 10, holdMin: 3, pad: 6, revealR: 40, pickSec: 60,
 // level 0,625 × TERRAIN.mud 0,4 = chậm 25% (canon); kỵ binh × 2 = chậm 50%.
 export const MUD = { level: 0.625, edge: 4, bank: { x0: 60, x1: 590, z0: -180, z1: -140 }, road: { z: -75, half: 5, x0: 60, x1: 470 } };
 
+// Vật đầm (đợt A4, phần rẻ): bụi đước ở góc hai bãi lau, bè cỏ trên bãi lầy bờ bắc, lùm cây ven sông gần cửa sông — mẫu ENV nướng (assets/models/env)
+// gộp một lưới ở battles/b17.js, không va chạm; chưa nạp mô hình thì bỏ (lau, gò vẫn dựng bằng code). ENV_B17: mã nạp trước thêm vào đất Hàm Tử.
+export const MARSH_PROPS = [
+  { id: "ENV_duoc", x: 373, z: -96, ry: 0.4, s: 1 }, { id: "ENV_duoc", x: 443, z: -99, ry: 1.9, s: 0.9 },
+  { id: "ENV_duoc", x: 372, z: -54, ry: 2.8, s: 0.85 }, { id: "ENV_duoc", x: 440, z: -52, ry: 4.1, s: 1 },
+  { id: "ENV_duoc", x: 497, z: -148, ry: 0.9, s: 1 }, { id: "ENV_duoc", x: 556, z: -122, ry: 3.3, s: 0.9 },
+  { id: "ENV_be_co", x: 300, z: -161, ry: 1.57, s: 1 }, { id: "ENV_be_co", x: 360, z: -162, ry: 1.4, s: 1 },
+  { id: "ENV_be_co", x: 420, z: -161, ry: 1.7, s: 0.9 }, { id: "ENV_be_co", x: 520, z: -162, ry: 1.5, s: 1 },
+  { id: "ENV_lum_cay_ven_song", x: 562, z: -160, ry: 0.5, s: 1 }, { id: "ENV_lum_cay_ven_song", x: 548, z: -163, ry: 2.2, s: 0.9 },
+];
+export const ENV_B17 = [...new Set(MARSH_PROPS.map((p) => p.id))];
+
 // Pha. target: mục tiêu cho HUD chỉ đường (director-b17.js objectives). par giây — ĐỀ XUẤT BẢN THỬ (chưa đo bot nhiều seed). {Act:…} đổi theo thiết bị.
 export const PHASES = [
   { id: "P1", name: "Bàn kế ở bản doanh", goal: "Chọn bãi lau đặt phục binh", par: 60, target: { pick: true },

@@ -53,6 +53,7 @@ export const BATTLES = {
     sub: "20 tháng 5 năm Ất Dậu · khoảng 24/6/1285 · Tây Kết, Khoái Châu",
     heroes: ["H30", "H40"], playable: ["H35"], fixedR: 16, modes: ["nhanh"], wip: true, ownHero: true, noComic: true,
     models: ["X19", "X20", "H31", "H38"],                 // Toa Đô (boss), Ô Mã Nhi, Hưng Đạo vương (bản doanh), Yết Kiêu (X20, H38: đợt A2)
+    env: () => Promise.all([import("../battle/world.js"), import("./battle-b17.js")]).then(([w, d]) => [...w.WORLD_ENV, ...d.ENV_B17]),   // đất Hàm Tử + vật đầm
     keSach: { nhanh: 1, chuan: 1 },                       // Phục kích bãi lau (Lớn)
     par: { nhanh: 600 },                                  // = PAR_B17 của data/battle-b17.js (tổng par các pha, ĐỀ XUẤT BẢN THỬ)
     loading: { title: "Tây Kết · 1285" },

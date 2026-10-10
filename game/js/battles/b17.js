@@ -8,12 +8,14 @@
 import * as THREE from "three";
 import { buildWorld } from "../battle/world.js";
 import { setOverlay, heightAt } from "../battle/ground.js";
+import { envPart } from "../battle/glb.js";
+import { merge, lambert } from "../battle/models.js";
 import { ATMO_B15 } from "../battle/atmosphere.js";
 import { DirectorB17 } from "../battle/director-b17.js";
 import { MAP } from "../data/battle-b15.js";
 import B15 from "./b15.js";
 import { overlayB17, mudB17, moundDh, along, columnHead, routeS, BED_S, bedOf } from "../sim/b17.js";
-import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, ROUTE, MOUTH, OUTPOSTS, BEDS, MUD, AMBUSH, PAR_B17 } from "../data/battle-b17.js";
+import { PHASES, FRONTS, EVENTS, STORY_INSERTS, HISTORY_NOTES, SIDE_MISSIONS, ROUTE, MOUTH, OUTPOSTS, BEDS, MUD, AMBUSH, PAR_B17, MARSH_PROPS } from "../data/battle-b17.js";
 
 const COL = { land: "#cdb888", water: "#2f5d62", city: "#b39a6a", wall: "#5a4632", gold: "#f1d98a", dich: "#3d5a78", ta: "#c0392b", ink: "#1d1a17", marsh: "rgba(86,96,52,.55)", reed: "rgba(110,128,62,.8)" };
 
@@ -69,6 +71,14 @@ function buildReeds(scene) {
   return reeds;
 }
 const alongPt = (s) => along(ROUTE, s);
+// Vật đầm (MARSH_PROPS: đước, bè cỏ, lùm cây ven sông) — mẫu ENV nướng gộp một lưới màu đỉnh (một lượt vẽ); chưa nạp mô hình thì null.
+function buildMarshProps(scene) {
+  const parts = [];
+  for (const p of MARSH_PROPS) { const g = envPart(p.id, { x: p.x, y: heightAt(p.x, p.z) - 0.05, z: p.z, ry: p.ry, s: p.s }); if (g) parts.push(g); }
+  if (!parts.length) return null;
+  const m = new THREE.Mesh(merge(parts), lambert()); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+  return m;
+}
 
 // ---- bản đồ nhỏ -------------------------------------------------------------------------------------------------------------------
 function drawBase({ c, W, H, X, Z }) {
@@ -148,7 +158,7 @@ export const B17 = {
     for (const f of Object.values(w.lineFlags)) { f.ta.group.visible = false; f.dich.group.visible = false; }                                         // cờ tuyến B15
     setOverlay(overlayB17());                                      // bùn đầm, gò: từ đây heightAt / mudAt có lớp phủ
     tintMarsh(w);
-    w.b17 = { mounds: buildMounds(scene), reeds: buildReeds(scene) };
+    w.b17 = { mounds: buildMounds(scene), reeds: buildReeds(scene), marsh: buildMarshProps(scene) };
     return w;
   },
   camBoxes: B15.camBoxes,

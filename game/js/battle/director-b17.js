@@ -14,7 +14,8 @@ import * as THREE from "three";
 import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 import { BannerQueue } from "./banner-queue.js";
-import { flagTexture } from "./models.js";
+import { flagTexture, lambert } from "./models.js";
+import { envPart } from "./glb.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
 import { HAO_KHI, TIERS, MODES, HERO } from "../data/tuning.js";
 import { createB17, tickB17, sideB17, snapshotB17, restoreB17, along, routeS, columnHead, columnSpeed, secLeft, bedOf, routed, BED_S, finish as simFinish } from "../sim/b17.js";
@@ -122,9 +123,10 @@ export class DirectorB17 {
     return m;
   }
   flag(p, color, h = 7) {
-    const g = new THREE.Group(), y = heightAt(p.x, p.z);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
-    pole.position.y = h / 2; g.add(pole);
+    const g = new THREE.Group(), y = heightAt(p.x, p.z), env = envPart("ENV_cot_co", { s: h / 9 });          // cột mẫu cao 9 m (như B16), không có thì trụ
+    const pole = env ? new THREE.Mesh(env, (this._envMat ||= lambert())) : new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
+    if (!env) pole.position.y = h / 2;
+    g.add(pole);
     const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
     cloth.position.set(0.92, h - 0.7, 0); g.add(cloth);
     g.position.set(p.x, y, p.z); this.props.add(g); g.cloth = cloth;
