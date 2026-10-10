@@ -291,7 +291,7 @@ const HUN_KITS = { DV_GIAO: [FIX_DV_GIAOH], DV_DAO: [FIX_DV_DAOH], DV_NO: [FIX_D
   NG_CUNG: [FIX_NG_CUNGH], NG_TANK: [FIX_NG_TANKH], NG_KY: [FIX_NG_KYH] };
 for (const [k, [fix, over]] of Object.entries(HUN_KITS)) {
   const { shoulder, cut, keep, fix: oldFix, ...rest } = KIT_LIST[k];                // khớp, hộp cắt, mẫu giữ của Meshy không áp cho mẫu mới
-  KIT_LIST[k + "h"] = { ...rest, src: `design/glb/_raw/${k}_hunyuan.glb`, fix, ...over };
+  KIT_LIST[k + "h"] = { ...rest, src: `design/glb/_raw/nhan-vat/${k}_hunyuan.glb`, fix, ...over };
 }
 
 // Đợt ba: dân làng và quân áo Tống (lính bộ, cùng bảng mức chi tiết như lính đám đông Hunyuan3D ở trên). Chưa có mã Meshy song song nên không đi qua HUN_KITS. Không vũ khí trong tay, trừ
