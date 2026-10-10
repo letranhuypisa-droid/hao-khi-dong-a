@@ -163,6 +163,14 @@ export class BigUnit {
     if (this.state === "stagger") { this.st -= dt; this.setPose(A.hitReact(0.5), 0.3); if (this.st <= 0) this.state = "idle"; return; }
 
     if (this.state === "atk" || this.state === "red" || this.state === "ult" || this.state === "lunge") { this.updateAttack(dt, hero, d); return; }
+    // Hành quân (B17: Toa Đô, sĩ quan đi cùng cánh): director đặt this.march = { x, z, v } (điểm của mình trong cánh, tốc cánh m/s) — đi theo
+    // cánh, không ra đòn, VẪN nhận đòn (takeHeroHit không xét cờ này; khác this.script). null / thiếu: đánh như thường (B15, B16, B20 không đặt).
+    if (this.march) {
+      const m = this.march, md = Math.hypot(m.x - this.x, m.z - this.z);
+      if (md > 0.3 || m.v > 0) this.moveToward(m.x, m.z, dt, Math.min(1, Math.max(0.12, ((m.v || 0) + md * 0.8) / this.speed)));
+      else { this.yaw = turn(this.yaw, m.yaw ?? this.yaw, dt * 3); this.setPose(A.idle(this.animT), 0.15); }
+      return;
+    }
 
     if (!this.awake || !hero.alive) {
       const hd = Math.hypot(this.home.x - this.x, this.home.z - this.z);

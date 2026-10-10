@@ -14,7 +14,7 @@
 import { TERRAIN } from "../data/tuning.js";
 import { FRONTS, xToLine } from "../data/battle-b15.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
-import { heightAt, mudAt, laneFeaturesOn } from "../battle/ground.js";
+import { heightAt, mudAt, laneFeaturesOn, overlay } from "../battle/ground.js";
 
 const SL = TERRAIN.slope, HT = TERRAIN.height;
 
@@ -26,16 +26,18 @@ export function slopeFactor(grade) {
   if (grade < -SL.dead) return Math.min(SL.downCap, 1 + SL.down * (-grade - SL.dead));
   return 1;
 }
-export const mudFactor = (mud) => 1 - TERRAIN.mud * mud;
+// mounted (kỵ binh): bùn chậm gấp TERRAIN.mudMounted lần (canon B17: bộ chậm 25%, kỵ chậm 50%). Thiếu / false: như cũ.
+export const mudFactor = (mud, mounted = false) => 1 - TERRAIN.mud * mud * (mounted ? TERRAIN.mudMounted : 1);
 
 // Hệ số tốc chạy tại (x, z) theo hướng (dx, dz) (không cần chuẩn hoá; 0 thì 1). hf, mf: hàm độ cao, bùn (mặc
 // định mặt đất trận; kiểm thử truyền hàm giả). Dò mặt đất trước/sau SL.probe m: bắt đúng mái lũy, vách hố.
-export function speedFactor(x, z, dx, dz, hf = heightAt, mf = mudAt) {
+// mounted: tham số tùy chọn (crowd.js chỉ truyền khi trận có lớp phủ bùn — ground.js setOverlay — nên B15 giữ nguyên).
+export function speedFactor(x, z, dx, dz, hf = heightAt, mf = mudAt, mounted = false) {
   const L = Math.sqrt(dx * dx + dz * dz);
   if (!(L > 1e-6)) return 1;
   const k = SL.probe / L, ox = dx * k, oz = dz * k;
   const grade = (hf(x + ox, z + oz) - hf(x - ox, z - oz)) / (2 * SL.probe);
-  return Math.max(TERRAIN.minSpeed, slopeFactor(grade) * mudFactor(mf(x, z)));
+  return Math.max(TERRAIN.minSpeed, slopeFactor(grade) * mudFactor(mf(x, z), mounted));
 }
 
 // ---- thế đất cao trong giao chiến -----------------------------------------------------------------------
@@ -81,13 +83,15 @@ export function earthworkLossMult(side, frontId, x, luyStands) {
 // ---- gò cho cung thủ ------------------------------------------------------------------------------------
 // Gò gần (x, z) nhất trong TERRAIN.perch.seek m mà đỉnh cách mục tiêu (tx, tz) trong [minD, reach × range]:
 // đứng trên đỉnh bắn tới được, lại không sát mặt tướng. null nếu không có (hoặc chưa bật công trình làn đánh).
-const MOUNDS = LANE_TERRAIN.mounds;
+// Lớp phủ (ground.js setOverlay, B17) có gò riêng (O.mounds) thì xét cả các gò đó, sau gò của làn đánh (B15 không có lớp phủ: như cũ).
+const MOUNDS = LANE_TERRAIN.mounds, NONE = [];
 export function perchNear(x, z, tx, tz, range) {
-  if (!laneFeaturesOn()) return null;
+  const lane = laneFeaturesOn(), ov = overlay()?.mounds;
+  if (!lane && !ov) return null;
   const P = TERRAIN.perch, far = P.reach * range;
   let best = null, bd = P.seek * P.seek;
-  for (let i = 0; i < MOUNDS.length; i++) {
-    const m = MOUNDS[i], d2 = (m.x - x) * (m.x - x) + (m.z - z) * (m.z - z);
+  for (let L = 0; L < 2; L++) for (let i = 0, list = L ? ov || NONE : lane ? MOUNDS : NONE; i < list.length; i++) {
+    const m = list[i], d2 = (m.x - x) * (m.x - x) + (m.z - z) * (m.z - z);
     if (d2 >= bd) continue;
     const t2 = (m.x - tx) * (m.x - tx) + (m.z - tz) * (m.z - tz);
     if (t2 > far * far || t2 < P.minD * P.minD) continue;

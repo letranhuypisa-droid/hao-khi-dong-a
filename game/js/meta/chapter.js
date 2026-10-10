@@ -45,7 +45,7 @@ export function battleUnlockKeys(res) {
   const b20 = res.battle === "B20";
   if (b20 ? (Array.isArray(res.bossesMet) ? res.bossesMet.includes("X20") : !!res.bossMet) : res.bossMet) keys.push("bossMet");
   const list = res.keSachList || (b20 ? Object.values(res.river?.keSach || {}) : []);
-  const strict = b20 || res.battle === "B16";          // B16 (đợt 21) theo luật B20: thẻ Kế Sách chỉ mở khi thành công
+  const strict = b20 || res.battle === "B16" || res.battle === "B17";   // B16 (đợt 21), B17 theo luật B20: thẻ Kế Sách chỉ mở khi thành công
   for (const k of list) if (k.state === "thanhcong" || (!strict && k.state === "thatbai")) keys.push("keSach:" + k.id);
   if (res.won) keys.push("firstWin");
   return keys;

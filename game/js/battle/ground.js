@@ -202,7 +202,7 @@ export function featureLook(x, z) {
 let TERRAIN = "map";
 // Chọn địa hình dựng sẵn ("map" Hàm Tử, "arena" Võ trường); luôn bỏ địa hình / boong / nước của trận khác (buildWorld,
 // buildArena gọi hàm này trước tiên nên trận trước có vỡ giữa chừng cũng không để lại địa hình B20 cho Võ trường).
-export function setTerrain(t) { TERRAIN = t; MESH = null; if (BT || DECKS || WATER) { BT = null; DECKS = null; WATER = null; rebind(); } }
+export function setTerrain(t) { TERRAIN = t; MESH = null; if (BT || DECKS || WATER || OV) { BT = null; DECKS = null; WATER = null; OV = null; rebind(); } }
 export const ARENA_R = 46;
 
 // Độ cao mặt đất mọi module dùng (chân tướng/lính qua IK, đạo cụ, camera). Khi đã dựng lưới mịn (bật công
@@ -235,6 +235,12 @@ export function setBattleTerrain(T) {
   rebind();
 }
 export function setDecks(deckSet) { DECKS = deckSet || null; rebind(); }
+// Lớp phủ trên địa hình đang dùng (B17 Tây Kết, dựng trên đất Hàm Tử: bùn đầm, gò thấp) — tùy chọn: O = { mud?(x, z) → 0..1, dh?(x, z) → m,
+// mounds?: [{ x, z, r, h }] }. heightAt cộng dh, mudAt lấy max(bùn cũ, mud), perchNear (terrain-rules.js) xét thêm mounds. null (mặc định):
+// heightAt, mudAt là đúng hàm cũ (B15 không đổi một bit). setTerrain (buildWorld, buildArena) và runBattle (lúc vào, lúc rời trận) bỏ lớp phủ.
+let OV = null;
+export function setOverlay(O) { OV = O || null; rebind(); }
+export const overlay = () => OV;
 export function setWaterLevel(fn) { WATER = fn || null; }
 export const battleTerrain = () => BT;
 export const decksOn = () => DECKS;
@@ -242,11 +248,13 @@ export function waterLevel(x, z) { return WATER !== null ? WATER(x, z) : -Infini
 // Mặt người, đồ đứng được: đất, boong hoặc mặt nước (cái nào cao hơn).
 export function surfaceY(x, z) { const h = heightAt(x, z), w = waterLevel(x, z); return h > w ? h : w; }
 function rebind() {
-  const base = BT ? BT.height : heightB15;
-  if (DECKS) { const D = DECKS; heightAt = (x, z) => { const y = D.heightAt(x, z); return y === y ? y : base(x, z); }; }
+  let base = BT ? BT.height : heightB15;
+  if (OV && OV.dh) { const b0 = base, f = OV.dh; base = (x, z) => b0(x, z) + f(x, z); }
+  if (DECKS) { const D = DECKS, b1 = base; heightAt = (x, z) => { const y = D.heightAt(x, z); return y === y ? y : b1(x, z); }; }
   else heightAt = base;
   const T = BT;
   mudAt = T ? (T.mud ? (x, z) => T.mud(x, z) : () => 0) : mudB15;
+  if (OV && OV.mud) { const m0 = mudAt, f = OV.mud; mudAt = (x, z) => { const a = m0(x, z), b = f(x, z); return a > b ? a : b; }; }
   waterDist = T ? (T.waterDist || (() => 999)) : waterDistB15;
   collide = T ? collideBT : collideB15;
 }

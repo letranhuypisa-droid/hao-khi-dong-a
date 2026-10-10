@@ -13,8 +13,8 @@
 // ra giữa trận (main.js loadModels); rig của chúng làm nóng ở BattleDef.rigs.
 // keSach: số Kế Sách theo chế độ (nhãn nút chế độ ở Xuất trận). Đợt 9 D5 (tùy chọn): result.cLabel (tên dòng thứ tư của
 // bảng điểm — B15 "Cứ Điểm"), resultUI() → module dựng phần riêng của màn kết quả (ui/result-b20.js), marks() → tên các
-// Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau). ownHero (B16): trận R cố định mà tướng dùng chỉ số, cây kỹ năng của
-// người chơi (không có preset) — chữ ở sảnh nói đúng như vậy. noComic (B16): Chương chưa có comic.
+// Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau). ownHero (B16, B17): trận R cố định mà tướng dùng chỉ số, cây kỹ năng của
+// người chơi (không có preset) — chữ ở sảnh nói đúng như vậy. noComic (B16, B17): Chương chưa có comic.
 
 export const BATTLES = {
   B15: {
@@ -44,6 +44,22 @@ export const BATTLES = {
     load: () => import("../battles/b16.js"), comic: () => import("./comic-b16.js"), suquan: () => import("./suquan-b16.js"),
     notes: () => import("./battle-b16.js").then((m) => m.HISTORY_NOTES),
   },
+  // B17 (bản thử đợt A1, dựng trên đất Hàm Tử + lớp phủ đầm lầy): tướng của canon là H30 Trần Nhân Tông, H40 Nguyễn Khoái (cả hai "sắp có": H40 chờ lớp
+  // Cung WC09 — mạch B của design/B17-tay-ket.md, H30 chờ mô hình và lớp WC12); H35 của người chơi đứng tạm (ownHero) — bỏ khi H40 xong. R 16 cố định
+  // (+3 sau B16), Trận nhanh. Đợt A1 chỉ có Kế Sách Lớn Phục kích bãi lau (Hỏi kế Quốc công là đợt A2). noComic: bỏ khi bake comic-b17.js.
+  B17: {
+    id: "B17", chapter: "B17", name: "Tây Kết", title: "Trận Tây Kết", date: "1285",
+    sub: "20 tháng 5 năm Ất Dậu · khoảng 24/6/1285 · Tây Kết, Khoái Châu",
+    heroes: ["H30", "H40"], playable: ["H35"], fixedR: 16, modes: ["nhanh"], wip: true, ownHero: true, noComic: true,
+    models: ["X19", "X20", "H31", "H38"],                 // Toa Đô (boss), Ô Mã Nhi, Hưng Đạo vương (bản doanh), Yết Kiêu (X20, H38: đợt A2)
+    keSach: { nhanh: 1, chuan: 1 },                       // Phục kích bãi lau (Lớn)
+    par: { nhanh: 600 },                                  // = PAR_B17 của data/battle-b17.js (tổng par các pha, ĐỀ XUẤT BẢN THỬ)
+    loading: { title: "Tây Kết · 1285" },
+    result: { title: "Thắng trận Tây Kết", missionsTotal: 3, sideTotal: 1, eventNames: {}, cLabel: "Đồn, bãi lau, cánh" },
+    marks: () => import("./battle-b17.js").then((m) => m.KS_ORDER.map((id) => m.KE_SACH[id].name)),
+    load: () => import("../battles/b17.js"), comic: () => import("./comic-b17.js"), suquan: () => import("./suquan-b17.js"),
+    notes: () => import("./battle-b17.js").then((m) => m.HISTORY_NOTES),
+  },
   B20: {
     id: "B20", chapter: "B20", name: "Bạch Đằng", title: "Trận Bạch Đằng", date: "9/4/1288",
     sub: "Ngày 8 tháng 3 năm Mậu Tý · 9/4/1288 · sông Bạch Đằng",
@@ -59,7 +75,7 @@ export const BATTLES = {
     notes: () => import("./battle-b20.js").then((m) => m.HISTORY_NOTES),
   },
 };
-export const BATTLE_ORDER = ["B15", "B16", "B20"];
+export const BATTLE_ORDER = ["B15", "B16", "B17", "B20"];
 
 // BattleDef của trận (default của module, không có thì export trùng id).
 export async function loadBattleDef(id) {

@@ -421,6 +421,7 @@ function openSheet(cls, label, draw) {
 const LEAD = {
   B15: () => `Chiếm bến trên, giữ hai cánh, phá Hàm Tử quan, đánh lui ${BOSS.name}. Hai mặt trận cách nhau 150 m: bạn không thể có mặt ở cả hai, nên hãy dùng Mệnh Lệnh.`,
   B16: () => "Gọi dân binh ở các làng ven sông, đánh úp bến Chương Dương đốt 12 thuyền neo, hộ tống xe húc phá cổng nam kinh thành, đánh lui Thoát Hoan rồi chiếm điện chính. Bản thử: dựng tạm trên đất Hàm Tử.",
+  B17: () => "Toa Đô chưa biết Thoát Hoan đã rút, kéo cánh quân dọc đường đê ra biển. Chọn bãi lau đặt phục binh, hạ 3 đồn để làm chậm cánh, đứng xa khi Toa Đô vào bãi rồi phát lệnh phục kích, hạ Toa Đô trên gò. Bản thử: dựng tạm trên đất Hàm Tử, Trần Quốc Toản đứng thay Nguyễn Khoái.",
   B20: () => "Dụ hạm đội Nguyên vào khúc sông đã đóng cọc lúc triều lên, giữ chân chúng tới khi nước ròng, rồi lên boong chiến thuyền mắc cạn. Sáu pha theo con nước.",
 };
 async function openBattleInfo(id) {
@@ -538,6 +539,7 @@ const EMPTY_CH = { opened: false, openSeen: false, closeSeen: false, insertSeen:
 const COMIC_INFO = {
   B15: { open: "Tình thế, Chủ soái quyết", insert: "Áo Tống trên bến", insertLock: "Mở khi thuyền quân Triệu Trung cập bến" },
   B16: { open: "Chưa có (bản thử)", close: "Chưa có (bản thử)" },
+  B17: { open: "Chưa có (bản thử)", close: "Chưa có (bản thử)" },
   B20: { open: "Tình thế, hội quân", decree: "Chủ soái quyết", close: "Triều rút, bắt sống Ô Mã Nhi" },
 };
 function suquan() {

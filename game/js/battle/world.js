@@ -150,6 +150,7 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   terrain.receiveShadow = true;
   scene.add(terrain);
+  world.terrain = terrain;                         // trận dựng trên đất Hàm Tử tô lại màu đỉnh (B17: vùng đầm) — chỉ đọc ở đó
   // groundY: độ cao đúng mặt tam giác đang vẽ (lưới mịn) — đạo cụ đặt sát đất không lơ lửng, không chìm. Dựng
   // lưới xong thì heightAt cũng trả đúng mặt này (ground.js), nên chân tướng/lính, đạo cụ, camera cùng một mặt đất.
   world.groundY = grid ? grid.meshY : heightAt;

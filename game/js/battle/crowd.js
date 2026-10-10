@@ -28,7 +28,7 @@ import { skinnedKit, glbKit, poseFor, soldierFrame, resetMotion, advanceStride, 
 import { model } from "./glb.js";
 import { lerpYaw, SNAP_D, STEP, MAX_STEPS } from "./pacing.js";
 import { heightAt, collide } from "./world.js";
-import { surfaceY } from "./ground.js";
+import { surfaceY, overlay } from "./ground.js";
 import { TIERS, UNITS, KITS, AI, MOVES, IMPACT, SUPPLY, pickKit, g, heSoGiap, arrowHeroMult } from "../data/tuning.js";
 import { speedFactor, rangeMult, hitMult, heightDamageMult, perchNear } from "../sim/terrain-rules.js";   // dốc, bùn, thế đất cao
 import { leashClamp, fleeDir } from "./garrison.js";
@@ -334,6 +334,7 @@ export class Crowd {
   // ---- AI --------------------------------------------------------------------------------
   update(dt) {
     const ctx = this.ctx, hero = ctx.hero, rng = ctx.rng, nav = ctx.naval, forts = ctx.world?.forts;      // forts: đồn có tường của B15 (fort.js), thiếu thì như cũ
+    const ovMud = !!overlay()?.mud;                                      // lớp phủ bùn của trận (ground.js setOverlay — B17), không có: null
     const enemies = this.enemies, allies = this.allies, allyFoes = this.allyFoes;
     enemies.length = 0; allies.length = 0; allyFoes.length = 0;
     for (const a of this.agents) if (this.hittable(a)) (a.side === "dich" ? enemies : allies).push(a);
@@ -565,7 +566,8 @@ export class Crowd {
         const ox = a.x - hero.x, oz = a.z - hero.z, o = Math.hypot(ox, oz);
         if (o < 1.1 && o > 1e-6) { sx += ox / o * (1.1 - o) * 2; sz += oz / o * (1.1 - o) * 2; }
       }
-      const tf = mvx !== 0 || mvz !== 0 ? speedFactor(a.x, a.z, mvx, mvz) : 1;    // lên dốc chậm, xuống dốc nhanh, bùn lầy
+      // lên dốc chậm, xuống dốc nhanh, bùn lầy; trận có lớp phủ bùn (B17): kỵ binh chậm gấp đôi trong bùn — B15 không có lớp phủ: lời gọi như cũ
+      const tf = mvx !== 0 || mvz !== 0 ? (ovMud ? speedFactor(a.x, a.z, mvx, mvz, undefined, undefined, !!K.mounted) : speedFactor(a.x, a.z, mvx, mvz)) : 1;
       a.x += (mvx * a.speed * tf + sx * 4) * dt; a.z += (mvz * a.speed * tf + sz * 4) * dt;
       [a.x, a.z] = collide(ctx.world, a.x, a.z, 0.4, ctx.openGates, a);
       this.leash(a);

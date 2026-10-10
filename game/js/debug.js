@@ -552,7 +552,7 @@ const OBJ_OFF = window.__objectiveOff = { ks: false, b2: false };
 const B2_TRIP = new WeakMap();     // director → đã quyết sang B2 (trạng thái của bot, không ghi lên director của trận)
 window.__objective = (c) => {
   if (c.battle?.id === "B20") return window.__objectiveB20(c);   // B20: mục tiêu theo pha riêng (dưới)
-  if (c.battle?.id === "B16") return c.battle.debug.objective(c);  // B16: mục tiêu của director (battles/b16.js debug.objective)
+  if (c.battle?.id === "B16" || c.battle?.id === "B17") return c.battle.debug.objective(c);  // B16, B17: mục tiêu của director (battles/b16.js, b17.js debug.objective)
   const d = c.director, w = c.world.bases, sim = c.sim, h = c.hero;
   if (d.phase === 0) return w.A1;
   if (d.phase === 1 || d.phase === 2) {

@@ -11,6 +11,9 @@
 /* B16 chưa có comic: tạm dùng khung của Hàm Tử (cùng Quốc Toản, cùng năm 1285) */
 .lobby.b-B16 .lb-img { background-image: url(../assets/comic/B15/K4.webp); background-image: image-set(url(../assets/comic/B15/K4.avif) type("image/avif"), url(../assets/comic/B15/K4.webp) type("image/webp")); --pos: 60% 45%; }
 .s-B16 .st-art, .bi-art.s-B16, .ld-art.b-B16 .ld-img { background-image: url(../assets/comic/B15/K2.webp); background-image: image-set(url(../assets/comic/B15/K2.avif) type("image/avif"), url(../assets/comic/B15/K2.webp) type("image/webp")); }
+/* B17 chưa có comic: tạm dùng khung của Hàm Tử nói về Tây Kết (O4: cánh Toa Đô tiến lên Tây Kết; D3: vua sai đón đánh ở Tây Kết) */
+.lobby.b-B17 .lb-img { background-image: url(../assets/comic/B15/O4.webp); background-image: image-set(url(../assets/comic/B15/O4.avif) type("image/avif"), url(../assets/comic/B15/O4.webp) type("image/webp")); --pos: 50% 45%; }
+.s-B17 .st-art, .bi-art.s-B17, .ld-art.b-B17 .ld-img { background-image: url(../assets/comic/B15/D3.webp); background-image: image-set(url(../assets/comic/B15/D3.avif) type("image/avif"), url(../assets/comic/B15/D3.webp) type("image/webp")); }
 .s-B20 .st-art, .bi-art.s-B20, .ld-art.b-B20 .ld-img { background-image: url(../assets/comic/B20/K1.webp); background-image: image-set(url(../assets/comic/B20/K1.avif) type("image/avif"), url(../assets/comic/B20/K1.webp) type("image/webp")); }
 
 /* ---- khung: sảnh chiếm trọn chiều cao màn, dải đầu nằm trên tranh ---- */

@@ -243,7 +243,7 @@ export const SIM = {
 // khi |hệ số − 1| ≥ tag.min; tag Bùn lầy khi mudAt ≥ tag.mud; địch đang giáp mặt trong tag.r m (khóa: 2 × tag.r).
 export const TERRAIN = {
   slope: { probe: 0.6, dead: 0.04, up: 0.45, upFloor: 0.6, down: 0.3, downCap: 1.12 },
-  mud: 0.4, minSpeed: 0.4,
+  mud: 0.4, minSpeed: 0.4, mudMounted: 2,       // mudMounted: kỵ binh chậm gấp đôi trong bùn — chỉ khi trận có lớp phủ bùn (B17; ground.js setOverlay)
   height: { dead: 0.4, perM: 0.08, cap: 0.2, floor: 0.15, rangePerM: 0.12, rangeCap: 0.25 },
   front: { luyBand: [-0.04, 0.01], luyLoss: 0.75, uTaBand: 0.03, uTaLoss: 0.8 },
   perch: { seek: 14, minD: 7, reach: 0.9 },

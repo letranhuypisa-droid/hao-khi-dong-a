@@ -31,6 +31,28 @@ await t("mặc định (B15): waterLevel = −∞, surfaceY = heightAt, không �
   assert.equal(G.heightAt, h0); assert.equal(G.collide, c0); assert.equal(G.mudAt, m0); assert.equal(G.waterDist, w0);
   assert.deepEqual(snap(), before);
 });
+await t("lớp phủ (B17: bùn đầm, gò — setOverlay): bật thì đổi độ cao / bùn đúng chỗ phủ; gỡ thì đúng hàm B15 như trước; setTerrain cũng gỡ", async () => {
+  const { overlayB17, mudB17, moundDh } = await import("../js/sim/b17.js");
+  G.setTerrain("map");
+  const before = snap();
+  assert.equal(G.overlay(), null);
+  G.setOverlay(overlayB17());
+  assert.notEqual(G.heightAt, h0); assert.notEqual(G.mudAt, m0);
+  for (const [x, z] of [[382, -89], [400, -90], [300, -160], [72, -32]]) {
+    assert.equal(G.heightAt(x, z), h0(x, z) + moundDh(x, z));
+    assert.equal(G.mudAt(x, z), Math.max(m0(x, z), mudB17(x, z)));
+  }
+  assert.equal(G.collide, c0); assert.equal(G.waterDist, w0);                    // lớp phủ không đổi va chạm, khoảng cách tới nước
+  G.setOverlay(null);
+  assert.equal(G.heightAt, h0); assert.equal(G.mudAt, m0); assert.deepEqual(snap(), before);
+  G.setOverlay(overlayB17()); G.setTerrain("map");                               // buildWorld của trận sau (trận B17 vỡ giữa chừng)
+  assert.equal(G.overlay(), null); assert.equal(G.heightAt, h0); assert.equal(G.mudAt, m0); assert.deepEqual(snap(), before);
+  // lớp phủ trên địa hình trận khác + boong: boong vẫn đè, ngoài boong là đất trận khác + gò
+  G.setBattleTerrain({ height: () => 5, clamp: { x0: 0, x1: 10, z0: 0, z1: 10 } }); G.setOverlay({ dh: () => 1 }); G.setDecks({ heightAt: (x) => (x > 5 ? 9 : NaN) });
+  assert.equal(G.heightAt(6, 0), 9); assert.equal(G.heightAt(1, 0), 6);
+  G.setTerrain("map");
+  assert.equal(G.heightAt, h0); assert.equal(G.overlay(), null);
+});
 await t("setTerrain (Võ trường / Hàm Tử) bỏ luôn địa hình, boong, nước của trận khác", () => {
   G.setBattleTerrain({ height: () => 5, clamp: { x0: 0, x1: 10, z0: 0, z1: 10 } }); G.setWaterLevel(() => 3);
   G.setTerrain("arena");
@@ -75,7 +97,7 @@ await t("collide trên địa hình khác: kẹp theo T.clamp, collideExtra nh�
 
 console.log("\nDanh mục trận, thẻ theo Chương, trời theo pha");
 await t("danh mục: B15 (thang R, H35) và B20 (R 25 cố định, H31 chơi được, H34/H38 sắp có, chỉ Trận nhanh, đang dựng)", () => {
-  assert.deepEqual(BATTLE_ORDER, ["B15", "B16", "B20"]);
+  assert.deepEqual(BATTLE_ORDER, ["B15", "B16", "B17", "B20"]);
   const A = BATTLES.B15, B = BATTLES.B20;
   assert.equal(A.ladder, true); assert.deepEqual(A.heroes, ["H35"]);
   assert.equal(A.result.missionsTotal, 4); assert.equal(A.result.sideTotal, 2);
@@ -90,6 +112,20 @@ await t("danh mục: B16 bản thử (R 13 cố định, H35 của người chơ
   assert.equal(B.par.nhanh, D.PAR_B16);
   assert.equal(B.result.missionsTotal, D.PHASES.length); assert.equal(B.result.sideTotal, D.SIDE_MISSIONS.length);
   assert.deepEqual(await B.marks(), ["Đánh úp bến thuyền", "Dân binh các lộ"]);
+});
+await t("danh mục: B17 bản thử (R 16 cố định, H35 của người chơi đứng tạm, H30 / H40 sắp có, chỉ Trận nhanh, par = tổng par pha, mô hình X19 X20 H31 H38)", async () => {
+  const B = BATTLES.B17, D = await import("../js/data/battle-b17.js");
+  assert.equal(B.fixedR, 16); assert.equal(B.preset, undefined); assert.equal(B.ownHero, true); assert.equal(B.wip, true); assert.equal(B.noComic, true);
+  assert.deepEqual(B.heroes, ["H30", "H40"]); assert.deepEqual(B.playable, ["H35"]); assert.deepEqual(B.modes, ["nhanh"]);
+  assert.deepEqual(B.models, ["X19", "X20", "H31", "H38"]);
+  assert.equal(B.par.nhanh, D.PAR_B17);
+  assert.equal(B.result.missionsTotal, 3); assert.equal(B.result.sideTotal, D.SIDE_MISSIONS.length);
+  assert.equal(B.keSach.nhanh, D.KS_ORDER.length);
+  assert.deepEqual(await B.marks(), ["Phục kích bãi lau"]);
+  assert.ok(BATTLE_ORDER.indexOf("B17") === BATTLE_ORDER.indexOf("B16") + 1 && BATTLE_ORDER.indexOf("B17") < BATTLE_ORDER.indexOf("B20"));
+  // B17 theo luật B20: thẻ Kế Sách chỉ mở khi thành công
+  assert.deepEqual(C.battleUnlockKeys({ battle: "B17", won: false, keSachList: [{ id: "phucKich", state: "thatbai" }] }), []);
+  assert.deepEqual(C.battleUnlockKeys({ battle: "B17", won: true, bossMet: true, keSachList: [{ id: "phucKich", state: "thanhcong" }] }), ["bossMet", "keSach:phucKich", "firstWin"]);
 });
 await t("nội dung Chương nạp lười: comic, thẻ, Quiz của B15 và B20; ghi chú màn nạp trận", async () => {
   for (const id of BATTLE_ORDER) {

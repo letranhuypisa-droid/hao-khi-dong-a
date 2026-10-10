@@ -19,7 +19,7 @@
 // Bóng / Đồ hoạ ở bảng tạm dừng thì biên dịch lại ngay lúc còn tạm dừng; đổi cỡ vẽ thì vẽ lại cảnh sau bảng.
 
 import * as THREE from "three";
-import { heightAt, setBattleTerrain, setDecks, setWaterLevel, waterLevel } from "./ground.js";
+import { heightAt, setBattleTerrain, setDecks, setWaterLevel, setOverlay, waterLevel } from "./ground.js";
 import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
 import { FX, releaseFxTextures, preloadFx } from "./fx.js";
@@ -49,8 +49,8 @@ import B15 from "../battles/b15.js";
 // keep: cần bị kéo ngắn thì nâng camera cho cần dài ít nhất keep × dist.
 const CAM_WALL = { pad: 0.35, minH: 0.8, keep: 0.6 };
 
-// Trả mặt đất về địa hình dựng sẵn (bỏ địa hình / boong / nước của trận khác).
-function resetGround() { setBattleTerrain(null); setDecks(null); setWaterLevel(null); }
+// Trả mặt đất về địa hình dựng sẵn (bỏ địa hình / boong / nước / lớp phủ bùn, gò của trận khác).
+function resetGround() { setBattleTerrain(null); setDecks(null); setWaterLevel(null); setOverlay(null); }
 
 // battle: BattleDef (mặc định B15), heroId: tướng (mặc định H35), quyetSach: kết quả Hiến kế { picked, historical } | null
 // (ctx.quyetSach, director của trận đọc). Dựng lỗi (vd trận chưa dựng) thì dọn GPU, trả mặt đất về mặc định rồi reject
