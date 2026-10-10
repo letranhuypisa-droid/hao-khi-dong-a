@@ -127,15 +127,10 @@ await t("danh mục: B17 bản thử (R 16 cố định, H35 của người chơ
   assert.deepEqual(C.battleUnlockKeys({ battle: "B17", won: false, keSachList: [{ id: "phucKich", state: "thatbai" }] }), []);
   assert.deepEqual(C.battleUnlockKeys({ battle: "B17", won: true, bossMet: true, keSachList: [{ id: "phucKich", state: "thanhcong" }] }), ["bossMet", "keSach:phucKich", "firstWin"]);
 });
-await t("nội dung Chương nạp lười: comic, thẻ, Quiz của B15 và B20; ghi chú màn nạp trận", async () => {
+await t("nội dung Chương nạp lười: comic, thẻ, Quiz của mọi Chương (B17 có thẻ, Quiz từ đợt A3); ghi chú màn nạp trận", async () => {
   for (const id of BATTLE_ORDER) {
     const M = await loadChapterMeta(id);
     assert.equal(M.comic.chapter.id, id);
-    if (BATTLES[id].wip && !M.cards.length) {            // Chương đang dựng chưa có nội dung (B16 bản thử): chỉ cần rỗng đúng dạng + ghi chú màn nạp
-      assert.deepEqual([M.comic.open, M.comic.close, M.quiz], [[], [], []], id);
-      assert.ok((await BATTLES[id].notes()).length >= 3, id + " ghi chú");
-      continue;
-    }
     assert.ok(M.cards.length >= 8 && M.cards.every((c) => c.chapter === id), id + " thẻ");
     assert.ok(M.quiz.length >= 10 && M.quiz.every((q) => q.chapter === id), id + " quiz");
     assert.ok(M.groups.length >= 6, id + " nhóm thẻ");
