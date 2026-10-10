@@ -2,16 +2,14 @@
 
 Chương thứ tư theo thứ tự Quyển VI (VI·6, ngay sau Chương Dương). Canon: `design/canon.json` → `battles` B17, `heroes` H30 và H40, `enemies` X19 và X20.
 
-Trạng thái (2026-10-10):
-- **Đã gộp vào `main` 94d19cc**:
-  - mạch A: đợt A1 (greybox), phần boss của A2, phần rẻ của A4 (nhánh `claude/happy-lichterman-f0e557`);
-  - mạch B: B1 và B2, lớp Cung WC09, H40 chơi được (nhánh `claude/practical-ishizaka-a22c2c`).
-- **Xong trên nhánh `claude/affectionate-zhukovsky-f38e20`, chưa gộp**: phần còn lại của A2, và A5 (H40 là tướng chơi của B17, cân bằng, par).
-- **Chưa làm**: A3, phần còn lại của A4, A6, B3.
+Trạng thái (2026-10-10), đã gộp vào `main`:
+- **Mạch A**: A1 (greybox), A2 (đủ), A3 (nội dung chữ), A5 (H40 là tướng chơi, par 320 s), phần rẻ của A4.
+- **Mạch B**: B1 và B2 (lớp Cung WC09, H40).
+- **Chưa làm**: phần còn lại của A4 (mô hình H30), A6 (comic), B3 (clip Mixamo), cố vấn sử duyệt thẻ và Quiz.
 
 ## Đã làm
 
-### Đợt A2 phần còn lại và đợt A5 (2026-10-10, nhánh `claude/affectionate-zhukovsky-f38e20`, chưa gộp)
+### Đợt A2 phần còn lại và đợt A5 (2026-10-10, nhánh `claude/affectionate-zhukovsky-f38e20`)
 
 Luật thuần ở `sim/b17.js` (test trong `tests/b17-sim.test.mjs`, 34 mục), dựng và sinh lính ở `battle/director-b17.js`, số ở `data/battle-b17.js`.
 
@@ -83,6 +81,20 @@ Luật thuần ở `sim/b17.js` (test trong `tests/b17-sim.test.mjs`, 34 mục),
   - Toa Đô ở R 16 đổ trong ~1 phút trước cung H40 cấp 16. Máu Toa Đô chưa chỉnh, chờ người chơi thử.
   - Màu áo vua là nhuộm tạm, cần mô hình H30.
 
+### Đợt A3: nội dung chữ (2026-10-10, nhánh `claude/nifty-bouman-0c7882`)
+
+- **`data/suquan-b17.js`**: 11 thẻ Sử quán, 15 câu Quiz, đều `review: "draft"`. Thẻ có `panels: []`, Quiz chỉ dùng `seenRef` dạng `card:…`.
+  - Thẻ: Tây Kết, Toa Đô (sử Nguyên chép tử trận khi rút, thụy Tương Mẫn), áo ngự, Nguyễn Khoái và quân Thánh Dực, Hưng Đạo vương ở Tây Kết, Ô Mã Nhi ra biển, Yết Kiêu và Dã Tượng (Tương truyền), "Ai giết Toa Đô?", hỏi kế 1287 (Hư cấu về bối cảnh), Phục kích bãi lau, chữ thích trên tay 1285.
+  - Đối chiếu đoạn Toàn thư năm 1285 (bản dịch trích ở nghiencuuquocte.org): mục Tây Kết không nêu tên Hưng Đạo vương; Ô Mã Nhi trốn qua cửa sông Thanh Hóa, còn một thuyền vượt biển; chữ thích tay chép tháng giêng 1285; An Nam chí lược có thuyết Toa Đô ngã ngựa xuống nước.
+  - Thẻ áo ngự viết "thấy Toa Đô đã tử trận", không dùng chữ "thủ cấp". Thẻ hỏi kế mở lúc mở Chương; khi A2 có Kế Sách Nhỏ thì có thể đổi khóa sang `keSach:<id>`.
+- **`tests/b17-content.test.mjs`** (13 mục): số thẻ, nhãn, nhóm, khóa mở, id không trùng Chương khác, `lintQuiz`.
+  - Soát chữ trong trận: lấy mọi chuỗi ký tự (bỏ chú thích) trong `director-b17.js`, `battles/b17.js`, `sim/b17.js`, cộng toàn bộ chuỗi của `data/battle-b17.js` và comic B17. Không được có "thủ cấp", "chém đầu", chữ "Thát".
+  - Chữ "Thát" chỉ được ở thẻ `B17-thichchu`, kèm giải nghĩa; không câu Quiz nào dựa vào thẻ này.
+  - Câu nào nêu tên người cùng việc giết Toa Đô phải kèm lời phủ định. Thẻ và Quiz không gọi "giặc".
+- **`tests/battles.test.mjs`**: bỏ chỗ miễn "Chương đang dựng chưa có nội dung"; mọi Chương phải có ≥ 8 thẻ, ≥ 10 câu.
+- **Kiểm chứng**: `node game/tools/run-tests.mjs` xanh. Trong khung trình duyệt: luồng kết Chương mở 10 thẻ theo khóa thật của trận (`battleUnlockKeys`); Quiz 4 câu chạy hết, mở thẻ "Chuyện bên lề"; Sử quán hiện 11 / 11; console không lỗi.
+- **Còn lại**: cố vấn sử duyệt bản nháp. (Dòng README đã sửa lúc gộp.)
+
 ### Gộp hai mạch vào `main` (2026-10-10, 94d19cc)
 
 - **Xung đột**: chỉ ở chú thích đầu `units.js`, giữ cả hai đoạn.
@@ -121,7 +133,7 @@ Luật thuần ở `sim/b17.js` (test trong `tests/b17-sim.test.mjs`, 34 mục),
 - **Toa Đô B17** đặt cả hai. Lúc tử trận: `ctx.cinematic` (camera lùi, chậm hình), băng chữ "Toa Đô tử trận"; không máu, không thủ cấp.
 - **Quân Viễn Chinh** (`sim/b17.js`): từ P2, cứ 180 s Sĩ Khí cánh −10. Dưới 40 thì lính hộ tống Công −15%. Về 0 thì đội hình vỡ như phục kích.
 - **Kiểm chứng**: test xanh. Bot B17 seed 1001 thắng 298 s, Chí Tử Chiến bật ở 282 s (bot hạ Toa Đô trước cú bổ đầu; cú bổ kiểm trong khung trình duyệt và test Node). Vết B15 trùng mã băm; bot B16 528 s; bot B20 thắng 168 s.
-- **Chưa làm của A2**: Phá Trận Thủy Bộ (thuyền đổ bộ), Ô Mã Nhi và bến tàn quân (2 nhiệm vụ phụ còn lại), sứ giả (Kế Sách Nhỏ, bãi thứ hai), vua Nhân Tông AI với điều kiện thua, Yết Kiêu.
+- **Chưa làm của A2** (lúc đó; nay đã làm, xem mục "Đợt A2 phần còn lại và đợt A5"): Phá Trận Thủy Bộ (thuyền đổ bộ), Ô Mã Nhi và bến tàn quân (2 nhiệm vụ phụ còn lại), sứ giả (Kế Sách Nhỏ, bãi thứ hai), vua Nhân Tông AI với điều kiện thua, Yết Kiêu.
 
 ### Đợt A1: bản thử greybox (2026-10-10)
 
