@@ -54,7 +54,7 @@ console.log("\nBộ kiểm tên file (hoa/thường, thiếu)");
 const ok = checkDeploy(OUT);
 t("game thật qua bộ kiểm: không thiếu, không sai hoa/thường, và đã đối chiếu đủ loại", () => {
   assert.deepEqual(ok.problems, []);
-  for (const k of ["import", "html", "css", "sfx", "music", "voice", "fx", "comic", "icon", "model"]) assert.ok(ok.checked[k] > 0, k + " không được đối chiếu cái nào");
+  for (const k of ["import", "html", "css", "sfx", "music", "fx", "comic", "icon", "model"]) assert.ok(ok.checked[k] > 0, k + " không được đối chiếu cái nào");
 });
 t("bắt tên file sai hoa/thường và file thiếu (đổi thử trên bản sao)", () => {
   const bad = join(tmp, "mut"); cpSync(OUT, bad, { recursive: true });

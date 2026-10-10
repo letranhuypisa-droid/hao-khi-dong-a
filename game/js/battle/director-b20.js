@@ -1182,7 +1182,7 @@ export class DirectorB20 {
       if (a.vg && this.phase === 0) { const ev = []; provoke(this.st, "ko", 1, ev); this.handle(ev); }
     } else if (a.role === "guard") this.guardDue.push(this.time + 20);   // thân binh bổ sung sau 20 s
   }
-  onOfficerAwake(u) { return u.id ? this.ctx.voice?.meet(u.id, "b20", u) : false; }   // Phàn Tiếp (X24), Ô Mã Nhi (X20): lời giáp mặt (battle/voice.js)
+  onOfficerAwake() {}
   onOfficerKilled(u) {
     const ctx = this.ctx;
     this.ko++;

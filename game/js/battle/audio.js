@@ -3,8 +3,7 @@
 //
 // Đồ thị: nguồn → (panner trái/phải theo camera) → bus SFX ─┬─→ bộ nén → master → loa
 //                                                          └─→ vang (convolver, gửi ít) ─┘
-// Bus Nhạc riêng (15.9). Bus Giọng (voiceBus, đợt 16) đi thẳng vào bộ nén, không qua master: thanh "hiệu ứng" không kéo giọng theo; battle/voice.js
-// phát lên bus này và gọi duck() hạ hiệu ứng khi đang nói. AudioContext mở ở lần chạm đầu tiên (luật autoplay). Mỗi sự kiện (play("hit")) là một
+// Bus Nhạc riêng (15.9). AudioContext mở ở lần chạm đầu tiên (luật autoplay). Mỗi sự kiện (play("hit")) là một
 // "công thức": một hoặc vài lớp mẫu, mỗi lần chọn ngẫu nhiên một biến thể và lệch cao độ ±6% cho khỏi lặp tai.
 
 // Mẫu có trong assets/sfx (tên → số biến thể; 1 = file không hậu tố). Hậu kỳ: tools/post-assets-2.py.
@@ -51,8 +50,8 @@ function loadBuf(ctx, file) {
 const fileOf = (name, v) => `${name}${SFX_FILES[name] > 1 ? "-" + v : ""}.${EXT[name] || "wav"}`;
 
 export class Audio {
-  constructor(volume = 0.7, voice = 0.9) {
-    this.vol = volume; this.voiceVol = voice; this.ctx = null; this.listener = { x: 0, z: 0, yaw: 0 }; this.last = {}; this.active = {};
+  constructor(volume = 0.7) {
+    this.vol = volume; this.ctx = null; this.listener = { x: 0, z: 0, yaw: 0 }; this.last = {}; this.active = {};
     this.amb = null;
   }
   unlock() {
@@ -64,18 +63,12 @@ export class Audio {
       const comp = c.createDynamicsCompressor();
       comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.18;
       this.master.connect(comp).connect(c.destination);
-      this.comp = comp;
       this.sfx = c.createGain(); this.sfx.connect(this.master);
       this.music = c.createGain(); this.music.gain.value = 0.5; this.music.connect(this.master);
       // vang ngắn (xung đáp dựng bằng nhiễu tắt dần): bãi sông rộng, gửi rất ít
       this.verb = c.createConvolver(); this.verb.buffer = this.impulse(1.4);
       this.verbSend = c.createGain(); this.verbSend.gain.value = 0.16;
       this.sfx.connect(this.verbSend).connect(this.verb).connect(this.master);
-      // bus Giọng (battle/voice.js): vào thẳng bộ nén (không qua master), vang riêng nhỏ cho giọng có chút không gian
-      this.voiceBus = c.createGain(); this.voiceBus.gain.value = this.voiceVol; this.voiceBus.connect(comp);
-      this.verbV = c.createConvolver(); this.verbV.buffer = this.verb.buffer;
-      this.voiceSend = c.createGain(); this.voiceSend.gain.value = 0.1;
-      this.voiceBus.connect(this.voiceSend).connect(this.verbV).connect(comp);
       const len = c.sampleRate; this.noise = c.createBuffer(1, len, c.sampleRate);
       const d = this.noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.preload();
@@ -92,9 +85,6 @@ export class Audio {
     return b;
   }
   setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = v; }
-  setVoiceVolume(v) { this.voiceVol = v; if (this.voiceBus) this.voiceBus.gain.value = v; }
-  // Hạ tiếng binh khí / nền khi có người nói (battle/voice.js): level 1 = thả ra; sec = hằng số thời gian của đường cong
-  duck(level, sec = 0.1) { const c = this.ctx; if (c && this.sfx) this.sfx.gain.setTargetAtTime(level, c.currentTime, sec); }
   suspend() { this.ctx?.suspend(); }
   // Rời trận: đóng hẳn AudioContext (trình duyệt giới hạn số context; suspend thì mỗi trận rò một cái).
   // ctx = null để unlock() lần sau dựng context mới thay vì resume một context đã đóng.

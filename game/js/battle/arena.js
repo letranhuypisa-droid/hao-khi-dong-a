@@ -13,7 +13,6 @@ import { createRenderer, Warm, watchLateFirstUse } from "./gfx.js";
 import { Pacer, STEP } from "./pacing.js";
 import { View } from "./view.js";
 import { Audio } from "./audio.js";
-import { Voice } from "./voice.js";
 import { Input } from "./input.js";
 import { lerpAngle, setupTouch, controlsHTML, releaseGpu, syncCompact, logHTML, rotateBlocked } from "./battle.js";
 import { compactMsg, logMsgs } from "../ui/layout.js";
@@ -245,7 +244,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     ctx.world = buildArena(scene, { shadows: settings.shadows }); gfx.shadow(ctx.world.sun);
     ctx.hk = createHaoKhi({ quick: false });
     ctx.sim = { heroFront: null, fronts: {}, bases: {} };
-    ctx.audio = new Audio(settings.volume, settings.voice ?? 0.9); ctx.audio.unlock();
+    ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
     music?.play(opts.mode === "luyentap" || opts.mode === "huanluyen" ? "hub" : "boss");
     ctx.fx = new FX(scene, camera, hudRoot); ctx.fx.fmt = ctx.fmt;
     ctx.crowd = new Crowd(scene, ctx);
@@ -257,10 +256,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     // Hero dựng ở chỗ xuất hiện của B15 (72, −32) rồi mới đặt vào sân. Khung đầu chưa có bước (pacing.js) vẽ rig ở gốc rig, camera nhắm
     // tướng (view.pos) — trước đây giữa rừng ngoài rào sân: dời gốc rig, độ cao theo sân. Chỉ gốc, không place(): chuyển động phụ của rig
     // (chân, vạt, dải khăn) vẫn "dịch chuyển" ở bước đầu như trước đợt 19c; y bước đầu tính lại trước khi ai đọc.
-    ctx.hero = new Hero(ctx, stats);
-    ctx.voice = new Voice(ctx.audio, { music, volume: settings.voice ?? 0.9, say: (t, T, k) => ctx.director?.say?.(t, T, k) });   // lồng tiếng chiêu của H35 (voice.js)
-    ctx.voice.preload(ctx.hero.id, null);
-    ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI; ctx.hero.y = heightAt(0, 8);
+    ctx.hero = new Hero(ctx, stats); ctx.hero.x = 0; ctx.hero.z = 8; ctx.hero.yaw = Math.PI; ctx.hero.y = heightAt(0, 8);
     ctx.hero.rig.root.position.set(0, ctx.hero.y, 8); ctx.hero.rig.root.rotation.y = Math.PI;
     for (const tr of ctx.hero.trails) ctx.view.follow(tr.mesh, ctx.hero.rig.root);   // vệt lưỡi dời theo tướng lúc vẽ
     const input = new Input(canvas);
@@ -312,7 +308,7 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
     const finish = (res) => {
       finished = true; cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize); document.removeEventListener("pointerlockchange", onLock); document.removeEventListener("visibilitychange", onVis);
-      input.dispose(); ctx.voice?.dispose(); ctx.audio.close(); warm?.attach(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
+      input.dispose(); ctx.audio.close(); warm?.attach(); releaseGpu(scene, renderer);    // như battle.js: không thì sân cũ ở lại bộ nhớ
       resolve(res);
     };
     const showEnd = (res) => {
@@ -350,7 +346,6 @@ export function runArena({ container, save, R, difficulty, music, opts, onSettin
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
       ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;
-      ctx.voice?.update(dt);
       if (!d.over) {
         if (inp.pressed.lock) ctx.hero.toggleLock();
         let scale = 1;

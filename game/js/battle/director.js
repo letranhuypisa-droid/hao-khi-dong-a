@@ -732,7 +732,7 @@ export class Director {
       if (a.role === "guard") (this.guardDue = this.guardDue || []).push(this.time + 20);   // thân binh bổ sung sau 20 s
     }
   }
-  onOfficerAwake(u) { if (u.tier === "tuong") { this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); return this.ctx.voice?.meet("X19", "b15", u); } }
+  onOfficerAwake(u) { if (u.tier === "tuong") { this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); } }
   onOfficerKilled(u) {
     const ctx = this.ctx;
     if (u.tier === "doitruong") this.hk(HAO_KHI.src.killCaptain, "hạ đội trưởng");

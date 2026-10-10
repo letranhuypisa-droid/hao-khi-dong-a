@@ -2,14 +2,14 @@
 // Khoá API lấy từ biến môi trường AI33_KEY, không ghi vào tệp nào. Luôn chạy bằng Node (bash trên Windows làm hỏng dấu tiếng Việt / chữ Hán trong curl).
 // Mọi tác vụ đã gửi ghi vào <out>/tasks.jsonl: chạy lại không gửi (không trả credit) lần nữa với tên đã có tác vụ, trừ khi --again.
 //   AI33_KEY=… node design/tools/ai33-audio.mjs sfx   design/audio/sfx.json    [--only a,b] [--out dir] [--again] [--dry]
-//   AI33_KEY=… node design/tools/ai33-audio.mjs voice game/js/data/voice.js    [--only a,b] [--out dir] [--again] [--dry]
+//   AI33_KEY=… node design/tools/ai33-audio.mjs voice <spec.json>              [--only a,b] [--out dir] [--again] [--dry]   (đọc lời bằng TTS; game hiện không dùng lồng tiếng)
 //   node design/tools/ai33-audio.mjs voices <nhà cung cấp> <ngôn ngữ> [giới tính]   liệt kê giọng (cần khoá; chỉ đọc, không tốn credit)
 // sfx.json:   [{ "name": "oar-1", "text": "…", "dur": 2, "loop": false, "infl": 0.5 }]   (50 credit mỗi giây; dur 0.5–22)
-// voice: game/js/data/voice.js (VOICE_CAST + VOICE_LINES) hoặc JSON { "voices": { "H35": "elevenlabs_…" }, "lines": [{ "name": "H35-bopNat-1", "voice": "H35", "text": "…", "speed": 1 }] }
+// voice: JSON { "voices": { "H35": "elevenlabs_…" }, "lines": [{ "name": "H35-bopNat-1", "voice": "H35", "text": "…", "speed": 1 }] }
 //   (hậu kỳ cắt, chuẩn hoá, nén: game/tools/post-audio-3.py)
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const BASE = "https://api.ai33.pro";
 const [mode, spec, ...rest] = process.argv.slice(2);
@@ -51,13 +51,8 @@ const STATE = path.join(OUT, "tasks.jsonl");
 const readState = () => (fs.existsSync(STATE) ? fs.readFileSync(STATE, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const addState = (r) => fs.appendFileSync(STATE, JSON.stringify(r) + "\n");
 
-// voice: hoặc tệp JSON { voices, lines }, hoặc game/js/data/voice.js (nguồn lời thoại duy nhất của game: VOICE_CAST + VOICE_LINES)
-async function loadSpec() {
-  if (!/\.js$/.test(spec)) return JSON.parse(fs.readFileSync(spec, "utf8"));
-  const m = await import(pathToFileURL(path.resolve(spec)).href);
-  return { voices: Object.fromEntries(Object.entries(m.VOICE_CAST).map(([k, v]) => [k, v.tts])),
-    lines: m.VOICE_LINES.map((l) => ({ name: l.id, voice: l.who, text: l.zh || l.text, speed: l.speed })) };
-}
+// voice: tệp JSON { voices, lines }
+async function loadSpec() { return JSON.parse(fs.readFileSync(spec, "utf8")); }
 const S = await loadSpec();
 const only = (opt("only", "") || "").split(",").filter(Boolean);
 const jobs = (mode === "sfx" ? S : S.lines).filter((j) => !only.length || only.includes(j.name));

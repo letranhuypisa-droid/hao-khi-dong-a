@@ -898,7 +898,7 @@ export class Hero {
     const s = this.sk[slot];
     if (!s) return false;
     const ok = s.start(this);
-    if (ok) { this.skillActive = s; this.ctx.voice?.skill(this.id, this.def.skills?.[slot === 1 ? "sk1" : "sk2"]); }   // lồng tiếng (battle/voice.js)
+    if (ok) this.skillActive = s;
     return ok;
   }
   updateSkill(dt) {
@@ -908,9 +908,7 @@ export class Hero {
   }
   startUlt() {
     this.buf = null;
-    const ok = this.ultImpl.start(this);
-    if (ok) this.ctx.voice?.skill(this.id, this.def.skills?.ult || "bopNat", true);
-    return ok;
+    return this.ultImpl.start(this);
   }
   updateUlt(dt) { this.ultImpl.update(this, dt); }
 

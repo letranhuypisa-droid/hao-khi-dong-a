@@ -750,7 +750,7 @@ export class DirectorB16 {
     ctx.fx.banner(`ĐÃ HẠ ${TIERS[u.tier].name.toUpperCase()}`, "#e6dcc3", 1.2);
     ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
   }
-  onOfficerAwake(u) { if (u === this.boss) { this.ctx.fx.banner("TRẤN NAM VƯƠNG THOÁT HOAN", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); return this.ctx.voice?.meet("X18", "b16", u); } }
+  onOfficerAwake(u) { if (u === this.boss) { this.ctx.fx.banner("TRẤN NAM VƯƠNG THOÁT HOAN", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); } }
   onBossDefeated(u) {
     if (u !== this.boss) return;
     this.bossDown = true; this.ko++;
