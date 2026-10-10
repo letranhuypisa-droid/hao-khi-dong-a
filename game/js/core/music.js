@@ -51,7 +51,9 @@ export class Music {
     if (old) this.fadeTo(old, 0, fade, () => { old.pause(); old.src = ""; });
   }
 
-  setVolume(v) { this.volume = v; if (this.cur) this.cur.volume = v; }
+  setVolume(v) { this.volume = v; if (this.cur) this.cur.volume = v * (this.duckF ?? 1); }
+  // Hạ nhạc khi có người nói (battle/voice.js): f 0..1 nhân vào âm lượng nhạc, f = 1 thả ra
+  duck(f, sec = 0.2) { this.duckF = f; if (this.cur) this.fadeTo(this.cur, this.volume * f, sec); }
   pause() { this.held = true; this.cur?.pause(); }
   resume() { this.held = false; if (this.cur && this.cur.paused) { this.pending = null; this.start(this.cur); } }
 

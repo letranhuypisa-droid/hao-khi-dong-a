@@ -732,7 +732,7 @@ export class Director {
       if (a.role === "guard") (this.guardDue = this.guardDue || []).push(this.time + 20);   // thân binh bổ sung sau 20 s
     }
   }
-  onOfficerAwake(u) { if (u.tier === "tuong") { this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); } }
+  onOfficerAwake(u) { if (u.tier === "tuong") { this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.6); this.ctx.audio.play("horn"); return this.ctx.voice?.meet("X19", "b15", u); } }
   onOfficerKilled(u) {
     const ctx = this.ctx;
     if (u.tier === "doitruong") this.hk(HAO_KHI.src.killCaptain, "hạ đội trưởng");
@@ -768,7 +768,7 @@ export class Director {
     cloth.position.set(0.4, 3.6, 0); g.add(cloth);
     g.position.set(x, heightAt(x, z), z); ctx.scene.add(g);
     this.flags.push({ x, z, r, atk, t: dur, g });
-    ctx.fx.ring(x, z, r, 0xf1d98a, 0.8); ctx.audio.play("drum");
+    ctx.fx.ring(x, z, r, 0xf1d98a, 0.8); ctx.audio.play("drum"); ctx.audio.play("flag", x, z);
     this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good");
   }
   updateFlags(dt) {
@@ -851,7 +851,7 @@ export class Director {
     ctx.hero.hkUltReady = true;
     this.tpcLog = this.tpcLog || []; this.tpcLog.push({ at: Math.round(this.time), front: hf, flipped: flipped.length });
     ctx.cinematic("TỔNG PHẢN CÔNG", ctx.hero, true);
-    ctx.audio.play("drums3"); ctx.audio.play("horn");
+    ctx.audio.play("drums3"); ctx.audio.play("horn"); ctx.audio.play("warcry");
     this.fillActors(false);
     return true;
   }

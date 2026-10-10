@@ -598,7 +598,7 @@ export class DirectorB17 {
     if (!tpcReady(ctx.hk)) { this.say(`Hào Khí ${Math.floor(ctx.hk.value)}/100 — chưa đủ để kích Tổng Phản Công.`, 2); return false; }
     const T = hkActivate(ctx.hk);
     h.hkUltReady = true; this.plantFlag(h.x, h.z, 30, 0.3, T, true);
-    ctx.cinematic?.("TỔNG PHẢN CÔNG", h, true); ctx.audio.play("drums3"); ctx.audio.play("horn");
+    ctx.cinematic?.("TỔNG PHẢN CÔNG", h, true); ctx.audio.play("drums3"); ctx.audio.play("horn"); ctx.audio.play("warcry");
     ctx.crowd.rout(h.x, h.z, 14, (e) => e.tier === "thuong");
     return true;
   }
@@ -609,7 +609,7 @@ export class DirectorB17 {
     cloth.position.set(0.45, 3.6, 0); g0.add(cloth); g0.position.set(x, y, z); this.props.add(g0);
     this.flags.push({ x, z, r, atk, t: dur, g: g0 });
     this.ctx.fx.ring(x, z, r, COL.gold, 0.8);
-    if (!quiet) { this.ctx.audio.play("drum"); this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good"); }
+    if (!quiet) { this.ctx.audio.play("drum"); this.ctx.audio.play("flag"); this.say(`Cắm cờ: quân ta trong ${r} m Công +${Math.round(atk * 100)}% trong ${dur} s.`, 3, "good"); }
   }
   dropProp(g0) {
     this.props.remove(g0);
@@ -957,8 +957,10 @@ export class DirectorB17 {
     ctx.slowmo?.(0.55, 0.28); ctx.fx.flash(0.4); ctx.audio.play("finisher", u.x, u.z); ctx.audio.play("cheer");
   }
   onOfficerAwake(u) {
-    if (u === this.boss && !this.bossRoared) { this.bossRoared = true; this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.4); this.ctx.audio.play("horn"); }
-    if (u === this.oma && !this.omaRoared) { this.omaRoared = true; this.ctx.fx.banner("Ô MÃ NHI", "#ff8a6a", 1.2); this.say("Ô Mã Nhi giữ bến tàn quân. Đánh ông về 0 Sinh lực thì ông bỏ bến.", 4); }
+    let spoke = false;
+    if (u === this.boss && !this.bossRoared) { this.bossRoared = true; this.ctx.fx.banner("TOA ĐÔ", "#ff8a6a", 1.4); this.ctx.audio.play("horn"); spoke = this.ctx.voice?.meet("X19", "b17", u); }
+    if (u === this.oma && !this.omaRoared) { this.omaRoared = true; this.ctx.fx.banner("Ô MÃ NHI", "#ff8a6a", 1.2); this.say("Ô Mã Nhi giữ bến tàn quân. Đánh ông về 0 Sinh lực thì ông bỏ bến.", 4); spoke = this.ctx.voice?.meet("X20", "b17", u); }
+    return spoke;
   }
   // Toa Đô về 0 Sinh lực: tử trận (canon "bị giết"; BigUnit fate "killed" — ngã theo clip death, nằm lại). Camera lùi xa, chậm hình (ctx.cinematic),
   // băng chữ. Không máu me, không thủ cấp (canon B17.sensitivity).

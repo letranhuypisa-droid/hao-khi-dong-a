@@ -19,7 +19,7 @@
 // Bóng / Đồ hoạ ở bảng tạm dừng thì biên dịch lại ngay lúc còn tạm dừng; đổi cỡ vẽ thì vẽ lại cảnh sau bảng.
 
 import * as THREE from "three";
-import { heightAt, setBattleTerrain, setDecks, setWaterLevel, setOverlay, waterLevel } from "./ground.js";
+import { heightAt, setBattleTerrain, setDecks, setWaterLevel, setOverlay, waterLevel, waterDist } from "./ground.js";
 import { Crowd } from "./crowd.js";
 import { Hero } from "./hero.js";
 import { FX, releaseFxTextures, preloadFx } from "./fx.js";
@@ -30,6 +30,7 @@ import { GFX_LEVELS, GFX_NAME, isGfx } from "../core/gfx.js";
 import * as Models from "./models.js";
 import { Atmosphere } from "./atmosphere.js";
 import { Audio } from "./audio.js";
+import { Voice } from "./voice.js";
 import { Input } from "./input.js";
 import { HUD } from "./hud.js";
 import { createHintDriver } from "./hints.js";
@@ -98,11 +99,14 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       ctx.hk = def.createHaoKhi ? def.createHaoKhi(ctx, stats, diff, mode)
         : createHaoKhi({ quick: MODES[mode].hkQuick, start: stats.mods.hkStart, gainPct: stats.mods.hkPct, decayMult: stats.mods.hkDecay, tpcExt: stats.mods.tpcExt,
           diffMult: diff.hk ?? 1 });   // Hào Khí nhận × theo độ khó (§10)
-      ctx.audio = new Audio(settings.volume); ctx.audio.unlock();
+      ctx.audio = new Audio(settings.volume, settings.voice ?? 0.9); ctx.audio.unlock();
       music?.play("battle");
       ctx.fx = new FX(scene, camera, hudRoot); ctx.fx.fmt = ctx.fmt;
       ctx.crowd = new Crowd(scene, ctx);
       ctx.hero = new (def.Hero || Hero)(ctx, stats, heroDef);
+      // lồng tiếng (voice.js): lời của tướng ra trận và của tướng địch trong chương này, phụ đề qua director.say
+      ctx.voice = new Voice(ctx.audio, { music, volume: settings.voice ?? 0.9, say: (t, T, k) => ctx.director?.say?.(t, T, k) });
+      ctx.voice.preload(ctx.hero.id, def.chapter);
       // Hero chưa đọc chỗ xuất hiện của trận (lõi tướng chưa nhận def): đặt theo BattleDef, chỉ cho trận khác B15
       const sp = def.heroSpawn;
       if (sp && def !== B15 && !ctx.hero.def) { ctx.hero.x = sp.x; ctx.hero.z = sp.z; ctx.hero.yaw = sp.yaw ?? ctx.hero.yaw; }
@@ -181,6 +185,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         save.settings[k] = v; onSettings?.(save.settings);
         if (k === "troops") { ctx.troops = TROOP_LEVELS.find((t) => t.id === v); ctx.director.fillActors(false); }
         if (k === "volume") ctx.audio.setVolume(v);
+        if (k === "voice") ctx.voice?.setVolume(v);
         if (k === "music") music?.setVolume(v);
         // Tỉ lệ render, Đồ hoạ: tỉ lệ điểm ảnh, bóng đổi ngay (MSAA theo từ trận sau). Bóng / kiểu bóng đổi thì mọi chương trình shader dựng
         // lại: biên dịch và vẽ một lượt ngay lúc còn tạm dừng (warm.pass) thay vì khựng cả giây ở khung đầu sau khi bấm Tiếp tục.
@@ -222,7 +227,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       window.removeEventListener("resize", onResize);
       document.removeEventListener("pointerlockchange", onLockChange);
       document.removeEventListener("visibilitychange", onVis);
-      input.dispose(); ctx.audio.close();                      // đóng hẳn AudioContext (suspend thì mỗi trận rò một cái)
+      input.dispose(); ctx.voice?.dispose(); ctx.audio.close();                      // đóng hẳn AudioContext (suspend thì mỗi trận rò một cái)
       // dọn riêng của trận trước khi trả GPU (B20: naval tự gỡ lưới hạm đội — làm sau releaseGpu là gỡ hai lần)
       resetGround(); def.dispose?.(ctx);
       warm?.attach();                                          // nhóm làm nóng về cảnh để releaseGpu dọn cùng (battle/gfx.js)
@@ -347,6 +352,7 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
       const d = ctx.director;
       if (inp.pressed.pause && !d.over) { pause(true); input.endFrame(); return; }
       ctx.audio.listener.x = ctx.hero.x; ctx.audio.listener.z = ctx.hero.z; ctx.audio.listener.yaw = cam.yaw;
+      ctx.voice?.update(dt);
 
       if (!d.over) {
         // vòng lệnh (giữ Tab)
@@ -404,7 +410,8 @@ export function runBattle({ container, save, R, difficulty, mode = "nhanh", musi
         const { dF, fire } = def.bed(ctx);          // khoảng cách tới giao tranh, mức lửa trại (BattleDef)
         let fighting = 0;
         for (const a of ctx.crowd.agents) if ((a.windup > 0 || a.duel) && a.state !== "dead" && (a.x - h.x) ** 2 + (a.z - h.z) ** 2 < 900) fighting++;
-        ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), fire);
+        const river = Math.min(1, Math.max(0, 1 - waterDist(h.x, h.z) / 70));     // sóng sông: đầy khi đứng sát nước, hết ở 70 m (ground.waterDist theo bản đồ của trận)
+        ctx.audio.setBed(Math.min(1, Math.max(0, 1 - dF / 140) * 0.55 + Math.min(1, fighting / 18) * 0.45 + (ctx.hk.tpc ? 0.2 : 0)), fire, river);
       }
       ctx.world.update(time);
       ctx.ambient?.update(view.clock);  // giờ vẽ (đồng hồ trận lùi (1 − α) bước): hit-stop đứng hình, vòng lệnh chậm ×0,2, màn 120 Hz liền mạch
@@ -504,6 +511,7 @@ function pauseHTML(save, heroId = "H35", def = null, dev = 0, log = null, gfx = 
     <label>Bóng <input type="checkbox" ${s.shadows ? "checked" : ""} data-set="shadows"></label>
     <label>Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-set="volume"></label>
     <label>Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
+    <label>Âm lượng giọng nói <input type="range" min="0" max="1" step="0.05" value="${s.voice ?? 0.9}" data-set="voice"></label>
     <label>Gợi ý lần đầu <input type="checkbox" ${s.hints !== false ? "checked" : ""} data-set="hints"></label>
     <p class="small">Số lính hiển thị chỉ đổi phần vẽ; mô phỏng và vùng chiến đấu cho cùng kết quả ở mọi mức. Đồ hoạ Tự động chọn theo máy và tự hạ độ phân giải khi khung hình chậm; khử răng cưa đổi từ trận sau.${cv ? ` Khung vẽ lúc này <span data-cv>${cv.width}×${cv.height}</span> điểm ảnh.` : ""}</p>
     ${controlsHTML(dev, heroId)}${def?.touch?.interact ? interactNote(def) : ""}

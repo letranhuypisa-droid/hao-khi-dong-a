@@ -525,7 +525,7 @@ export class DirectorB20 {
     const ev = [], r = launch(this.st, ev);
     if (!r.ok) return false;
     this.vgNext = this.time + VANGUARD.first; this.orders++;
-    this.banner("RA KHIÊU CHIẾN", "#f1d98a", 1.4); this.ctx.audio.play("drum"); this.ctx.audio.play("horn");
+    this.banner("RA KHIÊU CHIẾN", "#f1d98a", 1.4); this.ctx.audio.play("drum"); this.ctx.audio.play("horn"); this.ctx.audio.play("oar");
     this.say("Thuyền nhẹ ra khiêu chiến: đoàn tự áp sát đầu hạm đội, bắn tên khiêu khích rồi tự lui dụ về phía Khúc cọc. Tướng giữ thuyền, đánh lính Nguyên đổ bộ.", 8, "good");
     this.handle(ev);
     return true;
@@ -733,7 +733,7 @@ export class DirectorB20 {
   groundFlagship() {
     const ctx = this.ctx, b = this.ships.FS; if (!b || this.phase !== 4) return;
     b.drive = null; this.fsTilt(b); b.strand();
-    this.banner("KỲ HẠM MẮC CẠN", "#f1d98a", 2.2); ctx.fx.shake(0.6); ctx.audio.play("horn"); ctx.audio.play("drums3");
+    this.banner("KỲ HẠM MẮC CẠN", "#f1d98a", 2.2); ctx.fx.shake(0.6); ctx.audio.play("horn"); ctx.audio.play("drums3"); ctx.audio.play("stakeCrash", b.x, b.z); ctx.audio.play("hullCreak", b.x, b.z);
     this.say(`${lbl("Hư cấu")}Nước ròng, kỳ hạm Ô Mã Nhi mắc cạn giữa bãi cọc.`, 6, "good");
     const cam = ctx.cam, h = this.hero; if (cam) { cam.yaw = Math.atan2(b.x - h.x, b.z - h.z); cam.idle = 0; cam.pitch = Math.max(cam.pitch, 0.42); }
     // cảnh: máy quay đứng ngang mạn kỳ hạm 35 m, cao 14 m, phía tướng đang đứng — thấy thân thuyền lún, nghiêng (review B20)
@@ -937,7 +937,7 @@ export class DirectorB20 {
     for (const b of [pt, n1, n2]) b.calm = true;
     for (const id of CLUSTER.ids) { const q = this.hulls[id] || (this.hulls[id] = { id, boat: this.ships[id], left: HULL_CREW.n, spawned: false, agents: [] }); q.force = true; }
     this.hullT = 0;
-    this.banner("LIÊN HOÀN THUYỀN", "#ff8a6a", 1.8); this.ctx.audio.play("horn"); this.ctx.fx.shake(0.35);
+    this.banner("LIÊN HOÀN THUYỀN", "#ff8a6a", 1.8); this.ctx.audio.play("horn"); this.ctx.audio.play("chain"); this.ctx.fx.shake(0.35);
     this.say(`${lbl("Hư cấu")}Phàn Tiếp xích ba thuyền làm một bệ đứng vững — thủy thủ hai thuyền kề tràn sang qua ván xích.`, 6, "bad");
     this.say(`${lbl("Hư cấu")}Phàn Tiếp: "${BOSSES.X24.line.text}"`, 4);
   }
@@ -1182,7 +1182,7 @@ export class DirectorB20 {
       if (a.vg && this.phase === 0) { const ev = []; provoke(this.st, "ko", 1, ev); this.handle(ev); }
     } else if (a.role === "guard") this.guardDue.push(this.time + 20);   // thân binh bổ sung sau 20 s
   }
-  onOfficerAwake() {}
+  onOfficerAwake(u) { return u.id ? this.ctx.voice?.meet(u.id, "b20", u) : false; }   // Phàn Tiếp (X24), Ô Mã Nhi (X20): lời giáp mặt (battle/voice.js)
   onOfficerKilled(u) {
     const ctx = this.ctx;
     this.ko++;
@@ -1277,7 +1277,7 @@ export class DirectorB20 {
     this.tpcLog = this.tpcLog || []; this.tpcLog.push({ at: Math.round(this.time), phase: this.phase });
     ctx.cinematic("TỔNG PHẢN CÔNG", this.hero, true);
     this.say("Tổng Phản Công: Tuyệt Kỹ đầu tiên ({ult}) là bản Hào Khí — không tốn Khí Lực, vòng chém rộng hơn.", 5, "good");
-    ctx.audio.play("drums3"); ctx.audio.play("horn");
+    ctx.audio.play("drums3"); ctx.audio.play("horn"); ctx.audio.play("warcry");
     return true;
   }
   onTpcEnd() { this.say("Tổng Phản Công kết thúc.", 3); }
