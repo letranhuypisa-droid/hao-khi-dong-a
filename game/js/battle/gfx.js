@@ -21,7 +21,7 @@
 
 import * as THREE from "three";
 import { isGfx, gfxPlan, DynRes } from "../core/gfx.js";
-import { makeRig, RIGS, pickupMesh, flagTexture } from "./models.js";
+import { makeRig, RIGS, pickupMesh, flagTexture, ropeLine } from "./models.js";
 import { fxTextures } from "./fx.js";
 
 // Máy: tên GPU đọc một lần mỗi lần mở trang (ngữ cảnh WebGL tạm, bỏ ngay); DPR, màn đọc mới mỗi lần (kéo cửa sổ sang màn khác, phóng to trang).
@@ -113,6 +113,9 @@ export class Warm {
     g.add(new THREE.Mesh(plane, new THREE.MeshLambertMaterial({ color: 0x1d1a17 })));
     g.add(new THREE.Mesh(plane, new THREE.MeshLambertMaterial({ map: flagTexture("破"), side: THREE.DoubleSide })));
     g.add(new THREE.Mesh(plane, new THREE.MeshLambertMaterial({ color: 0x9b2d20, side: THREE.DoubleSide })));
+    // dây móc / dây chuỗi phao (H40 Móc Tên, B17 Chặn Dòng trên sông): Line hình học chỉ có position — chương trình riêng, không vật nào
+    // lúc vào trận có (đo B17: lần đầu ở t ≈ 180 s)
+    g.add(ropeLine());
     for (const k of new Set(rigs)) if (RIGS[k]) { const r = makeRig(RIGS[k]); g.add(r.root); }
     g.traverse((o) => { o.frustumCulled = false; });
   }
@@ -127,11 +130,17 @@ export class Warm {
     // sprite fx còn nằm trong pool (ẩn) dời tới tướng; sprite đang dùng (lửa cháy 20 s lúc tạm dừng đổi Bóng) giữ nguyên chỗ, nguyên trạng
     if (h) for (const o of this.pool) if (!o.visible) o.position.set(h.x, (h.y || 0) + 1, h.z);
     // đèn ẩn giữ nguyên: số đèn là một phần khoá chương trình — hiện thêm đèn thì dựng biến thể không bao giờ dùng
-    const culled = [], shown = [], bumped = [];
+    // Bóng: three vẽ mọi vật đổ bóng (trừ customDepthMaterial / map + alphaTest) bằng MỘT vật liệu độ sâu chung, chép map và mặt của từng
+    // vật vào đó, nhưng chỉ dựng lại chương trình khi đổi loại vật (instancing, skinning, morph…): biến thể (uv hay không, flipSided /
+    // doubleSided, có normal…) theo vật gây đổi, tức theo thứ tự vật trong cảnh lúc đó. B20 t ≈ 23 s: một vật trước "b20-statics" (không
+    // map) đổi loại → biến thể độ sâu "không uv" lần đầu. Lượt làm nóng đánh dấu vật liệu độ sâu needsUpdate trước MỖI vật đổ bóng
+    // (onBeforeShadow; game không dùng móc này) → dựng đủ mọi biến thể mà thứ tự nào về sau cũng có thể gọi tới.
+    const culled = [], shown = [], bumped = [], casters = [], rebuild = (r, o, cam, sc, geo, depth) => { depth.needsUpdate = true; };
     scene.traverse((o) => {
       if (!o.visible && !o.isLight) { o.visible = true; shown.push(o); }
       if (o.isInstancedMesh && o.count === 0 && o.instanceMatrix.count > 0) { o.count = 1; bumped.push(o); }
       if (o.frustumCulled && (o.isMesh || o.isSprite || o.isPoints || o.isLine)) { o.frustumCulled = false; culled.push(o); }
+      if (o.castShadow && !Object.hasOwn(o, "onBeforeShadow")) { o.onBeforeShadow = rebuild; casters.push(o); }
     });
     try {
       renderer.compile(scene, camera);
@@ -140,6 +149,7 @@ export class Warm {
       for (const o of culled) o.frustumCulled = true;
       for (const o of shown) o.visible = false;
       for (const o of bumped) o.count = 0;
+      for (const o of casters) delete o.onBeforeShadow;
       scene.remove(g);
     }
     if (clean) renderer.render(scene, camera);

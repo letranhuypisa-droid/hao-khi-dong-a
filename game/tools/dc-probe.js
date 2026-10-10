@@ -4,6 +4,8 @@
 //   1) const P = await import("/tools/dc-probe.js"); await P.prep();   rồi tải lại /?debug (&battle=B16 | B17 | B20) — save mới trước MỖI lượt
 //   2) const P = await import("/tools/dc-probe.js"); await P.start(); const r = await P.run({ draw: true, attrib: 140 });
 //      r: max, over150, mean, trace (k, ag, st, hero, t mỗi 10 bước); window.__dc.peaks: khung > attrib, lượt vẽ theo nhãn ("S " = lượt bóng)
+//      r.lateFirstUse / r.late: chương trình shader dùng lần đầu sau làm nóng (gfx.js watchLateFirstUse) — giờ trận, vật đang vẽ (nhãn, lượt
+//      bóng?), vật liệu, khoá chương trình của three (so với R.info.programs để biết khác biến thể nào); làm nóng đủ thì rỗng
 // Vết: ag (lính còn sống), st (__state()) và hero ở bước 10/20/30/40 trùng cột ag / st / hero của bảng env-place-traces (ghi chú phiên); H là băm
 // dồn riêng của tệp này. Chỉ tin lượt vẽ ở tab đang hiện có canvas > 0 (tab nền: camera NaN, vẽ hết); một advance(5) là 151 khung vẽ.
 // So hai bản cùng origin: phục vụ bản cũ ở /_base/ (thư mục nối tạm), chụp góc nhìn cố định bằng view / saveShot, so bằng diffShots.
@@ -78,10 +80,24 @@ export async function run({ n = 40, sec = 5, draw = true, attrib = 0, dist = fal
   const THREE = await import("three"), _v = new THREE.Vector3();
   const c = window.__hk, R = c.renderer, frames = [], trace = [], peaks = [];
   const origRender = R.render, origRBD = R.renderBufferDirect;
-  let cur = null, label = labeler(c);
+  let cur = null, label = labeler(c), drawing = null;
+  // chương trình "dùng lần đầu" sau làm nóng (gfx.js watchLateFirstUse): ghi vật đang vẽ (lượt bóng: vật liệu độ sâu) và chỗ gọi ngoài three
+  const gl = R.getContext(), origLog = gl.getProgramInfoLog, late = [];
+  gl.getProgramInfoLog = function (p) {
+    if (c.warmed) {
+      const d = drawing, o = d?.object, m = d?.material, om = o?.material, prog = R.info.programs.find((q) => q.program === p);
+      late.push({ t: +c.director.time.toFixed(2), shadow: d ? d.scene === null : null, key: prog?.cacheKey.split(",onBeforeCompile")[0] || null, label: o ? label(o) : "?", src: o?.__src || o?.parent?.__src || null, name: o?.name || null,
+        kind: o ? (o.isInstancedMesh ? "I" : o.isSkinnedMesh ? "K" : o.isSprite ? "S" : o.isPoints ? "P" : o.isLine ? "L" : "M") + (o.isBatchedMesh ? "B" : "") : null,
+        mat: m ? m.type + (m.name ? "#" + m.name : "") : null, objMat: om && om !== m ? (Array.isArray(om) ? "[" + om.length + "]" : om.type) : null,
+        flags: m ? { side: m.side, alphaTest: m.alphaTest, map: !!m.map, transparent: m.transparent, vc: m.vertexColors, morph: !!d.geometry?.morphAttributes?.position, cast: o.castShadow, vis: o.visible, count: o.count } : null,
+        stack: new Error().stack.split("\n").filter((l) => !/three\.|dc-probe/.test(l)).slice(1, 4).map((l) => l.trim()) });
+    }
+    return origLog.call(this, p);
+  };
   R.renderBufferDirect = function (camera, scene, geometry, material, object, group) {
-    const before = R.info.render.calls;
-    origRBD.call(this, camera, scene, geometry, material, object, group);
+    const before = R.info.render.calls, prev = drawing;
+    drawing = { scene, geometry, material, object };
+    try { origRBD.call(this, camera, scene, geometry, material, object, group); } finally { drawing = prev; }
     if (cur && R.info.render.calls > before) {
       let k = (scene === null ? "S " : "") + label(object);
       if (dist && scene !== null && !object.isInstancedMesh) { const g = geometry.boundingSphere || (geometry.computeBoundingSphere(), geometry.boundingSphere); _v.copy(g.center).applyMatrix4(object.matrixWorld); k += " @" + Math.round(_v.distanceTo(camera.position) / 50) * 50; }
@@ -104,11 +120,12 @@ export async function run({ n = 40, sec = 5, draw = true, attrib = 0, dist = fal
       if (k % 10 === 0) trace.push({ k, ...s });
       if (c.director.over) { trace.push({ k, over: true, ...s }); break; }
     }
-  } finally { R.render = origRender; R.renderBufferDirect = origRBD; }
+  } finally { R.render = origRender; R.renderBufferDirect = origRBD; gl.getProgramInfoLog = origLog; }
   const over = frames.filter((x) => x > 150).length, max = Math.max(0, ...frames), mean = frames.reduce((a, b) => a + b, 0) / (frames.length || 1);
   const imax = frames.indexOf(max);
-  window.__dc = { frames, peaks, trace };
-  return { canvas: [R.domElement.width, R.domElement.height], css: [innerWidth, innerHeight], nFrames: frames.length, max, imax, over150: over, mean: +mean.toFixed(1), trace, nPeaks: peaks.length };
+  window.__dc = { frames, peaks, trace, late };
+  return { canvas: [R.domElement.width, R.domElement.height], css: [innerWidth, innerHeight], nFrames: frames.length, max, imax, over150: over, mean: +mean.toFixed(1), trace, nPeaks: peaks.length,
+    lateFirstUse: c.lateFirstUse, late };
 }
 
 // Nhóm lượt vẽ của các khung đỉnh: cộng theo nhãn (đã bỏ hậu tố), trung bình trên các khung > ngưỡng
