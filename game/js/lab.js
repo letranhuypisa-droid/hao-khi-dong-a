@@ -8,6 +8,8 @@
 //                          (&us=0,.25,.5) = mỗi rig một dải
 //   &hero=H31              tướng H31 (rig RIGS.H31, bộ đòn WC01 anim-wc01.js) thay H35 ở view=hero; m nhận thêm hich, binhThu,
 //                          ult; ở view=rigs thì H31 chỉ hiện khi ghi rõ (&rigs=H31) và dùng tư thế WC01
+//   &hero=H40              tướng H40 (rig RIGS.H40, bộ đòn WC09 Cung anim-wc09.js, tên cầm tay) ở view=hero; m nhận thêm xuyenHang,
+//                          chanDong, mocTen (kỹ năng). view=rigs giữ tư thế cũ của H40 đồng minh (shoot của anim.js)
 //   &play                  chạy thời gian thật thay vì khung đứng
 //   &noglb                 không nạp mô hình GLB (glb.js): khối hình dựng bằng code như trước
 //   &lod=1                 lính GLB: xem mức chi tiết 0 (gần, mặc định), 1, 2 (xa)
@@ -31,6 +33,9 @@ import { MOVES } from "./data/tuning.js";
 import { ANIMS } from "./battle/hero-anim.js";
 import * as W1 from "./battle/anim-wc01.js";
 import { MOVES_WC01 } from "./data/moves-wc01.js";
+import * as W9 from "./battle/anim-wc09.js";
+import { MOVES_WC09 } from "./data/moves-wc09.js";
+import { handArrow } from "./battle/models.js";
 
 if (new URLSearchParams(location.search).has("meshy")) useMeshy();      // &meshy: mọi mô hình Hunyuan3D về bản Meshy (tướng, sĩ quan, lính Tự do, cận vệ, lính đám đông) để so
 // Lính Tự do (bậc 0, 2; song đao WC03) và cận vệ dựng RIGS lúc chạy (soldier.js, guard.js): đăng ký sẵn để &rigs=linh_WC03_0,linh_WC03_2,cv_khien,cv_giao… xem được; không nằm trong danh sách mặc định.
@@ -42,6 +47,11 @@ const DYN_RIG = /^(linh_|cv_)/;
 const WC01_RIGS = { H31: 1, H31m: 1 };
 const WC01_POSE = { idle: (u, t) => W1.idle(t), block: () => W1.block(), hit: (u) => W1.hitReact(u), dodge: (u) => W1.dodgeRoll(u), down: (u) => W1.knockdown(u) };
 const WC01_DUR = { hich: 3, binhThu: 0.9, ult: 4.4 };
+// Tướng lớp WC09 (cung) ở view=hero: bảng đòn, tư thế ngoài đòn, thời lượng kỹ năng (data/heroes.js SKILLS castSec / clip)
+const WC09_RIGS = { H40: 1, H40m: 1 };
+const WC09_POSE = { idle: (u, t) => W9.idle(t), block: () => W9.BLOCK, hit: (u) => W9.hitReact(u), dodge: (u) => W9.dodgeRoll(u), down: (u) => W9.knockdown(u) };
+const WC09_DUR = { xuyenHang: 0.8, chanDong: 0.7, mocTen: 2.2 };
+const wc09Of = (it) => !!(it && WC09_RIGS[it.key] && opts.view === "hero");
 
 const canvas = document.querySelector("canvas"), bar = document.querySelector(".bar");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -156,7 +166,8 @@ function build() {
     if (o.hero) {
       it.rig = makeRig(RIGS[o.key]); it.motion = new RigMotion(it.rig); it.yaw = Math.PI - opts.yaw;
       scene.add(it.rig.root); it.rig.root.position.set(it.x, labGround(it.x, it.z), it.z); it.rig.root.rotation.y = it.yaw;
-      it.pose = WC01_RIGS[o.key] ? W1.idle(0) : A.idle(0); it.phase = 0; it.dist = 0; it.settled = false;
+      it.pose = WC01_RIGS[o.key] ? W1.idle(0) : wc09Of(it) ? W9.idle(0) : A.idle(0); it.phase = 0; it.dist = 0; it.settled = false;
+      if (wc09Of(it)) it.arrow = handArrow(it.rig);
     } else {
       const K = KITS[o.kit];
       it.K = K; it.pose = new Float32Array(NCH); it.settled = false;
@@ -186,7 +197,8 @@ function drawBar() {
   for (const k of Object.keys(KITS)) b(KITS[k].name, opts.view === "kit" && opts.kit === k, () => set({ view: "kit", kit: k }));
   b("chu kỳ đòn", opts.view === "cycle", () => set({ view: "cycle", play: true }));
   for (const s of ["strike", "windup", "hit", "dead2b"]) b(STATES[s].label, opts.view === "state" && opts.s === s, () => set({ view: "state", s }));
-  const heroMoves = opts.hero && WC01_RIGS[opts.hero] ? [...Object.keys(ANIMS.WC01), "idle", "run", "block", "blockwalk", "hit", "dodge", "down"] : HERO_MOVE_LIST;
+  const heroMoves = opts.hero && WC01_RIGS[opts.hero] ? [...Object.keys(ANIMS.WC01), "idle", "run", "block", "blockwalk", "hit", "dodge", "down"]
+    : opts.hero && WC09_RIGS[opts.hero] ? [...Object.keys(ANIMS.WC09), "idle", "run", "block", "blockwalk", "hit", "dodge", "down"] : HERO_MOVE_LIST;
   for (const m of heroMoves) b(m, opts.view === "hero" && opts.m === m, () => set({ view: "hero", m }));
   for (const m of ["idle", "run", "strafe", "blockwalk", "sweep", "heavy", "broken", "ult"]) b("tướng/sĩ quan: " + m, opts.view === "rigs" && opts.m === m, () => set({ view: "rigs", m }));
   for (const g of Object.keys(GROUNDS)) b("đất: " + g, opts.ground === g, () => set({ ground: g }));
@@ -212,12 +224,13 @@ const clipLabPose = (name, u) => {
   return p;
 };
 const rigDur = (m, it) => (labClip(m) ? clipDur(labClip(m)) : null) ?? (it && WC01_RIGS[it.key] ? MOVES_WC01[m]?.dur ?? WC01_DUR[m] : null)
+  ?? (wc09Of(it) ? MOVES_WC09[m]?.dur ?? WC09_DUR[m] : null)
   ?? MOVES[m]?.dur ?? (m === "ult" ? 1.9 : m === "dodge" ? 0.32 : m === "fall" ? 1.1 : m === "broken" ? 3.5 : 0.95);
 const longWpn = (it) => ["giao", "dadao"].includes(RIGS[it.key].weapon);          // như BigUnit.longWeapon
 window.__lab.camera = camera;          // kịch bản chụp màn đặt camera cận cảnh (bàn chân, vạt áo)
 window.__lab.items = () => items;
 const WALKS = { run: 1, strafe: 1, blockwalk: 1 };
-const rigSpeed = (it) => (it.m === "strafe" ? 1.5 : it.m === "blockwalk" ? 2 : it.key === "hero" ? 6.75 : it.key === "H31" ? 6.0 : 4.2);
+const rigSpeed = (it) => (it.m === "strafe" ? 1.5 : it.m === "blockwalk" ? 2 : it.key === "hero" ? 6.75 : it.key === "H31" ? 6.0 : wc09Of(it) ? 6.25 : 4.2);
 // Nhịp bước theo kiểu đi: chạy (gait), đi ngang thăm dò (strafeGait), bước khi đỡ (stepGait, như Hero.updateBlock).
 const walkGait = (it, sp) => (it.m === "run" ? A.gait : it.m === "strafe" ? A.strafeGait : A.stepGait)(sp, it.rig.scale);
 // Một bước mô phỏng (dt giây): đi/chạy thì dời root theo hướng đi (run: trước mặt, strafe: sang phải, blockwalk:
@@ -229,10 +242,10 @@ function rigStep(it, dt, u, t) {
     const sp = rigSpeed(it), g = walkGait(it, sp);
     it.phase += dt * g.rate; it.dist += dt * sp;
     const dr = (opts.dir ?? 90) * Math.PI / 180, dx = m === "run" ? 0 : m === "strafe" ? 1 : Math.sin(dr), dz = m === "run" ? 1 : m === "strafe" ? 0 : Math.cos(dr);
-    const wc01 = WC01_RIGS[it.key];
-    if (m === "run") target = wc01 ? W1.run(it.phase, 1, g.stride) : A.run(it.phase, 1, g.stride);
+    const wc01 = WC01_RIGS[it.key], wc09 = wc09Of(it);
+    if (m === "run") target = wc01 ? W1.run(it.phase, 1, g.stride) : wc09 ? W9.run(it.phase, 1, g.stride) : A.run(it.phase, 1, g.stride);
     else if (m === "strafe") target = A.strafe(it.phase, 1, g.stride);
-    else target = A.guardStep(wc01 ? W1.BLOCK : A.BLOCK, it.phase, dx, dz, g.stride);
+    else target = A.guardStep(wc01 ? W1.BLOCK : wc09 ? W9.BLOCK : A.BLOCK, it.phase, dx, dz, g.stride);
     const wpn = RIGS[it.key].weapon;
     if (m === "run" && (wpn === "giao" || wpn === "dadao")) A.carryLong(target, it.phase);    // như BigUnit.moveToward
     k = m === "run" ? 0.35 : m === "blockwalk" ? 0.8 : 0.5;          // như Hero (chạy, đỡ), BigUnit (đi ngang)
@@ -240,12 +253,18 @@ function rigStep(it, dt, u, t) {
     const cy = Math.cos(it.yaw), sy = Math.sin(it.yaw);
     px += (dx * cy + dz * sy) * off; pz += (dz * cy - dx * sy) * off;
   } else {
-    const tbl = WC01_RIGS[it.key] ? ANIMS.WC01 : HERO_ANIM, pz0 = WC01_RIGS[it.key] ? WC01_POSE : RIG_ANIM;
+    const tbl = WC01_RIGS[it.key] ? ANIMS.WC01 : wc09Of(it) ? ANIMS.WC09 : HERO_ANIM, pz0 = WC01_RIGS[it.key] ? WC01_POSE : wc09Of(it) ? WC09_POSE : RIG_ANIM;
     target = (labClip(m) ? (uu) => clipLabPose(labClip(m), uu) : (tbl[m] || pz0[m] || RIG_ANIM[m] || pz0.idle))(u, t, it); k = m === "idle" ? 0.15 : m === "broken" ? 0.25 : 0.8;
   }
   it.pose = A.blendPose(it.pose, target, k); A.applyPose(it.rig, it.pose);
   root.position.set(px, labGround(px, pz), pz); root.rotation.y = it.yaw;
   it.motion.update(dt, it.pose, labGround);
+  if (it.arrow) {                  // tên cầm tay (như hero.js nocked): đứng thủ, đang kéo dây tới lúc buông; mũi chĩa tay cầm cung
+    const mv = MOVES_WC09[m], H = mv?.hits;
+    it.arrow.visible = m === "idle" || ((mv?.shape === "ray" || mv?.shape === "rain") && u > 0.06 && u <= H[H.length - 1] && !H.some((h) => u > h && u < h + 0.03))
+      || ((m === "xuyenHang" || m === "mocTen") && u > 0.06 && u < (m === "mocTen" ? 0.25 : 0.55));
+    if (it.arrow.visible) { root.updateMatrixWorld(true); it.rig.p.handL.getWorldPosition(_v); it.arrow.lookAt(_v); }
+  }
 }
 function rigFrame(it, t) {
   if (opts.play) {

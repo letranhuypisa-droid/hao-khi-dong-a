@@ -298,11 +298,23 @@ function smartBot(getTarget, opts) {
     }
     // tướng không phải H35 (H31, ?debug&hero=H31): Hịch Tướng Sĩ khi quanh 8 m không có địch (đọc 3 s đứng yên), Binh Thư
     // Yếu Lược khi có sĩ quan trong 20 m. H35 không vào nhánh này (bot B15 giữ y hệt).
-    if (h.def && h.def.skills?.sk1 !== "phaTran" && on("skill") && free) {
+    if (h.def && h.def.skills?.sk1 === "hichTuongSi" && on("skill") && free) {
       if (h.skillReady(1) && count(8) === 0 && !bigs.some((o) => o.d < 10)) { P.skill = true; dbg.skill++; mode("Hịch Tướng Sĩ"); return; }
       if (h.skillReady(2) && bigs.length && bigs[0].d < 20) { P.skill2 = true; dbg.skill++; mode("Binh Thư", bigs[0].u); return; }
     }
-    if (on("ult") && free && h.state !== "ult") {
+    // H40 (cung, ?debug&hero=H40): Tên Xuyên Hàng khi ≥ 3 lính trong 25 m hay sĩ quan trong 28 m; Chặn Dòng khi ≥ 4 lính cận chiến
+    // áp tới trong 9 m; Tuyệt Kỹ Móc Tên vào sĩ quan / Toa Đô còn khoẻ trong 30 m (không dùng vào đám đông).
+    if (h.ranged && h.def.skills?.sk1 === "tenXuyenHang" && free) {
+      if (on("skill") && h.skillReady(1) && (count(25) >= 3 || bigs.some((o) => o.d < 28 && o.u.awake))) {
+        const t = bigs.find((o) => o.d < 28 && o.u.awake)?.u || foes[0].a; aimAt(t); P.skill = true; dbg.skill++; mode("Tên Xuyên Hàng", t); return;
+      }
+      if (on("skill") && h.skillReady(2) && count(9, (a) => !a.K.ranged) >= 4) { aimAt(foes[0].a); P.skill2 = true; dbg.skill++; mode("Chặn Dòng", foes[0].a); return; }
+      if (on("ult") && h.ki >= 100) {
+        const off = bigs.find((o) => o.u.awake && o.d < 30 && o.u.hp > o.u.maxHp * 0.25 && !(o.u.status?.bind > now));
+        if (off) { aimAt(off.u); P.ult = true; dbg.ult++; mode("Móc Tên", off.u); return; }
+      }
+    }
+    if (on("ult") && free && h.state !== "ult" && !h.ranged) {
       const hk = h.inTPC && h.hkUltReady;
       if (h.ki >= 100 || hk) {
         const off = bigs.find((o) => o.u.awake && o.d < 2.4 + o.u.radius && o.u.hp > o.u.maxHp * 0.3 && o.u.roarT <= 0);
@@ -372,10 +384,11 @@ function smartBot(getTarget, opts) {
         if (g && g.d < obj.clear && (!f || g.d <= f.d + 3)) { tgt = g.u; why = "B20: sĩ quan"; }
         else if (f && f.d < obj.clear) { tgt = f.a; why = "B20: dọn boong"; }
       }
-      else if (foes.length && foes[0].d < (gateId ? 6 : 9)) { tgt = foes[0].a; why = "dọn"; }
+      else if (foes.length && foes[0].d < (gateId ? 6 : h.ranged ? 18 : 9)) { tgt = foes[0].a; why = "dọn"; }
     }
 
     // ---- 8. hành động ------------------------------------------------------------------------------
+    if (tgt && h.ranged) { rangedAct(tgt, why); return; }          // H40 (cung): giữ tầm mà bắn
     if (tgt) {
       const td = dist(tgt), reachT = REACH + (tgt.isBig ? tgt.radius : 0.25);
       if (tgt.isBig) wantLock(tgt); else dropLock();
@@ -402,10 +415,12 @@ function smartBot(getTarget, opts) {
     }
     dropLock();
     if (h.state === "attack" && count(REACH) > 0) { strike(null); mode("dứt chuỗi"); return; }
+    if (h.ranged && foes.length && foes[0].d < 20 && (!gateId || !obj.gate)) { rangedAct(foes[0].a, "bắn dọc đường"); return; }
 
     // cổng: đứng trước cổng mà chém (đòn vòng C4 luôn trúng cổng trong 8 m)
     if (gateId && obj.gate) {
       const g = c.world.gates[gateId], gd = Math.hypot(g.x - 1.6 - h.x, g.z - h.z);
+      if (gd < 4.5 && h.ranged) { stick(g.x - h.x, g.z - h.z, 0.16); P[h.state === "attack" && h.move === "N1" ? "c" : "n"] = true; mode("phá cổng (đạp)"); return; }   // cung: N rồi C = cú đạp C2 (đòn cận chiến, đủ sát thương vào cổng)
       if (gd < 4.5) { stick(g.x - h.x, g.z - h.z, 0.2); strike(null, true); mode("phá cổng"); return; }
       travel(obj.x, obj.z, L0, L0 > 12); mode("tới cổng"); return;
     }
@@ -435,6 +450,37 @@ function smartBot(getTarget, opts) {
         else if (h.chainGrace > 0 && h.chain === 3) P.c = true;
         else P.n = true;
       }
+    }
+    // ---- tầm xa (H40, WC09) ---------------------------------------------------------------------------------
+    // Ngắm như người chơi PC: xoay camera về mục tiêu (hướng ngắm = camera, hero.updateAim), cần chỉ để đi (inp.touch = false sau setStick).
+    function aimAt(t) { c.cam.yaw = Math.atan2(t.x - h.x, t.z - h.z); }
+    function stickW(dx, dz, m) {                       // như stick() nhưng theo camera vừa xoay; giữ chế độ bàn phím (không phải cảm ứng)
+      const L = Math.hypot(dx, dz), cyy = c.cam.yaw, ffx = Math.sin(cyy), ffz = Math.cos(cyy);
+      if (L < 1e-6 || m <= 0) inp.setStick(0, 0);
+      else inp.setStick(m * ((dx / L) * -ffz + (dz / L) * ffx), m * ((dx / L) * ffx + (dz / L) * ffz));
+      inp.touch = false;
+    }
+    // Giữ tầm: lính cận chiến trong 5 m thì vừa lùi vừa bắn (bắn khi đi), sát 2,2 m thì đạp (N → C = C2: đạp hất rồi nhảy lùi) hay lộn
+    // né ra; mục tiêu xa quá 20 m (sĩ quan 22) thì tiến lại, gần hơn 9 m (không có ai áp sát) thì lùi dần. Chuỗi: N liên tục; N N N → C
+    // (mưa tên quanh mình) khi ≥ 3 lính trong 5 m; N N N N → C (tên xuyên hàng) khi ≥ 3 lính trong 20 m trước mặt.
+    function rangedAct(t, why) {
+      const td = dist(t), far = t.isBig ? 22 : 20;
+      if (td > far + 4) { travel(t.x, t.z, td, td > 30); mode(why + " (tiếp cận)", t); return; }
+      if (t.isBig) wantLock(t); else dropLock();
+      aimAt(t);
+      const melee = foes.filter((o) => o.d < 5 && !o.a.K.ranged), close = melee.length ? melee[0] : null;
+      let mx = 0, mz = 0, mag = 0;
+      if (close) { for (const o of melee) { mx += h.x - o.a.x; mz += h.z - o.a.z; } mag = 1; }
+      else if (td > far) { mx = t.x - h.x; mz = t.z - h.z; mag = 1; }
+      else if (td < 9) { mx = h.x - t.x; mz = h.z - t.z; mag = 0.6; }
+      if (close && close.d < 2.2 && free && on("roll") && h.dodgeCd <= 0 && melee.length >= 3) { stickW(mx, mz, 1); P.dodge = true; mode(why + " (lộn ra)", t); return; }
+      stickW(mx, mz, mag);
+      const ch = h.state === "attack" && h.move?.[0] === "N" ? Number(h.move[1]) : h.chainGrace > 0 ? h.chain : 0;
+      if (close && close.d < 2.6 && ch === 1) P.c = true;                                   // N → C: đạp
+      else if (ch === 3 && count(5, (a) => !a.K.ranged) >= 3) P.c = true;                   // N N N → C: mưa tên quanh mình
+      else if (ch === 4 && h.stats.level >= 5 && foes.filter((o) => o.d < 20).length >= 3) P.c = true;   // N×4 → C: xuyên hàng
+      else if (h.state !== "attack" || F_CHAIN(h)) P.n = true;
+      mode(why + (close ? " (lùi bắn)" : " (bắn)"), t);
     }
     // Đi tới (x, z): tránh nhặt thuốc khi máu còn cao, gỡ kẹt, lộn liên tiếp khi đi xa.
     function travel(x, z, L, roll) {
@@ -490,6 +536,8 @@ function faces(u, t, halfArc) {
   while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
   return Math.abs(da) <= halfArc;
 }
+// Đang ra đòn N nối được (bấm N dồn để ra phát kế) — bot tầm xa bấm N mỗi khung khi đúng chuỗi.
+const F_CHAIN = (h) => !!h.F?.[h.move]?.chainN;
 // Phá Trận sẵn sàng (H35). Tướng có ô 1 khác (H31 Hịch Tướng Sĩ — đứng đọc 3 s) không dùng các nhánh lao Phá Trận của bot.
 function skillReady(h) { if (h.def && h.def.skills?.sk1 !== "phaTran") return false; return h.phaTran.left > 0 || h.phaTran.cd <= 0; }
 

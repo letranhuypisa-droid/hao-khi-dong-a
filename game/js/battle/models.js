@@ -457,6 +457,43 @@ export function disposeRig(rig) {
   for (const m of rig.mats || []) m.dispose();
 }
 
+// Tên cầm tay của tướng cung (WC09, hero.js — đợt B17-B1): con của khớp tay phải, gốc (đuôi tên) ở bàn tay, mũi +Z; hero.js mỗi
+// khung quay mũi về tay cầm cung (lookAt) và chỉ hiện khi đang lắp / kéo dây. Mô hình wpn/mui_ten (0,85 m; tệp nướng để mũi ở z 0,
+// đuôi lông ở z 0,85 nên lật 180° rồi dời 0,85: đuôi ở bàn tay) khi đã nạp, không thì que khối. Không thuộc RIGS: rig cung của tướng
+// đồng minh (units.js) không có tên cầm tay như trước.
+export function handArrow(rig) {
+  const m = rig.glb ? model("wpn/mui_ten") : null;
+  let mesh;
+  if (m) { mesh = new THREE.Group(); mesh.add(weaponMesh(m, { p: [0, 0, 0.85], r: [0, Math.PI, 0] })); }
+  else {
+    mesh = new THREE.Mesh(merge([part(new THREE.BoxGeometry(0.018, 0.018, 0.8), PAL.go, { z: 0.4 }), part(new THREE.ConeGeometry(0.025, 0.08, 4), PAL.sat, { z: 0.84, rx: Math.PI / 2 }),
+      part(new THREE.BoxGeometry(0.004, 0.05, 0.12), PAL.trung, { z: 0.08 })]), lambert());
+    mesh.castShadow = true;
+  }
+  mesh.visible = false;
+  rig.p.handR.add(mesh);
+  return mesh;
+}
+
+// Hàng cọc chặn (H40 Chặn Dòng Dụ Địch trên đất, hero-skills.js — đợt B17-B2): n cọc tre vót nhọn rải đều dọc trục x cục bộ từ
+// −len/2 tới len/2, nghiêng ra trước (+z); dây buộc ngang. Nơi gọi đặt độ cao từng cọc theo đất (children[i].position.y) và gỡ khi hết giờ.
+export function stakeRow(len, n = Math.max(4, Math.round(len / 0.9))) {
+  const g = new THREE.Group(), mat = lambert();
+  const geo = merge([part(new THREE.CylinderGeometry(0.06, 0.08, 1.5, 5), PAL.go, { y: 0.75 }), part(new THREE.ConeGeometry(0.06, 0.3, 5), PAL.vai, { y: 1.65 })]);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(geo, mat); m.position.x = -len / 2 + (len * i) / (n - 1); m.rotation.x = 0.35 + 0.12 * Math.sin(i * 2.3); m.rotation.z = 0.08 * Math.cos(i * 1.7);
+    m.castShadow = true; g.add(m);
+  }
+  return g;
+}
+// Dây móc (H40 Móc Tên Trói Thuyền): đoạn thẳng hai đầu, set(ax, ay, az, bx, by, bz) mỗi khung; gỡ khỏi cảnh khi xong.
+export function ropeLine(color = 0xd9c79a) {
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color })); line.frustumCulled = false;
+  line.set = (ax, ay, az, bx, by, bz) => { const p = geo.attributes.position; p.setXYZ(0, ax, ay, az); p.setXYZ(1, bx, by, bz); p.needsUpdate = true; };
+  return line;
+}
+
 // Cấu hình rig theo vai (tướng người chơi, sĩ quan, boss, tướng đồng minh). units.js, hero.js, lab.js dùng chung.
 // model: mô hình GLB (assets/models/char/<model>.hkm, design/glb-prompts.md) — màu, mũ ở đây chỉ còn dùng khi chưa nạp được mô hình.
 export const RIGS = {

@@ -36,6 +36,9 @@ export const HINTS = {
   siKhi: { prio: 50, ttl: 30, T: 11, text: () => GLOSS.siKhi.short },
   tuLuc: { prio: 40, ttl: 5, T: 9,
     text: () => { const c = WEAPON_CLASSES.WC01.traits.charge; return `Đại kiếm: giữ {c} thay vì bấm nhanh để tụ lực. Giữ ${vn(c.levels[0])} s lên cấp 2 (sát thương ×${vn(c.mult[1])}), ${vn(c.levels[1])} s lên cấp 3 (×${vn(c.mult[2])}); thanh "Tụ lực" hiện dưới Sinh lực.`; } },
+  // Cung (WC09, H40): lần bấm đầu N / C — ngắm, tên bay thật, căng dây (đợt B17-B1)
+  cung: { prio: 42, ttl: 6, T: 11,
+    text: () => { const R = WEAPON_CLASSES.WC09.traits.ranged; return `Cung: {n} bắn, tự nhắm người gần tâm ngắm (±${R.aimCone}°, ${R.aimRange} m); tên bay thật, kẻ né khỏi đường tên là trượt. Vừa đi vừa bắn được. Giữ {c} để căng dây, ngắm chính xác theo tâm màn, thả ra là bắn.`; } },
   hich: { prio: 30, ttl: 30, T: 10,
     text: () => { const H = SKILLS.hichTuongSi; return `Bấm {skill}: ${H.name}. Đứng đọc ${H.channel} s (trúng đòn nặng thì bị ngắt), mọi cánh quân ta tăng ${H.siKhi} Sĩ Khí (tinh thần) và Công +${pct(H.allyAtk)} trong ${H.dur} s.`; } },
   kyLui: { prio: 55, ttl: 6, T: 10, text: () => GLOSS.cungKy.short },
@@ -73,7 +76,7 @@ export function createHints({ seen = {}, enabled = () => true, gap = GAP_SEC, on
 
 // ---- luật đến hạn (thuần) ----------------------------------------------------------------------------------------------------
 // snap: ảnh chụp trận (snapshotOf):
-//   t (giây trong trận) · battle ("B15"…) · hero { id, alive, hpFrac, revives, revive{hp,invuln}, charge (có tụ lực), sk1, sk2, ready1, ready2 }
+//   t (giây trong trận) · battle ("B15"…) · hero { id, alive, hpFrac, revives, revive{hp,invuln}, charge (có tụ lực), ranged (cung WC09), sk1, sk2, ready1, ready2 }
 //   used { skill, skill2 } (đã bấm E / T lần nào chưa) · pressed (cạnh bấm khung này) · fronts [{ id, ta, dich }] | null (chỉ B15 hiện Sĩ Khí)
 //   target { poiseMax } | null (khung mục tiêu HUD) · redRing (vòng đỏ gần tướng) · officerNear
 //   kiteT (giây cung kỵ thật lùi giữ tầm gần tướng liên tục; bộ gợi ý tự cộng, snapshotOf chỉ cho kiter)
@@ -92,7 +95,8 @@ export function hintsDue(s) {
     if (low) out.push({ id: "siKhiThap", info: low });
     if (shifted || s.t >= SK_FIRST_AT) out.push({ id: "siKhi", info: {} });
   }
-  if (h.charge && s.pressed?.c) out.push({ id: "tuLuc", info: {} });
+  if (h.charge && !h.ranged && s.pressed?.c) out.push({ id: "tuLuc", info: {} });
+  if (h.ranged && (s.pressed?.n || s.pressed?.c)) out.push({ id: "cung", info: {} });
   if (h.sk1 === "hichTuongSi" && h.ready1 && !s.used.skill && s.t >= HICH_AFTER) out.push({ id: "hich", info: {} });
   if (h.sk2 === "binhThu" && h.ready2 && !s.used.skill2 && s.officerNear) out.push({ id: "binhThu", info: {} });
   if (s.kiteT >= KITE_AFTER) out.push({ id: "kyLui", info: {} });
@@ -118,7 +122,7 @@ export function snapshotOf(ctx, mem, inp) {
   return {
     t: mem.t, battle: ctx.battle?.id ?? "",
     hero: { id: h.id ?? def.id, alive: !!h.alive, hpFrac: h.maxHp > 0 ? h.hp / h.maxHp : 1, revives: h.revives ?? 0, revive: def.revive,
-      charge: !!h.chargeTrait, sk1: sk.sk1 ?? null, sk2: sk.sk2 ?? null, ready1: !!h.skillReady?.(1), ready2: !!h.skillReady?.(2) },
+      charge: !!h.chargeTrait, ranged: !!h.ranged, sk1: sk.sk1 ?? null, sk2: sk.sk2 ?? null, ready1: !!h.skillReady?.(1), ready2: !!h.skillReady?.(2) },
     used: mem.used, pressed: inp?.pressed || {},
     fronts: ctx.battle?.id === "B15" && ctx.sim?.fronts ? Object.entries(ctx.sim.fronts).map(([id, f]) => ({ id, ta: f.sk.ta, dich: f.sk.dich })) : null,   // B20 không hiện Sĩ Khí
     target: tgt ? { poiseMax: tgt.poiseMax || 0 } : null,
@@ -142,7 +146,7 @@ export function createHintDriver(ctx, { seen = {}, enabled = () => true, onSeen 
       if (P.skill) mem.used.skill = true;
       if (P.skill2) mem.used.skill2 = true;
       if (d.over || !enabled()) { mem.acc = 0; mem.kiteT = 0; return; }       // tắt rồi bật lại giữa trận: không dồn thời gian lúc tắt vào đồng hồ lùi giữ tầm
-      if (mem.acc >= TICK || P.c) {                                  // cạnh bấm C chỉ tồn tại một khung: đọc ngay khung đó
+      if (mem.acc >= TICK || P.c || (P.n && ctx.hero?.ranged)) {      // cạnh bấm C (và N của cung) chỉ tồn tại một khung: đọc ngay khung đó
         const step = mem.acc; mem.acc = 0;
         const snap = snapshotOf(ctx, mem, inp);
         mem.kiteT = snap.kiter ? mem.kiteT + step : 0;               // đứt quãng (hết lùi, lính hạ, xa tướng) thì đếm lại từ đầu

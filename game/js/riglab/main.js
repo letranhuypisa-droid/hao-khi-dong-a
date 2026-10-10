@@ -2,7 +2,7 @@
 // Nạp mô hình người tĩnh (Hunyuan3D…) → autorig.js gắn xương theo rig tướng của game → xem chạy đúng các đòn, dáng chạy của game
 // (bake.js) → xuất GLB có xương và clip hoạt ảnh. "Mẫu thử" dựng một tướng mặc áo dài từ chính rig game, xoay tay chữ A, bỏ xương —
 // giống một mô hình Hunyuan3D — để thử khi chưa có tệp.
-// window.__rig: load(url), loadBuffer(ArrayBuffer, tên), sample(), setClip(tên), setSet("WC03"|"WC01"), rotate(), adjust(obj),
+// window.__rig: load(url), loadBuffer(ArrayBuffer, tên), sample(), setClip(tên), setSet("WC03"|"WC01"|"WC09"), rotate(), adjust(obj),
 // exportGLB() → ArrayBuffer, info() — cho kịch bản chụp màn / nướng tự động bằng Playwright.
 
 import * as THREE from "three";

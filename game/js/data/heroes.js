@@ -7,6 +7,7 @@
 
 import { HERO, MOVES } from "./tuning.js";
 import { MOVES_WC01, CHAIN_N as CHAIN_N_WC01 } from "./moves-wc01.js";
+import { MOVES_WC09, CHAIN_N as CHAIN_N_WC09 } from "./moves-wc09.js";
 
 // ---- §2.1 Quy đổi thang 1–5 → số thật (cấp 1; Công/Sinh lực/Giáp nhân g(L) ở progress.js) -----------------------------
 //   Cong = 60 + 20s · HP = 1200 + 200s · Giap = 30 + 10s · TocDiChuyen = 5,5 + 0,25s · TocDanh = 0,90 + 0,05s ·
@@ -64,10 +65,31 @@ export const SKILLS = {
     tpc: { r: 25, mvTotal: 35, chops: [{ t: 0.9, mv: 10 }, { t: 2.0, mv: 11 }, { t: 3.2, mv: 14, breakShields: true }], lightBoats: true },
     end: { order: "tiencong", siKhi: 15 }, cinematic: "bespoke-≤6s", scope: "toàn bản đồ",
     canon: { lineSpeed: 0.30, lineSpeedDur: 20 } },
+  // ---- H40 Nguyễn Khoái (canon H40; cơ chế battle/hero-skills.js, đợt B17-B2). Số canon ghi rõ; còn lại ĐỀ XUẤT BẢN THỬ.
+  // ô 1 Tên Xuyên Hàng (canon: 5 tên nặng 30 m, mỗi tên xuyên 4, người thứ 4 bị ghim 1,5 s, hồi 12 s): kéo dây castSec rồi
+  // buông 5 tên tỏa spread rad; lính bị ghim dùng choáng có sẵn (crowd stun), sĩ quan / tướng dùng trạng thái ghim của BigUnit.
+  tenXuyenHang: { id: "tenXuyenHang", name: "Tên Xuyên Hàng", short: "Xuyên Hàng", slot: 1, label: "Hư cấu", arrows: 5, range: 30, pierce: 4,
+    pinAt: 4, pin: 1.5, cd: 12, mv: 0.9, spread: 0.2, castSec: 0.8, release: 0.55, speed: 55 },
+  // ô 2 Chặn Dòng Dụ Địch (canon: phao chặn 15 m trên sông trong 15 s, thuyền địch không vượt; Chính sử theo tài liệu hiện
+  // đại + Hư cấu phao, hồi 35 s). Thả ngang hướng ngắm, tâm cách tướng ahead m. Trận có sông (director.onBoom — B20): chặn
+  // thuyền; trên đất (B15, B17): hàng cọc, lính địch chạm vào bị chặn lại phải đi vòng (ĐỀ XUẤT BẢN THỬ).
+  chanDong: { id: "chanDong", name: "Chặn Dòng Dụ Địch", short: "Chặn Dòng", slot: 2, label: "Chính sử + Hư cấu", len: 15, dur: 15, cd: 35,
+    ahead: 9, castSec: 0.7, thick: 0.9 },
+  // Nội tại Thánh Dực Dũng Nghĩa (canon): trên thuyền tầm bắn +20%, không bị đẩy xuống nước; mỗi thuyền địch mắc cạn trong 30 m:
+  // +1 Khí Lực/s. Trận không có thuyền (B15, B17): không có tác dụng.
+  thanhDuc: { id: "thanhDuc", name: "Thánh Dực Dũng Nghĩa", slot: "passive", label: "Chính sử + Hư cấu", deckRange: 0.2, strandedR: 30, kiPerBoat: 1 },
+  // Tuyệt Kỹ Móc Tên Trói Thuyền (canon): móc dây vào 1 tướng địch (hoặc thuyền chỉ huy) trong 35 m, kéo lại 10 m, trói 4 s;
+  // boss mất 50% Phá Thế, không kết thúc pha. Cắt máy 2 s kiểu "lướt theo đòn" (§4.5 template). Lính thường không móc được.
+  // Đòn móc MV 3 (ĐỀ XUẤT BẢN THỬ; không nằm trong tổng MV 20 vì phần chính là khống chế); bất tử trong lúc bắn và kéo.
+  mocTen: { id: "mocTen", name: "Móc Tên Trói Thuyền", short: "Móc Tên", slot: "ult", label: "Hư cấu", cost: 100, range: 35, pull: 10, bind: 4,
+    poiseCut: 0.5, mv: 3, invuln: 2.6, clip: 2.2, release: 0.5, pullSec: 0.9, speed: 45, cinematic: "template-2-3s", scope: "cục bộ" },
 };
 // Đặc tính chỉ huy (commandTrait)
 export const TRAITS = {
   phuTu: { id: "phuTu", name: "Phụ Tử Chi Binh", label: "Hư cấu", siKhiStart: 20, allyOrderSpeed: 0.3 },
+  // H40 (canon commandTrait): cánh nỏ / cung binh ta tầm bắn +20%; Mệnh Lệnh "Bắn yểm trợ" thêm 2 đợt — chưa nối vào trận nào
+  // (cánh phục binh B17 dùng, mạch A)
+  thanhDucQuan: { id: "thanhDucQuan", name: "Thánh Dực Quân", label: "Chính sử + Hư cấu", allyRangedRange: 0.2, coverWaves: 2 },
 };
 
 // ---- Tướng --------------------------------------------------------------------------------------------------------
@@ -92,6 +114,21 @@ export const HEROES = {
     weaponName: "Gươm Tiết chế", weaponLabel: "Hư cấu",   // canon: thanh gươm cụ thể không có trong chính sử
     quote: { text: "Bệ hạ chém đầu tôi trước rồi hãy hàng.", label: "Chính sử" },
   },
+  // H40 Nguyễn Khoái (đợt B17-B1, lớp WC09 Cung): chơi được bằng ?debug&hero=H40 ở mọi trận; danh sách playable của trận
+  // (data/battles.js) chưa có H40 — B17 (mạch A) thêm khi xong. Canon: Liệt hầu, tướng quân Thánh Dực; chỉ số thang 1–5 tổng 17.
+  H40: {
+    id: "H40", name: "Nguyễn Khoái", title: "Liệt hầu · Tướng quân Thánh Dực", cls: "WC09", weaponClass: "WC09",
+    rig: "H40", anim: "WC09", moves: "WC09", portrait: "H40",
+    stats: { cong: 3, thu: 3, toc: 3, tam: 5, thong: 3 },                  // canon (tổng 17)
+    cong1: 120, hp1: 1800, giap1: 60, move: 6.25, atkSpeed: 1.05, rangeMul: 1.15,
+    aura: 16, auraAtk: 0.06, skMult: 1.2, cmdCd: 0.92, bodyguards: 10,
+    kiLucBars: 2, kiLucSteps: KI_LUC_STEPS, kiLucPerBar: HERO.kiLucPerBar, kiLucRegen: HERO.kiLucRegen,
+    revive: { ...HERO.revive },
+    skills: { sk1: "tenXuyenHang", sk2: "chanDong", passive: "thanhDuc", ult: "mocTen" }, trait: "thanhDucQuan",
+    flag: null,                                   // không cờ sau lưng (RIGS.H40: áo choàng son sẫm, ống tên)
+    weaponName: "Cung Thánh Dực", weaponLabel: "Hư cấu",
+    quote: { text: "Nước lên thì lui, nước ròng thì đánh.", label: "Hư cấu" },
+  },
   // Chưa làm (wip): chỉ chỉ số canon + lớp để màn chọn tướng liệt kê; kỹ năng, rig, hoạt ảnh riêng làm ở đợt sau.
   H34: { id: "H34", name: "Trần Khánh Dư", title: "Nhân Huệ vương · Phó tướng quân Vân Đồn", cls: "WC01", weaponClass: "WC01", wip: true,
     stats: { cong: 4, thu: 3, toc: 3, tam: 2, thong: 3 }, anim: "WC01", moves: "WC01", portrait: "H34",
@@ -104,9 +141,9 @@ export const HEROES = {
 for (const id of ["H34", "H38"]) HEROES[id] = { ...deriveStats(HEROES[id].stats), ...HEROES[id] };
 
 // ---- Bảng đòn theo lớp, cờ đòn -------------------------------------------------------------------------------------------
-// WC03 = MOVES của tuning.js (cùng một đối tượng: B15 và các kiểm thử cũ đọc thẳng MOVES), WC01 = moves-wc01.js.
-export const MOVESETS = { WC03: MOVES, WC01: MOVES_WC01 };
-export const CHAINS = { WC03: ["N1", "N2", "N3", "N4", "N5", "N6"], WC01: CHAIN_N_WC01 };
+// WC03 = MOVES của tuning.js (cùng một đối tượng: B15 và các kiểm thử cũ đọc thẳng MOVES), WC01 = moves-wc01.js, WC09 = moves-wc09.js.
+export const MOVESETS = { WC03: MOVES, WC01: MOVES_WC01, WC09: MOVES_WC09 };
+export const CHAINS = { WC03: ["N1", "N2", "N3", "N4", "N5", "N6"], WC01: CHAIN_N_WC01, WC09: CHAIN_N_WC09 };
 export const movesetOf = (def) => MOVESETS[def.moves || def.cls || "WC03"];
 
 // Cờ của một đòn cho lõi (hero.js), crowd.js (lính né đòn nặng), HUD. Bảng đòn ghi cờ tường minh (moves-wc01.js) thì dùng
@@ -118,7 +155,8 @@ export const movesetOf = (def) => MOVESETS[def.moves || def.cls || "WC03"];
 //   ringFx     đòn vòng và (nặng hoặc N6)            · endsChain  N6 · chainN  đòn N nối tiếp được (N và không kết chuỗi)
 //   resetChain đòn C (kể cả phản đòn), Đòn Quyết     · isC  đòn C, Lướt C (Phá Thế ×1,5, choáng khắc C) · finisher  Đòn Quyết
 //   big        Đòn Quyết, phản đòn (rung, chớp lớn)
-//   armor [u0,u1] cửa sổ siêu giáp · charge, chargeU tụ lực · armorPen bỏ qua giáp · hold C3 giữ để kéo dài (chỉ WC01)
+//   armor [u0,u1] cửa sổ siêu giáp · charge, chargeU tụ lực · armorPen bỏ qua giáp · hold C3 giữ để kéo dài (WC01, WC09)
+//   ranged     mũi tên / mưa tên (shape "ray" | "rain", WC09): lõi bắn tên bay thật thay cho hình trúng tức thì
 export function moveFlags(key, m) {
   const C = key[0] === "C", heavy = m.heavy ?? (m.mv >= 2 || key === "DQ");
   const slam = m.slam ?? (key === "C1" || key === "C4" || key === "C6" || key === "DQ");
@@ -133,5 +171,6 @@ export function moveFlags(key, m) {
     chainN: key[0] === "N" && !endsChain, resetChain: C || key === "DQ", isC: C || key === "DC",
     finisher: key === "DQ", big: key === "DQ" || key === "CT", mirrorArc: m.mirrorArc ?? false,
     armor: m.armor || null, charge: !!m.charge, chargeU: m.chargeU ?? 0.3, armorPen: m.armorPen || 0, hold: m.hold || null,
+    ranged: m.shape === "ray" || m.shape === "rain",
   };
 }

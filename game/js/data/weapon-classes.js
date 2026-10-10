@@ -1,5 +1,5 @@
 // data/weapon-classes.js — hệ số lớp vũ khí (systems.md §4.4) cho ba lớp P0 của VS: WC01 Đại kiếm, WC03 Song đao,
-// WC14 Đoản đao & lặn. File này KHÔNG import gì (chạy được trong Node để kiểm thử).
+// WC14 Đoản đao & lặn; và WC09 Cung (R1, B17). File này KHÔNG import gì (chạy được trong Node để kiểm thử).
 //
 // mv: hệ số MV (nhân vào bảng MV chuẩn §4.2) · speed: hệ số tốc animation · poise: hệ số Phá Thế · rangeN: tầm N chuẩn
 // (m, trước khi cộng phần bù của code và nhân Tầm của tướng). Cận chiến: mv × speed ≈ 1,0 (1,6 MV/s).
@@ -17,8 +17,19 @@ export const WEAPON_CLASSES = {
   // Đoản đao & lặn: đánh sau lưng ×2 (§2.2); lặn, đục thuyền là kỹ năng (chưa làm ở nền móng)
   WC14: { id: "WC14", name: "Đoản đao & lặn", mv: 0.75, speed: 1.33, poise: 0.8, rangeN: 2.0, hands: 1, grip: "một tay",
     traits: { backstab: 2 } },
+  // Cung (P1 – R1; H40 Nguyễn Khoái, sau này H32, H48): tầm xa, mv × speed ≈ 0,82 → 1,3 MV/s tính cả kéo dây (§2.2, §4.2).
+  // Tầm N 25 m KHÔNG nhân Tầm của tướng (§2.1: chỉ nhân bán kính mưa tên). ranged (ĐỀ XUẤT BẢN THỬ, đợt B17-B1):
+  //   aimCone ±30°, aimRange 25 m — tự nhắm cả lính thường (§3.3 "Ngắm tầm xa"); arrowSpeed m/s (tên bay thật, trúng trễ
+  //   theo quãng bay); kiR: Khí Lực nạp khi địch trong chừng này m (cận chiến 12 m); moveShoot: đi chậm × tốc chạy khi đang
+  //   bắn đòn có cờ moveShoot (§4.4 "bắn khi di chuyển", bản B1: chỉ chân bước, thân trên giữ thế bắn); ahead: camera nhìn
+  //   trước mặt tướng chừng này m để tâm ngắm giữa màn nằm trên đường tên (PC).
+  // charge: giữ C ở C1 = kéo căng dây, ngắm chính xác theo tâm màn (§3.3 "giữ chuột phải = ngắm chính xác"); thả ra là bắn.
+  //   Mốc 0,5 s / 1,0 s, MV ×1 / 1,25 / 1,5; tự buông sau 3 s (tay mỏi).
+  WC09: { id: "WC09", name: "Cung", mv: 0.68, speed: 1.2, poise: 0.6, rangeN: 25, hands: 2, grip: "cung", ranged: true,
+    traits: { ranged: { aimCone: 30, aimRange: 25, arrowSpeed: 40, kiR: 30, moveShoot: 0.5, ahead: 4, aimAhead: 14 },
+      charge: { levels: [0.5, 1.0], auto: 3.0, mult: [1, 1.25, 1.5] } } },
 };
-export const { WC01, WC03, WC14 } = WEAPON_CLASSES;
+export const { WC01, WC03, WC14, WC09 } = WEAPON_CLASSES;
 
 // Phá Thế gây ra mỗi MV (§2.4: 20 × MV_sau_hệ_số_lớp × hệ số Phá Thế lớp): WC03 = 14 (khớp POISE_PER_MV của B15),
 // WC01 = 30 → chuỗi N 1,62 MV/s ≈ 48 Phá Thế/s (§2.4 "Đại kiếm ~48/s").

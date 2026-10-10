@@ -11,6 +11,9 @@
 // Boss B20 (director-b20.js): o.T đè số của bậc (Ô Mã Nhi: bậc "tuong" nhưng HP 12000, Phá Thế 1000 — Đại tướng), o.leash (m quanh
 // nhà), o.stay(tướng) (boss giữ boong của mình: tướng ở ngoài thì về chỗ đứng), this.script = { pts, k, onDone } đi theo kịch bản (lui lên lầu kỳ hạm — không nhận đòn), T.lunge
 // "Kích xuyên" (lao đâm: báo trước rồi lướt tới) khi this.lungeOn.
+// Trạng thái khống chế (đợt B17-B2, kỹ năng H40 — hero-skills.js): applyStatus("pin", giây) ghim tại chỗ (Tên Xuyên Hàng),
+// applyStatus("pull", { x, z, sec }) kéo về điểm đó rồi applyStatus("bind", giây) trói (Móc Tên Trói Thuyền): đứng yên, không
+// ra đòn, vẫn nhận đòn. this.status = null khi không có gì — B15 / B20 không ai gọi applyStatus nên nhánh này không chạy.
 // B15 không có các trường này nên mọi nhánh mới không chạy.
 
 import { makeRig, disposeRig, RIGS } from "./models.js";
@@ -83,6 +86,7 @@ export class BigUnit {
     this.pose = A.idle(0); this.awake = o.awake ?? (o.side === "ta"); this.aggro = o.aggro ?? 22;
     this.giapPen = 0; this.dead = 0; this.retreating = false; this.speed = o.side === "dich" ? 4.2 : 4.6;
     this.roarT = 0; this.strafeT = 0; this.strafeDir = 1; this.blockWatch = 0; this.hitTimes = []; this.backCd = 0;
+    this.status = null;                           // ghim / kéo / trói (applyStatus, đợt B17-B2)
     A.applyPose(this.rig, this.pose);
     this.place(0);       // đặt rig ngay chỗ xuất hiện, dây treo buông sẵn (khỏi bay từ gốc toạ độ vào)
   }
@@ -138,6 +142,7 @@ export class BigUnit {
       }
       if (this.noHit > 3) this.poise = Math.min(this.poiseMax, this.poise + this.poiseMax * 0.2 * dt);
     }
+    if (this.status && this.updateStatus(dt)) { this.place(dt); return; }   // đang bị ghim / kéo / trói (kỹ năng H40)
 
     if (this.side === "dich") this.updateEnemy(dt, hero); else this.updateAlly(dt);
     this.place(dt);
@@ -418,6 +423,37 @@ export class BigUnit {
     const interrupt = (opt.knock || opt.launch) && this.state === "atk";
     if (!broke && (interrupt || (this.poiseMax > 0 && this.poise < this.poiseMax * 0.35 && this.state === "idle"))) { this.state = "hit"; this.st = 0.3; }
     return { killed: false, broke };
+  }
+
+  // ---- khống chế (đợt B17-B2) ------------------------------------------------------------------------------------------------
+  // kind "pin": v = giây ghim · "bind": v = giây trói · "pull": v = { x, z, sec } kéo thẳng về (x, z) trong sec giây (va chạm như đi
+  // thường). Hủy đòn đang ra (đòn viền đỏ, Tuyệt Kỹ đang gồng cũng hủy). Ghim / trói lấy giá trị lớn hơn nếu đang có sẵn.
+  applyStatus(kind, v) {
+    if (!this.alive || this.dead || this.retreating || this.captured || this.script) return false;
+    const S = this.status ||= { pinT: 0, bindT: 0, pull: null };
+    if (kind === "pin") S.pinT = Math.max(S.pinT, v);
+    else if (kind === "bind") S.bindT = Math.max(S.bindT, v);
+    else if (kind === "pull") S.pull = { x0: this.x, z0: this.z, x1: v.x, z1: v.z, sec: v.sec, t: 0 };
+    if (this.state === "atk" || this.state === "red" || this.state === "ult" || this.state === "lunge" || this.state === "evade") { this.state = "idle"; this.st = 0; }
+    this.awake = true;
+    return true;
+  }
+  // Một bước khống chế: trả true khi còn bị giữ (update bỏ qua AI). Kéo trước, rồi trói, rồi ghim.
+  updateStatus(dt) {
+    const S = this.status, ctx = this.ctx;
+    if (S.pull) {
+      const p = S.pull; p.t += dt;
+      const k = Math.min(1, p.t / p.sec), e = 1 - (1 - k) * (1 - k);
+      [this.x, this.z] = collide(ctx.world, p.x0 + (p.x1 - p.x0) * e, p.z0 + (p.z1 - p.z0) * e, 0.7, ctx.openGates, this);
+      this.yaw = turn(this.yaw, Math.atan2(p.x0 - p.x1, p.z0 - p.z1), dt * 10);      // ngửa người về phía bị kéo
+      this.setPose(A.hitReact(0.45), 0.4);
+      if (k >= 1) S.pull = null;
+      return true;
+    }
+    if (S.bindT > 0) { S.bindT -= dt; this.setPose(A.captured(this.animT), 0.25); return true; }
+    if (S.pinT > 0) { S.pinT -= dt; this.setPose(A.stagger(0.3, this.longWeapon), 0.3); return true; }
+    this.status = null;
+    return false;
   }
 
   // Đòn của địch vào tướng đồng minh.
