@@ -447,7 +447,9 @@ await t("BattleDef B17 khớp danh mục (đợt A5): H40 dựng sẵn cấp 16 
   assert.deepEqual(B17.preset, BATTLES.B17.preset); assert.deepEqual(B17.preset, { level: 16 }); assert.deepEqual(BATTLES.B17.playable, ["H40"]);
   assert.equal(B17.par.nhanh, D.PAR_B17); assert.equal(BATTLES.B17.par.nhanh, D.PAR_B17);
   for (const k of B17.rigs) assert.ok(RIGS[k], k);
-  assert.equal(RIGS.B17_H30.model, RIGS.photuong.model, "vua mượn mô hình Phó tướng (luôn nạp)");
+  // Vua: mô hình riêng H30h (đợt năm) — battles.js models nạp trước; cỡ giữ của mô hình mượn cũ (bán kính va chạm 0,9 × cỡ: luật trận không đổi)
+  assert.equal(RIGS.B17_H30.model, "H30h"); assert.ok(BATTLES.B17.models.includes("H30"), "B17 nạp trước mô hình vua");
+  assert.equal(RIGS.B17_H30.scale, RIGS.photuong.scale, "vua giữ cỡ cũ");
 });
 
 console.log(`\n${pass} đạt, ${fail} trượt`);

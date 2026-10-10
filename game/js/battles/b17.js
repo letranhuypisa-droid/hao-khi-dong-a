@@ -196,7 +196,7 @@ export const B17 = {
   hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, baseKey, drawTop, frontsHTML, pinTip: true },
   par: { nhanh: PAR_B17, chuan: PAR_B17 },
   preset: { level: 16 },                                   // H40 dựng sẵn cấp 16 (= R; data/battles.js preset — battle.js heroStats đọc của BattleDef)
-  rigs: ["X19", "H31", "X20", "H38", "B17_H30", "B17_SUGIA"],           // Toa Đô, Hưng Đạo vương, Ô Mã Nhi, Yết Kiêu, vua (mô hình mượn), sứ giả
+  rigs: ["X19", "H31", "X20", "H38", "B17_H30", "B17_SUGIA"],           // Toa Đô, Hưng Đạo vương, Ô Mã Nhi, Yết Kiêu, vua (H30h), sứ giả (mô hình mượn)
   debug: { objective: botObjective, state: (ctx) => ({ ...ctx.director.st, hero: { x: ctx.hero.x, z: ctx.hero.z, hp: ctx.hero.hp }, boss: ctx.director.boss ? { x: ctx.director.boss.x, z: ctx.director.boss.z, hp: ctx.director.boss.hp } : null }) },
   dispose: (ctx) => { setOverlay(null); ctx.director?.dispose?.(); },
 };

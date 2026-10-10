@@ -22,6 +22,7 @@ import { FRONTS, MAP, VILLAGE } from "../data/battle-b15.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
 import { rope } from "./ik.js";
 import { makeRng } from "../core/rng.js";
+import { envPart } from "./glb.js";
 
 const TAU = Math.PI * 2, HALF_PI = Math.PI / 2;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -188,6 +189,17 @@ function buffaloHeadGeo() {
     p.push(seg([arc[k][0] * s, arc[k][1], arc[k][2]], [arc[k + 1][0] * s, arc[k + 1][1], arc[k + 1][2]], rad[k], rad[k + 1], k < 3 ? H : T, 5));
   return merge(p);
 }
+// trâu từ mẫu MOUNT_trau (dài 2,9 m cả đầu, lưng 1,5 m; mặt +z) ×1,05, tách như khối code: thân (bỏ bốn chân dưới bụng và đuôi — chân, đuôi vẫn là "chi"
+// code bước, quất theo nhịp) và cổ + đầu + sừng (z mẫu > 0,66) xoay quanh chân cổ. Chân cổ mẫu (0, 1,15, 0,68) đặt đúng khớp đầu code (khung thân 0, 1,1,
+// 0,95): chân code rơi dưới vai, mông mẫu, lưng mẫu ở 1,45 m (trẻ chăn trâu ngồi 1,5), gốc đuôi code ở mông mẫu. Tai có sẵn trên đầu mẫu (không vẽ tai code).
+// Chưa nạp mẫu → null (khối code)
+const BUF_S = 1.05, BUF_NECK_Y = 1.15, BUF_NECK_Z = 0.68;
+function buffaloModel() {
+  const s = BUF_S, cut = 0.66;
+  const body = envPart("MOUNT_trau", { y: 1.1 - BUF_NECK_Y * s, z: 0.95 - BUF_NECK_Z * s, s, drop: [[1, -2, cut, -1, 0.5], [1, cut, 3, -1, 3], [1, -3, -1.29, -1, 3]] });
+  const head = envPart("MOUNT_trau", { y: -BUF_NECK_Y * s, z: -BUF_NECK_Z * s, s, drop: [[1, -3, cut, -1, 3]] });
+  return body && head ? { body, head } : null;
+}
 // trẻ chăn trâu: ngồi dạng chân trên lưng trâu, nón lá, thổi sáo ngang; gốc ở chỗ ngồi
 function boyGeo() {
   const S = 0xc48f63, A = 0x5b4632, Q = 0x2b2926, N = 0xd8c48e, F = 0xb89a58;
@@ -220,8 +232,9 @@ export class Ambient {
     this.mBird = inst(birdBodyGeo(), CAP.bird, mat, true);
     this.mNeck = inst(egretNeckGeo(), CAP.neck, mat, true);
     this.mWing = inst(wingGeo(), CAP.wing, wmat, true);
-    this.mBuf = inst(buffaloBodyGeo(), CAP.buf, mat, true); this.mBuf.castShadow = true; this.mBuf.receiveShadow = true;
-    this.mHead = inst(buffaloHeadGeo(), CAP.buf, mat, true); this.mHead.receiveShadow = true;
+    const bm = buffaloModel(); this.bufModel = !!bm;
+    this.mBuf = inst(bm ? bm.body : buffaloBodyGeo(), CAP.buf, mat, true); this.mBuf.castShadow = true; this.mBuf.receiveShadow = true;
+    this.mHead = inst(bm ? bm.head : buffaloHeadGeo(), CAP.buf, mat, true); this.mHead.receiveShadow = true;
     this.mLimb = inst(limbGeo(), CAP.limb, mat, true);
     this.mBoy = inst(boyGeo(), CAP.boy, mat, false); this.mBoy.receiveShadow = true;
     this.meshes = [this.mBird, this.mNeck, this.mWing, this.mBuf, this.mHead, this.mLimb, this.mBoy];
@@ -911,8 +924,8 @@ export class Ambient {
     put(this.mBuf, n.buf, MB, 1, 1, 1); tint(this.mBuf, n.buf++, B.tint);
     sub(MH, MB, 0, 1.1, 0.95, B.headY, B.headP, 0); put(this.mHead, n.head, MH, 1, 1, 1); tint(this.mHead, n.head++, B.tint);
     const L = this.mLimb;
-    // tai: vẫy nhanh rồi rủ lại (tai, đuôi chỉ vẽ trong 90 m)
-    if (near) for (let s = -1; s <= 1; s += 2) {
+    // tai: vẫy nhanh rồi rủ lại (tai, đuôi chỉ vẽ trong 90 m; đầu mẫu MOUNT_trau có tai sẵn)
+    if (near && !this.bufModel) for (let s = -1; s <= 1; s += 2) {
       const f = s < 0 ? B.earL : B.earR;
       sub(MX, MH, 0.2 * s, -0.01, 0.6, 0, 0.5 * f * Math.sin(f * 14), s * (HALF_PI - 0.3 + 0.35 * f));
       put(L, n.limb, MX, 0.12, 0.21, 0.05); tint(L, n.limb++, C_EAR);

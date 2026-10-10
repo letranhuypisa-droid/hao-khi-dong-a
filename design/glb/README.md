@@ -64,6 +64,7 @@ Môi trường (`env`, đợt 2026-10-10): GLB Hunyuan3D để ở `design/glb/_
 
 - `design/glb/_raw/nhan-vat/`: nhân vật Hunyuan3D `<mã>_hunyuan.glb` (cùng `X19_hunyuan_rigged.fbx`), catalog `CHARS`/`KITS` đọc ở đây.
 - `design/glb/_raw/moi-truong/`: cảnh, đạo cụ, thú cưỡi `ENV_*`, `PROP_*`, `MOUNT_*` (`glb-bake.mjs env` đọc mặc định ở đây).
+- `design/glb/_raw/vu-khi/`: vũ khí Hunyuan3D `WPN_<mã>.glb` (đợt 2026-10-10; catalog `WEAPONS` `raw`, bảng Meshy cũ `WEAPONS_MESHY`). Mẫu dựng mũi lên, nên không `flip`; `guard: true` cho kiếm, đao; `face` cho khiên khi phép dò mặt núm hoà.
 - `design/glb/_raw/img/`: ảnh tham chiếu của các mã CHƯA có GLB (ảnh của mã đã có GLB đã bỏ vào Thùng rác ngày 2026-10-10); `img/best/_overview_*` là bảng xem nhanh.
 - `design/glb/_raw/sheets/`: tờ xem trước (contact sheet).
 - GLB mới tải về thả tạm ở gốc `design/` (vẫn bị `.gitignore` bỏ qua), soát xong thì chuyển vào hai thư mục trên.

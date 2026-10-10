@@ -36,7 +36,7 @@ export const BATTLES = {
     id: "B16", chapter: "B16", name: "Chương Dương", title: "Trận Chương Dương", date: "1285",
     sub: "Tháng 5 năm Ất Dậu · khoảng tháng 6/1285 · bến Chương Dương, kinh thành Thăng Long",
     heroes: ["H32", "H35"], playable: ["H35"], fixedR: 13, modes: ["nhanh"], wip: true, ownHero: true, noComic: true,
-    models: [],                                           // Thoát Hoan mượn mô hình tướng Nguyên chung (OFF_tuong, luôn nạp)
+    models: ["X18"],                                      // Thoát Hoan (boss, mô hình X18h từ đợt năm; trước đó mượn tướng Nguyên chung OFF_tuong)
     keSach: { nhanh: 2, chuan: 2 },                       // Đánh úp bến thuyền (Lớn), Dân binh các lộ (Nhỏ)
     par: { nhanh: 690 },                                  // = PAR_B16 của data/battle-b16.js (tổng par các pha, theo đo bot 2026-10-10)
     loading: { title: "Bến Chương Dương · 1285" },
@@ -53,7 +53,7 @@ export const BATTLES = {
     id: "B17", chapter: "B17", name: "Tây Kết", title: "Trận Tây Kết", date: "1285",
     sub: "20 tháng 5 năm Ất Dậu · khoảng 24/6/1285 · Tây Kết, Khoái Châu",
     heroes: ["H30", "H40"], playable: ["H40"], fixedR: 16, preset: { level: 16 }, modes: ["nhanh"], wip: true, noComic: true,
-    models: ["X19", "X20", "H31", "H38"],                 // Toa Đô (boss), Ô Mã Nhi (bến tàn quân), Hưng Đạo vương (bản doanh), Yết Kiêu; vua mượn OFF_photuong (luôn nạp)
+    models: ["X19", "X20", "H31", "H38", "H30"],          // Toa Đô (boss), Ô Mã Nhi (bến tàn quân), Hưng Đạo vương (bản doanh), Yết Kiêu, vua Trần Nhân Tông
     env: () => Promise.all([import("../battle/world.js"), import("./battle-b17.js")]).then(([w, d]) => [...w.WORLD_ENV, ...d.ENV_B17]),   // đất Hàm Tử + vật đầm
     keSach: { nhanh: 2, chuan: 2 },                       // Phục kích bãi lau (Lớn), Hỏi kế Quốc công (Nhỏ)
     par: { nhanh: 320 },                                  // = PAR_B17 của data/battle-b17.js (tổng par các pha, theo đo bot H40 đợt A5 2026-10-10)

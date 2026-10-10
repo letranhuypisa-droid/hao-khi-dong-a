@@ -3,7 +3,8 @@
 // Địa hình faceted (flat shading), nước phẳng dập dềnh, đạo cụ ghép khối. Mọi thứ tĩnh được
 // gộp hoặc instanced để giữ trần draw call (mục 15.7: T2 ≤ 150 draw).
 // Mô hình môi trường nướng (assets/models/env, glb.js envPart: màu phẳng, gộp được vào lưới tĩnh; envLOD: vật riêng lẻ hai mức gần / xa)
-// thay khối code cho cột cờ, tháp canh, cổng Hàm Tử, tường đất Hàm Tử quan, rào cọc đồn và doanh trại, thuyền chiến Nguyên trên sông, cây; chưa
+// thay khối code cho cột cờ, tháp canh, cổng Hàm Tử, tường đất Hàm Tử quan, rào cọc đồn và doanh trại, thuyền chiến Nguyên trên sông, cây, lều (quân ta,
+// quân Nguyên), lều nỉ tròn trong Hàm Tử quan, nhà làng ven bãi, lau sậy ven sông; chưa
 // nạp (Node, lỗi mạng) thì dựng khối code như cũ. Hai đường rút world rng y hệt nhau và không đổi vật va chạm, nên mô phỏng (ctx.rng riêng) không
 // phụ thuộc mô hình có nạp hay không. Rào bản doanh ta (vòng cọc thưa 1,5 m cho camera nhìn qua) giữ code: mẫu ENV_rao_coc hạ thấp thành vách gỗ kín.
 // Võ trường (buildArena, ARENA_ENV): giá binh khí, hình nộm, trống trên lầu trống; khán đài, đài chỉ huy, bia, vạc lửa ở scenery.js addArenaScenery.
@@ -29,6 +30,12 @@ export { waterDist, vnoise, fbm, ZONES, paddyAt, setTerrain, ARENA_R, heightAt, 
 // FADE_MIN; ra khỏi hành lang thì hiện lại. Mỗi vật có vật liệu riêng (nhân bản khi đăng ký).
 const FADE_PAD = 1.1, FADE_NEAR = 6, FADE_MIN = 0.12;
 const FORT_FAR = 70;               // tháp góc đồn (ENV_thap_canh_nguyen): mức xa từ 70 m; cả đồn gộp một lưới khi mọi tháp đã xa hơn (buildFort)
+// Chỗ chiếm của vật trong sân doanh trại (barracksYard; hộp [dx0, dz0, dx1, dz1] từ tâm, gồm mái chìa): hai dãy nhà lính, chuồng ngựa, nhà chỉ huy và bậc
+// thềm, ba cọc tập, hai giá giáo, bếp lửa, kho thùng hai góc đông, rơm, hai cờ hiệu, lều. Ghi vào L.yard (toạ độ thế giới) để lều lương "Đánh úp trại"
+// (director-td.js) đặt tránh; không phải vật va chạm.
+const YARD_FOOT = [[-15.2, -13.1, -3.2, -8.1], [3.2, -13.1, 15.2, -8.1], [-15.3, 7.9, -3.5, 13.1], [2.1, 7.1, 15.5, 13.3], [6.6, 6.4, 11, 7.4],
+  [-12.7, -6.3, -5.3, -5], [5.3, -6.2, 12.9, -5], [-4.4, 5.3, -2.6, 7.1], [12.9, -7.9, 15.2, -4.4], [13, 4.9, 14.8, 6.4], [-15, 4.6, -12.6, 6.9],
+  [2.2, 6.3, 3.2, 6.9], [-1.5, -8.7, 1.9, -5.7]];
 function addFader(world) {
   world.fadeables = [];
   world.addFadeable = (obj, r = 0.3) => {
@@ -64,18 +71,20 @@ function gable(w, h, len) {
   return g;
 }
 
-// Mô hình môi trường mà cảnh Hàm Tử dùng (world.js, scenery.js, director-b16.js, kesach.js trên cùng đất): màn tải nạp trước (main.js loadModels);
-// tests/env.test.mjs giữ danh sách khớp với các lời gọi envPart / envLOD / model và danh sách đồ thêm (scenery.js VILLAGE_PROPS, WORLD_PROPS).
+// Mô hình môi trường mà cảnh Hàm Tử dùng (world.js, scenery.js, director-b16.js, kesach.js trên cùng đất; trâu của ambient.js, lều lương "Đánh úp trại"
+// của director-td.js): màn tải nạp trước (main.js loadModels); tests/env.test.mjs giữ danh sách khớp với các lời gọi envPart / envLOD / envMesh / model và
+// danh sách đồ thêm (scenery.js VILLAGE_PROPS, WORLD_PROPS).
 export const WORLD_ENV = ["ENV_bao_gao", "ENV_ben_go", "ENV_bep_lua", "ENV_bo_rom", "ENV_canh_cong", "ENV_cay_da", "ENV_cay_gao", "ENV_cay_tan_tron",
   "ENV_choi_tranh", "ENV_co_duoi_ngua", "ENV_coc_buoc_ngua", "ENV_coc_luy_nguyen", "ENV_coc_tre_tran", "ENV_coc_troi", "ENV_cong_ham_tu", "ENV_cot_co", "ENV_cu_ma",
-  "ENV_cum_cau", "ENV_da_b", "ENV_da_c", "ENV_ho_chong", "ENV_hom_go", "ENV_khom_chuoi", "ENV_khung_leu_chay", "ENV_luoi_phoi", "ENV_mieu", "ENV_mu_nguyen_roi",
+  "ENV_cum_cau", "ENV_da_b", "ENV_da_c", "ENV_go_da", "ENV_ho_chong", "ENV_hom_go", "ENV_khom_chuoi", "ENV_khom_tre", "ENV_khung_leu_chay", "ENV_lau_say",
+  "ENV_leu_luong", "ENV_leu_tran", "ENV_leu_tron", "ENV_leu_vuong_nguyen", "ENV_luoi_phoi", "ENV_mieu", "ENV_mu_nguyen_roi", "ENV_nha_lang_a", "ENV_nha_lang_b",
   "ENV_non_tre_roi", "ENV_rao_coc", "ENV_rao_tre", "ENV_so_dat", "ENV_thap_canh_nguyen", "ENV_thung_cau", "ENV_thung_go", "ENV_thuyen_mui", "ENV_thuyen_song_nguyen",
-  "ENV_thuyen_tong", "ENV_tuong_dat", "ENV_xac_ngua", "ENV_xe_luong", "ENV_xe_luong_vo", "MOUNT_ngua_nguyen", "MOUNT_ngua_tuong", "PROP_non_la", "PROP_ong_ten",
-  "PROP_quang_ganh", "PROP_tay_nai"];
+  "ENV_thuyen_tong", "ENV_tuong_dat", "ENV_xac_ngua", "ENV_xe_luong", "ENV_xe_luong_vo", "MOUNT_ngua_nguyen", "MOUNT_ngua_tuong", "MOUNT_trau", "PROP_non_la",
+  "PROP_ong_ten", "PROP_quang_ganh", "PROP_tay_nai"];
 // Mô hình môi trường của Võ trường (buildArena, scenery.js addArenaScenery): khán đài (có texture), đài chỉ huy, giá binh khí, hình nộm, bia rơm,
-// trống trên lầu trống, vạc lửa. Lầu trống, cây, rào giữ code (lầu trống chưa có mẫu; cây mẫu 40 tam giác mất thân; rào 220 cọc thành ~88 khúc
-// ENV_rao_coc ≈ 44 nghìn tam giác cho một vòng rào — Võ trường giữ số code).
-export const ARENA_ENV = ["ENV_bia_rom", "ENV_dai_chi_huy", "ENV_gia_binh_khi", "ENV_hinh_nom", "ENV_khan_dai", "ENV_trong_tran", "ENV_vac_lua"];
+// trống trên lầu trống, vạc lửa, bia đá Sát Thát, lều trại. Lầu trống, cây, rào giữ code (lầu trống chưa có mẫu; cây mẫu 40 tam giác mất thân; rào
+// 220 cọc thành ~88 khúc ENV_rao_coc ≈ 44 nghìn tam giác cho một vòng rào — Võ trường giữ số code).
+export const ARENA_ENV = ["ENV_bia_da", "ENV_bia_rom", "ENV_dai_chi_huy", "ENV_gia_binh_khi", "ENV_hinh_nom", "ENV_khan_dai", "ENV_leu_tran", "ENV_trong_tran", "ENV_vac_lua"];
 
 // forts: đồn và doanh trại (Cứ Điểm "don", "doanh_trai") dựng có tường, hai cổng, tháp góc và vật va chạm (fort.js) thay vòng cọc; B15 chiến dịch (battles/b15.js) và nhiệm vụ Tự do
 // (td.js) đều bật; tắt thì vòng cọc cũ (không có vật va chạm).
@@ -229,13 +238,20 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       staticParts.push(P(new THREE.ConeGeometry(0.13, 0.3, 5), color, { x, y: y + 1.6 + (i % 3) * 0.15, z }));
     }
   };
-  const tent = (x, z, ry, color, s = 1) => {
-    const y = heightAt(x, z);
+  // lều: quân ta (tran, bản doanh) mẫu ENV_leu_tran (chóp bốn mặt rộng 3 m, cao 2,4, vạt cửa đen ở +z mẫu), quân Nguyên (đồn, doanh trại) mẫu
+  // ENV_leu_vuong_nguyen (vách đứng mái bốn mặt 3,6 × 3,1 m, cao 2,6, cửa +z) — cùng chỗ chiếm chóp code (đáy vuông 3,1 m, cao 2,4), cửa quay theo ry
+  // như vạt cửa code; mẫu giữ màu vải của nó (không nhuộm theo color). Không có mẫu thì chóp code
+  const tent = (x, z, ry, color, s = 1, tran = false) => {
+    const y = heightAt(x, z), env = envPart(tran ? "ENV_leu_tran" : "ENV_leu_vuong_nguyen", { x, y: y - 0.05, z, ry, s: tran ? s * 1.05 : s });
+    if (env) { staticParts.push(env); return; }
     staticParts.push(P(new THREE.ConeGeometry(2.2 * s, 2.4 * s, 4), color, { x, y: y + 1.2 * s, z, ry: ry + Math.PI / 4 }));
     staticParts.push(P(new THREE.BoxGeometry(0.6 * s, 1.2 * s, 0.05), PAL.then, { x: x + Math.sin(ry) * 1.3 * s, y: y + 0.6 * s, z: z + Math.cos(ry) * 1.3 * s, ry }));
   };
+  // lều nỉ tròn: mẫu ENV_leu_tron (Ø 4,8 m như trụ code, cao 2,8; cửa gỗ đỏ ở +z mẫu) ×s; cửa quay về tây (phía tường, cổng thành) lệch theo chỗ đứng
+  // (không rút rng); không có mẫu thì trụ + nón code
   const yurt = (x, z, s = 1) => {
-    const y = heightAt(x, z);
+    const y = heightAt(x, z), env = envPart("ENV_leu_tron", { x, y: y - 0.05, z, ry: -Math.PI / 2 + 0.6 * Math.sin(x * 1.7 + z * 0.9), s });
+    if (env) { staticParts.push(env); return; }
     staticParts.push(P(new THREE.CylinderGeometry(2.4 * s, 2.4 * s, 1.8 * s, 9), PAL.xam, { x, y: y + 0.9 * s, z }));
     staticParts.push(P(new THREE.ConeGeometry(2.7 * s, 1.4 * s, 9), 0x8d8f86, { x, y: y + 2.5 * s, z }));
   };
@@ -271,7 +287,7 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
 
   // ---- bản doanh ta --------------------------------------------------------------------
   palisade(34, 0, 18, 0);
-  tent(24, -7, 0.4, PAL.son, 1.1); tent(22, 8, -0.3, PAL.sonDam, 1.1); tent(38, -10, 0.2, PAL.vai); tent(40, 10, -0.2, PAL.vai); tent(30, 0, 0, PAL.son, 1.4);
+  tent(24, -7, 0.4, PAL.son, 1.1, true); tent(22, 8, -0.3, PAL.sonDam, 1.1, true); tent(38, -10, 0.2, PAL.vai, 1, true); tent(40, 10, -0.2, PAL.vai, 1, true); tent(30, 0, 0, PAL.son, 1.4, true);
   const hqFlag = flagPole(44, -4, 9, true); hqFlag.cloth.material.map = flagTexture("TRẦN", "#9b2d20", "#f1d98a");
   hqFlag.cloth.material.color.set(0xffffff);
 
@@ -334,6 +350,7 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
     }
     for (const [dx, dz, ry] of [[-14.4, 6.2, 0.2], [-13.2, 6.6, -0.3], [-14.1, 4.9, 0.1]]) staticParts.push(box(1.1, 0.6, 0.6, HAY, cx + dx, heightAt(cx + dx, cz + dz) + 0.3, cz + dz, ry));
     tent(cx + 0.2, cz - 7.2, 0.1, PAL.xam, 0.9);
+    L.yard = YARD_FOOT.map(([a, b, c, d]) => [cx + a, cz + b, cx + c, cz + d]);
   };
 
   // kind: "don" (đồn, lều lính) hoặc "doanh_trai" (doanh trại: dãy nhà lính, chuồng ngựa, nhà chỉ huy, sân tập); cùng tường, cổng, tháp góc.
@@ -454,13 +471,20 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   }
 
   // ---- làng ven bãi (Hư cấu, cho Kế Sách "Mũi tên thư") --------------------------------------
-  const hut = (x, z, ry, s = 1) => {
+  // nhà: mẫu ENV_nha_lang_a (nhà sàn, thang lên cửa ở +z mẫu) và ENV_nha_lang_b (nhà tranh vách đất, hiên trước ở +z) xen nhau, thân 3,6 × 2,8 m dọc
+  // x như hộp code, cao 4,7 / 4,5 m ×s; mặt trước quay vào tâm làng (ry hoặc ry + π: cùng chỗ chiếm), chân ở chỗ đất thấp nhất dưới thân. Không có
+  // mẫu thì cột, hộp, mái code
+  const hut = (x, z, ry, s = 1, k = 0) => {
     const y = heightAt(x, z);
+    const front = Math.sin(ry) * (VILLAGE.x - x) + Math.cos(ry) * (VILLAGE.z - z) < 0 ? ry + Math.PI : ry;
+    let y0 = y; for (const [a, b] of [[-1.8, -1.4], [1.8, -1.4], [-1.8, 1.4], [1.8, 1.4]]) y0 = Math.min(y0, heightAt(x + (a * Math.cos(ry) + b * Math.sin(ry)) * s, z + (b * Math.cos(ry) - a * Math.sin(ry)) * s));
+    const env = envPart(k % 2 ? "ENV_nha_lang_b" : "ENV_nha_lang_a", { x, y: y0 - 0.05, z, ry: front, s });
+    if (env) { staticParts.push(env); return; }
     for (const [dx, dz] of [[-1.6, -1.2], [1.6, -1.2], [-1.6, 1.2], [1.6, 1.2]]) staticParts.push(P(new THREE.BoxGeometry(0.2, 1.2, 0.2), PAL.go, { x: x + dx * s, y: y + 0.6, z: z + dz * s }));
     staticParts.push(P(new THREE.BoxGeometry(3.6 * s, 1.6 * s, 2.8 * s), 0xa08560, { x, y: y + 1.2 + 0.8 * s, z, ry }));
     staticParts.push(P(new THREE.ConeGeometry(2.9 * s, 1.8 * s, 4), 0x8f7a4a, { x, y: y + 2.9 + 0.9 * s, z, ry: ry + Math.PI / 4, sx: 1.25 }));
   };
-  [[-14, -8, 0.3], [0, -14, -0.2], [13, -6, 0.6], [-10, 9, -0.4], [9, 10, 0.1], [22, 4, 0.9]].forEach(([dx, dz, r]) => hut(VILLAGE.x + dx, VILLAGE.z + dz, r, 0.9 + ((dx * 7 + dz) % 3 + 3) % 3 * 0.08));
+  [[-14, -8, 0.3], [0, -14, -0.2], [13, -6, 0.6], [-10, 9, -0.4], [9, 10, 0.1], [22, 4, 0.9]].forEach(([dx, dz, r], k) => hut(VILLAGE.x + dx, VILLAGE.z + dz, r, 0.9 + ((dx * 7 + dz) % 3 + 3) % 3 * 0.08, k));
 
   // ---- Hàm Tử quan: tường tây có hai cổng, tường nam, lều Nguyên bên trong ------------------------
   const wallSeg = (x0, z0, x1, z1) => {
@@ -550,7 +574,8 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
   tintTrees(trees, rng);
   placeInst(palmGeo, 60, (x, z) => clear(x, z) && waterDist(x, z) < 40, [0.8, 1.2]);
   addScenery(scene, world, { shadows, mat });
-  const reedGeo = merge([0, 1, 2, 3].map((k) => P(new THREE.ConeGeometry(0.06, 1.6, 3), 0x8f8a4a, { x: (k % 2) * 0.25 - 0.1, z: Math.floor(k / 2) * 0.25 - 0.1, y: 0.8, rz: (k - 1.5) * 0.12 })));
+  // lau sậy ven sông: mẫu ENV_lau_say mức xa (34 tam giác, khóm cao 1,7 m có bông; code 24) ×0,95 cho cao như bốn lá code, không có thì lá code
+  const reedGeo = envPart("ENV_lau_say", { lod: 1, s: 0.95 }) || merge([0, 1, 2, 3].map((k) => P(new THREE.ConeGeometry(0.06, 1.6, 3), 0x8f8a4a, { x: (k % 2) * 0.25 - 0.1, z: Math.floor(k / 2) * 0.25 - 0.1, y: 0.8, rz: (k - 1.5) * 0.12 })));
   placeInst(reedGeo, 700, (x, z) => { const d = waterDist(x, z); return d > -2 && d < 7 && !(x > W - 4 && z > MAP.riverNorthZ + 3); }, [0.9, 1.4]);
 
   // cờ tuyến mặt trận (ta đỏ, địch chàm), di chuyển theo tuyến mô phỏng

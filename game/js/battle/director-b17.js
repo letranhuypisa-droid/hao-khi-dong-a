@@ -43,8 +43,9 @@ const HK_WHY = { chet: "sứ giả gục", muon: "phục kích đã nổ trướ
 const BOAT_SLOTS = PIER.docks.length + 6;
 const FAR_UNIT = 140;                                  // m: đơn vị lớn xa camera hơn thế thì ẩn (cullFar) — cao ~15 điểm ảnh ở 768 dòng              // thuyền tàn quân (0..3) + thuyền đổ bộ (đang chạy cùng lúc tối đa 6)
 
-// Mô hình mượn (như guard.js dựng RIGS lúc chạy): vua Nhân Tông — mô hình Phó tướng nhuộm vàng (tintGold) tới khi bake H30; sứ giả — mô hình cận vệ giáo.
-RIGS.B17_H30 ||= { ...RIGS.photuong, cloth: 0xc9a227, armor: PAL.vang, trim: PAL.son, cape: 0xd8b03a };
+// Vua Nhân Tông: mô hình H30h (đợt năm, áo ngự son giáp viền vàng) ở cỡ 1,342 của mô hình Phó tướng mượn trước đây (bán kính va chạm BigUnit = 0,9 × cỡ: giữ luật trận),
+// áo choàng vàng của code cho dễ nhận giữa quân ta áo đỏ. Sứ giả mượn mô hình cận vệ giáo (như guard.js dựng RIGS lúc chạy).
+RIGS.B17_H30 ||= { ...RIGS.H30, scale: RIGS.photuong.scale, cape: 0xd8b03a };
 RIGS.B17_SUGIA ||= { model: modelOf("CV_giao"), scale: sizeOf("CV_giao", 1.04), cloth: 0x7a2418, armor: 0x4a3a2a, trim: PAL.vang, hat: "non", weapon: "giao" };
 
 export class DirectorB17 {
@@ -135,17 +136,6 @@ export class DirectorB17 {
     if (!g0) return;
     this.ctx.openGates.A3 = true; g0.broken = true;
   }
-  // Áo vàng của vua (mô hình mượn): nhuộm vàng màu texture ở shader (giữ sáng tối của texture, đổi sắc) — chỉ vật liệu thân GLB của đơn vị này.
-  tintGold(u) {
-    const m = u.rig.glb ? u.rig.mats[0] : null;
-    if (!m) return;
-    m.onBeforeCompile = (sh) => {
-      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", "#include <map_fragment>\n"
-        + "{ float l = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)); vec3 gold = vec3(1.0, 0.78, 0.26) * (0.35 + 1.5 * l); diffuseColor.rgb = mix(diffuseColor.rgb, gold, 0.72); }");
-    };
-    m.customProgramCacheKey = () => "b17-gold"; m.needsUpdate = true;
-  }
-
   // ---- vật của trận ----------------------------------------------------------------------------------------------------------
   ringMesh(c, r, color = COL.ring, op = 0.55) {
     const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
@@ -295,7 +285,7 @@ export class DirectorB17 {
     const ctx = this.ctx, Kc = this.checkpointKing, p = Kc && this.st.king.mode === "fight" ? Kc : KING;
     const u = this.king = this.spawnAlly("B17_H30", KING.name, KING.id, KING.hp, p.x, p.z);
     if (Kc) u.hp = Math.max(u.maxHp * 0.5, Kc.hp ?? u.maxHp);
-    u.postK = 1; this.tintGold(u); this.generals[KING.id] = u;
+    u.postK = 1; this.generals[KING.id] = u;
     for (const m of [...u.rig.meshes.slice(1), ...u.rig.weapons]) m.castShadow = false;   // vua luôn gần tướng: chỉ thân đổ bóng (bớt 3 lượt vẽ bóng)
     this.kingWing = [];
     for (let k = 0; k < KING.wing; k++) {

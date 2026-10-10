@@ -98,6 +98,16 @@ export const reedGeo = (n = 4, h = 1.7) => merge(Array.from({ length: n }, (_, k
   { x: Math.cos(k * 2.4) * 0.22, y: h / 2, z: Math.sin(k * 2.4) * 0.22, rx: Math.sin(k * 2.4) * 0.16, rz: -Math.cos(k * 2.4) * 0.16, sy: 0.8 + (k % 3) * 0.15 })));
 // Tảng đá: khối hai mươi mặt dẹt (màu trắng, instanceColor tô)
 export const rockGeo = () => merge([part(ico(1, 0), 0xffffff, { sy: 0.65 })]);
+// Màu mẫu nướng (glb.js envPart) nhân lên cho trung bình kênh ≈ k: lưới code của InstancedMesh tô trắng, sắc từng bản do instanceColor; mẫu giữ vân
+// của nó (chép từ scenery.js). null → null.
+export function whiten(g, k = 0.85) {
+  if (!g) return g;
+  const C = g.attributes.color.array; let m = 0;
+  for (let i = 0; i < C.length; i++) m += C[i];
+  m = m / C.length || 1;
+  for (let i = 0; i < C.length; i++) C[i] = Math.min(1, C[i] * k / m);
+  return g;
+}
 
 // Màu thân cây đa dạng cho rừng instanced (xanh đậm, xanh vàng, vài cây ngả vàng, đỏ) — chép từ scenery.js.
 export function tintTrees(im, rng) {

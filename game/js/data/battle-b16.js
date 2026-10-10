@@ -71,7 +71,7 @@ export const GATE_SOUTH = "B3", GATE_EAST = "A3";
 // Điện chính trong thành (pha 4 đánh lui Thoát Hoan ở sân trước điện, pha 5 chiếm điện).
 export const PALACE = { x: 530, z: -42, r: 12, capSec: 8, guards: 18 };
 export const BOSS_B16 = {
-  id: "X18", name: "Thoát Hoan", nameHan: "脫歡", tier: "tuong", rigKey: "tuong", defeatMeans: "rút chạy",
+  id: "X18", name: "Thoát Hoan", nameHan: "脫歡", tier: "tuong", rigKey: "X18", defeatMeans: "rút chạy",
   at: { x: 516, z: -30 }, retreatTo: { x: 540, z: -175 }, aggro: 40,
   intro: "Trấn Nam vương Thoát Hoan, con Hốt Tất Liệt, tổng chỉ huy quân Nguyên đang đóng ở kinh thành.",
 };

@@ -334,28 +334,29 @@ function profile(g, step = 0.01) {
   const argmax = () => { let m = 0; for (let k = 1; k < K; k++) if (r[k] > r[m]) m = k; return m; };
   return { z0, z1, L: z1 - z0, K, r, yp, yn, z, rAt, argmax };
 }
-const SWORDS = ["songdao", "dao", "dao_linh", "daikiem"];
-t("kiem", "kiếm, đao (songdao, dao, dao_linh, daikiem): chắn tay sát phía tay (≤ 45% dài từ đuôi, trước chỗ nắm), chỗ nắm hẹp, lưỡi theo +Z ≥ ½ dài", () => SWORDS.flatMap((id) => {
+const SWORDS = ["songdao", "dao", "dao_linh", "daikiem", "daikiem_vandon", "doandao"];
+t("kiem", "kiếm, đao (songdao, dao, dao_linh, daikiem, daikiem_vandon, doandao): chắn tay sát phía tay (≤ 45% dài từ đuôi, trước chỗ nắm), chỗ nắm hẹp, lưỡi theo +Z ≥ ½ dài", () => SWORDS.flatMap((id) => {
   const p = profile(WP[id].meshes.body), kg = p.argmax(), zg = p.z(kg), f = (zg - p.z0) / p.L, r0 = p.rAt(0), bad = [];
   if (f > 0.45) bad.push(`chắn tay (r ${f3(p.r[kg])}) ở z ${f2(zg)} = ${pc(f)} dài tính từ đuôi`);
   if (zg <= 0) bad.push(`chắn tay ở z ${f2(zg)}, sau chỗ nắm`);
-  if (r0 > 0.5 * p.r[kg]) bad.push(`chỗ nắm z = 0 rộng ${f3(r0)} (> ½ chắn tay)`);
+  if (r0 > (id === "doandao" ? 0.75 : 0.5) * p.r[kg]) bad.push(`chỗ nắm z = 0 rộng ${f3(r0)} (> ${id === "doandao" ? "¾" : "½"} chắn tay)`);   // đoản đao: chuôi quấn dày, chắn tay nhỏ
   if (p.z1 - zg < 0.5 * p.L) bad.push(`lưỡi phía +Z dài ${f2(p.z1 - zg)} / ${f2(p.L)} m`);
   return bad.length ? [{ id, msg: bad.join("; ") }] : [];
 }));
-t("dadao", "đại đao: chỗ nắm trên cán (z = 0 hẹp ≤ 0,06 m), lưỡi bắt đầu ≥ 0,10 m trên tay và lệch +Y, cán còn ≥ 0,2 m dưới tay", () => {
-  const p = profile(WP.dadao.meshes.body), bad = [];
-  let kb = -1; for (let k = 0; k < p.K; k++) if (p.yp[k] > 0.15) { kb = k; break; }
-  if (kb < 0) return [{ id: "dadao", msg: "không thấy lưỡi (y > 0,15)" }];
-  const zb = p.z(kb), r0 = p.rAt(0);
-  let yP = 0, yN = 0; for (let k = kb; k < p.K; k++) { if (p.yp[k] > yP) yP = p.yp[k]; if (-p.yn[k] > yN) yN = -p.yn[k]; }
+// Đại đao Hunyuan3D (2026-10-10): lưỡi thẳng hàng cán (bản Meshy cũ lưỡi nằm cạnh cán như lá cờ, phép kiểm cũ đòi lưỡi lệch +Y gấp 3 lần) — chân lưỡi là meta.head
+// (phép "tua" kiểm), phía lưỡi rộng hơn ở +Y (catalog side).
+t("dadao", "đại đao: chỗ nắm trên cán (z = 0 hẹp ≤ 0,06 m), lưỡi (từ meta.head) bắt đầu ≥ 0,10 m trên tay, phía rộng hơn ở +Y, cán còn ≥ 0,2 m dưới tay", () => {
+  const p = profile(WP.dadao.meshes.body), bad = [], zb = WP.dadao.meta.head;
+  if (typeof zb !== "number") return [{ id: "dadao", msg: "thiếu meta.head (chân lưỡi)" }];
+  const r0 = p.rAt(0);
+  let yP = 0, yN = 0; for (let k = 0; k < p.K; k++) { if (p.z(k) < zb) continue; if (p.yp[k] > yP) yP = p.yp[k]; if (-p.yn[k] > yN) yN = -p.yn[k]; }
   if (zb < 0.1) bad.push(`lưỡi bắt đầu ở z ${f2(zb)}`);
   if (r0 > 0.06) bad.push(`chỗ nắm z = 0 rộng ${f3(r0)}`);
   if (p.z0 > -0.2) bad.push(`cán dưới tay chỉ ${f2(-p.z0)} m`);
-  if (yP < 3 * yN) bad.push(`lưỡi không lệch +Y (+${f3(yP)} / −${f3(yN)})`);
+  if (yP < yN) bad.push(`phía lưỡi không ở +Y (+${f3(yP)} / −${f3(yN)})`);
   return bad.length ? [{ id: "dadao", msg: bad.join("; ") }] : [];
 });
-t("mui", "giáo (giao_dv, giao_ng), chùy: đầu (mặt cắt rộng nhất) ở phía +Z (≥ 60% dài từ đuôi), chỗ nắm trên cán (≤ 0,07 m)", () => ["giao_dv", "giao_ng", "chuy"].flatMap((id) => {
+t("mui", "giáo (giao_dv, giao_ng), chùy, đại phủ: đầu (mặt cắt rộng nhất) ở phía +Z (≥ 60% dài từ đuôi), chỗ nắm trên cán (≤ 0,07 m)", () => ["giao_dv", "giao_ng", "chuy", "daiphu"].flatMap((id) => {
   const p = profile(WP[id].meshes.body), kh = p.argmax(), f = (p.z(kh) - p.z0) / p.L, r0 = p.rAt(0), bad = [];
   if (f < 0.6) bad.push(`đầu (r ${f3(p.r[kh])}) ở ${pc(f)} dài tính từ đuôi`);
   if (r0 > 0.07) bad.push(`chỗ nắm z = 0 rộng ${f3(r0)}`);
