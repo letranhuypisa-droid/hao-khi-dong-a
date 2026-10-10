@@ -69,6 +69,34 @@
   "tris": 4996,
   "bytes": 194726
  },
+ "char/H27h": {
+  "kind": "char",
+  "file": "char/H27h.hkm",
+  "tex": "char/H27h.webp",
+  "tris": 6000,
+  "bytes": 257378
+ },
+ "char/H28h": {
+  "kind": "char",
+  "file": "char/H28h.hkm",
+  "tex": "char/H28h.webp",
+  "tris": 6000,
+  "bytes": 249920
+ },
+ "char/H29h": {
+  "kind": "char",
+  "file": "char/H29h.hkm",
+  "tex": "char/H29h.webp",
+  "tris": 6000,
+  "bytes": 247976
+ },
+ "char/H30h": {
+  "kind": "char",
+  "file": "char/H30h.hkm",
+  "tex": "char/H30h.webp",
+  "tris": 6000,
+  "bytes": 262192
+ },
  "char/H31": {
   "kind": "char",
   "file": "char/H31.hkm",
@@ -82,6 +110,13 @@
   "tex": "char/H31h.webp",
   "tris": 9000,
   "bytes": 445734
+ },
+ "char/H32h": {
+  "kind": "char",
+  "file": "char/H32h.hkm",
+  "tex": "char/H32h.webp",
+  "tris": 6000,
+  "bytes": 281940
  },
  "char/H33": {
   "kind": "char",
@@ -97,6 +132,13 @@
   "tris": 6000,
   "bytes": 280348
  },
+ "char/H34h": {
+  "kind": "char",
+  "file": "char/H34h.hkm",
+  "tex": "char/H34h.webp",
+  "tris": 6000,
+  "bytes": 266252
+ },
  "char/H35": {
   "kind": "char",
   "file": "char/H35.hkm",
@@ -111,12 +153,33 @@
   "tris": 8996,
   "bytes": 436602
  },
+ "char/H36h": {
+  "kind": "char",
+  "file": "char/H36h.hkm",
+  "tex": "char/H36h.webp",
+  "tris": 6000,
+  "bytes": 258922
+ },
+ "char/H37h": {
+  "kind": "char",
+  "file": "char/H37h.hkm",
+  "tex": "char/H37h.webp",
+  "tris": 6000,
+  "bytes": 250092
+ },
  "char/H38h": {
   "kind": "char",
   "file": "char/H38h.hkm",
   "tex": "char/H38h.webp",
   "tris": 5976,
   "bytes": 210598
+ },
+ "char/H39h": {
+  "kind": "char",
+  "file": "char/H39h.hkm",
+  "tex": "char/H39h.webp",
+  "tris": 6000,
+  "bytes": 243624
  },
  "char/H40": {
   "kind": "char",
@@ -202,6 +265,27 @@
   "tris": 5964,
   "bytes": 230404
  },
+ "char/X16h": {
+  "kind": "char",
+  "file": "char/X16h.hkm",
+  "tex": "char/X16h.webp",
+  "tris": 6000,
+  "bytes": 269366
+ },
+ "char/X17h": {
+  "kind": "char",
+  "file": "char/X17h.hkm",
+  "tex": "char/X17h.webp",
+  "tris": 6000,
+  "bytes": 249644
+ },
+ "char/X18h": {
+  "kind": "char",
+  "file": "char/X18h.hkm",
+  "tex": "char/X18h.webp",
+  "tris": 7500,
+  "bytes": 380988
+ },
  "char/X19": {
   "kind": "char",
   "file": "char/X19.hkm",
@@ -222,6 +306,20 @@
   "tex": "char/X20.webp",
   "tris": 7500,
   "bytes": 294982
+ },
+ "char/X21h": {
+  "kind": "char",
+  "file": "char/X21h.hkm",
+  "tex": "char/X21h.webp",
+  "tris": 6000,
+  "bytes": 267276
+ },
+ "char/X23h": {
+  "kind": "char",
+  "file": "char/X23h.hkm",
+  "tex": "char/X23h.webp",
+  "tris": 6000,
+  "bytes": 255242
  },
  "char/X24": {
   "kind": "char",
@@ -266,6 +364,15 @@
    292
   ],
   "bytes": 5052
+ },
+ "env/ENV_bia_da": {
+  "kind": "env",
+  "file": "env/ENV_bia_da.hkm",
+  "tris": 500,
+  "lods": [
+   500
+  ],
+  "bytes": 8556
  },
  "env/ENV_bia_rom": {
   "kind": "env",
@@ -492,6 +599,16 @@
   ],
   "bytes": 8752
  },
+ "env/ENV_da_a": {
+  "kind": "env",
+  "file": "env/ENV_da_a.hkm",
+  "tris": 200,
+  "lods": [
+   200,
+   60
+  ],
+  "bytes": 4864
+ },
  "env/ENV_da_b": {
   "kind": "env",
   "file": "env/ENV_da_b.hkm",
@@ -549,6 +666,35 @@
    298
   ],
   "bytes": 18508
+ },
+ "env/ENV_gia_cheo": {
+  "kind": "env",
+  "file": "env/ENV_gia_cheo.hkm",
+  "tris": 498,
+  "lods": [
+   498
+  ],
+  "bytes": 8444
+ },
+ "env/ENV_go_chan_song": {
+  "kind": "env",
+  "file": "env/ENV_go_chan_song.hkm",
+  "tris": 300,
+  "lods": [
+   300,
+   80
+  ],
+  "bytes": 6848
+ },
+ "env/ENV_go_da": {
+  "kind": "env",
+  "file": "env/ENV_go_da.hkm",
+  "tris": 1492,
+  "lods": [
+   1492,
+   298
+  ],
+  "bytes": 29856
  },
  "env/ENV_hinh_nom": {
   "kind": "env",
@@ -608,6 +754,16 @@
   ],
   "bytes": 9892
  },
+ "env/ENV_khom_tre": {
+  "kind": "env",
+  "file": "env/ENV_khom_tre.hkm",
+  "tris": 594,
+  "lods": [
+   594,
+   82
+  ],
+  "bytes": 12200
+ },
  "env/ENV_khung_leu_chay": {
   "kind": "env",
   "file": "env/ENV_khung_leu_chay.hkm",
@@ -626,6 +782,66 @@
    1184
   ],
   "bytes": 146776
+ },
+ "env/ENV_lau_say": {
+  "kind": "env",
+  "file": "env/ENV_lau_say.hkm",
+  "tris": 898,
+  "lods": [
+   898,
+   34
+  ],
+  "bytes": 17164
+ },
+ "env/ENV_leu_luong": {
+  "kind": "env",
+  "file": "env/ENV_leu_luong.hkm",
+  "tex": "env/ENV_leu_luong.webp",
+  "tris": 1490,
+  "lods": [
+   1490
+  ],
+  "bytes": 85918
+ },
+ "env/ENV_leu_tran": {
+  "kind": "env",
+  "file": "env/ENV_leu_tran.hkm",
+  "tris": 600,
+  "lods": [
+   600,
+   198
+  ],
+  "bytes": 13784
+ },
+ "env/ENV_leu_tron": {
+  "kind": "env",
+  "file": "env/ENV_leu_tron.hkm",
+  "tris": 998,
+  "lods": [
+   998,
+   300
+  ],
+  "bytes": 22024
+ },
+ "env/ENV_leu_vuong_nguyen": {
+  "kind": "env",
+  "file": "env/ENV_leu_vuong_nguyen.hkm",
+  "tris": 800,
+  "lods": [
+   800,
+   238
+  ],
+  "bytes": 17208
+ },
+ "env/ENV_long_thuyen": {
+  "kind": "env",
+  "file": "env/ENV_long_thuyen.hkm",
+  "tris": 3982,
+  "lods": [
+   3982,
+   778
+  ],
+  "bytes": 76400
  },
  "env/ENV_lum_cay_ven_song": {
   "kind": "env",
@@ -673,6 +889,26 @@
    3000
   ],
   "bytes": 187236
+ },
+ "env/ENV_nha_lang_a": {
+  "kind": "env",
+  "file": "env/ENV_nha_lang_a.hkm",
+  "tris": 1498,
+  "lods": [
+   1498,
+   400
+  ],
+  "bytes": 31728
+ },
+ "env/ENV_nha_lang_b": {
+  "kind": "env",
+  "file": "env/ENV_nha_lang_b.hkm",
+  "tris": 1498,
+  "lods": [
+   1498,
+   396
+  ],
+  "bytes": 31424
  },
  "env/ENV_non_tre_roi": {
   "kind": "env",
@@ -948,6 +1184,26 @@
   ],
   "bytes": 32536
  },
+ "env/MOUNT_trau": {
+  "kind": "env",
+  "file": "env/MOUNT_trau.hkm",
+  "tris": 1194,
+  "lods": [
+   1194,
+   300
+  ],
+  "bytes": 25256
+ },
+ "env/MOUNT_voi_chien": {
+  "kind": "env",
+  "file": "env/MOUNT_voi_chien.hkm",
+  "tris": 2498,
+  "lods": [
+   2498,
+   598
+  ],
+  "bytes": 51692
+ },
  "env/PROP_banh_voi": {
   "kind": "env",
   "file": "env/PROP_banh_voi.hkm",
@@ -965,6 +1221,15 @@
    396
   ],
   "bytes": 6604
+ },
+ "env/PROP_co_lung": {
+  "kind": "env",
+  "file": "env/PROP_co_lung.hkm",
+  "tris": 300,
+  "lods": [
+   300
+  ],
+  "bytes": 5144
  },
  "env/PROP_giap_voi": {
   "kind": "env",
@@ -1064,45 +1329,45 @@
   "lods": [
    538,
    252,
-   110
+   112
   ],
-  "bytes": 60970
+  "bytes": 64308
  },
  "kit/DV_DAO": {
   "kind": "kit",
   "file": "kit/DV_DAO.hkm",
   "tex": "kit/DV_DAO.webp",
-  "tris": 615,
+  "tris": 611,
   "lods": [
-   615,
-   288,
+   611,
+   280,
    118
   ],
-  "bytes": 66704
+  "bytes": 65438
  },
  "kit/DV_DAOh": {
   "kind": "kit",
   "file": "kit/DV_DAOh.hkm",
   "tex": "kit/DV_DAOh.webp",
-  "tris": 614,
+  "tris": 610,
   "lods": [
-   614,
-   288,
+   610,
+   284,
    116
   ],
-  "bytes": 64338
+  "bytes": 66044
  },
  "kit/DV_GIAO": {
   "kind": "kit",
   "file": "kit/DV_GIAO.hkm",
   "tex": "kit/DV_GIAO.webp",
-  "tris": 575,
+  "tris": 568,
   "lods": [
-   575,
-   264,
-   134
+   568,
+   262,
+   136
   ],
-  "bytes": 67356
+  "bytes": 60810
  },
  "kit/DV_GIAOh": {
   "kind": "kit",
@@ -1112,9 +1377,9 @@
   "lods": [
    576,
    270,
-   134
+   136
   ],
-  "bytes": 69986
+  "bytes": 58698
  },
  "kit/DV_NO": {
   "kind": "kit",
@@ -1132,161 +1397,161 @@
   "kind": "kit",
   "file": "kit/DV_NOh.hkm",
   "tex": "kit/DV_NOh.webp",
-  "tris": 554,
+  "tris": 558,
   "lods": [
-   554,
+   558,
    258,
-   98
+   108
   ],
-  "bytes": 62786
+  "bytes": 61428
  },
  "kit/NG_CUNG": {
   "kind": "kit",
   "file": "kit/NG_CUNG.hkm",
   "tex": "kit/NG_CUNG.webp",
-  "tris": 546,
+  "tris": 548,
   "lods": [
-   546,
-   248,
+   548,
+   250,
    98
   ],
-  "bytes": 52010
+  "bytes": 53006
  },
  "kit/NG_CUNGh": {
   "kind": "kit",
   "file": "kit/NG_CUNGh.hkm",
   "tex": "kit/NG_CUNGh.webp",
-  "tris": 544,
+  "tris": 546,
   "lods": [
-   544,
-   245,
+   546,
+   247,
    102
   ],
-  "bytes": 58412
+  "bytes": 59120
  },
  "kit/NG_DAO": {
   "kind": "kit",
   "file": "kit/NG_DAO.hkm",
   "tex": "kit/NG_DAO.webp",
-  "tris": 617,
+  "tris": 613,
   "lods": [
-   617,
-   285,
-   113
+   613,
+   281,
+   117
   ],
-  "bytes": 61406
+  "bytes": 65256
  },
  "kit/NG_DAOh": {
   "kind": "kit",
   "file": "kit/NG_DAOh.hkm",
   "tex": "kit/NG_DAOh.webp",
-  "tris": 616,
+  "tris": 612,
   "lods": [
-   616,
-   288,
+   612,
+   286,
    142
   ],
-  "bytes": 67322
+  "bytes": 74536
  },
  "kit/NG_GIAO": {
   "kind": "kit",
   "file": "kit/NG_GIAO.hkm",
   "tex": "kit/NG_GIAO.webp",
-  "tris": 635,
+  "tris": 631,
   "lods": [
-   635,
-   295,
-   117
+   631,
+   294,
+   118
   ],
-  "bytes": 60570
+  "bytes": 59640
  },
  "kit/NG_GIAOh": {
   "kind": "kit",
   "file": "kit/NG_GIAOh.hkm",
   "tex": "kit/NG_GIAOh.webp",
-  "tris": 628,
+  "tris": 624,
   "lods": [
-   628,
-   297,
-   123
+   624,
+   296,
+   124
   ],
-  "bytes": 67502
+  "bytes": 67034
  },
  "kit/NG_KY": {
   "kind": "kit",
   "file": "kit/NG_KY.hkm",
   "tex": "kit/NG_KY.webp",
-  "tris": 877,
+  "tris": 879,
   "lods": [
-   877,
+   879,
    338,
-   140
+   132
   ],
-  "bytes": 132370
+  "bytes": 126454
  },
  "kit/NG_KYh": {
   "kind": "kit",
   "file": "kit/NG_KYh.hkm",
   "tex": "kit/NG_KYh.webp",
-  "tris": 867,
+  "tris": 869,
   "lods": [
-   867,
+   869,
    338,
-   134
+   126
   ],
-  "bytes": 139498
+  "bytes": 140190
  },
  "kit/NG_TANK": {
   "kind": "kit",
   "file": "kit/NG_TANK.hkm",
   "tex": "kit/NG_TANK.webp",
-  "tris": 587,
+  "tris": 590,
   "lods": [
-   587,
+   590,
    280,
    114
   ],
-  "bytes": 61608
+  "bytes": 66862
  },
  "kit/NG_TANKh": {
   "kind": "kit",
   "file": "kit/NG_TANKh.hkm",
   "tex": "kit/NG_TANKh.webp",
-  "tris": 584,
+  "tris": 586,
   "lods": [
-   584,
+   586,
    280,
    114
   ],
-  "bytes": 65960
+  "bytes": 65916
  },
  "wpn/chuy": {
   "kind": "wpn",
   "file": "wpn/chuy.hkm",
   "tex": "wpn/chuy.webp",
   "tris": 800,
-  "bytes": 36630
+  "bytes": 32380
  },
  "wpn/cung_ng": {
   "kind": "wpn",
   "file": "wpn/cung_ng.hkm",
   "tex": "wpn/cung_ng.webp",
-  "tris": 500,
-  "bytes": 32928
+  "tris": 726,
+  "bytes": 35796
  },
  "wpn/cung_viet": {
   "kind": "wpn",
   "file": "wpn/cung_viet.hkm",
   "tex": "wpn/cung_viet.webp",
-  "tris": 800,
-  "bytes": 41364
+  "tris": 1022,
+  "bytes": 39494
  },
  "wpn/dadao": {
   "kind": "wpn",
   "file": "wpn/dadao.hkm",
   "tex": "wpn/dadao.webp",
   "tris": 1500,
-  "bytes": 68016
+  "bytes": 46030
  },
  "wpn/daikiem": {
   "kind": "wpn",
@@ -1295,47 +1560,82 @@
   "tris": 1498,
   "bytes": 59366
  },
+ "wpn/daikiem_vandon": {
+  "kind": "wpn",
+  "file": "wpn/daikiem_vandon.hkm",
+  "tex": "wpn/daikiem_vandon.webp",
+  "tris": 1500,
+  "bytes": 44754
+ },
+ "wpn/daiphu": {
+  "kind": "wpn",
+  "file": "wpn/daiphu.hkm",
+  "tex": "wpn/daiphu.webp",
+  "tris": 1200,
+  "bytes": 44044
+ },
  "wpn/dao": {
   "kind": "wpn",
   "file": "wpn/dao.hkm",
   "tex": "wpn/dao.webp",
-  "tris": 999,
-  "bytes": 43966
+  "tris": 1000,
+  "bytes": 29552
  },
  "wpn/dao_linh": {
   "kind": "wpn",
   "file": "wpn/dao_linh.hkm",
   "tex": "wpn/dao_linh.webp",
-  "tris": 498,
-  "bytes": 30650
+  "tris": 1174,
+  "bytes": 36856
+ },
+ "wpn/doandao": {
+  "kind": "wpn",
+  "file": "wpn/doandao.hkm",
+  "tex": "wpn/doandao.webp",
+  "tris": 1000,
+  "bytes": 36608
+ },
+ "wpn/duisat": {
+  "kind": "wpn",
+  "file": "wpn/duisat.hkm",
+  "tex": "wpn/duisat.webp",
+  "tris": 666,
+  "bytes": 30102
  },
  "wpn/giao_dv": {
   "kind": "wpn",
   "file": "wpn/giao_dv.hkm",
   "tex": "wpn/giao_dv.webp",
   "tris": 600,
-  "bytes": 37468
+  "bytes": 19044
  },
  "wpn/giao_ng": {
   "kind": "wpn",
   "file": "wpn/giao_ng.hkm",
   "tex": "wpn/giao_ng.webp",
   "tris": 500,
-  "bytes": 26310
+  "bytes": 18090
  },
  "wpn/khien_nhat": {
   "kind": "wpn",
   "file": "wpn/khien_nhat.hkm",
   "tex": "wpn/khien_nhat.webp",
-  "tris": 500,
-  "bytes": 32284
+  "tris": 1296,
+  "bytes": 43924
  },
  "wpn/khien_tron": {
   "kind": "wpn",
   "file": "wpn/khien_tron.hkm",
   "tex": "wpn/khien_tron.webp",
-  "tris": 684,
-  "bytes": 37528
+  "tris": 936,
+  "bytes": 36692
+ },
+ "wpn/moc_voi": {
+  "kind": "wpn",
+  "file": "wpn/moc_voi.hkm",
+  "tex": "wpn/moc_voi.webp",
+  "tris": 756,
+  "bytes": 30558
  },
  "wpn/mui_ten": {
   "kind": "wpn",
@@ -1348,14 +1648,21 @@
   "kind": "wpn",
   "file": "wpn/no.hkm",
   "tex": "wpn/no.webp",
-  "tris": 1001,
-  "bytes": 58926
+  "tris": 920,
+  "bytes": 38084
+ },
+ "wpn/quat": {
+  "kind": "wpn",
+  "file": "wpn/quat.hkm",
+  "tex": "wpn/quat.webp",
+  "tris": 2260,
+  "bytes": 73660
  },
  "wpn/songdao": {
   "kind": "wpn",
   "file": "wpn/songdao.hkm",
   "tex": "wpn/songdao.webp",
-  "tris": 1200,
-  "bytes": 51394
+  "tris": 1408,
+  "bytes": 50506
  }
 }

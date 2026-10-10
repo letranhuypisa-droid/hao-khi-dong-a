@@ -99,7 +99,7 @@ export const B16 = {
   hud: { bounds: { x0: 0, x1: 600, z0: -200, z1: 200 }, drawBase, baseKey, drawTop, frontsHTML, pinTip: true },
   par: { nhanh: PAR_B16, chuan: PAR_B16 },
   frameVisuals: (ctx) => ctx.director.frameBoats(),  // thuyền neo vẽ theo lô: xếp mức gần / xa theo camera của khung này (director-b16.js)
-  rigs: ["tuong"],                                    // Thoát Hoan (mô hình tướng Nguyên chung) ra ở pha 4
+  rigs: ["X18"],                                      // Thoát Hoan (mô hình X18h, đợt năm) ra ở pha 4
   // bot (debug.js __objective): lính còn chặn vòng chiếm trước, rồi mục tiêu của pha
   debug: { objective: (ctx) => {
     const d = ctx.director, h = ctx.hero, b = d.blockers()[0]; if (b) return { x: b.x, z: b.z, ref: b.ref };

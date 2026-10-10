@@ -31,6 +31,8 @@ function basis(a, u, b, v) {
 
 export async function bakeWeapon(file, c) {
   const g = await readGLB(file, c.tris ?? Infinity);
+  // ry: xoay quanh Y (độ) trước khi đo — nỏ Hunyuan3D nằm báng dọc Z (Meshy: dọc X)
+  if (c.ry) { const a = (c.ry * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a); for (let i = 0; i < g.pos.length; i += 3) { const x = g.pos[i], z = g.pos[i + 2]; g.pos[i] = cs * x + sn * z; g.pos[i + 2] = -sn * x + cs * z; } }
   const P = g.pos, b = bounds(P);
   let R, origin, scale;
   const Y = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -67,7 +69,10 @@ export async function bakeWeapon(file, c) {
     scale = c.h / b.size[upAx];
     origin = Y(b.c[0], b.c[1], b.c[2]);
   } else if (c.type === "crossbow") {
-    // báng theo X (đầu cánh nỏ phía −X), rãnh +Y, cánh nỏ theo Z → khung cẳng tay: X → +Y, Y → +Z
+    // báng theo X (đầu cánh nỏ phía −X), rãnh +Y, cánh nỏ theo Z → khung cẳng tay: X → +Y, Y → +Z. Đầu cánh nỏ là đầu có bề ngang Z lớn hơn:
+    // nằm ở +X thì xoay nửa vòng quanh Y (mẫu Hunyuan3D sau ry).
+    const end = (lo) => bounds(P, (x) => (lo ? x < b.lo[0] + 0.15 * b.size[0] : x > b.hi[0] - 0.15 * b.size[0])).size[2];
+    if (end(false) > end(true)) { for (let i = 0; i < P.length; i += 3) { P[i] = -P[i]; P[i + 2] = -P[i + 2]; } Object.assign(b, bounds(P)); }
     R = basis(0, Y(0, 1, 0), 1, Y(0, 0, 1));
     scale = c.len / b.size[0];
     origin = Y(b.hi[0] - c.grip / scale, b.c[1], b.c[2]);
@@ -81,7 +86,7 @@ export async function bakeWeapon(file, c) {
   for (let i = 0; i < P.length; i += 3) { v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(M); V[i] = v.x; V[i + 1] = v.y; V[i + 2] = v.z; }
   const out = bounds(V);
   const nor = smoothNormals(V, g.idx);
-  const head = c.head ? headBase(V, g.idx) : null, guard = c.type === "blade" && c.flip && !c.side ? guardZ(V, g.idx) : null;
+  const head = c.head ? headBase(V, g.idx) : null, guard = c.type === "blade" && (c.guard ?? (c.flip && !c.side)) ? guardZ(V, g.idx) : null;   // guard: true — kiếm, đao Hunyuan3D dựng mũi lên (không flip)
   return { mesh: packMesh({ pos: V, nor, uv: g.uv, idx: g.idx }), raw: { pos: V, nor, uv: g.uv, idx: g.idx }, image: g.image, tris: g.tris, trisBefore: g.trisBefore,
     meta: { kind: "wpn", type: c.type, lo: out.lo.map((x) => +x.toFixed(3)), hi: out.hi.map((x) => +x.toFixed(3)), ...(head != null ? { head: +head.toFixed(3) } : {}),
       ...(guard != null ? { guard: +guard.toFixed(3) } : {}) } };

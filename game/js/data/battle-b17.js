@@ -83,7 +83,7 @@ export const ENVOY = { name: "Sứ giả", route: [{ x: 160, z: 128 }, { x: 118,
   squads: [{ at: 0.2, n: 6, side: 24 }, { at: 0.55, n: 6, side: -24 }] };
 // Vua Trần Nhân Tông (H30) là tướng AI khi chơi Nguyễn Khoái (canon): dẫn cánh chính wing lính, tự đánh đồn chưa chiếm gần nhất (đứng trong vòng thì
 // chiếm như tướng ta). Dưới fallPct% Sinh lực thì lui về bản doanh (home), tới nơi hồi healSec giây (+heal × Sinh lực tối đa) rồi quay lại. Vua gục là
-// thua. Chưa có mô hình H30: mượn mô hình Phó tướng (OFF_photuongh) nhuộm vàng.
+// thua. Mô hình H30h (đợt năm; trước đó mượn Phó tướng nhuộm vàng), cỡ giữ như cũ: director-b17.js B17_H30.
 export const KING = { id: "H30", name: "Vua Trần Nhân Tông", short: "Vua", x: 62, z: -26, hp: 2400, wing: 16, fallPct: 30, healSec: 40, heal: 0.7,
   home: { x: 42, z: -8 }, homeR: 7 };
 // Yết Kiêu (H38, Tương truyền): hai lần trồi lên từ lạch đầm bên sườn cánh Toa Đô (at: giây kể từ đầu P2), cách đầu cánh side m về phía sông, hạ kills

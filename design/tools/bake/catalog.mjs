@@ -175,6 +175,78 @@ const FIX_DAN_TREH = {
   shR: [0.278, 1.383, 0.000], elR: [0.378, 1.148, 0.014], handR: [0.519, 0.965, 0.121],
   neck: 1.540,
 };
+// Đợt năm (2026-10-10, 50 GLB Hunyuan3D thả vào design/): 14 tướng của lượt `tuong-moi` (design/glb-prompts.md mục A8–A15, B7–B13, cùng H34, H39). Khớp tay do
+// design/tools/fit-arms.mjs đo (A-pose nắm đấm, hai tay đối xứng, không cảnh báo). Đều mặc giáp tay → ARM_TUBE như tướng Hunyuan khác.
+const FIX_H27H = {
+  shL: [-0.273, 1.465, 0.003], elL: [-0.362, 1.226, 0.017], handL: [-0.490, 1.035, 0.128],
+  shR: [0.273, 1.465, 0.003], elR: [0.362, 1.226, 0.017], handR: [0.490, 1.035, 0.128],
+  neck: 1.630,
+};
+const FIX_H28H = {
+  shL: [-0.270, 1.448, 0.002], elL: [-0.339, 1.203, 0.014], handL: [-0.446, 0.995, 0.116],
+  shR: [0.270, 1.448, 0.002], elR: [0.339, 1.203, 0.014], handR: [0.446, 0.995, 0.116],
+  neck: 1.620,
+};
+const FIX_H29H = {
+  shL: [-0.296, 1.430, -0.009], elL: [-0.360, 1.184, 0.001], handL: [-0.464, 0.965, 0.081],
+  shR: [0.296, 1.430, -0.009], elR: [0.360, 1.184, 0.001], handR: [0.464, 0.965, 0.081],
+  neck: 1.600,
+};
+const FIX_H30H = {
+  shL: [-0.268, 1.461, -0.002], elL: [-0.364, 1.225, 0.014], handL: [-0.499, 1.045, 0.134],
+  shR: [0.268, 1.461, -0.002], elR: [0.364, 1.225, 0.014], handR: [0.499, 1.045, 0.134],
+  neck: 1.640,
+};
+const FIX_H32H = {
+  shL: [-0.263, 1.444, 0.002], elL: [-0.339, 1.200, 0.009], handL: [-0.462, 0.985, 0.069],
+  shR: [0.263, 1.444, 0.002], elR: [0.339, 1.200, 0.009], handR: [0.462, 0.985, 0.069],
+  neck: 1.620,
+};
+const FIX_H34H = {
+  shL: [-0.291, 1.442, -0.013], elL: [-0.351, 1.194, -0.001], handL: [-0.445, 0.980, 0.101],
+  shR: [0.291, 1.442, -0.013], elR: [0.351, 1.194, -0.001], handR: [0.445, 0.980, 0.101],
+  neck: 1.610,
+};
+const FIX_H36H = {
+  shL: [-0.268, 1.431, -0.006], elL: [-0.347, 1.189, 0.001], handL: [-0.473, 0.975, 0.059],
+  shR: [0.268, 1.431, -0.006], elR: [0.347, 1.189, 0.001], handR: [0.473, 0.975, 0.059],
+  neck: 1.610,
+};
+const FIX_H37H = {
+  shL: [-0.278, 1.456, -0.007], elL: [-0.358, 1.214, 0.005], handL: [-0.478, 1.015, 0.111],
+  shR: [0.278, 1.456, -0.007], elR: [0.358, 1.214, 0.005], handR: [0.478, 1.015, 0.111],
+  neck: 1.620,
+};
+const FIX_H39H = {
+  shL: [-0.291, 1.464, -0.008], elL: [-0.362, 1.220, 0.012], handL: [-0.460, 1.035, 0.157],
+  shR: [0.291, 1.464, -0.008], elR: [0.362, 1.220, 0.012], handR: [0.460, 1.035, 0.157],
+  neck: 1.610,
+};
+const FIX_X16H = {
+  shL: [-0.288, 1.416, -0.024], elL: [-0.373, 1.176, -0.014], handL: [-0.503, 0.975, 0.074],
+  shR: [0.288, 1.416, -0.024], elR: [0.373, 1.176, -0.014], handR: [0.503, 0.975, 0.074],
+  neck: 1.570,
+};
+const FIX_X17H = {
+  shL: [-0.269, 1.383, 0.014], elL: [-0.344, 1.139, 0.024], handL: [-0.461, 0.930, 0.111],
+  shR: [0.269, 1.383, 0.014], elR: [0.344, 1.139, 0.024], handR: [0.461, 0.930, 0.111],
+  neck: 1.510,
+};
+const FIX_X18H = {
+  shL: [-0.280, 1.436, -0.012], elL: [-0.364, 1.195, -0.005], handL: [-0.496, 0.985, 0.052],
+  shR: [0.280, 1.436, -0.012], elR: [0.364, 1.195, -0.005], handR: [0.496, 0.985, 0.052],
+  neck: 1.620,
+};
+const FIX_X21H = {
+  shL: [-0.277, 1.426, -0.016], elL: [-0.367, 1.188, 0.000], handL: [-0.493, 1.005, 0.126],
+  shR: [0.277, 1.426, -0.016], elR: [0.367, 1.188, 0.000], handR: [0.493, 1.005, 0.126],
+  neck: 1.560,
+};
+const FIX_X23H = {
+  shL: [-0.282, 1.424, 0.009], elL: [-0.367, 1.184, 0.021], handL: [-0.495, 0.985, 0.117],
+  shR: [0.282, 1.424, 0.009], elR: [0.367, 1.184, 0.021], handR: [0.495, 0.985, 0.117],
+  neck: 1.580,
+};
 // Bán kính ống quanh chuỗi tay ghi tay (human.mjs fitHuman rad, radOut; đơn vị H, mặc định [0,05, 0,04, 0,045] / [0,07, 0,07, 0,065]): tay giáp dày của
 // Hunyuan3D (cẳng tay hộ tay, cánh tay trên giáp) lòi mặt trong ra ngoài ống mặc định 0,087–0,106 (khung thô) → đỉnh mặt trong theo thân, nách thành tam giác
 // cầu: 17–27 tam giác tách, đường tách hở 0,6 m khi giơ tay (H31h, H33h, H40h, X19h). Mức nhỏ nhất làm hết cầu ở H31h, H33h, X19h (cầu 0); H40h còn 4 tam giác ở gáy.
@@ -221,6 +293,21 @@ export const CHARS = {
   // Đợt ba: tướng khác nên 6000 / 512². TT giáp tay (hộ tay) như tướng Hunyuan khác → ARM_TUBE; H38 cởi trần, tay trần: ống mặc định.
   TTh: { src: "design/glb/_raw/nhan-vat/TT_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_TTH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
   H38h: { src: "design/glb/_raw/nhan-vat/H38_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H38H, simp: { w: 2, hi: 4 } },
+  // Đợt năm: tướng khác 6000 / 512² (H30 vua Trần Nhân Tông, tướng AI ở B17; X18 Thoát Hoan, boss B16 — camera áp sát khi đấu: 7500 / 1024² như Toa Đô).
+  H27h: { src: "design/glb/_raw/nhan-vat/H27_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H27H, ...ARM_TUBE },
+  H28h: { src: "design/glb/_raw/nhan-vat/H28_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H28H, ...ARM_TUBE },
+  H29h: { src: "design/glb/_raw/nhan-vat/H29_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H29H, ...ARM_TUBE },
+  H30h: { src: "design/glb/_raw/nhan-vat/H30_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H30H, ...ARM_TUBE },
+  H32h: { src: "design/glb/_raw/nhan-vat/H32_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H32H, ...ARM_TUBE },
+  H34h: { src: "design/glb/_raw/nhan-vat/H34_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H34H, ...ARM_TUBE },
+  H36h: { src: "design/glb/_raw/nhan-vat/H36_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H36H, ...ARM_TUBE },
+  H37h: { src: "design/glb/_raw/nhan-vat/H37_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H37H, ...ARM_TUBE },
+  H39h: { src: "design/glb/_raw/nhan-vat/H39_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H39H, ...ARM_TUBE },
+  X16h: { src: "design/glb/_raw/nhan-vat/X16_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_X16H, ...ARM_TUBE },
+  X17h: { src: "design/glb/_raw/nhan-vat/X17_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_X17H, ...ARM_TUBE },
+  X18h: { src: "design/glb/_raw/nhan-vat/X18_hunyuan.glb", tris: 7500, tex: 1024, fix: FIX_X18H, ...ARM_TUBE },
+  X21h: { src: "design/glb/_raw/nhan-vat/X21_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_X21H, rad: [0.06, 0.06, 0.065], radOut: [0.08, 0.08, 0.085] },   // giáp vảy tay dày: ARM_TUBE còn 17 tam giác cầu ở nách (hở 0,6 m ở C1); ống +0,01 hết cầu
+  X23h: { src: "design/glb/_raw/nhan-vat/X23_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_X23H, ...ARM_TUBE },
   H35: { tris: 9000, tex: 1024, shoulder: 1.441, w: { so: -0.09, ky: 0.12 } },
   H31: { tris: 9000, tex: 1024, shoulder: 1.303, w: { seam: 1 } },
   LINH_r01: { tris: 9000, tex: 1024, shoulder: 1.379 },
@@ -246,7 +333,8 @@ export const CHARS = {
 // songdao 0,04–0,30 / 0,32; dao 0,04–0,24 / 0,26; dao_linh 0,04–0,27 / 0,30; daikiem 0,08–0,46 / 0,48, tay trái 0,2 dưới tay
 // phải vẫn trên chuôi). Đại đao: lưỡi chạy dọc nửa trên cán (0,66–2,32 tính từ đuôi, đĩa chắn tay 0,52), tay phải nắm cán dưới đĩa
 // (0,40), còn 0,4 m cán sau tay. head: ghi chân đầu (giáo: chân mũi, đại đao: chân lưỡi) vào meta.head — tua treo ở đó.
-export const WEAPONS = {
+// Bảng Meshy cũ (tệp nén trong design/glb/vu-khi/, manifest.json), giữ để quay về: đổi tên bảng này thành WEAPONS rồi nướng lại wpn + kit.
+export const WEAPONS_MESHY = {
   songdao: { src: "WPN_songdao", type: "blade", len: 1.05, grip: 0.25, flip: true, tris: 1200 },
   daikiem: { src: "WPN_daikiem", type: "blade", len: 1.55, grip: 0.41, flip: true, tris: 1500 },
   dadao: { src: "WPN_dadao", type: "blade", len: 2.6, grip: 0.4, side: true, flip: true, head: true, tris: 1500 },
@@ -262,6 +350,36 @@ export const WEAPONS = {
   no: { src: "WPN_no", type: "crossbow", len: 0.8, grip: 0.14, tris: 700 },
   mui_ten: { src: "PROP_mui_ten", type: "arrow", len: 0.85, tris: 120 },
 };
+// Vũ khí Hunyuan3D (đợt năm, 2026-10-10; raw = GLB ngoài manifest ở design/glb/_raw/vu-khi/): mọi mẫu dựng đứng MŨI LÊN (không flip như Meshy), trục dài chuẩn hoá ~1,2.
+// grip đo từ mặt cắt dọc trục dài (chắn tay = mặt cắt rộng nhất ở phần dưới; tay nắm cách chắn tay ~5–6 cm): songdao chắn tay 0,21 / 1,05 m tính từ núm chuôi, dao 0,22 / 1,2,
+// dao_linh 0,17 / 0,95 (chuôi ngắn: nắm cách chắn tay 6 cm), daikiem 0,43–0,50 / 1,55, daikiem_vandon 0,44–0,48 / 1,6, doandao 0,17 / 0,5. guard: true ghi meta.guard (chắn tay) cho kiếm, đao không flip.
+// Đại đao lần này lưỡi thẳng hàng cán (lỗi "lưỡi nằm cạnh cán" của bản Meshy đã hết), lưỡi một bên nên vẫn side (phía lưỡi là +Y). Nỏ: báng dọc Z → ry 90.
+// Sáu mẫu mới (glb-prompts.md G14–G19): đại phủ (Toa Đô, tuỳ chọn), quạt Chiêu Văn (H33), đại kiếm Vân Đồn (H34), đoản đao, dùi sắt (H38), móc voi (H39).
+const HW = (k) => `design/glb/_raw/vu-khi/WPN_${k}.glb`;
+export const WEAPONS = {
+  songdao: { src: "WPN_songdao", raw: HW("songdao"), type: "blade", len: 1.05, grip: 0.16, guard: true, tris: 1200 },
+  // Gươm Tiết chế giữ bản Meshy: bản Hunyuan3D (chắn tay rộng hơn 0,08 m) làm vài khung Tuyệt Kỹ / C6 của WC01 (anim-wc01.js fitArms) vượt ngưỡng rig-glb.test (gươm
+  // vào mặt LINH_r24, lưỡi lệch > 45° 4–5 khung) ở mọi chỗ nắm thử (0,38 / 0,40 / 0,42). Tệp thô: HW("daikiem"), grip 0,40, guard: true.
+  daikiem: { ...WEAPONS_MESHY.daikiem },
+  dadao: { src: "WPN_dadao", raw: HW("dadao"), type: "blade", len: 2.6, grip: 0.4, side: true, head: true, tris: 1500 },
+  dao: { src: "WPN_dao", raw: HW("dao"), type: "blade", len: 1.2, grip: 0.165, guard: true, tris: 1000 },
+  dao_linh: { src: "WPN_dao_linh", raw: HW("dao_linh"), type: "blade", len: 0.95, grip: 0.09, guard: true, tris: 500 },
+  giao_dv: { src: "WPN_giao_dv", raw: HW("giao_dv"), type: "blade", len: 3.0, grip: 0.8, head: true, tris: 600 },
+  giao_ng: { src: "WPN_giao_ng", raw: HW("giao_ng"), type: "blade", len: 2.8, grip: 0.8, head: true, tris: 500 },
+  chuy: { src: "WPN_chuy", raw: HW("chuy"), type: "blade", len: 1.7, grip: 0.27, tris: 800 },
+  cung_viet: { src: "WPN_cung_viet", raw: HW("cung_viet"), type: "bow", len: 1.45, tris: 800 },
+  cung_ng: { src: "WPN_cung_ng", raw: HW("cung_ng"), type: "bow", len: 1.3, tris: 500 },
+  khien_tron: { src: "WPN_khien_tron_ng", raw: HW("khien_tron_ng"), type: "shield", h: 0.74, tris: 500 },
+  khien_nhat: { src: "WPN_khien_nhat_dv", raw: HW("khien_nhat_dv"), type: "shield", h: 0.75, tris: 500 },
+  no: { src: "WPN_no", raw: HW("no"), type: "crossbow", len: 0.8, grip: 0.14, ry: 90, tris: 700 },
+  mui_ten: { src: "PROP_mui_ten", type: "arrow", len: 0.85, tris: 120 },
+  daiphu: { raw: HW("daiphu"), type: "blade", len: 2.2, grip: 0.4, side: true, head: true, tris: 1200 },
+  quat: { raw: HW("quat"), type: "blade", len: 0.45, grip: 0.03, tris: 600 },
+  daikiem_vandon: { raw: HW("daikiem_vandon"), type: "blade", len: 1.6, grip: 0.4, guard: true, tris: 1500 },
+  doandao: { raw: HW("doandao"), type: "blade", len: 0.5, grip: 0.1, guard: true, tris: 600 },
+  duisat: { raw: HW("duisat"), type: "blade", len: 0.35, grip: 0.12, tris: 300 },
+  moc_voi: { raw: HW("moc_voi"), type: "blade", len: 0.7, grip: 0.3, tris: 500 },
+};
 
 // Lính đám đông: lods = tam giác thân mỗi mức (LOD0 < 18 m, LOD1 < 40 m, LOD2 xa hơn; ngân sách design/systems.md §13.3 — lính
 // LOD0 ≤ 600 điện thoại, ≤ 1.000 PC: cả người lẫn vũ khí ~550–640); vũ khí đặt trong khung cẳng tay như soldiers.js (W.*,
@@ -270,24 +388,25 @@ export const WEAPONS = {
 // treo giữa lưỡi). res: cạnh texture nướng của LOD0 (mặc định 512; kỵ binh 1024). LOD2 của vũ khí dài: giảm lưới gộp cán / lưỡi mảnh
 // thành đường thẳng trước (sai số chỉ bằng bề dày) — giáo Đại Việt 12 tam giác còn 4 (mất cán, tua treo giữa trời), đao lính 12 chỉ
 // còn chắn tay + chuôi: giáo 24, đao 20 (đo phủ trục dài: 87%, 99%). simp: { w } giảm lưới thân giữ trọng số cẳng tay (kit.mjs weldLOD). Giáo binh Đại Việt LOD2
-// thân 100 tam giác (90: hai tay mất, người que — bóng chính diện 62% LOD0; models.test kit-bong ≥ 80%).
+// thân 100 tam giác (90: hai tay mất, người que — bóng chính diện 62% LOD0; models.test kit-bong ≥ 80%). Bản Meshy nướng lại bằng bộ nướng hiện tại (2026-10-10, vũ khí
+// Hunyuan3D) ở 100 thì LOD2 mất một chân, còn 65% (tệp cũ nướng bằng bản code trước ảnh chụp e07dce7; 92 → 64%, 96 → 79%): 106 (81%); bản Hunyuan3D giữ 100 (HUN_KITS).
 const HAND = -0.29;
 export const KIT_LIST = {
   NG_DAO: { lods: [470, 220, 90], shoulder: 1.382, weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.14], wl: [70, 28, 10] }] },
   NG_GIAO: { lods: [470, 220, 90], shoulder: 1.305, tassel: "long", weapons: [{ id: "giao_ng", bone: "faR", p: [0, HAND, 0.09], wl: [70, 30, 12] }, { id: "khien_tron", bone: "faL", p: [0, -0.16, 0.12], s: 0.72, wl: [70, 28, 10] }] },
   NG_CUNG: { lods: [470, 220, 90], shoulder: 1.242, weapons: [{ id: "cung_ng", bone: "faL", p: [0, HAND, 0], wl: [80, 30, 12] }] },
   NG_TANK: { lods: [500, 240, 100], shoulder: 1.291, simp: { w: 1 }, weapons: [{ id: "chuy", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 14] }] },
-  DV_GIAO: { lods: [470, 220, 100], shoulder: 1.318, tassel: "son", weapons: [{ id: "giao_dv", bone: "faR", p: [0, HAND, 0.11], wl: [70, 30, 24] }] },
+  DV_GIAO: { lods: [470, 220, 106], shoulder: 1.318, tassel: "son", weapons: [{ id: "giao_dv", bone: "faR", p: [0, HAND, 0.11], wl: [70, 30, 24] }] },
   DV_DAO: { lods: [470, 220, 90], shoulder: 1.295, cut: CUT_DV_DAO, weapons: [{ id: "dao_linh", bone: "faR", p: [0, HAND, 0], wl: [80, 40, 20] }, { id: "khien_nhat", bone: "faL", p: [0, -0.14, 0.14], wl: [70, 28, 10] }] },
   // keep (như CHARS): cẳng tay áp sườn, đưa về tay buông thì nếp khuỷu, ống tay áo thành vạt đỏ, gai ở LOD0 khi ngã, khựng — bản 35beed2 sạch
-  DV_NO: { lods: [470, 220, 90], fix: FIX_DV_NO, keep: "35beed2", weapons: [{ id: "no", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 14] }] },
+  DV_NO: { lods: [470, 220, 90], fix: FIX_DV_NO, keep: "35beed2", weapons: [{ id: "no", bone: "faR", p: [0, HAND, 0], wl: [90, 40, 22] }] },   // nỏ Hunyuan3D cánh rộng 0,82 m: LOD2 14 tam giác chỉ phủ 43%
   // kỵ binh: [tam giác ngựa, tam giác người cưỡi] mỗi mức; cung ở cẳng tay trái như BUILD.NG_KY (HAND + 0,02 của khung ngựa: −0,27)
   NG_KY: { horse: "MOUNT_ngua_nguyen", shoulder: 1.354, lods: [[440, 360], [170, 140], [70, 60]], weapons: [{ id: "cung_ng", bone: "faL", p: [0, -0.27, 0], wl: [80, 30, 12] }] },
 };
 
 // Lính đám đông Hunyuan3D (đợt hai): cùng bảng mức chi tiết, vũ khí, tua như bản Meshy (KIT_LIST ở trên), nướng từ GLB ngoài manifest, khớp tay đo bằng fit-arms.mjs.
 // Mã <mã>h chạy song song bản Meshy (tệp nướng cũ còn nguyên; models.js kitOf chọn).
-const HUN_KITS = { DV_GIAO: [FIX_DV_GIAOH], DV_DAO: [FIX_DV_DAOH], DV_NO: [FIX_DV_NOH, { simp: { w: 1 } }], NG_DAO: [FIX_NG_DAOH, { lods: [470, 220, 112] }], NG_GIAO: [FIX_NG_GIAOH, { lods: [455, 220, 90] }],
+const HUN_KITS = { DV_GIAO: [FIX_DV_GIAOH, { lods: [470, 220, 100] }], DV_DAO: [FIX_DV_DAOH], DV_NO: [FIX_DV_NOH, { simp: { w: 1 } }], NG_DAO: [FIX_NG_DAOH, { lods: [470, 220, 112] }], NG_GIAO: [FIX_NG_GIAOH, { lods: [455, 220, 90] }],
   NG_CUNG: [FIX_NG_CUNGH], NG_TANK: [FIX_NG_TANKH], NG_KY: [FIX_NG_KYH] };
 for (const [k, [fix, over]] of Object.entries(HUN_KITS)) {
   const { shoulder, cut, keep, fix: oldFix, ...rest } = KIT_LIST[k];                // khớp, hộp cắt, mẫu giữ của Meshy không áp cho mẫu mới
@@ -316,6 +435,7 @@ export const ENV = {
   ENV_thuyen_song_nguyen: { ry: 90, z: 11, wl: 0.7, tris: 1600, far: 400 },
   ENV_thuyen_mui: { ry: 90, z: 4.2, wl: 0.25, tris: 700, far: 200 },
   ENV_thung_cau: { d: 1.8, tris: 400 },
+  ENV_long_thuyen: { ry: 90, z: 20, wl: 0.5, tris: 4000, far: 800 },   // long thuyền nhà Trần (tuỳ chọn), mẫu nằm dọc X
   // L. công trình
   ENV_cong_ham_tu: { x: 15.6, spread: [3.22, 4.6], tris: 6000, far: 1200, tex: 1024 },      // lối mẫu 6,4 m → 9,2 m như buildGate (tháp dời ra, rộng 18,4 m)
   ENV_canh_cong: { h: 5.4, tris: 300 },
@@ -332,6 +452,13 @@ export const ENV = {
   ENV_khan_dai: { h: 5.5, tris: 2500, far: 600, tex: 1024 },
   ENV_dai_chi_huy: { d: 7, tris: 2500 },
   ENV_mieu: { h: 3, tris: 2000 },
+  // đợt năm (2026-10-10): lều, nhà làng — kích thước theo bảng mục L (thân lều, nhà; dây néo / bậc thang làm hộp bao rộng hơn)
+  ENV_leu_luong: { z: 5, tris: 1500, tex: 512 },            // 5 × 4 m, nóc 3 m: mục tiêu Đánh úp trại (Tự do), người chơi tới sát
+  ENV_leu_tran: { h: 2.4, tris: 600, far: 200 },
+  ENV_leu_tron: { d: 4.8, tris: 1000, far: 300 },
+  ENV_leu_vuong_nguyen: { h: 2.6, tris: 800, far: 250 },
+  ENV_nha_lang_a: { h: 4.7, tris: 1500, far: 400 },
+  ENV_nha_lang_b: { h: 4.5, tris: 1500, far: 400 },
   // M. đạo cụ cảnh
   ENV_coc_bach_dang: { h: 2, tris: 120 },
   ENV_coc_gay: { d: 1.5, tris: 300 },
@@ -367,6 +494,10 @@ export const ENV = {
   ENV_co_duoi_ngua: { h: 4.4, tris: 300 },
   ENV_coc_troi: { h: 2, tris: 300 },
   ENV_bo_ten_thu: { h: 1.2, tris: 300 },
+  // đợt năm
+  ENV_go_chan_song: { ry: 90, z: 5.2, tris: 300, far: 80 },  // khúc gỗ phao chặn luồng (boomLogGeo), mẫu nằm dọc X
+  ENV_gia_cheo: { x: 2, tris: 500 },                         // giá mái chèo bến B20: rộng 2 m, chèo 2,6 m
+  ENV_bia_da: { h: 3.6, tris: 500 },                         // bia Sát Thát Võ trường (mặt trơn, chữ code vẽ)
   // N. cây, đá, núi
   ENV_cay_da: { h: 11, tris: 3000, far: 800 },
   ENV_cay_tan_tron: { h: 5.5, tris: 500, far: 64 },
@@ -381,6 +512,11 @@ export const ENV = {
   ENV_nui_da_b: { h: 23, tris: 1500, far: 300 },
   ENV_nui_da_c: { h: 30, tris: 1500, far: 300 },
   ENV_day_nui_xa: { x: 600, tris: 3000 },
+  // đợt năm: vật rải hàng trăm bản (tre, lau, đá) cần far nhỏ cho InstancedMesh
+  ENV_khom_tre: { h: 9, tris: 600, far: 90 },
+  ENV_lau_say: { h: 1.7, tris: 900, far: 40 },              // 300 / 600: giảm lưới cụt lá, hộp bao lệch 10% / 8%
+  ENV_da_a: { d: 1.9, tris: 200, far: 60 },
+  ENV_go_da: { h: 3.2, tris: 1500, far: 300 },               // gò đá cụm ~10 m, cao 3 m
   // O. thú (cảnh B15)
   ENV_co_dung: { h: 1.05, tris: 300 },
   ENV_co_bay: { d: 1.7, tris: 300 },
@@ -396,4 +532,8 @@ export const ENV = {
   PROP_ong_ten: { h: 0.55, tris: 300 },
   PROP_quang_ganh: { x: 1.7, tris: 600 },
   PROP_tay_nai: { d: 0.36, tris: 200 },
+  // đợt năm: trâu (vai 1,5 m, thân 2,2 m chưa tính đầu → dài cả đầu ~2,9 m), voi chiến (vai 2,7 m), cờ lưng (cán 2 m)
+  MOUNT_trau: { z: 2.9, tris: 1200, far: 300 },
+  MOUNT_voi_chien: { h: 2.9, tris: 2500, far: 600 },
+  PROP_co_lung: { h: 2.0, tris: 300 },
 };

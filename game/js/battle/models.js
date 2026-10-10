@@ -185,7 +185,7 @@ export function makeRig(cfg = {}) {
     hat = "tocbui", weapon = "songdao", cape = null, flag = null, shield = false,
     skirt = null, beard = null, heavy = false, capeScale = null } = cfg;        // skirt: màu vạt áo (mặc định cloth); beard: màu râu; heavy: giáp nặng
   const M = cfg.model ? model("char/" + cfg.model) : null;
-  const WM = (k) => (M ? model("wpn/" + k) : null);
+  const WM = (k) => (M ? model("wpn/" + (cfg.wpnAlt?.[k] ?? k)) : null);     // wpnAlt: { tệp mặc định của kiểu vũ khí: tệp riêng của tướng } (H34 đại kiếm Vân Đồn…)
   // capeScale: [rộng, dài] của áo choàng (H31: áo choàng hẹp, ngắn cho thấy giáp then viền vàng — review B20)
   const flapCol = skirt ?? cloth;
   const root = new THREE.Group(), p = {};
@@ -525,7 +525,33 @@ export const RIGS = {
 RIGS.TT = { model: "TTh", scale: 1.175, cloth: 0x9a7a2a, armor: PAL.then, trim: PAL.vang, hat: "khan", weapon: "cung" };
 RIGS.H38 = { model: "H38h", scale: 1.135, cloth: PAL.cham, armor: PAL.then, trim: PAL.vang, hat: "khan", weapon: "dao" };
 // Toa Đô (X19, boss B15): cùng rig "Tướng Nguyên" (đại đao, áo choàng) nhưng mô hình riêng (râu điểm bạc, giáp trầy); cỡ 1,38 của Meshy thành 1,48 (xem MESHY bên dưới).
-RIGS.X19 = { ...RIGS.tuong, model: "X19h", scale: 1.48 };
+// Đại phủ cán dài (wpn/daiphu, đợt năm; design/glb-prompts.md G14 "cho Toa Đô nếu muốn đúng truyện") thay đại đao — chỉ đổi hình, đòn vẫn của rig đại đao.
+RIGS.X19 = { ...RIGS.tuong, model: "X19h", scale: 1.48, wpnAlt: { dadao: "daiphu" } };
+// Đợt năm (GLB Hunyuan3D 2026-10-10, lượt `tuong-moi` của design/glb-prompts.md): 14 tướng. Cỡ như TT, H38: chiều cao thiết kế (bảng mục 1) theo tỉ lệ với H40 (1,80 m, cỡ 1,23).
+// Vũ khí theo cột Đi kèm (binh khí riêng chưa có prompt thì dùng thứ có sẵn), wpnAlt chọn tệp riêng. Hai tướng có trận dùng: vua Trần Nhân Tông (H30, tướng AI ở B17 —
+// director-b17.js B17_H30, giữ cỡ 1,342 của mô hình mượn cũ vì bán kính va chạm BigUnit = 0,9 × cỡ) và Thoát Hoan (X18, boss B16 — data/battle-b16.js rigKey, cỡ 1,38 như
+// rig "tuong" cũ). Còn lại chưa có trận: lab.html?view=rigs&rigs=H27,H28,…
+// hat "khan": búi tóc, mũ đã nằm trong lưới (khi chưa nạp được mô hình thì code dựng khăn), Nguyên: "munguyen".
+const T5 = (model, h, o) => ({ model, scale: +(1.23 * h / 1.8).toFixed(3), armor: PAL.then, trim: PAL.vang, hat: "khan", ...o });
+Object.assign(RIGS, {
+  H27: T5("H27h", 1.74, { cloth: PAL.sonDam, weapon: "dao" }),                                   // Trần Thái Tông: kiếm (khiên mây chưa có mẫu)
+  H28: T5("H28h", 1.72, { cloth: PAL.then, weapon: "giao" }),                                     // Trần Thủ Độ: giáo tạm cho cờ lệnh
+  H29: T5("H29h", 1.76, { cloth: 0x5a4030, weapon: "dao" }),                                      // Lê Phụ Trần
+  H30: T5("H30h", 1.72, { cloth: PAL.sonDam, weapon: "dao" }),                                    // Trần Nhân Tông (trận B17: tướng AI cầm đao)
+  H32: T5("H32h", 1.76, { cloth: 0x2f5a4a, weapon: "cung" }),                                     // Trần Quang Khải: cung Việt
+  H34: T5("H34h", 1.88, { cloth: PAL.sonDam, weapon: "daikiem", wpnAlt: { daikiem: "daikiem_vandon" } }),   // Trần Khánh Dư: đại kiếm Vân Đồn (WC01)
+  H36: T5("H36h", 1.76, { cloth: PAL.sonDam, weapon: "giao" }),                                   // Trần Bình Trọng
+  H37: T5("H37h", 1.8, { cloth: PAL.then, weapon: "giao" }),                                      // Phạm Ngũ Lão: giáo tạm cho sóc
+  H39: T5("H39h", 1.78, { cloth: 0x6a5030, weapon: "giao" }),                                     // Dã Tượng (móc voi wpn/moc_voi chờ voi chiến)
+  X16: T5("X16h", 1.74, { cloth: 0x4a3524, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "cung", wpnAlt: { cung_viet: "cung_ng" } }),   // Ngột Lương Hợp Thai
+  X17: T5("X17h", 1.8, { cloth: PAL.cham, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "giao", wpnAlt: { giao_dv: "giao_ng" } }),       // A Truật
+  X21: T5("X21h", 1.78, { cloth: 0x34465a, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "cung", wpnAlt: { cung_viet: "cung_ng" } }),   // Lý Hằng
+  X23: T5("X23h", 1.76, { cloth: 0x4b5364, armor: PAL.thep, trim: PAL.xam, hat: "munguyen", weapon: "dadao" }),                                   // Trương Văn Hổ: đại đao tạm cho kích
+});
+// Thoát Hoan (X18, boss B16): rig "Tướng Nguyên" (đại đao, áo choàng code) với mô hình riêng — áo chàm sẫm, giáp mạ vàng; áo choàng chàm (design/glb-prompts.md bảng màu X18).
+RIGS.X18 = { ...RIGS.tuong, model: "X18h", cloth: 0x2c3a4a, trim: 0xc9a14a, cape: 0x2c3a4a };
+// Yết Kiêu (H38): đoản đao Yết Kiêu (wpn/doandao, đợt năm) thay đao thẳng.
+RIGS.H38.wpnAlt = { dao: "doandao" };
 // Năm tướng (H35, H31, H33, H40, Toa Đô) dùng mô hình Hunyuan3D (design/hunyuan-prompts.md, mã nướng <mã>h: nắm đấm bao chuôi vũ khí, giáp chi tiết). Chuẩn hoá theo độ
 // cao vai nên đầu, mũ Hunyuan nhỏ hơn Meshy (đỉnh đầu thấp 7–9% ở cùng cỡ): cỡ H31, H33, H40, X19 nhân lên đúng tỉ lệ đó (1,12 → 1,23; 1,15 → 1,24 / 1,23; 1,38 → 1,48) để
 // giữ chiều cao tướng, boss như trước; H35 đỉnh đầu như nhau nên giữ 1,08. Bản Meshy cũ (assets/models/char/<mã>.hkm còn nguyên) ở khoá thêm "m" với đúng mã, cỡ cũ:
