@@ -148,6 +148,84 @@ class Field {
   }
 }
 
+// ---- sprite theo lô: mỗi khoá sprite (ảnh + :flat tấm phẳng + :add cộng sáng) một InstancedMesh, mọi sprite cùng khoá một lượt vẽ --------
+// Trước đây mỗi sprite (tia lửa, vệt chém, bụi, vòng sóng…) là một THREE.Sprite / Mesh riêng: lúc đánh đồn A1 ở B15, 25–35 lượt vẽ mỗi khung
+// chỉ cho fx (đỉnh 165–169 lượt vẽ cả cảnh, trần 150). Hình y như cũ: quad 1 × 1 quay về camera (Sprite: cỡ, góc quay) hoặc nằm trên đất xoay
+// quanh trục y (tấm phẳng), màu × ảnh, độ đục, rồi tone mapping, không gian màu, sương theo đúng thứ tự shader sprite / MeshBasic của three.
+// Trong lô xếp xa → gần; giữa các lô (và với vật trong suốt khác) three xếp theo vị trí lưới, đặt ở tâm các sprite đang hiện. Sprite ngoài
+// khung nhìn không vào lô (three cũng loại sprite theo khung nhìn). Lô rỗng thì ẩn.
+const SB_CAP = 256;
+const SB_VS = `
+attribute vec3 iPos; attribute vec2 iSR; attribute vec4 iCol;
+varying vec2 vUv; varying vec4 vCol;
+#include <fog_pars_vertex>
+void main() {
+  vUv = uv; vCol = iCol;
+  float c = cos(iSR.y), s = sin(iSR.y);
+#ifdef FLAT
+  vec2 q = position.xz * iSR.x;
+  vec4 mvPosition = viewMatrix * vec4(iPos.x + c * q.x + s * q.y, iPos.y, iPos.z - s * q.x + c * q.y, 1.0);
+#else
+  vec4 mvPosition = viewMatrix * vec4(iPos, 1.0);
+  vec2 q = position.xy * iSR.x;
+  mvPosition.xy += vec2(c * q.x - s * q.y, s * q.x + c * q.y);
+#endif
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+const SB_FS = `
+uniform sampler2D map;
+varying vec2 vUv; varying vec4 vCol;
+#include <fog_pars_fragment>
+void main() {
+  gl_FragColor = vCol * texture2D(map, vUv);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(), _c = new THREE.Color();
+
+class SpriteBatch {
+  constructor(scene, name, flat, additive, planeGeo) {
+    let g;
+    if (flat) { g = planeGeo.clone(); g.deleteAttribute("normal"); }      // tấm 1 × 1 nằm trên mặt xz (FX.planeGeo)
+    else {                                              // quad của THREE.Sprite (tâm 0,5, 0,5)
+      g = new THREE.BufferGeometry(); g.setIndex([0, 1, 2, 0, 2, 3]);
+      g.setAttribute("position", new THREE.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    }
+    const ia = (n) => new THREE.InstancedBufferAttribute(new Float32Array(SB_CAP * n), n).setUsage(THREE.DynamicDrawUsage);
+    this.aPos = ia(3); this.aSR = ia(2); this.aCol = ia(4); this.attrs = [this.aPos, this.aSR, this.aCol];
+    g.setAttribute("iPos", this.aPos); g.setAttribute("iSR", this.aSR); g.setAttribute("iCol", this.aCol);
+    const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog]);
+    uniforms.map = { value: tex(name) };               // gán sau merge: merge nhân bản texture chưa nạp xong
+    const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: SB_VS, fragmentShader: SB_FS, fog: true, defines: flat ? { FLAT: "" } : {},
+      transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      side: flat ? THREE.DoubleSide : THREE.FrontSide, forceSinglePass: true });
+    const m = this.mesh = new THREE.InstancedMesh(g, mat, SB_CAP);
+    m.count = 0; m.frustumCulled = false; m.visible = false;
+    if (OVER.has(name)) m.renderOrder = R_OVER;
+    scene.add(m);
+    this.list = [];
+  }
+  // sprite trong khung nhìn của khung này (this.list, đã có s.d: độ sâu theo hướng nhìn) → buffer, xa trước gần sau
+  upload() {
+    const L = this.list, n = Math.min(L.length, SB_CAP), m = this.mesh;
+    for (let i = 1; i < L.length; i++) { const p = L[i]; let j = i - 1; while (j >= 0 && L[j].d < p.d) { L[j + 1] = L[j]; j--; } L[j + 1] = p; }
+    const P = this.aPos.array, S = this.aSR.array, C = this.aCol.array;
+    let mx = 0, my = 0, mz = 0;
+    for (let i = 0; i < n; i++) {
+      const s = L[i];
+      P[i * 3] = s.x; P[i * 3 + 1] = s.y; P[i * 3 + 2] = s.z; S[i * 2] = s.sc; S[i * 2 + 1] = s.rot;
+      C[i * 4] = s.cr; C[i * 4 + 1] = s.cg; C[i * 4 + 2] = s.cb; C[i * 4 + 3] = s.a;
+      mx += s.x; my += s.y; mz += s.z;
+    }
+    m.count = n; m.visible = n > 0;
+    if (n > 0) { for (const a of this.attrs) upload(a, n); m.position.set(mx / n, my / n, mz / n); }
+    L.length = 0;
+  }
+}
+
 // Cụm khói của cột khói lớn theo mức chi tiết: 0 gần (nhiều cụm nhỏ), 1 vừa, 2 xa (ít cụm mà to).
 // Lên 25–60 m trong đời hạt (vy giảm dần theo drag), nở rộng, trôi theo gió của trường.
 // Cụm xa đậm và sẫm hơn (lit: sáng dần theo tuổi) để cột khói còn nổi trên nền trời qua sương.
@@ -167,7 +245,7 @@ export class FX {
     this.pm.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 3), 3);
     this.pm.frustumCulled = false; this.pm.count = 0; scene.add(this.pm);
     this.parts = [];
-    this.sprites = []; this.pool = {};
+    this.sprites = []; this.batches = {};              // sprite đang sống (bản ghi: giờ, cỡ, màu…) và lô vẽ theo khoá
     this.teles = [];
     this.ghosts = [];
     this.texts = [];
@@ -223,32 +301,22 @@ export class FX {
     return p;
   }
 
-  // Sprite (luôn quay về camera) hoặc tấm phẳng nằm trên đất, lấy từ pool theo ảnh.
+  // Sprite (luôn quay về camera) hoặc tấm phẳng nằm trên đất: một bản ghi, vẽ trong lô của khoá (SpriteBatch). Trả bản ghi.
   sprite(name, x, y, z, { size = 1, T = 0.3, grow = 1, rise = 0, rot = 0, spin = 0, opacity = 1, flat = false, additive = false, follow = null, flicker = 0, color = 0xffffff } = {}) {
+    _c.setHex(color);
+    const s = { b: this.batch(name, flat, additive), x, y, z, t: 0, T, size, grow, rise, spin, opacity, flat, follow, flicker, rot,
+      cr: _c.r, cg: _c.g, cb: _c.b, ring: 0, sc: 0, a: 0, d: 0 };
+    this.sprites.push(s);
+    return s;
+  }
+  batch(name, flat, additive) {
     const key = name + (flat ? ":flat" : "") + (additive ? ":add" : "");
-    const list = this.pool[key] || (this.pool[key] = []);
-    const o = list.pop() || this.make(name, flat, additive);
-    o.visible = true; o.position.set(x, y, z); o.material.color.setHex(color);
-    if (flat) o.rotation.set(0, rot, 0); else o.material.rotation = rot;
-    this.sprites.push({ o, t: 0, T, size, grow, rise, spin, opacity, flat, follow, flicker, rot });
-    return o;
+    return this.batches[key] || (this.batches[key] = new SpriteBatch(this.scene, name, flat, additive, this.planeGeo));
   }
-
-  make(name, flat, additive) {
-    const blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
-    const o = flat
-      ? new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex(name), transparent: true, depthWrite: false, blending, side: THREE.DoubleSide }))
-      : new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(name), transparent: true, depthWrite: false, blending }));
-    o.userData.key = name + (flat ? ":flat" : "") + (additive ? ":add" : ""); if (OVER.has(name)) o.renderOrder = R_OVER; this.scene.add(o);
-    return o;
-  }
-  // Làm nóng (battle/gfx.js Warm): pool = mỗi khoá sprite một vật dựng sẵn (trong cảnh, ẩn — dùng thật về sau); extra = vòng báo đòn, bóng
-  // né cùng công thức vật liệu (chỉ để biên dịch, không dùng, không dispose).
+  // Làm nóng (battle/gfx.js Warm): pool = lưới lô của mọi khoá sprite dựng sẵn (trong cảnh, ẩn khi rỗng — dùng thật về sau); extra = vòng báo
+  // đòn, bóng né cùng công thức vật liệu (chỉ để biên dịch, không dùng, không dispose).
   warmSet() {
-    const pool = SPRITE_KEYS.map((k) => {
-      const [name, ...f] = k.split(":"), o = this.make(name, f.includes("flat"), f.includes("add"));
-      o.visible = false; (this.pool[k] || (this.pool[k] = [])).push(o); return o;
-    });
+    const pool = SPRITE_KEYS.map((k) => { const [name, ...f] = k.split(":"); return this.batch(name, f.includes("flat"), f.includes("add")).mesh; });
     const t = this.teleMeshes(1, true);
     return { pool, extra: [t.outer, t.fill, this.ghostMesh()] };
   }
@@ -335,8 +403,8 @@ export class FX {
 
   // Vòng đỏ dưới chân địch: đòn viền đỏ (nhỏ) hoặc Tuyệt Kỹ boss (lớn).
   teleMeshes(r, big) {
-    const outer = new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex("redring"), transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-    const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: 0xd8321e, transparent: true, opacity: big ? 0.26 : 0.2, side: THREE.DoubleSide, depthWrite: false }));
+    const outer = new THREE.Mesh(this.planeGeo, new THREE.MeshBasicMaterial({ map: tex("redring"), transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
+    const fill = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ color: 0xd8321e, transparent: true, opacity: big ? 0.26 : 0.2, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     fill.rotation.x = -Math.PI / 2;
     outer.scale.setScalar(r * 2.25);
     for (const m of [outer, fill]) m.renderOrder = R_OVER;
@@ -407,21 +475,25 @@ export class FX {
     this.pm.count = n;
     if (n > 0) { upload(this.pm.instanceMatrix, n); upload(this.pm.instanceColor, n); }
 
-    // sprite và tấm phẳng từ ảnh Higgsfield
+    // sprite và tấm phẳng từ ảnh Higgsfield: cỡ, độ đục, góc của khung này; sprite trong khung nhìn (hình cầu bao quad + 1 m) vào lô của khoá
+    const cam = this.camera;
+    cam.updateMatrixWorld();                            // battle.js đặt camera ngay trước fx.update, renderer.render chưa cập nhật ma trận
+    _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm);
+    _f.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
     for (let i = this.sprites.length - 1; i >= 0; i--) {
       const s = this.sprites[i]; s.t += dt; const u = s.t / s.T;
-      if (u >= 1) {
-        s.o.visible = false; (this.pool[s.o.userData.key] || (this.pool[s.o.userData.key] = [])).push(s.o);
-        this.sprites[i] = this.sprites[this.sprites.length - 1]; this.sprites.pop(); continue;
-      }
+      if (u >= 1) { this.sprites[i] = this.sprites[this.sprites.length - 1]; this.sprites.pop(); continue; }
       let sc = s.ring ? s.size * (0.3 + 0.7 * u) : s.size * (1 + (s.grow - 1) * u);
-      if (s.flicker) sc *= 0.92 + 0.08 * Math.sin(s.t * 13 + s.o.position.x);
-      if (s.flat) s.o.scale.set(sc, 1, sc); else s.o.scale.set(sc, sc, 1);
-      s.o.position.y += s.rise * dt;
-      if (s.spin) { if (s.flat) s.o.rotation.y += s.spin * dt; else s.o.material.rotation += s.spin * dt; }
+      if (s.flicker) sc *= 0.92 + 0.08 * Math.sin(s.t * 13 + s.x);
+      s.y += s.rise * dt;
+      if (s.spin) s.rot += s.spin * dt;
       const fade = s.flicker ? (u > 0.9 ? (1 - u) * 10 : 1) : (s.ring ? 1 - u : u < 0.15 ? 1 : 1 - (u - 0.15) / 0.85);
-      s.o.material.opacity = s.opacity * Math.max(0, fade);
+      s.sc = sc; s.a = s.opacity * Math.max(0, fade);
+      _sph.center.set(s.x, s.y, s.z); _sph.radius = sc * 0.75 + 1;
+      if (_fr.intersectsSphere(_sph)) { s.d = (s.x - cx) * _f.x + (s.y - cy) * _f.y + (s.z - cz) * _f.z; s.b.list.push(s); }
     }
+    for (const k in this.batches) this.batches[k].upload();
     for (let i = this.teles.length - 1; i >= 0; i--) {
       const t = this.teles[i]; t.t += dt; const u = t.t / t.T;
       const un = t.unit, y = heightAt(un.x, un.z) + 0.15;

@@ -299,7 +299,8 @@ export function buildWorldB20(scene, { shadows = true, tide = 100, seed = SCN.se
   });
 
   // ---- Cứ Điểm / mốc: vòng trên đất hoặc trên mặt nước (mốc cọc theo con nước) ------------------------------------------
-  const ringMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, side: THREE.DoubleSide, depthWrite: false });
+  // trong suốt hai mặt mà phẳng: một lượt vẽ (forceSinglePass) — three mặc định vẽ hai lượt (mặt sau, mặt trước) cho vật như thế
+  const ringMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true });
   world.surfaceY = (x, z) => Math.max(grid.meshY(x, z), world.tideY);
   world.depthAt = (x, z) => world.tideY - grid.meshY(x, z);
   const placeRing = (v) => {

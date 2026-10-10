@@ -143,8 +143,30 @@ t("đã nạp: 7 thuyền sông, 260 cây, nhà cổng dùng mô hình (Node kh�
   let trees = null; scenes[1].traverse((o) => { if (o.isInstancedMesh && o.count > 200 && tris(o) === index["env/ENV_cay_tan_tron"].lods[1]) trees = o; });
   assert.ok(trees, "InstancedMesh cây dùng LOD1 ENV_cay_tan_tron");
   const gate = Object.values(withM[1].gates)[0];
-  let house = null; scenes[1].traverse((o) => { if (o.isLOD && tris(o.levels[0].object) === index["env/ENV_cong_ham_tu"].tris && Math.hypot(o.position.x - gate.x, o.position.z - gate.z) < 0.01) house = o; });
+  let house = null; scenes[1].traverse((o) => { if (o.isLOD && o.levels[0].object.isMesh && tris(o.levels[0].object) === index["env/ENV_cong_ham_tu"].tris && Math.hypot(o.position.x - gate.x, o.position.z - gate.z) < 0.01) house = o; });
   assert.ok(house, "nhà cổng mô hình (LOD) ở chỗ cổng");
+});
+// đồn có tường (world.js buildFort): cổng, tháp góc là THREE.LOD theo tâm đồn — gần: hai cổng, bốn tháp lưới riêng (tháp mẫu: LOD gần / xa riêng),
+// xa: một lưới gộp đúng bằng mức xa của bốn tháp cộng hai cổng, chỉ hiện khi tháp góc nào cũng xa camera hơn ngưỡng mức xa của nó
+t("đồn có tường: cổng + tháp góc xa tâm đồn thành một lưới gộp (= mức xa bốn tháp + hai cổng, cùng chỗ), ngưỡng ≥ ngưỡng mức xa của tháp + góc xa nhất", () => {
+  const tris = (m) => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+  const box = (o) => { o.updateWorldMatrix(true, false); return new THREE.Box3().setFromBufferAttribute(o.geometry.clone().applyMatrix4(o.matrixWorld).attributes.position); };
+  for (const [w, scene] of [[withM[1], scenes[1]], [without[1], scenesOff[1]]]) {
+    const lods = []; scene.traverse((o) => { if (o.isLOD && o.levels.length === 2 && o.levels[0].object.isGroup) lods.push(o); });
+    assert.equal(lods.length, w.forts.length, "mỗi đồn một LOD");
+    for (const lod of lods) {
+      const L = w.forts.find((f) => Math.hypot(f.cx - lod.position.x, f.cz - lod.position.z) < 0.01);
+      assert.ok(L, "LOD ở tâm đồn");
+      const [near, far] = lod.levels.map((l) => l.object), parts = [];
+      near.children.forEach((c) => parts.push(c.isLOD ? c.levels[c.levels.length - 1] : { object: c, distance: 0 }));
+      assert.equal(near.children.length, 6, "hai cổng, bốn tháp");
+      assert.equal(tris(far), parts.reduce((s, p) => s + tris(p.object), 0), "lưới gộp = mức xa của từng vật");
+      const B = box(far), U = new THREE.Box3(); for (const p of parts) U.union(box(p.object));
+      for (const k of ["min", "max"]) for (const a of ["x", "y", "z"]) assert.ok(Math.abs(B[k][a] - U[k][a]) < 1e-3, `hộp lưới gộp ${k}.${a}`);
+      const corner = Math.max(...L.corners.map(([x, z]) => Math.hypot(x - L.cx, z - L.cz)));
+      for (const p of parts) assert.ok(lod.levels[1].distance >= p.distance + corner - 1e-6, "lưới gộp hiện khi mọi tháp đã ở mức xa");
+    }
+  }
 });
 
 // đồ thêm (scenery.js VILLAGE_PROPS, WORLD_PROPS, ngựa ở cọc buộc ngựa): không va chạm, nên phải nằm ngoài chỗ lính, tướng, bot đi và đứng

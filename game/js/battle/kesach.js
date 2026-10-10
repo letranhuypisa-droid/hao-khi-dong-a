@@ -190,7 +190,7 @@ export class KeSachManager {
         part(new THREE.BoxGeometry(0.3, 0.06, 0.3), PAL.son, { y: 0.35 }),
       ]), lambert({ emissive: 0x3a2a08 }));
       m.add(bundle);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 20), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 20), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, forceSinglePass: true }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; m.add(ring);
       m.position.set(p.x, heightAt(p.x, p.z), p.z); ctx.scene.add(m);
       return { ...p, mesh: m, taken: false };

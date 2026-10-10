@@ -568,7 +568,7 @@ export function pickupMesh(color) {
   const g = new THREE.Group();
   const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.35, flatShading: true }));
   m.position.y = 0.8; g.add(m);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 16), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 16), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.7, side: THREE.DoubleSide, forceSinglePass: true }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; g.add(ring);
   g.userData.gem = m;
   return g;

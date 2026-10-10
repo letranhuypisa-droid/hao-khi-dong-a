@@ -220,7 +220,8 @@ export const B15 = {
   ambient: (scene, ctx) => new Ambient(scene, ctx),     // cò, trâu, trẻ chăn trâu, quạ, dân tản cư (ambient.js)
   // vòng Cứ Điểm (cổng đã mở thì tắt vòng), cờ tuyến hai mặt trận
   frameVisuals(ctx) {
-    for (const [id, v] of Object.entries(ctx.world.bases)) if (v.ring) v.ring.visible = ctx.sim.bases[id].type !== "cong" || !ctx.openGates[id];
+    // cung tiến độ chỉ hiện khi đang chiếm dở: ở 0 % là cung 0,001 rad không thấy mà vẫn tốn một lượt vẽ mỗi Cứ Điểm trong khung
+    for (const [id, v] of Object.entries(ctx.world.bases)) { if (v.ring) v.ring.visible = ctx.sim.bases[id].type !== "cong" || !ctx.openGates[id]; if (v.prog) v.prog.visible = v.progVal > 0.005; }
     for (const fid in FRONTS) ctx.world.setLine(fid, ctx.sim.fronts[fid].x);
   },
   // nền tiếng: khoảng cách tới tuyến gần nhất (dọc làn ±6 m, ngang làn ±20 m); lửa trại từ P3

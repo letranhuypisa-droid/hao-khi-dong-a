@@ -20,6 +20,7 @@ import { VILLAGES, BOATS, BOAT_RULE, LANDING, RAM, GATES, GATE_SOUTH, GATE_EAST,
   REEDS, DYKE, DEPOTS, DEPOT_RULE, SQUADS, COUNTER, BANNERS, BANNER_RULE } from "../data/battle-b16.js";
 
 const COL = { ta: 0x9b2d20, dich: 0x2c3e55, gold: 0xf1d98a, ring: 0xffffff };
+const BOAT_FAR = 60;               // thuyền neo (mẫu): từ đây vẽ mức xa LOD1 (frameBoats)
 const PUSH = { gap: 1.6, back: 2.4, pullR: 3.2, respawn: 5 };       // người đẩy xe húc: khoảng cách, đứng sau xe, tầm "đang đẩy", hồi người mới (giây)
 const RING_ITEMS = [
   { k: "theota", name: "Theo ta", icon: "theota" },
@@ -114,15 +115,16 @@ export class DirectorB16 {
   }
 
   // ---- vật của trận ----------------------------------------------------------------------------------------------------------
+  // vòng, cung trên đất: trong suốt hai mặt mà phẳng — một lượt vẽ (forceSinglePass; three mặc định hai lượt: mặt sau, mặt trước)
   ringMesh(c, r, color = COL.ring, op = 0.55) {
-    const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     m.rotation.x = -Math.PI / 2; m.position.set(c.x, heightAt(c.x, c.z) + 0.14, c.z); this.props.add(m);
     return m;
   }
   // cung tiến độ vàng trên đất, chạy vòng trong vòng chiếm (như vòng Cứ Điểm B15 — world.js setBaseProgress): đầy dần khi đứng giữ
   arcMesh(c, r) {
     const m = new THREE.Mesh(new THREE.RingGeometry(r - 1.3, r - 0.5, 56, 1, Math.PI / 2, 0.001),
-      new THREE.MeshBasicMaterial({ color: COL.gold, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: COL.gold, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     m.rotation.x = -Math.PI / 2; m.position.set(c.x, heightAt(c.x, c.z) + 0.16, c.z); this.props.add(m);
     m.userData = { r, p: 0 }; m.visible = false;
     return m;
@@ -163,22 +165,23 @@ export class DirectorB16 {
       });
     }
     // 12 thuyền neo: mẫu ENV_thuyen_song_nguyen (gốc ở mớn nước) tách thân / cột buồm ở 1,9 m — thuyền cháy giữ thân cháy đen, mất cột buồm.
-    // Mỗi phần một THREE.LOD (gần LOD0, từ 60 m LOD1; lưới dùng chung 12 thuyền): không thêm lượt vẽ.
+    // Vẽ theo lô: mỗi phần (thân, buồm, thân cháy) × mức (gần LOD0, từ BOAT_FAR m LOD1) một InstancedMesh, frameBoats() xếp thuyền vào lô theo
+    // khoảng cách camera như THREE.LOD — tối đa 6 lượt vẽ cho cả bến. Trước đây mỗi thuyền hai THREE.LOD: tới 24 lượt vẽ và ngần ấy lượt bóng
+    // (đỉnh B16 161 lượt vẽ, trần 150). Chưa nạp mẫu: khối code mỗi thuyền một nhóm như cũ.
     const boatId = "ENV_thuyen_song_nguyen", cuts = envPart(boatId) && [{ y1: 1.9 }, { y0: 1.9 }].map((cut) => [envPart(boatId, { cut }), envPart(boatId, { cut, lod: 1 })]);
-    const boatPart = ([near, far]) => {
-      const l = new THREE.LOD(); l.addLevel(new THREE.Mesh(near, this.envMat()), 0); l.addLevel(new THREE.Mesh(far, this.envMat()), 60);
-      for (const v of l.levels) v.object.castShadow = true;
-      return l;
-    };
-    this.boatMesh = BOATS.map((B) => {
+    if (cuts) {
+      this.charMat ||= new THREE.MeshLambertMaterial({ color: 0x1e1814 });
+      const lot = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, BOATS.length); m.count = 0; m.castShadow = true; P.add(m); return m; };
+      this.boatLots = { hull: cuts[0].map((g) => lot(g, this.envMat())), sail: cuts[1].map((g) => lot(g, this.envMat())), burnt: cuts[0].map((g) => lot(g, this.charMat)) };
+      this.boatAt = BOATS.map((B) => ({ p: new THREE.Vector3(B.x, 0.3, B.z), m: new THREE.Matrix4().compose(new THREE.Vector3(B.x, 0.3, B.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, B.yaw, 0)), new THREE.Vector3(1, 1, 1)) }));
+      this.boatKey = "";
+    }
+    this.boatMesh = cuts ? [] : BOATS.map((B) => {
       const g = new THREE.Group();
-      if (cuts) { const top = boatPart(cuts[1]); g.add(boatPart(cuts[0]), top); g.sail = top; }
-      else {
-        g.add(box(3.2, 1.1, 10, wood, 0, 0.55, 0), box(2.6, 0.9, 3.2, wood, 0, 1.5, -2.6));
-        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 7, 5), dark); mast.position.set(0, 4.4, 0.6); g.add(mast);
-        const s = box(0.08, 3.8, 3.2, sail, 0, 5, 0.6); g.add(s); g.sail = s;
-      }
-      g.position.set(B.x, cuts ? 0.3 : 0.1, B.z); g.rotation.y = B.yaw; P.add(g);
+      g.add(box(3.2, 1.1, 10, wood, 0, 0.55, 0), box(2.6, 0.9, 3.2, wood, 0, 1.5, -2.6));
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 7, 5), dark); mast.position.set(0, 4.4, 0.6); g.add(mast);
+      const s = box(0.08, 3.8, 3.2, sail, 0, 5, 0.6); g.add(s); g.sail = s;
+      g.position.set(B.x, 0.1, B.z); g.rotation.y = B.yaw; P.add(g);
       g.traverse((m) => { if (m.isMesh) m.userData.mat0 = m.material; });
       return g;
     });
@@ -224,12 +227,20 @@ export class DirectorB16 {
     const sack = new THREE.MeshLambertMaterial({ color: 0xb59a68 });
     const pile = envPart("ENV_bao_gao") && merge([...[-1.4, 0, 1.4].flatMap((x) => [-0.75, 0.75].map((z) => envPart("ENV_bao_gao", { x, z, s: 1.15, ry: (x + z) * 2 }))),
       envPart("ENV_bao_gao", { x: -0.7, y: 0.75, s: 1.2, ry: 1.4 }), envPart("ENV_bao_gao", { x: 0.7, y: 0.75, s: 1.2, ry: -1.7 })]);
+    // đống bao, bốn cột, mái gộp một lưới màu đỉnh (envMat như thuyền; màu đỉnh = màu vật liệu khối cũ) — một lượt vẽ thay sáu mỗi kho; kho cháy vẫn
+    // đổi cả lưới sang charMat như trước (mọi phần của kho đều đổi)
+    const tinted = (geo, color, x, y, z) => {
+      const g = geo.toNonIndexed(), c = new THREE.Color(color), n = g.attributes.position.count, cc = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) cc.set([c.r, c.g, c.b], i * 3);
+      g.translate(x, y, z); g.setAttribute("color", new THREE.BufferAttribute(cc, 3));
+      return g;
+    };
+    const depotGeo = merge([...(pile ? [pile] : [tinted(new THREE.BoxGeometry(4.2, 1.4, 3), sack.color, 0, 0.7, 0), tinted(new THREE.BoxGeometry(3.2, 1, 2.2), sack.color, 0, 1.9, 0)]),
+      ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => tinted(new THREE.BoxGeometry(0.16, 3.2, 0.16), wood.color, sx * 2.4, 1.6, sz * 1.8))),
+      tinted(new THREE.BoxGeometry(5.2, 0.15, 4), roof.color, 0, 3.25, 0)]);
     this.depotMesh = DEPOTS.map((D) => {
-      const g = new THREE.Group(), y = heightAt(D.x, D.z);
-      if (pile) { const m = new THREE.Mesh(pile, this.envMat()); m.castShadow = true; g.add(m); }
-      else g.add(box(4.2, 1.4, 3, sack, 0, 0.7, 0), box(3.2, 1, 2.2, sack, 0, 1.9, 0));
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.16, 3.2, 0.16, wood, sx * 2.4, 1.6, sz * 1.8));
-      g.add(box(5.2, 0.15, 4, roof, 0, 3.25, 0));
+      const g = new THREE.Group(), y = heightAt(D.x, D.z), m = new THREE.Mesh(depotGeo, this.envMat());
+      m.castShadow = true; g.add(m);
       g.position.set(D.x, y, D.z); P.add(g);
       for (const m of g.children) m.userData.mat0 = m.material;
       return g;
@@ -256,7 +267,8 @@ export class DirectorB16 {
       this.setArc(this.vArcs[i], v.p, on);
       this.vFlags[i].cloth.material.color.set(v.done ? COL.ta : 0x8a6a3a);
     });
-    BOATS.forEach((B, i) => {
+    if (this.boatLots) this.frameBoats();
+    else BOATS.forEach((B, i) => {
       const g = this.boatMesh[i], burnt = st.boats[i].burnt;
       g.sail.visible = !burnt;
       if (g.burnt === burnt) return;
@@ -278,6 +290,25 @@ export class DirectorB16 {
     this.palFlag.cloth.material.color.set(st.palace.taken ? COL.ta : COL.dich);
     this.ramMesh.visible = st.phase >= 2;
     for (const id of [GATE_SOUTH, GATE_EAST]) if (st.gates[id].open && !this.ctx.openGates[id]) this.openGateVisual(id, true);
+  }
+
+  // Thuyền neo (mẫu) vào lô: thuyền cháy → thân cháy, còn lại → thân + buồm; mức xa khi camera cách gốc thuyền ≥ BOAT_FAR (như THREE.LOD cũ:
+  // khoảng cách tới gốc, không trễ). Mỗi khung (BattleDef.frameVisuals, sau khi đặt camera) và mỗi lần đồng bộ trạng thái; chỉ ghi lại khi có
+  // thuyền đổi lô (hình cầu bao của lô tính lại theo các bản đang dùng — bóng, khung nhìn loại theo đó).
+  frameBoats() {
+    const L = this.boatLots; if (!L) return;
+    const cam = this.ctx.camera.position, st = this.st;
+    let key = "";
+    for (let i = 0; i < BOATS.length; i++) key += (st.boats[i].burnt ? "b" : "h") + (cam.distanceTo(this.boatAt[i].p) >= BOAT_FAR ? 1 : 0);
+    if (key === this.boatKey) return;
+    this.boatKey = key;
+    const n = { hull: [0, 0], sail: [0, 0], burnt: [0, 0] };
+    for (let i = 0; i < BOATS.length; i++) {
+      const l = +key[i * 2 + 1], M = this.boatAt[i].m;
+      if (key[i * 2] === "b") L.burnt[l].setMatrixAt(n.burnt[l]++, M);
+      else { L.hull[l].setMatrixAt(n.hull[l]++, M); L.sail[l].setMatrixAt(n.sail[l]++, M); }
+    }
+    for (const k in L) L[k].forEach((m, l) => { m.count = n[k][l]; m.instanceMatrix.needsUpdate = true; if (m.count) m.computeBoundingSphere(); });
   }
 
   // ---- sinh lính theo pha (cả khi tải lại điểm lưu) ----------------------------------------------------------------------------

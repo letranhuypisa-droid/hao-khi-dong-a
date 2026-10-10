@@ -28,6 +28,7 @@ export { waterDist, vnoise, fbm, ZONES, paddyAt, setTerrain, ARENA_R, heightAt, 
 // camera → tướng (lệch ngang < r + FADE_PAD m) hoặc cách ống kính < FADE_NEAR m thì mờ dần xuống
 // FADE_MIN; ra khỏi hành lang thì hiện lại. Mỗi vật có vật liệu riêng (nhân bản khi đăng ký).
 const FADE_PAD = 1.1, FADE_NEAR = 6, FADE_MIN = 0.12;
+const FORT_FAR = 70;               // tháp góc đồn (ENV_thap_canh_nguyen): mức xa từ 70 m; cả đồn gộp một lưới khi mọi tháp đã xa hơn (buildFort)
 function addFader(world) {
   world.fadeables = [];
   world.addFadeable = (obj, r = 0.3) => {
@@ -245,24 +246,33 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
     staticParts.push(P(new THREE.BoxGeometry(2.8, 0.25, 2.8), PAL.go, { x, y: y + h, z }));
     staticParts.push(P(new THREE.ConeGeometry(2.2, 1.4, 4), PAL.nau, { x, y: y + h + 1.6, z, ry: Math.PI / 4 }));
   };
-  const flagPole = (x, z, h = 7) => {
+  // Cột cờ: mỗi cờ một nhóm (cột, vải — vật liệu nhân bản, làm mờ khi chắn camera) như trước, nhưng thường ngày vẽ theo lô (syncFlags, cuối
+  // world.update): mọi cột một InstancedMesh, mọi vải một InstancedMesh (màu instance = màu vải) — hai lượt vẽ cho cả bản đồ thay hai lượt mỗi cờ
+  // (B15 nhìn dọc bờ sông bắc: 10 cờ trong khung, 20 lượt vẽ). Cờ đang mờ, cờ có ảnh (solo: cờ hiệu bản doanh) vẽ bằng lưới riêng như cũ.
+  const flags = [];
+  const flagPole = (x, z, h = 7, solo = false) => {
     const y = heightAt(x, z);
     const g = new THREE.Group(); g.position.set(x, y, z);
     const env = envPart("ENV_cot_co", { s: h / 9 });                                       // cột mẫu cao 9 m, có đế gỗ
     const pole = new THREE.Mesh(env || P(new THREE.CylinderGeometry(0.07, 0.09, h, 5), PAL.then, { y: h / 2 }), mat);
     g.add(pole);
-    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2, 4, 1), new THREE.MeshLambertMaterial({ color: PAL.son, side: THREE.DoubleSide }));
+    // vải hai mặt, vật liệu thành trong suốt khi đăng ký làm mờ (addFadeable): three vẽ vật trong suốt hai mặt hai lượt (mặt sau rồi mặt trước) —
+    // tấm phẳng thì một lượt cho hình y hệt (forceSinglePass), như mọi vòng trên đất, tấm fx phẳng
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2, 4, 1), new THREE.MeshLambertMaterial({ color: PAL.son, side: THREE.DoubleSide, forceSinglePass: true }));
     cloth.position.set(0.95, h - 0.7, 0); g.add(cloth);
     scene.add(g);
     world.animated.push((t) => { cloth.rotation.y = Math.sin(t * 2 + x) * 0.25; });
     world.addFadeable(g, 1.0);          // lá cờ dài 1,8 m chìa ra một bên cột
-    return { group: g, cloth };
+    // lưới cột của lô dựng cho cột 9 m: mẫu phóng đều h / 9, khối code giãn theo chiều cao (bán kính không theo h)
+    const F = { group: g, cloth, pole, solo, fade: world.fadeables[world.fadeables.length - 1], poleS: new THREE.Matrix4().makeScale(env ? h / 9 : 1, h / 9, env ? h / 9 : 1) };
+    flags.push(F);
+    return F;
   };
 
   // ---- bản doanh ta --------------------------------------------------------------------
   palisade(34, 0, 18, 0);
   tent(24, -7, 0.4, PAL.son, 1.1); tent(22, 8, -0.3, PAL.sonDam, 1.1); tent(38, -10, 0.2, PAL.vai); tent(40, 10, -0.2, PAL.vai); tent(30, 0, 0, PAL.son, 1.4);
-  const hqFlag = flagPole(44, -4, 9); hqFlag.cloth.material.map = flagTexture("TRẦN", "#9b2d20", "#f1d98a");
+  const hqFlag = flagPole(44, -4, 9, true); hqFlag.cloth.material.map = flagTexture("TRẦN", "#9b2d20", "#f1d98a");
   hqFlag.cloth.material.color.set(0xffffff);
 
   // ---- đồn có tường: tường cọc trên nền đất đắp, cổng trước (tây) và cổng sau (đông) trên tim đường, bốn tháp canh góc, lều trại bên trong ----------------------------------
@@ -354,6 +364,12 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       }
       staticParts.push(box(0.5, 0.17, len, RAIL, mx, top + 0.55, mz, ang), box(0.5, 0.17, len, RAIL, mx, top + 1.4, mz, ang));   // hai nẹp ngang buộc hàng cọc
     }
+    // Cổng, tháp góc: hai mức theo khoảng cách camera tới tâm đồn (THREE.LOD). Gần: mỗi cổng, mỗi tháp một lưới riêng (mờ khi chắn camera). Xa hơn
+    // FORT_FAR: cả hai cổng, bốn tháp một lưới gộp — một lượt vẽ thay sáu (B15 nhìn dọc bờ sông bắc thấy cả bốn đồn: 24 lượt vẽ chỉ cho tháp, cổng;
+    // đỉnh 165 lượt vẽ, trần 150). FORT_FAR = mức xa của tháp mẫu (70 m) + góc tháp xa tâm nhất, nên lưới gộp chỉ hiện khi tháp nào cũng đã ở mức xa
+    // (lưới gộp là đúng mức xa ấy, đúng chỗ), cổng là khối code y hệt. Vật trong mức gần giữ nguyên toạ độ thế giới (nhóm dời ngược vị trí LOD).
+    const fortLod = new THREE.LOD(), fy = heightAt(cx, cz), near = new THREE.Group(), farParts = [];
+    fortLod.position.set(cx, fy, cz); near.position.set(-cx, -fy, -cz);
     // cổng: hai trụ, xà ngang, mái nhỏ, cờ hiệu; lưới riêng (mờ khi chắn camera)
     for (const g of L.gates) {
       const y = heightAt(g.x, g.z), h2 = L.gate / 2 + 0.15, parts = [];
@@ -361,13 +377,18 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       parts.push(box(1.4, 0.8, L.gate + 2.6, LOG, g.x, y + 4.15, g.z), box(1.7, 0.2, L.gate + 3.2, ROOF, g.x, y + 4.62, g.z));
       parts.push(P(new THREE.ConeGeometry(2.35, 1.7, 4), ROOF, { x: g.x, y: y + 5.55, z: g.z, ry: Math.PI / 4, sz: (L.gate + 3.2) / 3.3 }));
       for (const dz of [-2.2, 0, 2.2]) parts.push(box(0.06, 1.5, 1.0, PAL.son, g.x + g.side * 0.8, y + 3.05, g.z + dz));
-      const m = new THREE.Mesh(merge(parts), mat); m.castShadow = shadows; scene.add(m); world.addFadeable(m, 5);
+      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 5); farParts.push(geo);
     }
     // tháp canh góc: bốn chân, sàn, lan can, mái; thang dựa chân tháp phía trong đồn
     for (const [tx, tz] of L.corners) {
       const y = heightAt(tx, tz), sx = tx < cx ? 1 : -1, sz = tz < cz ? 1 : -1, parts = [];
-      const env = envLOD("ENV_thap_canh_nguyen", mat, { far: 70, cast: shadows });                     // sàn 3,3 m ở 6,3 m, mặt thang nhìn vào sân
-      if (env) { env.position.set(tx, y, tz); env.rotation.y = Math.atan2(cx - tx, cz - tz); env.scale.setScalar(1.13); scene.add(env); world.addFadeable(env, 3.4); continue; }
+      const env = envLOD("ENV_thap_canh_nguyen", mat, { far: FORT_FAR, cast: shadows });               // sàn 3,3 m ở 6,3 m, mặt thang nhìn vào sân
+      if (env) {
+        const ry = Math.atan2(cx - tx, cz - tz);
+        env.position.set(tx, y, tz); env.rotation.y = ry; env.scale.setScalar(1.13); near.add(env); world.addFadeable(env, 3.4);
+        farParts.push(envPart("ENV_thap_canh_nguyen", { x: tx, y, z: tz, ry, s: 1.13, lod: 1 }));
+        continue;
+      }
       for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) parts.push(box(0.42, 5.4, 0.42, LOG2, tx + a * 1.55, y + 2.7, tz + b * 1.55));
       parts.push(box(4.0, 0.32, 4.0, LOG, tx, y + 5.35, tz));
       for (const k of [-1, 1]) for (const yy of [5.85, 6.35]) parts.push(box(4.0, 0.12, 0.12, RAIL, tx, y + yy, tz + k * 1.94), box(0.12, 0.12, 4.0, RAIL, tx + k * 1.94, y + yy, tz));
@@ -376,8 +397,11 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       const lx = tx + sx * 1.35, lz = tz + sz * 2.15;
       for (const k of [-0.3, 0.3]) parts.push(box(0.08, 5.3, 0.08, RAIL, lx + k, y + 2.65, lz));
       for (let r = 0; r < 9; r++) parts.push(box(0.6, 0.06, 0.06, RAIL, lx, y + 0.5 + r * 0.58, lz));
-      const m = new THREE.Mesh(merge(parts), mat); m.castShadow = shadows; scene.add(m); world.addFadeable(m, 3.4);
+      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 3.4); farParts.push(geo);
     }
+    const far = new THREE.Mesh(merge(farParts), mat); far.castShadow = shadows; far.position.copy(near.position);
+    const corner = Math.max(...L.corners.map(([x, z]) => Math.hypot(x - cx, z - cz)));
+    fortLod.addLevel(near, 0); fortLod.addLevel(far, FORT_FAR + corner); scene.add(fortLod);
     if (kind === "doanh_trai") { barracksYard(L); return L; }
     // bên trong: lều lính hai dãy chừa lối đi giữa tim đường, lều chỉ huy, kho thùng, đống rơm, bếp lửa, giá giáo (không va chạm, như lều khác)
     tent(cx - 8, cz - 7.2, 0.1, PAL.vai, 1.0); tent(cx, cz - 8.2, -0.1, PAL.vai, 1.05); tent(cx + 8, cz - 7.2, 0.2, PAL.xam, 1.0);
@@ -415,10 +439,11 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       vis.flag = flagPole(MAP.fortWallX + 2, z - 7, 10);
     }
     if (b.type !== "ban_doanh") {
-      const ring = new THREE.Mesh(new THREE.RingGeometry(vis.r - 0.35, vis.r, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+      // vòng chiếm, cung tiến độ: trong suốt hai mặt nhưng phẳng — một lượt vẽ (forceSinglePass), không phải hai; cung ẩn khi 0 % (B15 frameVisuals)
+      const ring = new THREE.Mesh(new THREE.RingGeometry(vis.r - 0.35, vis.r, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
       ring.rotation.x = -Math.PI / 2; ring.position.set(vis.x, heightAt(vis.x, vis.z) + 0.12, vis.z);
       scene.add(ring); vis.ring = ring;
-      const prog = new THREE.Mesh(new THREE.RingGeometry(vis.r - 1.1, vis.r - 0.45, 48, 1, 0, 0.001), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+      const prog = new THREE.Mesh(new THREE.RingGeometry(vis.r - 1.1, vis.r - 0.45, 48, 1, 0, 0.001), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
       prog.rotation.x = -Math.PI / 2; prog.position.copy(ring.position); prog.position.y += 0.02;
       scene.add(prog); vis.prog = prog; vis.progVal = 0;
     }
@@ -532,8 +557,35 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
     world.lineFlags[f.id] = { ta, dich };
   }
 
+  // lô cột cờ, vải cờ (flagPole): mỗi khung sau hoạt cảnh (vải phất, cờ tuyến đã dời theo setLine, độ mờ của fadeOccluders) chép ma trận, màu vải
+  // của từng cờ đang hiện vào lô; cờ đang mờ (a < 0,999) hoặc solo thì hiện lưới riêng của nó thay vì vào lô
+  const flagLot = (geo, m, color) => {
+    const im = new THREE.InstancedMesh(geo, m, flags.length); im.count = 0; im.frustumCulled = false;
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (color) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(flags.length * 3), 3); im.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+    scene.add(im); return im;
+  };
+  const poleLot = flagLot(envPart("ENV_cot_co") || P(new THREE.CylinderGeometry(0.07, 0.09, 9, 5), PAL.then, { y: 4.5 }), mat, false);
+  const clothLot = flagLot(new THREE.PlaneGeometry(1.8, 1.2, 4, 1), new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }), true);
+  const _fm = new THREE.Matrix4();
+  const syncFlags = () => {
+    let n = 0;
+    for (const F of flags) {
+      if (!F.group.visible) continue;
+      const own = F.solo || F.fade.a < 0.999;
+      F.pole.visible = F.cloth.visible = own;
+      if (own) continue;
+      F.group.updateWorldMatrix(false, true);
+      poleLot.setMatrixAt(n, _fm.multiplyMatrices(F.pole.matrixWorld, F.poleS));
+      clothLot.setMatrixAt(n, F.cloth.matrixWorld); clothLot.setColorAt(n, F.cloth.material.color);
+      n++;
+    }
+    poleLot.count = clothLot.count = n;
+    if (n > 0) for (const A of [poleLot.instanceMatrix, clothLot.instanceMatrix, clothLot.instanceColor]) { A.clearUpdateRanges(); A.addUpdateRange(0, n * A.itemSize); A.needsUpdate = true; }
+  };
+
   // đuốc ở bản doanh và cổng
-  world.update = (t) => { for (const fn of world.animated) fn(t); };
+  world.update = (t) => { for (const fn of world.animated) fn(t); syncFlags(); };
   world.setBaseOwner = (id, owner) => {
     const v = world.bases[id]; if (!v) return;
     const c = owner === "ta" ? 0xc0392b : 0x3d5a78;
@@ -755,7 +807,7 @@ export function buildArena(scene, { shadows = true } = {}) {
   scene.add(new THREE.Mesh(outer, new THREE.MeshLambertMaterial({ color: 0x6b763c })));
   // vòng vẽ vạch sân
   for (const r of [6, 18, 32]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 72), new THREE.MeshBasicMaterial({ color: 0xc9a14a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 72), new THREE.MeshBasicMaterial({ color: 0xc9a14a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.33; scene.add(ring);
   }
   // hàng rào cọc có 4 cửa

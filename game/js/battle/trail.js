@@ -18,7 +18,7 @@ export class BladeTrail {
     for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     g.setIndex(idx);
     this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
-      depthWrite: false, side: THREE.DoubleSide }));
+      depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 5; this.mesh.visible = false;
     scene.add(this.mesh);
     this.lastB = null; this.lastT = null;

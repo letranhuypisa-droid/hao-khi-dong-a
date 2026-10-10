@@ -148,7 +148,7 @@ export class DirectorB17 {
 
   // ---- vật của trận ----------------------------------------------------------------------------------------------------------
   ringMesh(c, r, color = COL.ring, op = 0.55) {
-    const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.4, r, 56), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     m.rotation.x = -Math.PI / 2; m.position.set(c.x, heightAt(c.x, c.z) + 0.14, c.z); this.props.add(m);
     return m;
   }

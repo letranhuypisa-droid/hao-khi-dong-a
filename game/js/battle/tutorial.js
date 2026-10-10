@@ -63,7 +63,7 @@ export class TutorialDirector {
   officerAlive() { return this.off && this.off.alive && !this.off.dead; }
   marker(x, z) {
     const g = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 2.1, 48), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 2.1, 48), new THREE.MeshBasicMaterial({ color: 0xf1d98a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15; g.add(ring);
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 9, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
     beam.position.y = 4.5; g.add(beam);
