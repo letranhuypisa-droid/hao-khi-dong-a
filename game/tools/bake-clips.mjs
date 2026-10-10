@@ -1,7 +1,7 @@
 // tools/bake-clips.mjs — nướng clip hoạt ảnh xương người (Quaternius UAL, Mixamo…) thành bảng góc của rig game: assets/anim/clips.json.
 //   node game/tools/bake-clips.mjs              nướng mọi clip trong CLIPS, in sai số FK, ghi clips.json
 //   node game/tools/bake-clips.mjs --list       liệt kê clip có trong từng nguồn (để chọn thêm vào CLIPS)
-//   node game/tools/bake-clips.mjs --only jog   chỉ nướng clip tên đó (vẫn ghi cả tệp, giữ các clip khác của lần trước)
+//   node game/tools/bake-clips.mjs --only jog,hySide   chỉ nướng các clip tên đó (vẫn ghi cả tệp, giữ các clip khác của lần trước)
 //   Mixamo: thả FBX vào game/anim-src/mixamo/ (tải "FBX Binary", skin tuỳ ý, clip chạy bộ nên chọn "In Place"). Lệnh nướng tự đổi FBX → GLB bằng
 //   Blender chạy nền (tools/fbx2glb.py; tìm `blender` trong PATH hoặc biến BLENDER) rồi nướng mỗi tệp thành clip "mx_<tên tệp>" và TỰ PHÂN LOẠI:
 //   vòng lặp (khung đầu ≈ khung cuối), chạy bộ (tốc độ chân trụ, hoặc tốc độ hông nếu clip có chuyển động gốc), đòn (tay vung ≥ 10 m/s → căn hướng
@@ -48,6 +48,10 @@ const SKELS = {
   mixamo: { hips: "mixamorigHips", spine: "mixamorigSpine", neck: "mixamorigNeck", head: "mixamorigHead", headTip: "mixamorigHeadTop_End",
     side: (s) => { const n = s === "L" ? "Left" : "Right"; return { arm: `mixamorig${n}Arm`, fore: `mixamorig${n}ForeArm`, hand: `mixamorig${n}Hand`,
       mid: `mixamorig${n}HandMiddle1`, thigh: `mixamorig${n}UpLeg`, shin: `mixamorig${n}Leg`, foot: `mixamorig${n}Foot`, toe: `mixamorig${n}ToeBase` }; } },
+  // Haley Tuffles (mocap miễn phí, iPi Soft): xương người chuẩn nhưng tên lạ — L/RShoulder là CÁNH TAY TRÊN (sau L/RClavicle), Finger0 ngón cái, Finger2 ngón giữa
+  hy: { hips: "Hip", spine: "LowerSpine", neck: "Neck", head: "Head",
+    side: (s) => ({ arm: `${s}Shoulder`, fore: `${s}Forearm`, hand: `${s}Hand`, mid: `${s}Finger2`,
+      thigh: `${s}Thigh`, shin: `${s}Shin`, foot: `${s}Foot`, toe: `${s}Toe` }) },
 };
 const SOURCES = {
   ual: { file: "anim-src/ual/Animation Library[Standard]/Godot/AnimationLibrary_Godot_Standard.glb", skel: "ual" },
@@ -90,6 +94,13 @@ const CLIPS = {
   gsSpin:    { src: "mx:great sword high spin attack", clip: "great sword high spin attack", aim: true, sword: true },
   gsHilt:    { src: "mx:great sword attack", clip: "great sword attack", aim: true, sword: true },
   getUp:     { src: "ual2", clip: "LayToIdle" },
+  // Nhát kiếm một tay của Haley Tuffles (anim-src/haley, 24 fps, tay phải vung). trim = [giây đầu, giây cuối] nướng: bỏ ~1 s lấy đà đứng chờ đầu clip
+  // (để cú chém không bị bóp 4–5× vào 0,2–0,5 s của đòn game, còn ~2×) và đoạn thừa sau cú chém — ứng với t0 … cú chém + (cú chém − t0) × (1 − hit) / hit
+  // của đòn dùng clip (hero-anim.js CLIP_SPECS, even). hySide2 → N5 (quét ngang), hyFront → C1 (lao bổ), hyDown → DQ (nhảy lên bổ xuống, tiếp đất quỳ).
+  // Còn trong anim-src/haley chưa dùng: SwordSwingSide (quét ngang mạnh nhất, 19 m/s), SwordSwingFrontHeavy (chuỗi quay 26 s, nhát nặng ở 1,35 s).
+  hySide2:   { src: "hy:SwordSwingSide2", clip: "SwordSwingSide2", aim: true, trim: [0.45, 1.5] },
+  hyFront:   { src: "hy:SwordSwingFront", clip: "SwordSwingFront", aim: true, trim: [0.55, 2.0] },
+  hyDown:    { src: "hy:SwordSwingDown", clip: "SwordSwingDown", aim: true, trim: [0.95, 2.9] },
 };
 
 const args = process.argv.slice(2);
@@ -145,19 +156,21 @@ function jointsNow(src) {
 
 // ---- lấy mẫu một clip -----------------------------------------------------------------------------------------------------------
 function sampleClip(src, clip, cfg) {
-  const loop = !!cfg.loop, n = loop ? Math.max(2, Math.round(clip.duration * FPS)) : Math.max(2, Math.ceil(clip.duration * FPS) + 1);
+  // trim: [giây đầu, giây cuối] — chỉ nướng đoạn này của clip nguồn (bỏ đoạn đứng chờ / đoạn thừa của chuỗi quay dài); dur, strike, start tính theo đoạn đã cắt
+  const ta = cfg.trim ? cfg.trim[0] : 0, D = (cfg.trim ? Math.min(cfg.trim[1], clip.duration) : clip.duration) - ta;
+  const loop = !!cfg.loop, n = loop ? Math.max(2, Math.round(D * FPS)) : Math.max(2, Math.ceil(D * FPS) + 1);
   const mixer = new THREE.AnimationMixer(src.root), action = mixer.clipAction(clip);
   action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
   const frames = [], joints = [], st = newState();
   for (let i = 0; i < n; i++) {
-    const t = loop ? (i * clip.duration) / n : Math.min(clip.duration, (i * clip.duration) / (n - 1));
+    const t = ta + (loop ? (i * D) / n : Math.min(D, (i * D) / (n - 1)));
     mixer.setTime(t);
     const P = jointsNow(src);
     joints.push(P);
     frames.push(solvePose(P, st, {}));
   }
   mixer.uncacheAction(clip);
-  return { n, dur: clip.duration, frames, joints, loop };
+  return { n, dur: D, frames, joints, loop };
 }
 
 // Hướng mặt lúc vung: clip đòn xoay hông rất nhiều khi vung (swordA ≈ 117°, swordC > 230°), nhưng trong game vùng sát thương nằm trước mặt hero và
@@ -328,19 +341,33 @@ function findBlender() {
   for (const exe of [process.env.BLENDER, "blender"].filter(Boolean)) if (spawnSync(exe, ["--version"], { encoding: "utf8" }).status === 0) return exe;
   return null;
 }
+// FBX → GLB bằng Blender chạy nền (tools/fbx2glb.py); bỏ qua nếu GLB đã mới hơn FBX. Trả true nếu có GLB dùng được.
+function ensureGlb(fbx, glb) {
+  if (fs.existsSync(glb) && fs.statSync(glb).mtimeMs >= fs.statSync(fbx).mtimeMs) return true;
+  const blender = findBlender();
+  if (!blender) { console.log(`  ! ${path.basename(fbx)}: cần Blender để đổi FBX sang GLB (cài và thêm vào PATH, hoặc đặt biến BLENDER); hoặc tự xuất GLB vào cùng thư mục`); return false; }
+  process.stdout.write(`  đổi ${path.basename(fbx)} → GLB bằng Blender… `);
+  const r = spawnSync(blender, ["--background", "--python", path.join(ROOT, "tools/fbx2glb.py"), "--", fbx, glb], { encoding: "utf8" });
+  const ok = r.status === 0 && fs.existsSync(glb);
+  console.log(ok ? "xong" : ["LỖI", ...(r.stdout || "").split("\n").slice(-6), r.stderr || ""].join("\n"));
+  return ok;
+}
+// Haley Tuffles: thả FBX vào anim-src/haley/; mỗi tệp thành nguồn "hy:<tên tệp>" (bộ xương hy). Không tự thêm clip: khai báo tường minh trong CLIPS.
+function discoverHaley() {
+  const dir = path.join(ROOT, "anim-src/haley");
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir)) {
+    const m = /^(.*)\.fbx$/i.exec(f); if (!m) continue;
+    const glb = path.join(dir, m[1] + ".glb");
+    if (ensureGlb(path.join(dir, f), glb)) SOURCES["hy:" + m[1]] = { file: glb, skel: "hy" };
+  }
+}
 function discoverMixamo() {
   const dir = path.join(ROOT, "anim-src/mixamo");
   if (!fs.existsSync(dir)) return;
-  const found = [];
   for (const f of fs.readdirSync(dir)) {
     const m = /^(.*)\.fbx$/i.exec(f); if (!m) continue;
-    const fbx = path.join(dir, f), glb = path.join(dir, m[1] + ".glb");
-    if (fs.existsSync(glb) && fs.statSync(glb).mtimeMs >= fs.statSync(fbx).mtimeMs) continue;
-    const blender = findBlender();
-    if (!blender) { console.log(`  ! ${f}: cần Blender để đổi FBX sang GLB (cài và thêm vào PATH, hoặc đặt biến BLENDER); hoặc tự xuất GLB vào cùng thư mục`); continue; }
-    process.stdout.write(`  đổi ${f} → GLB bằng Blender… `);
-    const r = spawnSync(blender, ["--background", "--python", path.join(ROOT, "tools/fbx2glb.py"), "--", fbx, glb], { encoding: "utf8" });
-    console.log(r.status === 0 && fs.existsSync(glb) ? "xong" : ["LỖI", ...(r.stdout || "").split("\n").slice(-6), r.stderr || ""].join("\n"));
+    ensureGlb(path.join(dir, f), path.join(dir, m[1] + ".glb"));
   }
   for (const f of fs.readdirSync(dir)) {
     const m = /^(.*)\.glb$/i.exec(f); if (!m) continue;
@@ -349,7 +376,7 @@ function discoverMixamo() {
     if (!CLIPS[key] && !Object.values(CLIPS).some((c) => c.src === id)) CLIPS[key] = { src: id, clip: m[1], auto: true, ...(/great sword|two handed sword|longsword/i.test(m[1]) ? { sword: true } : {}) };
   }
 }
-if (!flag("--list")) discoverMixamo();
+if (!flag("--list")) { discoverMixamo(); discoverHaley(); }
 
 // Tự phân loại một clip lạ: lấy mẫu thử không lặp, rồi so khung đầu / cuối và đo tốc độ.
 function classify(src, clip, cfg) {
@@ -378,14 +405,15 @@ function classify(src, clip, cfg) {
 const MIXAMO_USE = [];                  // clip mx_* đưa vào clips.json (game dùng); xem ghi chú ở chỗ ghi tệp
 const GAIT_REF = "jog";                  // clip chạy chuẩn để căn pha các clip chạy bộ khác (phải đứng trước chúng trong CLIPS)
 let gaitRef = null;
-const only = opt("--only");
+const only = opt("--only") ? new Set(opt("--only").split(",")) : null;
 const prev = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : { clips: {} };
 const result = { version: 1, fps: FPS, keys: KEYS, clips: { ...prev.clips } };
 const cache = {};
 let bad = 0;
 for (const [name, cfg] of Object.entries(CLIPS)) {
-  if (only && only !== name) continue;
+  if (only && !only.has(name)) continue;
   const def = SOURCES[cfg.src];
+  if (!def) { console.log(`  ! ${name}: chưa có nguồn "${cfg.src}" (thả FBX vào anim-src/haley/ hoặc anim-src/mixamo/); giữ bản đã nướng trong clips.json`); continue; }
   const gltf = (cache[cfg.src] ||= await loadGLB(def.file));
   const clip = gltf.animations.find((a) => a.name === cfg.clip) || gltf.animations.find((a) => a.name.endsWith("|" + cfg.clip));
   if (!clip) { console.log(`  ! ${name}: không có clip "${cfg.clip}" trong ${cfg.src}`); bad++; continue; }

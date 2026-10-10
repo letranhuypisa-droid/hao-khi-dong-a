@@ -15,10 +15,13 @@ const PROC = {
   C5: (u) => A.dash(u), C6: (u) => A.spin(u, 2),
   DN: (u) => A.dash(u), DC: (u) => A.dash(u), DQ: (u) => A.doubleChop(u), CT: (u) => A.slash(u, 1, 0),
 };
-// Đòn dựng từ clip kiếm (clip-moves.js); N5 kéo hai đao, N6 / C3 / C4 / C6 xoay, C1 / C2 / C5 / DQ nhảy bổ, hất, lao vẫn là khung khoá cũ.
-const CLIP_SPECS = {
+// Đòn dựng từ clip kiếm (clip-moves.js); N6 / C3 / C4 / C6 xoay, C2 / C5 hất, lao vẫn là khung khoá cũ.
+export const CLIP_SPECS = {
   N1: { clip: "swordA" }, N2: { clip: "swordA", mirror: true }, N3: { clip: "hook" }, N4: { clip: "swordC", t0: 0.5, t1: 0.95, mirror: true },
   DN: { clip: "swordB" }, DC: { clip: "swordDash", t0: 0.1, t1: 0.7 }, CT: { clip: "swordA" },
+  // Nhát kiếm Haley Tuffles (mocap, clip nướng đã cắt bỏ ~1 s lấy đà đứng chờ, bake-clips.mjs trim): quét ngang, lao bổ, nhảy lên bổ xuống tiếp đất quỳ.
+  // even: tốc độ phát sau cú chém bằng trước nó (~2×), không nén phần theo đà vào khoảng ngắn hơn nhiều.
+  N5: { clip: "hySide2", even: true }, C1: { clip: "hyFront", even: true }, DQ: { clip: "hyDown", even: true },
 };
 export const HERO_ANIM = withClips(PROC, CLIP_SPECS);
 export const HERO_MOVE_LIST = Object.keys(HERO_ANIM);

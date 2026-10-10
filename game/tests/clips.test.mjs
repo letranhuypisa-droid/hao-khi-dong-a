@@ -194,14 +194,48 @@ t("N2 là bản lật trái-phải của N1 (cùng clip, mirror) ở mốc sát 
   const u = MOVES.N1.hits[0], a = HA.HERO_ANIM.N1(u), b = HA.HERO_ANIM.N2(u);
   near(b.shLx, a.shRx, 1e-5, "vai"); near(b.elLx, a.elRx, 1e-5, "khuỷu"); near(b.kneeLx, a.kneeRx, 1e-5, "gối"); near(b.torsoY, -a.torsoY, 1e-5, "xoay thân");
 });
-t("đòn không có spec (N5, N6, C1…) và mọi đòn khi không có clip giữ nguyên hàm khung khoá cũ", () => {
+t("đòn không có spec (N6, C2…) và mọi đòn khi không có clip giữ nguyên hàm khung khoá cũ", () => {
   C.setClips(CLIPS_JSON);
-  assert.deepEqual(HA.HERO_ANIM.N5(0.4), A.scissor(0.4));
-  assert.deepEqual(HA.HERO_ANIM.C1(0.4), A.doubleChop(0.4));
+  assert.deepEqual(HA.HERO_ANIM.N6(0.4), A.spin(0.4, 1.25));
+  assert.deepEqual(HA.HERO_ANIM.C2(0.4), A.uppercut(0.4));
   C.setClips(null);
   assert.deepEqual(HA.HERO_ANIM.N1(0.3), A.slash(0.3, 1, 0));
   assert.deepEqual(HA.HERO_ANIM.N2(0.3), A.slash(0.3, -1, 0));
   assert.deepEqual(HA.HERO_ANIM.DC(0.3), A.dash(0.3));
+  assert.deepEqual(HA.HERO_ANIM.N5(0.4), A.scissor(0.4));
+  assert.deepEqual(HA.HERO_ANIM.C1(0.4), A.doubleChop(0.4));
+  assert.deepEqual(HA.HERO_ANIM.DQ(0.4), A.doubleChop(0.4));
+});
+// Nhát kiếm Haley Tuffles (mocap iPi Soft, nướng từ anim-src/haley): N5 ← hySide2, C1 ← hyFront, DQ ← hyDown.
+const HALEY_MOVES = { N5: "hySide2", C1: "hyFront", DQ: "hyDown" };
+t("clip Haley (hySide2, hyFront, hyDown): tay phải vung, không lặp, cú chém nằm trong clip, đủ khung hữu hạn", () => {
+  for (const name of new Set(Object.values(HALEY_MOVES))) {
+    const c = CLIPS_JSON.clips[name];
+    assert.ok(c, name + " có trong clips.json");
+    assert.equal(c.hand, "R", name + " tay vung"); assert.equal(c.loop, false, name + " không lặp");
+    assert.ok(c.strike > c.start && c.strike < c.dur - 0.3, `${name}: strike ${c.strike} nằm giữa start ${c.start} và cuối clip ${c.dur}`);
+    assert.equal(c.data.length, c.n * CLIPS_JSON.keys.length, name + " đủ n × kênh");
+    assert.ok(c.data.every(Number.isFinite), name + " số hữu hạn");
+  }
+});
+t("đòn Haley của H35 (N5, C1, DQ): đầu / cuối đúng thế thủ, mốc sát thương đúng tư thế clip lúc chém, không clip thì về khung khoá cũ", () => {
+  C.setClips(CLIPS_JSON);
+  for (const [k, name] of Object.entries(HALEY_MOVES)) {
+    for (const u of [0, 1]) for (const key of ["torsoY", "hipsY", "shRx", "kneeLx", "handRx"]) near(HA.HERO_ANIM[k](u)[key], A.GUARD[key], 1e-6, `${k} u=${u} ${key}`);
+    const want = A.zeroPose(); C.sampleT(name, CLIPS_JSON.clips[name].strike, want);
+    const got = HA.HERO_ANIM[k](MOVES[k].hits[0]);
+    for (const key of ["torsoY", "shRx", "shRy", "elRx", "hipLx", "kneeRx"]) near(got[key], want[key], 1e-5, `${k}@hit ${key}`);
+    near(got.handRx, want.handRx + CM.HAND_BIAS, 1e-5, k + " cổ tay + độ lệch lưỡi");
+  }
+});
+t("đòn Haley của H35: tốc độ phát clip 1–3× (lấy đà dài ~1 s của mocap không bị bóp vào 0,2–0,5 s), trước và sau cú chém xấp xỉ nhau (even)", () => {
+  for (const [k, name] of Object.entries(HALEY_MOVES)) {
+    const spec = HA.CLIP_SPECS[k], c = CLIPS_JSON.clips[name], hit = MOVES[k].hits[0], dur = MOVES[k].dur;
+    const t0 = spec.t0 ?? 0, before = (c.strike - t0) / (hit * dur);
+    const t1 = Math.min(c.dur, c.strike + ((c.strike - t0) / (hit * dur)) * (1 - hit) * dur), after = (t1 - c.strike) / ((1 - hit) * dur);
+    assert.ok(before >= 1 && before <= 3, `${k}: tốc độ trước chém ${before.toFixed(2)}×`);
+    assert.ok(Math.abs(after - before) < 0.05 || t1 === c.dur, `${k}: tốc độ sau chém ${after.toFixed(2)}× so với trước ${before.toFixed(2)}×`);
+  }
 });
 t("mọi đòn của HERO_ANIM trả số hữu hạn ở mọi u, có clip và không có", () => {
   for (const on of [true, false]) {
