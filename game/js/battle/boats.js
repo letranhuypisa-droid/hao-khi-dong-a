@@ -9,8 +9,9 @@
 // kích thước và số liệu dưới đây là ĐỀ XUẤT BẢN THỬ.
 
 import * as THREE from "three";
-import { PAL, lambert } from "./models.js";
+import { PAL, lambert, merge } from "./models.js";
 import { Deck, poseMatrix } from "./deck.js";
+import { envPart, hasModel } from "./glb.js";
 import { makeRng } from "../core/rng.js";
 import { waveY } from "../data/terrain-b20.js";
 import { STAKE_TOP } from "../data/river-b20.js";
@@ -357,6 +358,21 @@ function oars(mk, C, sp, zs, len, lod) {
   }
 }
 
+// cầu thang kỳ hạm: bậc gỗ khớp mặt dốc của boong (6,0 ở z −6,05 → 3,0 ở z 2,0), hai thành, tay vịn son (hình code và mẫu nướng dùng chung)
+function castleStair(mk, C, D, top, lod) {
+  const nStep = lod ? 1 : 8, z0 = -6.05, z1 = 2.0, run = (z1 - z0) / 8;
+  if (lod) mk.quad([-1.1, top, z0], [1.1, top, z0], [1.1, D, z1], [-1.1, D, z1], C.deck, [0, 0, z0]);
+  else for (let i = 0; i < nStep; i++) {
+    const zc = z0 + (i + 0.5) * run, yTop = top - (i + 0.5) * (3 / 8) + 0.19;
+    mk.box([0, (yTop + D) / 2, zc], [2.2, yTop - D, run], i % 2 ? C.deck2 : C.deck, null, "-y-z");
+  }
+  const pitch = Math.atan2(3, z1 - z0);
+  for (const sg of [1, -1]) {
+    mk.box([sg * 1.18, (top + D) / 2 + 0.05, (z0 + z1) / 2], [0.16, 0.5, Math.hypot(3, z1 - z0)], C.dark, rotM(0, pitch, 0));
+    if (!lod) mk.rod([sg * 1.18, D + 1.0, z1], [sg * 1.18, top + 1.0, z0], 0.05, 0.05, 4, C.red);
+  }
+}
+
 // ---- từng loại ------------------------------------------------------------------------------------------------------
 const BUILD = {
   junk(mk, lod) {
@@ -412,18 +428,7 @@ const BUILD = {
         for (let x = 1.3; x < xi; x += 0.75) mk.box([sg * x, top + 0.4, -6.15], [0.1, 0.8, 0.1], C.rail, null, "-y+y");
       }
     }
-    // cầu thang: bậc gỗ khớp mặt dốc (6,0 ở z −6,05 → 3,0 ở z 2,0), hai thành, tay vịn son
-    const nStep = lod ? 1 : 8, z0 = -6.05, z1 = 2.0, run = (z1 - z0) / 8;
-    if (lod) mk.quad([-1.1, top, z0], [1.1, top, z0], [1.1, D, z1], [-1.1, D, z1], C.deck, [0, 0, z0]);
-    else for (let i = 0; i < nStep; i++) {
-      const zc = z0 + (i + 0.5) * run, yTop = top - (i + 0.5) * (3 / 8) + 0.19;
-      mk.box([0, (yTop + D) / 2, zc], [2.2, yTop - D, run], i % 2 ? C.deck2 : C.deck, null, "-y-z");
-    }
-    const pitch = Math.atan2(3, z1 - z0);
-    for (const sg of [1, -1]) {
-      mk.box([sg * 1.18, (top + D) / 2 + 0.05, (z0 + z1) / 2], [0.16, 0.5, Math.hypot(3, z1 - z0)], C.dark, rotM(0, pitch, 0));
-      if (!lod) mk.rod([sg * 1.18, D + 1.0, z1], [sg * 1.18, top + 1.0, z0], 0.05, 0.05, 4, C.red);
-    }
+    castleStair(mk, C, D, top, lod);
     // đình trên lầu: 4 cột son, mái hai tầng ngói sẫm, đầu đao vàng
     const pz = -13.7, ph = 2.9, roofY = top + ph;
     for (const [x, z] of [[-2.2, -15.0], [2.2, -15.0], [-2.2, -12.4], [2.2, -12.4]]) mk.rod([x, top, z], [x, roofY, z], 0.16, 0.16, lod ? 4 : 6, C.red);
@@ -544,12 +549,104 @@ for (const [k, H] of Object.entries(HULLS)) {
   H.imp = [H.beam / ref.beam, H.deckY / ref.deckY, H.len / ref.len];
 }
 
+// ---- mẫu nướng K1–K5 (design/glb-prompts.md mục K) thay hình gần LOD0 ------------------------------------------------------
+// Mẫu Hunyuan (env/<mã>, glb.js envPart: màu phẳng theo mặt, gốc ở mớn nước, mũi +z) gộp vào InstancedMesh LOD0 của loại như hình code: cùng
+// vật liệu (vá nhìn xuyên của FleetRenderer áp luôn), không thêm lượt vẽ. LOD1, hình thay thế, boong / tường / cửa (HULLS), lá cờ (flagAt) giữ code.
+// Mẫu được nắn cho khớp boong code (người đứng theo deck.js, mô phỏng không đổi), số đo trên lưới nướng ghi trong design/glb-prompts.md mục K:
+//   cut   hộp [|x| <, z0, z1, y0, y1] (khung mẫu, glb.js envPart drop): bỏ tam giác có trọng tâm trong hộp (cầu thang, nắp hầm của mẫu nằm chỗ
+//         cầu thang code)
+//   sheer [z, dy]: hạ mặt boong mũi / lái cong lên của mẫu về phẳng như boong code — dời dy (nội suy theo z), nhân với độ cao tương đối
+//         từ mớn nước tới boong mẫu (0 ở mớn nước, đủ từ boong trở lên) nên đáy thân không đổi; sheerTop: chỉ hạ phần dưới độ cao này (sàn lòng
+//         thuyền), mép mạn và đầu rồng giữ nguyên
+//   z     [z mẫu, z code]: nội suy từng khúc (ngoài hai đầu giữ nguyên) — đưa mặt trước lầu của mẫu về đúng tường lầu code
+//   fit   [y mẫu, y code] tăng dần: nội suy từng khúc, ngoài hai đầu dời theo cặp gần nhất — ky, boong, nóc lầu về đúng HULLS
+//   sx    giãn ngang (mẫu hẹp hơn bề rộng code: sàn mẫu không phủ hết mặt đi được)
+//   sail  mặt xanh chàm cao hơn sail m (khung mẫu) là buồm: nhân màu cho trung bình bằng màu buồm code (buồm mẫu xám chàm sẫm hơn hẳn — hạm đội
+//         đổi màu khi thuyền qua mức LOD1 code ở 110 m)
+//   pole  cán cờ code [đáy, đỉnh, r đáy, r đỉnh, số cạnh] (mẫu không có cán; lá cờ vẽ riêng ở flagAt), như que cuối BUILD của loại
+//   add   phần dựng thêm bằng code: "stair" (cầu thang kỳ hạm như hình code), "floor" (sàn ván ở độ cao boong cho thuyền hở lòng sâu);
+//   patch vá sàn [x0, x1, z0, z1, y] chỗ lưới mẫu thủng
+export const ENV_HULL = {
+  junk: { id: "ENV_chien_thuyen_nguyen", sail: 4.5, sheer: [[-7.6, 0], [-7.4, -0.32], [-6.5, -0.3], [-6, -0.27], [-5, -0.12], [-4, -0.02], [-3, 0], [7, 0], [8, -0.2],
+    [8.5, -0.4], [9.25, -0.55], [10, -0.9]], z: [[-12, -12], [-7.4, -6.2], [-3, -3]],
+    fit: [[-1.34, -1.4], [2.9, 2.6], [5.05, 5.2]], pole: [[-2.3, 4.6, -11.2], [-2.3, 11.6, -11.2], 0.07, 0.05, 4] },
+  flagship: { id: "ENV_ky_ham_nguyen", sail: 8.5, cut: [[1.35, -7.6, -2.9, 4.05, 7.58], [1.1, -0.9, 1.3, 3.97, 4.75]],
+    sheer: [[11.2, 0], [12, -0.35], [13, -0.95], [13.5, -1.1]], z: [[-18, -18], [-7.3, -6.05], [-2, -2]],
+    fit: [[-1.89, -1.9], [3.95, 3.0], [7.6, 6.0]], pole: [[0, 10.4, -13.7], [0, 15.7, -13.7], 0.09, 0.06, 4], add: "stair", patch: [[-2.6, 2.6, -15.6, -11.9, 6.0]] },
+  escort: { id: "ENV_thuyen_ho_ve", sail: 2.2, sx: 1.15, sheer: [[3, 0], [4, -0.05], [5, -0.17], [6, -0.3], [6.5, -0.45], [7, -0.65]],
+    fit: [[-0.95, -0.9], [0.6, 1.8], [2.45, 3.3]], pole: [[-1.4, 2.8, -7.2], [-1.4, 7.5, -7.2], 0.05, 0.04, 4] },
+  scout: { id: "ENV_thuyen_do_luong", sail: 1.3, fit: [[-0.39, -0.5], [0.8, 1.25]], pole: [[0, 0.4, -3.8], [0, 3.3, -3.8], 0.035, 0.03, 3], add: "floor" },
+  light: { id: "ENV_thuyen_chien_tran", sheer: [[-4.4, -0.5], [-3.6, -0.38], [-3, -0.3], [-2.6, 0], [2.6, 0], [3.1, -0.3], [3.6, -0.32], [4.4, -0.52]], sheerTop: 1.45,
+    fit: [[-0.34, -0.36], [0.6, 0.7]], pole: [[0, 0.4, -5.3], [0, 3.4, -5.3], 0.045, 0.035, 5] },
+};
+// nội suy từng khúc qua các cặp [a, b] (a tăng dần); ngoài hai đầu: slope 1 (dời theo cặp gần nhất) hoặc giữ b (hold: hằng số)
+const pwl = (F, v, hold = false) => {
+  if (v <= F[0][0]) return hold ? F[0][1] : v - F[0][0] + F[0][1];
+  for (let i = 1; i < F.length; i++) if (v <= F[i][0]) { const [a0, b0] = F[i - 1], [a1, b1] = F[i]; return b0 + (v - a0) * (b1 - b0) / (a1 - a0); }
+  const [a, b] = F[F.length - 1]; return hold ? b : v - a + b;
+};
+// hình gần từ mẫu nướng của loại (đã nắn khớp boong, thêm cán cờ), null khi chưa nạp mẫu (Node, lỗi mạng) — dựng code như cũ
+function envHull(type) {
+  const E = ENV_HULL[type], g = E && envPart(E.id, { drop: E.cut }); if (!g) return null;
+  const P = g.attributes.position.array, N = g.attributes.normal.array, deckM = E.fit[1]?.[0] ?? 1, sp = SPECS[type];
+  if (E.sail != null) {                                                              // buồm mẫu về màu buồm code (không đổi màu khi qua LOD1)
+    const C = g.attributes.color.array, pick = [], sum = [0, 0, 0], want = new THREE.Color(sp.cols.sail).lerp(new THREE.Color(sp.cols.sail2), 0.5);
+    for (let i = 0; i < P.length; i += 9) {
+      const r = C[i], gg = C[i + 1], b = C[i + 2];
+      if ((P[i + 1] + P[i + 4] + P[i + 7]) / 3 > E.sail && b > r * 1.15 && b > gg * 1.05) { pick.push(i); sum[0] += r; sum[1] += gg; sum[2] += b; }
+    }
+    const k = [want.r, want.g, want.b].map((w, c) => (sum[c] > 0 ? (w * pick.length) / sum[c] : 1));
+    for (const i of pick) for (let v = 0; v < 9; v++) C[i + v] = Math.min(1, C[i + v] * k[v % 3]);
+  }
+  for (let i = 0; i < P.length; i += 3) {
+    let y = P[i + 1]; const z = P[i + 2];
+    if (E.sheer) y += pwl(E.sheer, z, true) * clamp(y / deckM, 0, 1) * (E.sheerTop ? clamp((E.sheerTop - y) / 0.3, 0, 1) : 1);
+    if (E.z) P[i + 2] = pwl(E.z, z);
+    if (E.sx) P[i] *= E.sx;
+    P[i + 1] = pwl(E.fit, y);
+  }
+  for (let i = 0; i < P.length; i += 9) {                                            // pháp tuyến theo mặt sau khi nắn
+    const n = norm(cross([P[i + 3] - P[i], P[i + 4] - P[i + 1], P[i + 5] - P[i + 2]], [P[i + 6] - P[i], P[i + 7] - P[i + 1], P[i + 8] - P[i + 2]]));
+    for (let k = 0; k < 9; k += 3) { N[i + k] = n[0]; N[i + k + 1] = n[1]; N[i + k + 2] = n[2]; }
+  }
+  // màu trung bình mặt sàn mẫu (mặt ngửa ở độ cao y quanh hộp x0…x1, z0…z1, khung code) cho phần dựng thêm bằng code; k: nhân sáng tối
+  const C = g.attributes.color.array, deckCol = (x0, x1, z0, z1, y, k = 1) => {
+    const c = [0, 0, 0]; let w = 0;
+    for (let i = 0; i < P.length; i += 9) {
+      const cx = (P[i] + P[i + 3] + P[i + 6]) / 3, cy = (P[i + 1] + P[i + 4] + P[i + 7]) / 3, cz = (P[i + 2] + P[i + 5] + P[i + 8]) / 3;
+      if (N[i + 1] < 0.9 || Math.abs(cy - y) > 0.12 || cx < x0 - 1.5 || cx > x1 + 1.5 || cz < z0 - 1.5 || cz > z1 + 1.5) continue;
+      for (let j = 0; j < 3; j++) c[j] += C[i + j]; w++;
+    }
+    return w ? new THREE.Color().setRGB(k * c[0] / w, k * c[1] / w, k * c[2] / w).getHex() : sp.cols.deck;
+  };
+  const mk = new Mk(), [a, b, ra, rb, n] = E.pole;
+  mk.rod(a, b, ra, rb, n, sp.cols.mast);
+  if (E.add === "stair") {                                                            // bậc gỗ cùng màu boong dưới của mẫu
+    const top = HULLS[type].topY, d = deckCol(-3.8, 3.8, 2, 8, sp.D);
+    castleStair(mk, { ...sp.cols, deck: d, deck2: deckCol(-3.8, 3.8, 2, 8, sp.D, 0.85) }, sp.D, top, 0);
+  }
+  // vá sàn (patch [x0, x1, z0, z1, y], khung code): chỗ lưới mẫu thủng (sàn dưới đình kỳ hạm), màu trung bình mặt sàn mẫu quanh đó
+  for (const [x0, x1, z0, z1, y] of E.patch || []) mk.quad([x0, y - 0.01, z0], [x1, y - 0.01, z0], [x1, y - 0.01, z1], [x0, y - 0.01, z1], deckCol(x0, x1, z0, z1, y), [0, y - 5, 0]);
+  if (E.add === "floor") {                                                           // sàn ván theo lòng thuyền code (innerHalfBeam), gỗ sẫm như lòng mẫu
+    const zs = [-3.6, -3.0, -2.0, -1, 0.4, 1.8, 2.8, 3.5], y = sp.D;
+    for (let k = 0; k + 1 < zs.length; k++) {
+      const w0 = innerHalfBeam(type, zs[k]) * 0.92, w1 = innerHalfBeam(type, zs[k + 1]) * 0.92;
+      mk.quad([-w0, y, zs[k]], [w0, y, zs[k]], [w1, y, zs[k + 1]], [-w1, y, zs[k + 1]], k % 2 ? 0x7d5e3c : 0x8b6a45, [0, y - 5, 0]);
+    }
+  }
+  const res = merge([g, mk.geometry()]);
+  res.computeBoundingSphere(); res.computeBoundingBox();
+  return res;
+}
+
 const GEO = new Map();
-export function hullGeometry(type, lod = 0) {
-  const key = type + ":" + lod;
-  if (GEO.has(key)) return GEO.get(key);
+// useEnv false: luôn hình code (soát, so sánh); LOD0 dùng mẫu nướng khi đã nạp (khoá đệm riêng: nạp sau vẫn đổi được)
+export function hullGeometry(type, lod = 0, useEnv = true) {
   const H = HULLS[type]; if (!H) throw new Error("không có loại thuyền " + type);
-  if (H.base && lod < 2) { const g = hullGeometry(H.base, lod).clone(); g.scale(H.scale, H.scale, H.scale); GEO.set(key, g); return g; }
+  const env = useEnv && lod === 0 && hasModel("env/" + ENV_HULL[H.base || type]?.id), key = type + ":" + lod + (env ? ":env" : "");
+  if (GEO.has(key)) return GEO.get(key);
+  if (H.base && lod < 2) { const g = hullGeometry(H.base, lod, useEnv).clone(); g.scale(H.scale, H.scale, H.scale); GEO.set(key, g); return g; }
+  if (env) { const g = envHull(type); GEO.set(key, g); return g; }
   const mk = new Mk();
   if (lod >= 2) impostor(mk, H.family); else BUILD[type](mk, lod);
   const g = mk.geometry();

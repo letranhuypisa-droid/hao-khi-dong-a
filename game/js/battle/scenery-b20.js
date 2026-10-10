@@ -12,6 +12,12 @@
 //
 // Ngân sách (hợp đồng §6, ĐỀ XUẤT BẢN THỬ): ≤ ~30 lượt vẽ, ≤ ~120 nghìn tam giác. Mỗi loại là một InstancedMesh hoặc
 // một lưới gộp; đồ động (bè, dây, phao, phao chặn luồng) là InstancedMesh cập nhật ma trận mỗi khung (vài chục cái).
+//
+// Mô hình môi trường nướng (glb.js envPart: màu phẳng, gộp vào cùng lưới tĩnh / InstancedMesh, không thêm lượt vẽ) thay khối code khi đã
+// nạp (B20_ENV, màn tải nạp trước): tháp canh tre (mức xa 996 tam giác, có trống báo), đầu bến chữ T (cọc nối dài xuống đáy và thang nước
+// ròng vẫn bằng code), tời neo phao chặn luồng, bè cỏ, lùm cây ven sông. Giữ code (design/glb-prompts.md mục K–N: giảm về số tam giác code
+// thì hỏng dáng, hoặc mẫu không khớp): cọc Bạch Đằng và cọc gãy, phao mốc, nhịp cầu bến (cọc mẫu chỉ 1,4 m), giá chèo (chưa có mẫu), sú vẹt,
+// cột đá vôi, đá. Đường code và đường mẫu rút rng y hệt nhau, vật va chạm không đổi.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -21,6 +27,12 @@ import { STAKE_FIELDS, STAKE_TOP, RAFT } from "../data/river-b20.js";
 import { MAP } from "../data/battle-b20.js";
 import { box, cyl, cone, ico, blade, unit, spanM, rod, bar, placeParts, colorByY, makeInst, solidAdder, groveGeo, reedGeo, rockGeo,
   tintTrees, karstGeo, addSkyKit, flagBatch } from "./kit.js";
+import { envPart } from "./glb.js";
+import { ENV_HULL } from "./boats.js";
+
+// Mô hình môi trường cảnh B20 (scenery-b20.js) và thuyền K1–K5 (boats.js ENV_HULL): màn tải nạp trước (main.js loadModels); tests/env.test.mjs
+// giữ danh sách khớp với các lời gọi envPart.
+export const B20_ENV = ["ENV_be_co", "ENV_cau_tau_dau", "ENV_lum_cay_ven_song", "ENV_thap_canh_tran", "ENV_toi_neo", ...Object.values(ENV_HULL).map((e) => e.id)];
 
 const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
@@ -343,7 +355,7 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   }
 
   // -- rừng ven sông
-  const grove = groveGeo(); geos.push(grove);
+  const grove = envPart("ENV_lum_cay_ven_song", { lod: 1 }) || groveGeo(); geos.push(grove);        // mẫu mức xa 72 tam giác (code 80)
   const trees = track(inst(grove, LO.trees.length, { cast: true })); trees.name = "trees";
   for (const t of LO.trees) trees.put(t.x, minG(t.x, t.z, 1.2, 4) - 0.15, t.z, t.ry, t.s, t.s * rng.range(0.9, 1.15));
   tintTrees(trees, rng);
@@ -370,7 +382,9 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   for (const s of all) { (s.broken ? stB : stW).put(s.x, s.y0, s.z, 0, s.r * SV.showR, s.L, new THREE.Color().setScalar(s.tint).getHex(), s.rx * SV.showLean, s.rz * SV.showLean); maxTop = Math.max(maxTop, s.top.y); }
 
   // -- bè cỏ + dây neo (dây nối góc bè với đỉnh bốn cọc quanh bè), phao đánh dấu mốc lộ
-  const rfg = raftGeo(); geos.push(rfg);
+  // bè: mẫu ENV_be_co mức xa (382 tam giác như 387 của code) dài dọc z → xoay dọc x như raftGeo; mặt cỏ mẫu ở 0,6 m: hạ 0,35 cho người đứng
+  // ở RAFT.y 0,25 (boong bè naval.js) và thân tre ngập nửa như code
+  const rfg = envPart("ENV_be_co", { lod: 1, ry: Math.PI / 2, y: -0.35 }) || raftGeo(); geos.push(rfg);
   const raftIM = track(inst(rfg, STAKE_FIELDS.length, { cast: true })); raftIM.name = "rafts";
   const ropeIM = track(inst(unit("o3"), STAKE_FIELDS.length * 4 + 2)); ropeIM.name = "ropes";
   const buoyG = buoyGeo(); geos.push(buoyG);
@@ -399,9 +413,13 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   // neo: đầu nam hai cọc + tời trên bờ, đầu bắc cụm ba cọc đóng ở mép lòng (luôn hiện: chỗ chuẩn bị sẵn)
   {
     const S = B.anchorS, ys = gy(S.x, S.z), N = B.anchorN, yn = gy(N.x, N.z);
-    for (const [dx, dz] of [[-1.2, 0], [1.2, 0]]) rod(statics, WOOD_D, S.x + dx, ys - 0.5, S.z + dz, S.x + dx, ys + 1.6, S.z + dz, 0.16, { sides: 6, cap: true });
-    statics.push(part(cyl(0.3, 0.3, 2.2, 8), WOOD, { x: S.x, y: ys + 1.1, z: S.z, rz: Math.PI / 2 }), part(cyl(0.34, 0.34, 0.5, 8), ROPE, { x: S.x, y: ys + 1.1, z: S.z, rz: Math.PI / 2 }));
-    for (const a of [0.2, 1.3, 2.6, 3.9, 5.0]) bar(statics, WOOD_D, S.x, ys + 1.1, S.z, S.x, ys + 1.1 + Math.sin(a) * 1.0, S.z + Math.cos(a) * 1.0, 0.08, 0.08);
+    const winch = envPart("ENV_toi_neo", { x: S.x, y: ys - 0.05, z: S.z, lod: 1 });           // mẫu mức xa 172 tam giác: hai cọc, trục dọc x như code
+    if (winch) statics.push(winch);
+    else {
+      for (const [dx, dz] of [[-1.2, 0], [1.2, 0]]) rod(statics, WOOD_D, S.x + dx, ys - 0.5, S.z + dz, S.x + dx, ys + 1.6, S.z + dz, 0.16, { sides: 6, cap: true });
+      statics.push(part(cyl(0.3, 0.3, 2.2, 8), WOOD, { x: S.x, y: ys + 1.1, z: S.z, rz: Math.PI / 2 }), part(cyl(0.34, 0.34, 0.5, 8), ROPE, { x: S.x, y: ys + 1.1, z: S.z, rz: Math.PI / 2 }));
+      for (const a of [0.2, 1.3, 2.6, 3.9, 5.0]) bar(statics, WOOD_D, S.x, ys + 1.1, S.z, S.x, ys + 1.1 + Math.sin(a) * 1.0, S.z + Math.cos(a) * 1.0, 0.08, 0.08);
+    }
     for (const [dx, dz, hh] of [[0, 0, 4.4], [0.9, 0.6, 3.9], [-0.7, 0.8, 3.6]]) rod(statics, WOOD_D, N.x + dx, yn - 1, N.z + dz, N.x + dx * 1.3, TIDE.high + hh - 2.2, N.z + dz * 1.3, 0.2, { sides: 6, cap: true });
     statics.push(part(cyl(0.34, 0.34, 0.5, 6), ROPE, { x: N.x, y: TIDE.high + 1.2, z: N.z }));
   }
@@ -422,12 +440,20 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     for (let s = 0.5; s < p.len; s += 1.0) { const a = at(s, -hwid), b = at(s, hwid); bar(statics, (Math.round(s) % 3) ? WOOD : 0x7a5a3a, a.x, Y, a.z, b.x, Y, b.z, 0.9, 0.1, 0); }
     for (const l of [-hwid + 0.3, hwid - 0.3]) { const a = at(0, l), b = at(p.len, l); bar(statics, WOOD_D, a.x, Y - 0.16, a.z, b.x, Y - 0.16, b.z, 0.2, 0.2); }
     for (let s = 1.2; s <= p.len + 0.01; s += 2.5) for (const l of [-hwid, hwid]) { const q = at(s, l); rod(statics, WOOD_D, q.x, gy(q.x, q.z) - 0.6, q.z, q.x, Y + 0.35, q.z, 0.13, { sides: 5, cap: true }); }
-    // đầu bến chữ T
-    const hd = p.head;
-    for (let l = -hd.w / 2 + 0.45; l < hd.w / 2; l += 0.9) { const a = at(p.len - hd.d, l), b = at(p.len, l); bar(statics, WOOD, a.x, Y + 0.01, a.z, b.x, Y + 0.01, b.z, 0.85, 0.1, 0); }
-    for (const [s, l] of [[p.len - 0.3, -hd.w / 2 + 0.3], [p.len - 0.3, hd.w / 2 - 0.3], [p.len - hd.d + 0.3, -hd.w / 2 + 0.3], [p.len - hd.d + 0.3, hd.w / 2 - 0.3]]) {
-      const q = at(s, l); rod(statics, WOOD_D, q.x, gy(q.x, q.z) - 0.6, q.z, q.x, Y + 0.9, q.z, 0.16, { sides: 6, cap: true });
-      statics.push(part(cyl(0.2, 0.2, 0.14, 6), ROPE, { x: q.x, y: Y + 0.55, z: q.z }));
+    // đầu bến chữ T: mẫu ENV_cau_tau_dau mức xa (sàn 6 × 4,4 m ở 2,0 m trên chân cọc, cọc góc quấn dây; thang mẫu bỏ — thang nước ròng code
+    // xuống tới đáy) đặt mặt sàn ở mặt boong bến (world-b20 pierDecks: Y + 0,05), +z mẫu ra phía nước; bốn cọc góc nối dài xuống đáy bằng code
+    const hd = p.head, hc = at(p.len - 2, 0), head = envPart("ENV_cau_tau_dau", { x: hc.x, y: Y + 0.05 - 2.0, z: hc.z, ry: Math.atan2(ux, uz), lod: 1, drop: [[0.6, 1.6, 2.6, -1, 1.95]] });
+    if (head) {
+      statics.push(head);
+      for (const [s, l] of [[p.len - 2 - 1.85, -2.62], [p.len - 2 - 1.85, 2.62], [p.len - 2 + 1.25, -2.62], [p.len - 2 + 1.25, 2.62]]) {
+        const q = at(s, -l); rod(statics, WOOD_D, q.x, gy(q.x, q.z) - 0.6, q.z, q.x, Y - 1.4, q.z, 0.14, { sides: 5 });
+      }
+    } else {
+      for (let l = -hd.w / 2 + 0.45; l < hd.w / 2; l += 0.9) { const a = at(p.len - hd.d, l), b = at(p.len, l); bar(statics, WOOD, a.x, Y + 0.01, a.z, b.x, Y + 0.01, b.z, 0.85, 0.1, 0); }
+      for (const [s, l] of [[p.len - 0.3, -hd.w / 2 + 0.3], [p.len - 0.3, hd.w / 2 - 0.3], [p.len - hd.d + 0.3, -hd.w / 2 + 0.3], [p.len - hd.d + 0.3, hd.w / 2 - 0.3]]) {
+        const q = at(s, l); rod(statics, WOOD_D, q.x, gy(q.x, q.z) - 0.6, q.z, q.x, Y + 0.9, q.z, 0.16, { sides: 6, cap: true });
+        statics.push(part(cyl(0.2, 0.2, 0.14, 6), ROPE, { x: q.x, y: Y + 0.55, z: q.z }));
+      }
     }
     { const a = at(p.len + 0.1, 0.9), b = at(p.len + 0.1, -0.9), ga = gy(a.x, a.z) - 0.3;          // thang xuống lúc nước ròng
       for (const q of [a, b]) bar(statics, WOOD_D, q.x, ga, q.z, q.x, Y + 0.05, q.z, 0.1, 0.1);
@@ -448,6 +474,17 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   for (const t of LO.towers) {
     const y = minG(t.x, t.z, 2.2, 6) - 0.2, H = 8.2, S = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
     const towardLand = t.side;                                                   // bờ bắc (−1): đất ở −z
+    // mẫu ENV_thap_canh_tran mức xa (996 tam giác: chân choãi, giằng, sàn ở 7,3 m, lan can, mái tranh, trống báo; thang ở +z mẫu → phía đất)
+    const tw = envPart("ENV_thap_canh_tran", { x: t.x, y, z: t.z, ry: towardLand > 0 ? 0 : Math.PI, lod: 1 });
+    if (tw) {
+      statics.push(tw);
+      const hx = t.x + 6, hz = t.z + towardLand * 4, hy = minG(hx, hz, 2, 6);
+      statics.push(placeParts(hutParts(0.9), hx, hy, hz, 0)); solid(hx, hz, 1.9);
+      rod(statics, PAL.then, t.x - 1.2, y + 7.3, t.z - 1.2, t.x - 1.2, y + H + 4.6, t.z - 1.2, 0.06, { sides: 5 });
+      flags.push({ x: t.x - 1.2, y: y + H + 4.5, z: t.z - 1.2, w: 0.9, h: 1.9, yaw: Math.PI * 0.75, cell: 0 });
+      solid(t.x, t.z, 2.2);
+      continue;
+    }
     for (const [a, b] of S) rod(statics, BAMBOO_D, t.x + a * 1.75, y - 0.3, t.z + b * 1.75, t.x + a * 1.12, y + H + 1.5, t.z + b * 1.12, 0.12, { sides: 5 });
     for (const lv of [2.6, 5.4]) for (let k = 0; k < 4; k++) {
       const [a0, b0] = S[k], [a1, b1] = S[(k + 1) % 4], r0 = 1.75 - 0.6 * (lv - 1.4) / H, r1 = 1.75 - 0.6 * (lv + 1.4) / H;

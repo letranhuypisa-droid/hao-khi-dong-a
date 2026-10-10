@@ -10,7 +10,8 @@
 // không kéo three.js vào hub). loading.title: tiêu đề màn nạp. result: mặc định cho màn kết quả khi kết quả trận không tự
 // ghi (res.missionsTotal, res.sideTotal, res.eventNames) — B15 giữ đúng chữ và số trước đợt 9.
 // models (đợt 19c): mô hình nhân vật (assets/models/char/<id>) màn tải nạp trước ngoài tướng người chơi — tướng đồng minh, boss, kể cả khi
-// ra giữa trận (main.js loadModels); rig của chúng làm nóng ở BattleDef.rigs.
+// ra giữa trận (main.js loadModels); rig của chúng làm nóng ở BattleDef.rigs. env(): danh sách mô hình môi trường (assets/models/env) màn tải
+// nạp trước cho đất của trận — thiếu thì đất Hàm Tử (world.js WORLD_ENV).
 // keSach: số Kế Sách theo chế độ (nhãn nút chế độ ở Xuất trận). Đợt 9 D5 (tùy chọn): result.cLabel (tên dòng thứ tư của
 // bảng điểm — B15 "Cứ Điểm"), resultUI() → module dựng phần riêng của màn kết quả (ui/result-b20.js), marks() → tên các
 // Kế Sách mang dấu "Kế đã định" khi Hiến kế chọn đúng (quyetSach.danhDau). ownHero (B16): trận R cố định mà tướng dùng chỉ số, cây kỹ năng của
@@ -49,6 +50,7 @@ export const BATTLES = {
     sub: "Ngày 8 tháng 3 năm Mậu Tý · 9/4/1288 · sông Bạch Đằng",
     heroes: ["H31", "H34", "H38"], playable: ["H31"], fixedR: 25, preset: { level: 25 }, modes: ["nhanh"], wip: true,
     models: ["H40", "X20", "X24"],                        // Nguyễn Khoái (vào từ pha 2), Ô Mã Nhi, Phàn Tiếp (boss)
+    env: () => import("../battle/scenery-b20.js").then((m) => m.B20_ENV),     // thuyền K1–K5, tháp canh, bến, bè, cây ven sông
     keSach: { nhanh: 3, chuan: 3 },                       // 3 Kế Sách Lớn (Nội Bàng — Nhỏ, chỉ Trận chuẩn — chưa làm)
     par: { nhanh: 330 },                                  // par Trận nhanh (ĐỀ XUẤT BẢN THỬ: tổng par các pha; = PAR_B20 của director-b20.js — HUD và màn kết quả cùng số)
     loading: { title: "Sông Bạch Đằng · 1288" },

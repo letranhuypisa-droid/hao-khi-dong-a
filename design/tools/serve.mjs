@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const inRoot = (f) => f === ROOT || f.startsWith(ROOT + path.sep);           // không chỉ startsWith(ROOT): thư mục anh em "…-main2" cũng khớp tiền tố
 const PORT = Number(process.argv[2]) || 8950;
 const SAVE = path.resolve(process.argv[3] || path.join(ROOT, "design/glb/_raw/sheets"));
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -17,8 +18,10 @@ http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   if (u.pathname === "/__list") {
     const dir = path.join(ROOT, u.searchParams.get("dir") || "design");
-    if (!dir.startsWith(ROOT)) { res.writeHead(403).end(); return; }
-    const names = fs.readdirSync(dir).filter((f) => /\.glb$/i.test(f)).sort();
+    if (!inRoot(dir)) { res.writeHead(403).end(); return; }
+    let names;
+    try { names = fs.readdirSync(dir).filter((f) => /\.glb$/i.test(f)).sort(); }
+    catch (e) { res.writeHead(404, { "Content-Type": "application/json" }).end(JSON.stringify({ error: e.code || e.message })); return; }   // thư mục sai: báo lỗi, đừng sập máy chủ
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(names));
     return;
   }
@@ -26,16 +29,19 @@ http.createServer((req, res) => {
     const name = path.basename(u.searchParams.get("name") || "out.bin");
     fs.mkdirSync(SAVE, { recursive: true });
     const chunks = [];
-    req.on("data", (c) => chunks.push(c)).on("end", () => { fs.writeFileSync(path.join(SAVE, name), Buffer.concat(chunks)); res.writeHead(200).end("ok " + path.join(SAVE, name)); });
+    req.on("data", (c) => chunks.push(c)).on("end", () => {
+      try { fs.writeFileSync(path.join(SAVE, name), Buffer.concat(chunks)); res.writeHead(200).end("ok " + path.join(SAVE, name)); }
+      catch (e) { res.writeHead(500).end("lỗi ghi " + e.message); }
+    });
     return;
   }
   let rel;
   try { rel = decodeURIComponent(u.pathname); } catch { res.writeHead(400).end(); return; }
   const file = path.join(ROOT, rel.endsWith("/") ? rel + "index.html" : rel);
-  if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }
+  if (!inRoot(file)) { res.writeHead(403).end(); return; }
   fs.stat(file, (e, st) => {
     if (e || !st.isFile()) { res.writeHead(404, { "Cache-Control": "no-store" }).end("404"); return; }
     res.writeHead(200, { "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream", "Content-Length": st.size, "Cache-Control": "no-store" });
     fs.createReadStream(file).pipe(res);
   });
-}).listen(PORT, () => console.log(`kho: http://localhost:${PORT}/  (gốc ${ROOT}, lưu ảnh ${SAVE})`));
+}).listen(PORT, "127.0.0.1", () => console.log(`kho: http://localhost:${PORT}/  (gốc ${ROOT}, lưu ảnh ${SAVE})`));

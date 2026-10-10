@@ -5,6 +5,8 @@
 // có trong đệm (đang tải, lỗi mạng, chạy ngoài trình duyệt) thì trả null và nơi gọi dựng khối hình bằng code như trước.
 //
 // .hkm: "HKM1" · u32 độ dài JSON · JSON · khối nhị phân (bake/io.mjs). Texture WebP theo quy ước UV glTF (flipY = false).
+// Vật tĩnh của cảnh (env/*, design/tools/bake/env.mjs): không texture (trừ vật nhìn gần), màu theo mặt fcol — envPart bung thành lưới gộp được
+// với models.js part / merge (cùng vật liệu lambert flatShading màu đỉnh của cảnh).
 
 import * as THREE from "three";
 import { driveQuat } from "./rig-helpers.js";
@@ -22,7 +24,10 @@ export function parseHKM(buf) {
   const geos = {};
   for (const [name, m] of Object.entries(meta.meshes)) {
     const g = new THREE.BufferGeometry();
-    for (const [k, c] of Object.entries(m.attrs)) g.setAttribute(k, new THREE.BufferAttribute(view(c), c.s, c.t.endsWith("n")));
+    for (const [k, c] of Object.entries(m.attrs)) {
+      if (c.n !== m.count * c.s) { (g.userData.face ||= {})[k] = view(c); continue; }          // thuộc tính theo tam giác (env: fcol)
+      g.setAttribute(k, new THREE.BufferAttribute(view(c), c.s, c.t.endsWith("n")));
+    }
     g.setIndex(new THREE.BufferAttribute(view(m.index), 1));
     g.computeBoundingSphere();
     geos[name] = g;
@@ -33,9 +38,9 @@ export function parseHKM(buf) {
 async function fetchModel(id, file, texFile) {
   const [buf, tex] = await Promise.all([
     fetch(new URL(file, BASE)).then((r) => { if (!r.ok) throw new Error(`${file}: ${r.status}`); return r.arrayBuffer(); }),
-    new THREE.TextureLoader().loadAsync(new URL(texFile, BASE).href),
+    texFile ? new THREE.TextureLoader().loadAsync(new URL(texFile, BASE).href) : null,       // env màu phẳng: không texture
   ]);
-  tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.needsUpdate = true;
+  if (tex) { tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.needsUpdate = true; }
   const m = parseHKM(buf); m.tex = tex;
   CACHE.set(id, m);
   return m;
@@ -64,6 +69,85 @@ export async function preloadModels(ids = null, timeout = 15000) {
 
 export const model = (id) => CACHE.get(id) || null;
 export const hasModel = (id) => CACHE.has(id);
+// đưa mô hình đã đọc sẵn vào đệm (kiểm thử, công cụ Node đọc .hkm từ đĩa: fetch không đọc file://); m null: gỡ khỏi đệm
+export const putModel = (id, m) => (m ? CACHE.set(id, m) : CACHE.delete(id));
+
+// ---- vật tĩnh của cảnh (env/<mã>) ------------------------------------------------------------------------------------------
+// Khung nướng (bake/env.mjs): mét, gốc giữa đáy (thuyền: mặt nước), vật dài dọc +Z. envPart trả BufferGeometry không chỉ số (position,
+// normal theo mặt, color tuyến tính theo mặt) đã đặt như models.js part: { x, y, z, rx, ry, rz, s, sx, sy, sz }, lod (0 gần, 1 xa —
+// mã không có LOD1 thì dùng LOD0), tint (nhân màu), cut ({ y0, y1 }: chỉ giữ tam giác có trọng tâm trong khoảng — tách buồm khỏi thân),
+// drop ([[|x| <, z0, z1, y0, y1], …]: bỏ tam giác có trọng tâm trong hộp, khung mẫu trước khi đặt — thang, cầu thang mẫu mà code dựng lại).
+// Chưa nạp (Node, lỗi mạng) → null: nơi gọi dựng khối code như cũ.
+const srgb = new Float32Array(256).map((_, i) => { const c = i / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+const FLAT = new Map();            // "id/lod" → BufferGeometry gốc đã bung
+function flatGeo(id, lod) {
+  const m = model("env/" + id); if (!m) return null;
+  const name = m.geos["lod" + lod] ? "lod" + lod : "lod0", key = id + "/" + name;
+  if (FLAT.has(key)) return FLAT.get(key);
+  const g = m.geos[name], P = g.attributes.position.array, I = g.index.array, F = g.userData.face.fcol, n = I.length;
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), e = new THREE.Vector3();
+  for (let t = 0; t < n; t += 3) {
+    a.fromArray(P, I[t] * 3); b.fromArray(P, I[t + 1] * 3); c.fromArray(P, I[t + 2] * 3);
+    e.crossVectors(b.sub(a), c.sub(a)).normalize();
+    for (let k = 0; k < 3; k++) {
+      const o = (t + k) * 3; pos.set([P[I[t + k] * 3], P[I[t + k] * 3 + 1], P[I[t + k] * 3 + 2]], o);
+      nor[o] = e.x; nor[o + 1] = e.y; nor[o + 2] = e.z;
+      col[o] = srgb[F[t]]; col[o + 1] = srgb[F[t + 1]]; col[o + 2] = srgb[F[t + 2]];
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute("position", new THREE.BufferAttribute(pos, 3)); out.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); out.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  FLAT.set(key, out);
+  return out;
+}
+const _em = new THREE.Matrix4(), _ev = new THREE.Vector3(), _eq = new THREE.Quaternion(), _ee = new THREE.Euler(), _es = new THREE.Vector3();
+export function envPart(id, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, s = 1, sx = s, sy = s, sz = s, lod = 0, tint = null, cut = null, drop = null } = {}) {
+  const base = flatGeo(id, lod); if (!base) return null;
+  let g = base.clone();
+  if (cut || drop) {
+    const P = g.attributes.position.array, keep = [];
+    for (let t = 0; t < P.length; t += 9) {
+      const cx = Math.abs(P[t] + P[t + 3] + P[t + 6]) / 3, cy = (P[t + 1] + P[t + 4] + P[t + 7]) / 3, cz = (P[t + 2] + P[t + 5] + P[t + 8]) / 3;
+      if (cut && !(cy >= (cut.y0 ?? -Infinity) && cy < (cut.y1 ?? Infinity))) continue;
+      if (drop && drop.some(([xm, z0, z1, y0, y1]) => cx < xm && cz > z0 && cz < z1 && cy > y0 && cy < y1)) continue;
+      keep.push(t / 9);
+    }
+    const out = new THREE.BufferGeometry();
+    for (const k of ["position", "normal", "color"]) {
+      const A = g.attributes[k].array, B = new Float32Array(keep.length * 9);
+      keep.forEach((f, i) => B.set(A.subarray(f * 9, f * 9 + 9), i * 9));
+      out.setAttribute(k, new THREE.BufferAttribute(B, 3));
+    }
+    g = out;
+  }
+  if (tint != null) {
+    const t = new THREE.Color(tint), C = g.attributes.color.array;
+    for (let i = 0; i < C.length; i += 3) { C[i] *= t.r; C[i + 1] *= t.g; C[i + 2] *= t.b; }
+  }
+  g.applyMatrix4(_em.compose(_ev.set(x, y, z), _eq.setFromEuler(_ee.set(rx, ry, rz)), _es.set(sx, sy, sz)));
+  g.computeBoundingSphere();
+  return g;
+}
+// hộp bao khung nướng (meta lo / hi) của env/<mã>, null nếu chưa nạp
+export const envBounds = (id) => { const m = model("env/" + id); return m ? { lo: m.meta.lo, hi: m.meta.hi } : null; };
+// THREE.LOD cho vật đặt riêng lẻ (cổng, tháp đồn, thuyền, cây đa): mỗi khung chỉ vẽ một mức nên không thêm lượt vẽ. Gần: LOD0 (texture nếu mã
+// nướng với catalog tex, không thì màu phẳng vật liệu mat), từ far m: LOD1 màu phẳng (mã chỉ một mức thì chỉ một mức). Lưới dùng chung giữa
+// các bản (khung nướng, chưa đặt: nơi gọi đặt LOD), đừng sửa. cast: đổ bóng. Chưa nạp → null.
+export function envLOD(id, mat, { far = 60, cast = false } = {}) {
+  const m = model("env/" + id); if (!m) return null;
+  const lod = new THREE.LOD(), near = m.tex ? new THREE.Mesh(m.geos.lod0, new THREE.MeshLambertMaterial({ map: m.tex })) : new THREE.Mesh(flatGeo(id, 0), mat);
+  lod.addLevel(near, 0);
+  if (m.geos.lod1) lod.addLevel(new THREE.Mesh(flatGeo(id, 1), mat), far);
+  for (const l of lod.levels) l.object.castShadow = cast;
+  return lod;
+}
+// lưới có texture (mã nướng với catalog tex) cho vật nhìn gần; không có texture thì màu phẳng
+export function envMesh(id, opts = {}) {
+  const m = model("env/" + id); if (!m) return null;
+  if (!m.tex) { const g = envPart(id, opts); return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })); }
+  return new THREE.Mesh(m.geos.lod0, new THREE.MeshLambertMaterial({ map: m.tex }));
+}
 
 // ---- thân nhân vật trên rig khớp nối -----------------------------------------------------------------------------------------
 // m.meta.bones: tên xương theo thứ tự chỉ số trong skinIndex — 15 khớp rig rồi xương phụ (đợt 19a A4: spine, neck, clavL/R, twistL/R,
