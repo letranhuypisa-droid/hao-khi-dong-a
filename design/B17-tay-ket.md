@@ -2,9 +2,28 @@
 
 Chương thứ tư theo thứ tự Quyển VI (VI·6, ngay sau Chương Dương). Canon: `design/canon.json` → `battles` B17, `heroes` H30 và H40, `enemies` X19 và X20.
 
-Trạng thái: **đợt A1 (greybox) và phần boss của A2 đã dựng** trên nhánh `claude/happy-lichterman-f0e557` (2026-10-10, chưa gộp vào `main`); phần còn lại của A2, A3–A6 và mạch B chưa làm.
+Trạng thái (2026-10-10), đã gộp vào `main` 94d19cc:
+- **Mạch A**: đợt A1 (greybox), phần boss của A2, phần rẻ của A4. Nhánh `claude/happy-lichterman-f0e557`.
+- **Mạch B**: B1 và B2 (lớp Cung WC09, H40 chơi được). Nhánh `claude/practical-ishizaka-a22c2c`.
+- **Chưa làm**: phần còn lại của A2, A3, phần còn lại của A4, A5, A6, B3.
 
 ## Đã làm
+
+### Gộp hai mạch vào `main` (2026-10-10, 94d19cc)
+
+- **Xung đột**: chỉ ở chú thích đầu `units.js`, giữ cả hai đoạn.
+  - Trong `update()`, nhánh ghim, kéo, trói của H40 chạy trước nhánh hành quân. Vì vậy Móc Tên giữ được Toa Đô đang hành quân.
+  - Ngã khi tử trận chạy trước cả hai, nên boss chết lúc bị trói vẫn ngã đúng.
+- **Test**: toàn bộ xanh (48 tệp).
+- **Vết bot B15**: Quân sĩ, Trận nhanh, seed 1001, `Date.now` và `Math.random` ghim, 40 × 5 s.
+  - Bản gộp trùng mã băm với `main` cd6832b ở cả 40 mốc, cùng 267 KO.
+- **B17 với H35**: bot thắng 298 s, không tải lại.
+  - Lệnh vẽ tối đa 136, trung bình 101, 0/63 mẫu quá 150. Đo trên tab đang hiện, canvas 1024 × 768.
+- **B17 với H40** (`?debug&battle=B17&hero=H40`): bot thắng chỉ trong **94 s**, không lỗi console. Par là 10:00, nên với cung B17 quá dễ; cân bằng ở đợt A5.
+- **Sửa số lệnh vẽ ở mục dưới**:
+  - Các số 162 (B17), 206 (B15), 219 (B16) đo trên tab chạy nền. Tab nền có canvas 0 × 0, camera không lọc được vật ngoài khung, nên vẽ mọi thứ.
+  - Đo lại B15 trên tab đang hiện: `main` sau ENV trung bình 95, đỉnh 140; bản 6cff030 trước ENV trung bình 93, đỉnh 142.
+  - Kết luận: mô hình ENV không làm tăng lệnh vẽ. Số tam giác thì tăng (khung cuối khoảng 600k lên 770k, tính cả bóng).
 
 ### Gộp main (mô hình ENV) và phần rẻ của A4 (2026-10-10)
 
@@ -14,7 +33,7 @@ Trạng thái: **đợt A1 (greybox) và phần boss của A2 đã dựng** trê
   - B17 nạp trước đất Hàm Tử cùng 3 mẫu đầm: `env` ở `data/battles.js`, danh sách `ENV_B17`.
   - Đước ở góc hai bãi lau, bè cỏ trên bãi lầy bờ bắc, lùm cây ven sông gần cửa sông (`MARSH_PROPS`): gộp một lưới, không va chạm. Chưa nạp mô hình thì bỏ.
   - Cột cờ mốc cửa sông dùng `ENV_cot_co` như B16.
-- **Lệnh vẽ sau khi gộp** (đo có bóng, bot seed 1001, mỗi 5 s):
+- **Lệnh vẽ sau khi gộp** (đo có bóng, bot seed 1001, mỗi 5 s). **Các số này đo trên tab nền (canvas 0 × 0), không dùng được.** Số đúng ở mục "Gộp hai mạch vào `main`" phía trên; không cần việc chung về lệnh vẽ:
   - B17: đỉnh 162 ở giây 5, trung bình 123, 3/61 mẫu quá 150. Ở khung đỉnh, phần đất Hàm Tử là 125; phần riêng B17 là 37 (7 đơn vị lớn, vật trận, lau, gò, vật đầm).
   - Cùng cách đo sau khi gộp ENV: B15 đỉnh 206, B16 đỉnh 219 (trung bình 135). Trước khi gộp, B17 đỉnh 121.
   - Việc cần làm chung cho đất Hàm Tử, không riêng B17: gộp hoặc instancing vật ENV, bớt bóng của vật xa.
@@ -328,6 +347,9 @@ Trục của B15: x từ tây sang đông 0–600, z từ bắc xuống nam −2
 - `playable: ["H40"]`, bỏ H35 khỏi B17, bot nhánh tầm xa.
 - Đo par bằng bot: nhiều seed, các độ khó Dân binh, Quân sĩ, Tướng quân, Nguyên soái.
 - Chỉnh tốc cánh, giờ dừng giao chiến, máu Toa Đô, cỡ toán đổ bộ.
+- Đo đầu tiên: H40 thắng B17 trong 94 s, vì bot bắn Toa Đô ngay từ đồn đầu.
+  - Cần chặn đường tắt này, ví dụ khóa Sinh lực khi Toa Đô còn hành quân (đã ghi ở mục Toa Đô) hoặc đội hộ tống che chắn.
+  - Rồi đo lại par.
 
 ### A6. Comic (cần khóa API ai33 của người dùng)
 
