@@ -1,5 +1,5 @@
 // design/tools/serve.mjs — máy chủ tĩnh phục vụ GỐC KHO (để trang trong design/ nạp game/vendor/three và GLB), không cache, thêm hai đường phụ cho công cụ soát GLB:
-//   GET  /__list?dir=design            → JSON tên các tệp .glb trong thư mục đó (tương đối gốc kho)
+//   GET  /__list?dir=design/glb/_raw/moi-truong → JSON tên các tệp .glb trong thư mục đó (tương đối gốc kho)
 //   POST /__save?name=abc.jpg          → ghi thân yêu cầu vào <saveDir>/abc.jpg (saveDir mặc định design/glb/_raw/sheets, đã ngoài git)
 //   node design/tools/serve.mjs [cổng] [saveDir]
 import http from "node:http";
@@ -17,7 +17,7 @@ const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; cha
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   if (u.pathname === "/__list") {
-    const dir = path.join(ROOT, u.searchParams.get("dir") || "design");
+    const dir = path.join(ROOT, u.searchParams.get("dir") || "design/glb/_raw/moi-truong");
     if (!inRoot(dir)) { res.writeHead(403).end(); return; }
     let names;
     try { names = fs.readdirSync(dir).filter((f) => /\.glb$/i.test(f)).sort(); }

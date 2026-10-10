@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Tờ xem trước GLB</title>
 <!-- Soát lô GLB thả vào design/: dựng từng tệp (một khung nhìn chéo, ánh sáng trung tính) lên một tờ lưới rồi gửi JPEG về máy chủ (design/tools/serve.mjs /__save).
-     Mở qua serve.mjs:  /design/glb/contact-sheet.html?dir=design&from=0&n=30&cols=6&cell=256&view=front|side|top
+     Mở qua serve.mjs:  /design/glb/contact-sheet.html?dir=design/glb/_raw/moi-truong&from=0&n=30&cols=6&cell=256&view=front|side|top
      Mỗi tệp nạp lần lượt rồi giải phóng (tệp 30–50 MB, ba ảnh 4096²). Không dùng khi chạy game. -->
 <script type="importmap">
   { "imports": { "three": "../../game/vendor/three/three.module.js", "three/addons/": "../../game/vendor/three/addons/" } }
@@ -18,7 +18,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const q = new URLSearchParams(location.search);
-const dir = q.get("dir") || "design", from = +(q.get("from") || 0), n = +(q.get("n") || 30), cols = +(q.get("cols") || 6), cell = +(q.get("cell") || 256), view = q.get("view") || "front";
+const dir = q.get("dir") || "design/glb/_raw/moi-truong", from = +(q.get("from") || 0), n = +(q.get("n") || 30), cols = +(q.get("cols") || 6), cell = +(q.get("cell") || 256), view = q.get("view") || "front";
 const only = q.get("only"), all = await (await fetch(`/__list?dir=${encodeURIComponent(dir)}`)).json();
 if (!Array.isArray(all)) { document.getElementById("log").textContent = `không đọc được thư mục ${dir}: ${all.error}`; throw new Error(all.error); }
 const names = (only ? only.split(",").map((s) => s + ".glb").filter((s) => all.includes(s)) : all).slice(from, from + n);

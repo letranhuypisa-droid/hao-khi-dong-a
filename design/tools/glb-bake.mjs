@@ -1,7 +1,7 @@
 // design/tools/glb-bake.mjs — nướng GLB Meshy (design/glb/) thành tài nguyên game (game/assets/models/): nhân vật gắn sẵn trọng
 // số theo 15 khớp rig, lính đám đông theo bộ khớp instanced, vũ khí theo khung tay, ngựa. Định dạng .hkm (bake/io.mjs) + WebP.
 //   cd design/tools && npm i
-//   node design/tools/glb-bake.mjs [char|kit|wpn|env|all] [--only H35,DV_GIAO] [--raw <thư mục GLB môi trường, mặc định design/>]
+//   node design/tools/glb-bake.mjs [char|kit|wpn|env|all] [--only H35,DV_GIAO] [--raw <thư mục GLB môi trường, mặc định design/glb/_raw/moi-truong/>]
 // Không cần mạng, không tốn credit: chỉ đọc design/glb/*.glb đã có trong repo. env: vật tĩnh của cảnh (bake/env.mjs, catalog ENV) từ GLB
 // Hunyuan3D thả ở design/<mã>.glb (ngoài git) → assets/models/env/; thiếu tệp gốc thì bỏ qua mã đó, giữ bản nướng cũ.
 import { registerHooks } from "node:module";
@@ -20,7 +20,7 @@ const { writeHKM, writeTexture, writeRaw, rawImage } = await import("./bake/io.m
 
 const args = process.argv.slice(2), what = args[0] || "all";
 const only = (() => { const i = args.indexOf("--only"); return i >= 0 ? args[i + 1].split(",") : null; })();
-const RAW = (() => { const i = args.indexOf("--raw"); return i >= 0 ? resolve(args[i + 1]) : join(ROOT, "design"); })();
+const RAW = (() => { const i = args.indexOf("--raw"); return i >= 0 ? resolve(args[i + 1]) : join(ROOT, "design/glb/_raw/moi-truong"); })();
 const OUT = join(ROOT, "game/assets/models");
 const man = JSON.parse(readFileSync(join(ROOT, "design/glb/manifest.json"), "utf8"));
 const INDEX = join(OUT, "index.json");
@@ -61,7 +61,7 @@ if (what === "kit" || what === "all") {
       const W = WEAPONS[w.id], bw = await bakeWeapon(join(ROOT, man[W.src].path), W), img = await rawImage(bw.image);
       weapons.push({ ...w, full: bw.raw, img, col: sampleColors(bw.raw.uv, img), head: bw.meta.head });
     }
-    const body = join(ROOT, c.src || man[code].path);                       // c.src: GLB ngoài manifest Meshy (Hunyuan3D, design/glb/_raw/<mã>_hunyuan.glb)
+    const body = join(ROOT, c.src || man[code].path);                       // c.src: GLB ngoài manifest Meshy (Hunyuan3D, design/glb/_raw/nhan-vat/<mã>_hunyuan.glb)
     const r = c.horse ? await bakeHorseKit(join(ROOT, man[c.horse].path), body, { ...c, weapons, name: code })
       : await bakeKit(body, { ...c, weapons, name: code });
     const hkm = join(OUT, "kit", code + ".hkm"), tex = join(OUT, "kit", code + ".webp");

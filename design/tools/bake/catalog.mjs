@@ -33,7 +33,7 @@ const FIX_H35H = {
 };
 // Bốn tướng Hunyuan3D còn lại (A-pose tay thẳng như H35h): khớp tay do design/tools/fit-arms.mjs đo bằng mặt cắt ngang (bake/fit-arms.mjs: nắm đấm,
 // hướng tay, chiều dài tay; vai ở trong giáp nên không đo được). Kiểm công cụ trên hai nguồn độc lập: H35h (FIX_H35H đo tay: vai lệch 0,02, nắm đấm 0,02;
-// khuỷu đo tay thấp hơn 0,07) và X19h (bộ xương công cụ rig tự động, design/glb/_raw/X19_hunyuan_rigged.fbx: vai lệch ≤ 0,02, khuỷu ≤ 0,03, nắm đấm
+// khuỷu đo tay thấp hơn 0,07) và X19h (bộ xương công cụ rig tự động, design/glb/_raw/nhan-vat/X19_hunyuan_rigged.fbx: vai lệch ≤ 0,02, khuỷu ≤ 0,03, nắm đấm
 // ≤ 0,025; khung thô). neck: khớp cổ đo theo vai ghi tay (human.mjs fitHuman, fix.neck — bộ dò tính cổ theo vai bộ dò nên lệch theo).
 // Chạy lại: node design/tools/fit-arms.mjs <mã>.
 const FIX_H31H = {
@@ -57,7 +57,7 @@ const FIX_X19H = {
   neck: 1.600,
 };
 // Mười bảy nhân vật Hunyuan3D đợt hai (ảnh gpt-image-2.5-sunburst, design/tools/ai33-img.mjs → Hunyuan3D, A-pose nắm đấm): khớp tay do design/tools/fit-arms.mjs đo
-// (node design/tools/fit-arms.mjs design/glb/_raw/<mã>_hunyuan.glb <tris>). Chín nhân vật rig (LINH, OFF, CV) nướng thành mã <mã>h; tám lính đám đông (DV, NG) ở KIT_LIST.
+// (node design/tools/fit-arms.mjs design/glb/_raw/nhan-vat/<mã>_hunyuan.glb <tris>). Chín nhân vật rig (LINH, OFF, CV) nướng thành mã <mã>h; tám lính đám đông (DV, NG) ở KIT_LIST.
 const FIX_LINH_R01H = {
   shL: [-0.279, 1.420, -0.008], elL: [-0.351, 1.175, 0.002], handL: [-0.464, 0.965, 0.092],
   shR: [0.279, 1.420, -0.008], elR: [0.351, 1.175, 0.002], handR: [0.464, 0.965, 0.092],
@@ -202,25 +202,25 @@ const CUT_DV_DAO = [{ lo: [0.255, 0.55, -0.36], hi: [0.36, 0.85, 0.1] }];
 export const CHARS = {
   // Thử mô hình Hunyuan3D 3.1 (design/hunyuan-prompts.md): src = GLB ngoài manifest Meshy, mã H35h chạy song song H35 Meshy. Chưa ghi tay / vai: nướng một lần,
   // đọc số trong lỗi, xem lưới rồi ghi.
-  H35h: { src: "design/glb/_raw/H35_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_H35H, w: { mirror: 1 } },
+  H35h: { src: "design/glb/_raw/nhan-vat/H35_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_H35H, w: { mirror: 1 } },
   // Cùng hạng ngân sách với bản Meshy (tướng người chơi 9000 / 1024², tướng khác 6000 / 512²); boss Toa Đô 7500 nhưng 1024² vì camera áp sát.
-  H31h: { src: "design/glb/_raw/H31_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_H31H, ...ARM_TUBE },
-  H33h: { src: "design/glb/_raw/H33_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H33H, ...ARM_TUBE },
-  H40h: { src: "design/glb/_raw/H40_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H40H, ...ARM_TUBE, rigid: [QUIVER_H40H] },
-  X19h: { src: "design/glb/_raw/X19_hunyuan.glb", tris: 7500, tex: 1024, fix: FIX_X19H, ...ARM_TUBE },
+  H31h: { src: "design/glb/_raw/nhan-vat/H31_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_H31H, ...ARM_TUBE },
+  H33h: { src: "design/glb/_raw/nhan-vat/H33_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H33H, ...ARM_TUBE },
+  H40h: { src: "design/glb/_raw/nhan-vat/H40_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H40H, ...ARM_TUBE, rigid: [QUIVER_H40H] },
+  X19h: { src: "design/glb/_raw/nhan-vat/X19_hunyuan.glb", tris: 7500, tex: 1024, fix: FIX_X19H, ...ARM_TUBE },
   // Đợt hai: lính Tự do, sĩ quan Nguyên, cận vệ (cùng hạng ngân sách với bản Meshy).
-  LINH_r01h: { src: "design/glb/_raw/LINH_r01_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_LINH_R01H, ...ARM_TUBE },
-  LINH_r24h: { src: "design/glb/_raw/LINH_r24_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_LINH_R24H, ...ARM_TUBE },
-  OFF_photuongh: { src: "design/glb/_raw/OFF_photuong_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_OFF_PHOTUONGH, ...ARM_TUBE },
-  OFF_doitruongh: { src: "design/glb/_raw/OFF_doitruong_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_OFF_DOITRUONGH, ...ARM_TUBE },
-  CV_khienh: { src: "design/glb/_raw/CV_khien_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_KHIENH, ...ARM_TUBE },
-  CV_giaoh: { src: "design/glb/_raw/CV_giao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_GIAOH, ...ARM_TUBE, zs: -0.07 },
-  CV_cungh: { src: "design/glb/_raw/CV_cung_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_CUNGH, ...ARM_TUBE, zs: 0.06, simp: { w: 2, hi: 4 } },
-  CV_songdaoh: { src: "design/glb/_raw/CV_songdao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_SONGDAOH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
-  CV_daidaoh: { src: "design/glb/_raw/CV_daidao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_DAIDAOH, ...ARM_TUBE },
+  LINH_r01h: { src: "design/glb/_raw/nhan-vat/LINH_r01_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_LINH_R01H, ...ARM_TUBE },
+  LINH_r24h: { src: "design/glb/_raw/nhan-vat/LINH_r24_hunyuan.glb", tris: 9000, tex: 1024, fix: FIX_LINH_R24H, ...ARM_TUBE },
+  OFF_photuongh: { src: "design/glb/_raw/nhan-vat/OFF_photuong_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_OFF_PHOTUONGH, ...ARM_TUBE },
+  OFF_doitruongh: { src: "design/glb/_raw/nhan-vat/OFF_doitruong_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_OFF_DOITRUONGH, ...ARM_TUBE },
+  CV_khienh: { src: "design/glb/_raw/nhan-vat/CV_khien_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_KHIENH, ...ARM_TUBE },
+  CV_giaoh: { src: "design/glb/_raw/nhan-vat/CV_giao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_GIAOH, ...ARM_TUBE, zs: -0.07 },
+  CV_cungh: { src: "design/glb/_raw/nhan-vat/CV_cung_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_CUNGH, ...ARM_TUBE, zs: 0.06, simp: { w: 2, hi: 4 } },
+  CV_songdaoh: { src: "design/glb/_raw/nhan-vat/CV_songdao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_SONGDAOH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
+  CV_daidaoh: { src: "design/glb/_raw/nhan-vat/CV_daidao_hunyuan.glb", tris: 5000, tex: 512, fix: FIX_CV_DAIDAOH, ...ARM_TUBE },
   // Đợt ba: tướng khác nên 6000 / 512². TT giáp tay (hộ tay) như tướng Hunyuan khác → ARM_TUBE; H38 cởi trần, tay trần: ống mặc định.
-  TTh: { src: "design/glb/_raw/TT_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_TTH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
-  H38h: { src: "design/glb/_raw/H38_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H38H, simp: { w: 2, hi: 4 } },
+  TTh: { src: "design/glb/_raw/nhan-vat/TT_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_TTH, ...ARM_TUBE, simp: { w: 2, hi: 4 } },
+  H38h: { src: "design/glb/_raw/nhan-vat/H38_hunyuan.glb", tris: 6000, tex: 512, fix: FIX_H38H, simp: { w: 2, hi: 4 } },
   H35: { tris: 9000, tex: 1024, shoulder: 1.441, w: { so: -0.09, ky: 0.12 } },
   H31: { tris: 9000, tex: 1024, shoulder: 1.303, w: { seam: 1 } },
   LINH_r01: { tris: 9000, tex: 1024, shoulder: 1.379 },
@@ -296,10 +296,10 @@ for (const [k, [fix, over]] of Object.entries(HUN_KITS)) {
 
 // Đợt ba: dân làng và quân áo Tống (lính bộ, cùng bảng mức chi tiết như lính đám đông Hunyuan3D ở trên). Chưa có mã Meshy song song nên không đi qua HUN_KITS. Không vũ khí trong tay, trừ
 // DV_AOTONG cầm cung Việt ở tay trái như NG_CUNG (design/glb-prompts.md: DV_AOTONG ↔ WPN_cung_viet); quang gánh, tay nải của dân là đạo cụ riêng (PROP_quang_ganh, PROP_tay_nai), chưa gắn.
-KIT_LIST.DV_AOTONGh = { src: "design/glb/_raw/DV_AOTONG_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DV_AOTONGH, weapons: [{ id: "cung_viet", bone: "faL", p: [0, HAND, 0], wl: [80, 40, 24] }] };
-KIT_LIST.DAN_NAMh = { src: "design/glb/_raw/DAN_NAM_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NAMH, weapons: [] };
-KIT_LIST.DAN_NUh = { src: "design/glb/_raw/DAN_NU_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NUH, weapons: [] };
-KIT_LIST.DAN_TREh = { src: "design/glb/_raw/DAN_TRE_hunyuan.glb", lods: [400, 190, 80], fix: FIX_DAN_TREH, weapons: [] };
+KIT_LIST.DV_AOTONGh = { src: "design/glb/_raw/nhan-vat/DV_AOTONG_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DV_AOTONGH, weapons: [{ id: "cung_viet", bone: "faL", p: [0, HAND, 0], wl: [80, 40, 24] }] };
+KIT_LIST.DAN_NAMh = { src: "design/glb/_raw/nhan-vat/DAN_NAM_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NAMH, weapons: [] };
+KIT_LIST.DAN_NUh = { src: "design/glb/_raw/nhan-vat/DAN_NU_hunyuan.glb", lods: [470, 220, 90], fix: FIX_DAN_NUH, weapons: [] };
+KIT_LIST.DAN_TREh = { src: "design/glb/_raw/nhan-vat/DAN_TRE_hunyuan.glb", lods: [400, 190, 80], fix: FIX_DAN_TREH, weapons: [] };
 
 // Môi trường (glb-bake.mjs env, bake/env.mjs): GLB Hunyuan3D thả ở design/<mã>.glb (đợt 2026-10-09, git bỏ qua; --raw <thư mục> để đọc chỗ khác).
 // Kích thước thật theo cột "Kích thước thật" của design/glb-prompts.md (mục H, I, K–N), một trong h / x / z / d (mét; env.mjs); ry xoay để vật dài

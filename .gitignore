@@ -5,7 +5,7 @@ design/glb/_raw/
 design/tools/node_modules/
 # Nguồn clip hoạt ảnh thô (Quaternius UAL CC0, FBX / GLB Mixamo tải về): game/tools/bake-clips.mjs nướng ra game/assets/anim/clips.json
 game/anim-src/
-# GLB rời ở gốc design/ (ENV_*, PROP_*, DAN_*...: file thô mới tải về, mỗi file ~40 MB) — chưa xử lý, ngoài git
+# GLB mới tải về, thả tạm ở gốc design/ (mỗi file ~40 MB), ngoài git; soát xong chuyển vào design/glb/_raw/moi-truong (cảnh, đạo cụ, thú cưỡi) hoặc design/glb/_raw/nhan-vat (người)
 /design/*.glb
 # worktree của Claude Code (git worktree), mỗi cái là một bản làm việc riêng
 .claude/worktrees/

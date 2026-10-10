@@ -137,7 +137,7 @@ await t("tay áp sát thân (không khe): báo lỗi hướng dẫn ghi khớp t
   if (!err || !/dummy.*không thấy nắm đấm.*catalog\.mjs/.test(err.message)) throw new Error(err ? err.message : "không báo lỗi");
 });
 const HUNYUAN_H35 = join(ROOT, CHARS.H35h.src);
-if (!existsSync(HUNYUAN_H35)) console.log("  bỏ qua: chưa có design/glb/_raw/H35_hunyuan.glb (ngoài git) — phép kiểm trên GLB Hunyuan3D thật");
+if (!existsSync(HUNYUAN_H35)) console.log("  bỏ qua: chưa có design/glb/_raw/nhan-vat/H35_hunyuan.glb (ngoài git) — phép kiểm trên GLB Hunyuan3D thật");
 else await t("H35h (Hunyuan3D thật): đo lại khớp tay catalog (đo bằng lát cắt bằng mắt): nắm đấm ≤ 3 cm, vai ≤ 3 cm, khuỷu ≤ 7 cm; hai tay lệch ≤ 6 cm", async () => {
   const c = CHARS.H35h, cg = cutBoxes(await readGLB(HUNYUAN_H35, c.tris), c.cut), N = normPt(cg.bounds, 1.9), P = new Float32Array(cg.g.pos.length);
   for (let i = 0; i < P.length; i += 3) P.set(N(cg.g.pos[i], cg.g.pos[i + 1], cg.g.pos[i + 2]), i);
