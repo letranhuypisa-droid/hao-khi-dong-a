@@ -148,7 +148,7 @@ t("đã nạp: 7 thuyền sông, 260 cây, nhà cổng dùng mô hình (Node kh�
 });
 // đồn có tường (world.js buildFort): cổng, tháp góc là THREE.LOD theo tâm đồn — gần: hai cổng, bốn tháp lưới riêng (tháp mẫu: LOD gần / xa riêng),
 // xa: một lưới gộp đúng bằng mức xa của bốn tháp cộng hai cổng, chỉ hiện khi tháp góc nào cũng xa camera hơn ngưỡng mức xa của nó
-t("đồn có tường: cổng + tháp góc xa tâm đồn thành một lưới gộp (= mức xa bốn tháp + hai cổng, cùng chỗ), ngưỡng ≥ ngưỡng mức xa của tháp + góc xa nhất", () => {
+t("đồn có tường: cổng + tháp góc xa tâm đồn thành một lưới gộp (= mức xa bốn tháp + hai cổng, cùng chỗ), ngưỡng ≥ ngưỡng mức xa của tháp + góc xa nhất; cổng, tháp làm mờ đo từ chỗ của nó", () => {
   const tris = (m) => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
   const box = (o) => { o.updateWorldMatrix(true, false); return new THREE.Box3().setFromBufferAttribute(o.geometry.clone().applyMatrix4(o.matrixWorld).attributes.position); };
   for (const [w, scene] of [[withM[1], scenes[1]], [without[1], scenesOff[1]]]) {
@@ -163,6 +163,13 @@ t("đồn có tường: cổng + tháp góc xa tâm đồn thành một lưới 
       assert.equal(tris(far), parts.reduce((s, p) => s + tris(p.object), 0), "lưới gộp = mức xa của từng vật");
       const B = box(far), U = new THREE.Box3(); for (const p of parts) U.union(box(p.object));
       for (const k of ["min", "max"]) for (const a of ["x", "y", "z"]) assert.ok(Math.abs(B[k][a] - U[k][a]) < 1e-3, `hộp lưới gộp ${k}.${a}`);
+      // world.fadeOccluders đo vật từ getWorldPosition: mỗi cổng, mỗi tháp (mẫu hay khối code) đứng đúng chỗ của nó, không ở gốc bản đồ
+      const spots = [...L.gates.map((g) => [g.x, g.z]), ...L.corners], at = new Set(), p = new THREE.Vector3();
+      for (const c of near.children) {
+        c.getWorldPosition(p); const i = spots.findIndex(([x, z]) => Math.hypot(p.x - x, p.z - z) < 0.01);
+        assert.ok(i >= 0 && w.fadeables.some((f) => f.obj === c), "cổng / tháp làm mờ đo từ chỗ của nó"); at.add(i);
+      }
+      assert.equal(at.size, 6, "mỗi cổng, mỗi tháp một chỗ");
       const corner = Math.max(...L.corners.map(([x, z]) => Math.hypot(x - L.cx, z - L.cz)));
       for (const p of parts) assert.ok(lod.levels[1].distance >= p.distance + corner - 1e-6, "lưới gộp hiện khi mọi tháp đã ở mức xa");
     }

@@ -368,16 +368,18 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
     // FORT_FAR: cả hai cổng, bốn tháp một lưới gộp — một lượt vẽ thay sáu (B15 nhìn dọc bờ sông bắc thấy cả bốn đồn: 24 lượt vẽ chỉ cho tháp, cổng;
     // đỉnh 165 lượt vẽ, trần 150). FORT_FAR = mức xa của tháp mẫu (70 m) + góc tháp xa tâm nhất, nên lưới gộp chỉ hiện khi tháp nào cũng đã ở mức xa
     // (lưới gộp là đúng mức xa ấy, đúng chỗ), cổng là khối code y hệt. Vật trong mức gần giữ nguyên toạ độ thế giới (nhóm dời ngược vị trí LOD).
-    const fortLod = new THREE.LOD(), fy = heightAt(cx, cz), near = new THREE.Group(), farParts = [];
+    // Cổng, tháp khối code dựng hình học ở toạ độ thế giới (gộp vào lưới xa như thế); gộp xong mới dời hình học về quanh chân vật và đặt lưới ở chân
+    // (own): fadeOccluders đo vật từ getWorldPosition, lưới để ở gốc thì đo từ gốc bản đồ và cổng không bao giờ mờ. Dời tại chỗ, không tạo hình học mới.
+    const fortLod = new THREE.LOD(), fy = heightAt(cx, cz), near = new THREE.Group(), farParts = [], own = [];
     fortLod.position.set(cx, fy, cz); near.position.set(-cx, -fy, -cz);
-    // cổng: hai trụ, xà ngang, mái nhỏ, cờ hiệu; lưới riêng (mờ khi chắn camera)
+    // cổng: hai trụ, xà ngang, mái nhỏ, cờ hiệu; lưới riêng (mờ khi chắn camera; r 5 ≈ nửa bề dài mái 5,1 m, đường nhìn qua đầu mái cũng mờ)
     for (const g of L.gates) {
       const y = heightAt(g.x, g.z), h2 = L.gate / 2 + 0.15, parts = [];
       for (const k of [-1, 1]) parts.push(box(1.05, 4.7, 1.05, LOG2, g.x, y + 2.35, g.z + k * h2), box(1.3, 0.28, 1.3, ROOF, g.x, y + 4.8, g.z + k * h2));
       parts.push(box(1.4, 0.8, L.gate + 2.6, LOG, g.x, y + 4.15, g.z), box(1.7, 0.2, L.gate + 3.2, ROOF, g.x, y + 4.62, g.z));
       parts.push(P(new THREE.ConeGeometry(2.35, 1.7, 4), ROOF, { x: g.x, y: y + 5.55, z: g.z, ry: Math.PI / 4, sz: (L.gate + 3.2) / 3.3 }));
       for (const dz of [-2.2, 0, 2.2]) parts.push(box(0.06, 1.5, 1.0, PAL.son, g.x + g.side * 0.8, y + 3.05, g.z + dz));
-      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 5); farParts.push(geo);
+      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 5); farParts.push(geo); own.push([m, g.x, y, g.z]);
     }
     // tháp canh góc: bốn chân, sàn, lan can, mái; thang dựa chân tháp phía trong đồn
     for (const [tx, tz] of L.corners) {
@@ -397,9 +399,10 @@ export function buildWorld(scene, { shadows = true, forts = false } = {}) {
       const lx = tx + sx * 1.35, lz = tz + sz * 2.15;
       for (const k of [-0.3, 0.3]) parts.push(box(0.08, 5.3, 0.08, RAIL, lx + k, y + 2.65, lz));
       for (let r = 0; r < 9; r++) parts.push(box(0.6, 0.06, 0.06, RAIL, lx, y + 0.5 + r * 0.58, lz));
-      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 3.4); farParts.push(geo);
+      const geo = merge(parts), m = new THREE.Mesh(geo, mat); m.castShadow = shadows; near.add(m); world.addFadeable(m, 3.4); farParts.push(geo); own.push([m, tx, y, tz]);
     }
     const far = new THREE.Mesh(merge(farParts), mat); far.castShadow = shadows; far.position.copy(near.position);
+    for (const [m, x, y, z] of own) { m.geometry.translate(-x, -y, -z); m.position.set(x, y, z); }
     const corner = Math.max(...L.corners.map(([x, z]) => Math.hypot(x - cx, z - cz)));
     fortLod.addLevel(near, 0); fortLod.addLevel(far, FORT_FAR + corner); scene.add(fortLod);
     if (kind === "doanh_trai") { barracksYard(L); return L; }
