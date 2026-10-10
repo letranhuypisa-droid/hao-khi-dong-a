@@ -63,7 +63,8 @@ export async function bakeWeapon(file, c) {
     // mặt khiên: trục mỏng nhất; núm ở phía các đỉnh giữa mặt khiên lồi xa hơn
     const nAx = b.size.indexOf(Math.min(...b.size)), upAx = nAx === 1 ? 2 : 1;
     const ctr = bounds(P, (x, y, z) => { const p = [x, y, z]; return [0, 1, 2].every((k) => k === nAx || Math.abs(p[k] - b.c[k]) < 0.12 * b.size[k]); });
-    const sgn = ctr.hi[nAx] - b.c[nAx] > b.c[nAx] - ctr.lo[nAx] ? 1 : -1;
+    // face: ghi tay phía có núm (±1 theo trục mỏng của mẫu) — khiên tròn Hunyuan3D có tay cầm sau nhô xa đúng bằng núm trước, phép dò hoà, chọn nhầm mặt sau
+    const sgn = c.face ?? (ctr.hi[nAx] - b.c[nAx] > b.c[nAx] - ctr.lo[nAx] ? 1 : -1);
     const n = Y(0, 0, 0); n.setComponent(nAx, 1);
     R = basis(nAx, Y(0, 0, sgn), upAx, Y(0, 1, 0));
     scale = c.h / b.size[upAx];

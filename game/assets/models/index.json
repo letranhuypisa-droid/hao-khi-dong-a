@@ -1433,49 +1433,49 @@
   "kind": "kit",
   "file": "kit/NG_DAO.hkm",
   "tex": "kit/NG_DAO.webp",
-  "tris": 613,
+  "tris": 615,
   "lods": [
-   613,
+   615,
    281,
    117
   ],
-  "bytes": 65256
+  "bytes": 62572
  },
  "kit/NG_DAOh": {
   "kind": "kit",
   "file": "kit/NG_DAOh.hkm",
   "tex": "kit/NG_DAOh.webp",
-  "tris": 612,
+  "tris": 614,
   "lods": [
-   612,
+   614,
    286,
    142
   ],
-  "bytes": 74536
+  "bytes": 71536
  },
  "kit/NG_GIAO": {
   "kind": "kit",
   "file": "kit/NG_GIAO.hkm",
   "tex": "kit/NG_GIAO.webp",
-  "tris": 631,
+  "tris": 633,
   "lods": [
-   631,
+   633,
    294,
    118
   ],
-  "bytes": 59640
+  "bytes": 61174
  },
  "kit/NG_GIAOh": {
   "kind": "kit",
   "file": "kit/NG_GIAOh.hkm",
   "tex": "kit/NG_GIAOh.webp",
-  "tris": 624,
+  "tris": 626,
   "lods": [
-   624,
+   626,
    296,
    124
   ],
-  "bytes": 67034
+  "bytes": 67804
  },
  "kit/NG_KY": {
   "kind": "kit",

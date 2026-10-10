@@ -369,8 +369,8 @@ export const WEAPONS = {
   chuy: { src: "WPN_chuy", raw: HW("chuy"), type: "blade", len: 1.7, grip: 0.27, tris: 800 },
   cung_viet: { src: "WPN_cung_viet", raw: HW("cung_viet"), type: "bow", len: 1.45, tris: 800 },
   cung_ng: { src: "WPN_cung_ng", raw: HW("cung_ng"), type: "bow", len: 1.3, tris: 500 },
-  khien_tron: { src: "WPN_khien_tron_ng", raw: HW("khien_tron_ng"), type: "shield", h: 0.74, tris: 500 },
-  khien_nhat: { src: "WPN_khien_nhat_dv", raw: HW("khien_nhat_dv"), type: "shield", h: 0.75, tris: 500 },
+  khien_tron: { src: "WPN_khien_tron_ng", raw: HW("khien_tron_ng"), type: "shield", h: 0.74, face: 1, tris: 500 },   // face: núm ở +Z mẫu (tay cầm sau nhô bằng núm)
+  khien_nhat: { src: "WPN_khien_nhat_dv", raw: HW("khien_nhat_dv"), type: "shield", h: 0.75, face: 1, tris: 500 },
   no: { src: "WPN_no", raw: HW("no"), type: "crossbow", len: 0.8, grip: 0.14, ry: 90, tris: 700 },
   mui_ten: { src: "PROP_mui_ten", type: "arrow", len: 0.85, tris: 120 },
   daiphu: { raw: HW("daiphu"), type: "blade", len: 2.2, grip: 0.4, side: true, head: true, tris: 1200 },
