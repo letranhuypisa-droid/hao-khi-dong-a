@@ -53,7 +53,7 @@ const joinRel = (fromFile, spec) => {
 export function checkDeploy(root) {
   const R = resolve(root), files = walk(R).map((p) => posix(R, p));
   const exact = new Set(files), lower = new Map(files.map((f) => [f.toLowerCase(), f]));
-  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, fx: 0, comic: 0, icon: 0, model: 0, clip: 0 };
+  const problems = [], checked = { import: 0, html: 0, css: 0, sfx: 0, music: 0, fx: 0, comic: 0, icon: 0, model: 0, clip: 0, terrain: 0 };
   const need = (rel, kind, from) => {
     checked[kind]++;
     const path = rel.replace(/^\.\//, "").replace(/\/+/g, "/");
