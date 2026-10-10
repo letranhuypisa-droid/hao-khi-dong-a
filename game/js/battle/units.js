@@ -158,8 +158,8 @@ export class BigUnit {
     const ctx = this.ctx;
     const dx = hero.x - this.x, dz = hero.z - this.z, d = Math.hypot(dx, dz);
     if (!this.awake && hero.alive && (d < 16 || Math.hypot(hero.x - this.home.x, hero.z - this.home.z) < this.aggro)) {
-      this.awake = true; ctx.director?.onOfficerAwake(this);
-      this.roarT = 0.9; ctx.audio.play("roar", this.x, this.z);          // gầm thị uy khi phát hiện tướng
+      this.awake = true; const spoke = ctx.director?.onOfficerAwake(this);       // director trả true nếu tướng địch đã lên tiếng (battle/voice.js)
+      this.roarT = 0.9; ctx.audio.play("roar", this.x, this.z, spoke ? { gain: 0.3 } : null);          // gầm thị uy khi phát hiện tướng (nhỏ đi khi đang nói)
     }
     this.backCd -= dt;
     if (this.roarT > 0) { this.roarT -= dt; this.yaw = turn(this.yaw, Math.atan2(dx, dz), dt * 8); this.setPose(A.roar(1 - this.roarT / 0.9), 0.3); return; }

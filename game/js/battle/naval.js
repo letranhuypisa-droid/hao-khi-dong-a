@@ -455,6 +455,7 @@ export class Naval {
   // Tia nước (tên rơi xuống sông, người rơi nước): vòng sóng trên mặt nước + bụi nước trắng.
   splash(x, z, s = 1) {
     const fx = this.ctx.fx; if (!fx) return;
+    if (s >= 1) this.ctx.audio?.play("splash", x, z);                // người / tướng rơi nước (tên rơi nước s = 0,3 thì không kêu)
     const y = this.world.tideY;
     fx.sprite("ring", x, y + 0.3, z, { size: 1.2 + 1.4 * s, T: 0.8, grow: 2.2, flat: true, opacity: 0.9, color: 0xf4fbff, rot: Math.random() * 6.28 });
     fx.sprite("smoke", x, y + 0.2 + 0.4 * s, z, { size: 0.6 + 1.0 * s, T: 0.5, grow: 1.6, rise: 1.2 + s, opacity: 0.75, color: 0xf0f6f8, rot: Math.random() * 6.28 });

@@ -596,12 +596,12 @@ console.log("Icon chiêu, SFX, bảng đòn (đợt 7)");
     for (const [k, m] of Object.entries(MOVE_INFO)) assert.ok(existsSync(root + `assets/icons/${m.icon}.webp`), `${k}: thiếu ${m.icon}.webp`);
   });
   t("mọi mẫu SFX khai trong audio.js có file (đủ số biến thể), cả hai vòng nền", () => {
-    const EXT = { drumroll: "m4a", horn: "m4a", cheer: "m4a", volley: "m4a", gong: "m4a", gatebreak: "m4a" };
+    const EXT = { drumroll: "m4a", horn: "m4a", cheer: "m4a", volley: "m4a", gong: "m4a", gatebreak: "m4a", warcry: "m4a", stingloss: "m4a", wave: "m4a" };
     for (const [n, v] of Object.entries(SFX_FILES)) for (let i = 1; i <= v; i++) {
       const f = `${n}${v > 1 ? "-" + i : ""}.${EXT[n] || "wav"}`;
       assert.ok(existsSync(root + "assets/sfx/" + f), "thiếu " + f);
     }
-    for (const f of ["ambience.m4a", "fire.m4a"]) assert.ok(existsSync(root + "assets/sfx/" + f), "thiếu " + f);
+    for (const f of ["ambience.m4a", "fire.m4a", "river.m4a"]) assert.ok(existsSync(root + "assets/sfx/" + f), "thiếu " + f);
   });
   t("đòn C kế tiếp theo chuỗi: C1 khi rảnh, N2 đang chém → C3, vừa né → Lướt, sĩ quan Vỡ Thế → Đòn Quyết", () => {
     const cKey = (k) => "C" + Math.min(4, k);

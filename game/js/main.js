@@ -147,6 +147,7 @@ function openSettings() {
     <label class="field">Gợi ý lần đầu giữa trận <input type="checkbox" data-set="hints" ${s.hints !== false ? "checked" : ""}></label>
     <label class="field">Âm lượng nhạc <input type="range" min="0" max="1" step="0.05" value="${s.music ?? 0.5}" data-set="music"></label>
     <label class="field">Âm lượng hiệu ứng <input type="range" min="0" max="1" step="0.05" value="${s.volume ?? 0.8}" data-set="volume"></label>
+    <label class="field">Âm lượng giọng nói <input type="range" min="0" max="1" step="0.05" value="${s.voice ?? 0.9}" data-set="voice"></label>
     <button data-hintreset>Hiện lại gợi ý đã xem</button>
     ${onTitle ? "" : `<button data-totitle>Về màn chào</button>`}
     <p class="small">Đồ hoạ Tự động chọn theo máy và tự hạ độ phân giải khi khung hình chậm. Số lính hiển thị chỉ đổi phần vẽ; mô phỏng cho cùng kết quả ở mọi mức. "Tự nhận": giao diện cảm ứng theo cách bạn bấm gần nhất.</p>

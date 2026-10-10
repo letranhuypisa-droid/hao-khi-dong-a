@@ -1,0 +1,18 @@
+[
+  {"name": "ignite", "dur": 2, "text": "A bundle of dry reeds and a torch catching fire with a soft whoosh, then flames crackling, one short burst of fire, sound effect only, no music, no speech"},
+  {"name": "flag", "dur": 1.5, "text": "A wooden flagpole driven firmly into hard ground with one heavy thud, then a large cloth banner snapping open in the wind, sound effect only, no music"},
+  {"name": "oar-1", "dur": 1.5, "text": "One long wooden oar stroke on a river: the oar creaking in its oarlock, the blade dipping into water and pulling through with a soft swish, a single stroke, sound effect only, no music"},
+  {"name": "oar-2", "dur": 1.5, "text": "A single heavy rowing stroke of a war boat, wooden oar knocking in the oarlock then the blade sliding through river water, dripping at the end, sound effect only, no music"},
+  {"name": "hullcreak", "dur": 2.5, "text": "An old wooden ship hull creaking and groaning under strain, one slow deep timber groan, sound effect only, no music"},
+  {"name": "splash", "dur": 1.5, "text": "A heavy object falling into a river with a big splash followed by small waves lapping, one splash, sound effect only, no music"},
+  {"name": "stakecrash", "dur": 2, "text": "A wooden boat hull smashing onto sharp wooden stakes under the water, loud timber cracking and splintering, one violent impact, sound effect only, no music"},
+  {"name": "chain", "dur": 2, "text": "Heavy iron chains pulled taut between two ships: a sharp metallic clank, rattling links, then a strained creak, sound effect only, no music"},
+  {"name": "grapple", "dur": 1.2, "text": "A rope with an iron grappling hook whipping through the air and biting into wood with one hard thunk, sound effect only, no music"},
+  {"name": "warcry", "dur": 3, "text": "A crowd of a hundred soldiers shouting a fierce battle cry together outdoors, powerful and slightly distant, a single roaring shout, sound effect only, no music"},
+  {"name": "crow", "dur": 1.8, "text": "Two crows cawing in the distance over a battlefield, sound effect only, no music"},
+  {"name": "buffalo", "dur": 2.2, "text": "A water buffalo lowing once, one deep moo in the countryside, sound effect only, no music"},
+  {"name": "stingloss", "dur": 4, "text": "A short somber defeat sting: one low heavy drum hit and a descending mournful horn, about three seconds, cinematic, ancient Asian war"},
+  {"name": "bowheavy", "dur": 1.2, "text": "A very powerful war bow release with a deep twang followed by a fast arrow whoosh, one shot, sound effect only, no music"},
+  {"name": "wave", "dur": 3, "text": "A rising tidal surge of water rushing forward with a deep rolling roar and foam, sound effect only, no music"},
+  {"name": "river", "dur": 12, "loop": true, "infl": 0.4, "text": "A wide river flowing steadily with small waves lapping against wooden boats, calm seamless looping ambience, no music, no voices, no birds"}
+]
