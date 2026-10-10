@@ -16,10 +16,11 @@
 // Mô hình môi trường nướng (glb.js envPart: màu phẳng, gộp vào cùng lưới tĩnh / InstancedMesh, không thêm lượt vẽ) thay khối code khi đã
 // nạp (B20_ENV, màn tải nạp trước): tháp canh tre (mức xa 996 tam giác, có trống báo), đầu bến chữ T (cọc nối dài xuống đáy và thang nước
 // ròng vẫn bằng code), tời neo phao chặn luồng, bè cỏ, lùm cây ven sông, chòi tranh ở gốc bến và chân tháp, nhà bạt chỉ huy và trống đồng của bản
-// doanh, cột đá vôi và đảo đá (mức xa, nhuộm lại sắc đá vôi), hai cụm núi đá vôi xa. Giữ code (design/glb-prompts.md mục K–N: giảm về số tam giác code thì hỏng dáng,
-// hoặc mẫu không khớp): cọc Bạch Đằng và cọc gãy (900 bản: mẫu 120 / 296 tam giác, code 25), phao mốc, nhịp cầu bến (cọc mẫu chỉ 1,4 m), giá
-// chèo (chưa có mẫu), sú vẹt, rào bản doanh (≈ 36 khúc ENV_rao_coc, 17 nghìn tam giác), đá tảng. Đường code và đường mẫu rút rng y hệt nhau,
-// vật va chạm không đổi.
+// doanh, cột đá vôi và đảo đá (mức xa, nhuộm lại sắc đá vôi), hai cụm núi đá vôi xa; đợt năm: đá tảng (mức xa, InstancedMesh), khúc gỗ phao chặn
+// luồng (mức xa), giá mái chèo, lều quanh bản doanh (mức xa). Giữ code (design/glb-prompts.md mục K–N: giảm về số tam giác code thì hỏng dáng,
+// hoặc mẫu không khớp): cọc Bạch Đằng và cọc gãy (900 bản: mẫu 120 / 296 tam giác, code 25), phao mốc, nhịp cầu bến (cọc mẫu chỉ 1,4 m), sú vẹt,
+// rào bản doanh (≈ 36 khúc ENV_rao_coc, 17 nghìn tam giác), lau sậy (800 khóm × 34 tam giác mức xa vượt ngân sách). Đường code và đường mẫu rút rng
+// y hệt nhau, vật va chạm không đổi.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -28,14 +29,15 @@ import { TIDE, TIDE_Y, zc, hw, bedHeight, waterDist, TRIBS, tribHalfW, tribPoint
 import { STAKE_FIELDS, STAKE_TOP, RAFT } from "../data/river-b20.js";
 import { MAP } from "../data/battle-b20.js";
 import { box, cyl, cone, ico, blade, unit, spanM, rod, bar, placeParts, colorByY, makeInst, solidAdder, groveGeo, reedGeo, rockGeo,
-  tintTrees, karstGeo, addSkyKit, flagBatch } from "./kit.js";
+  tintTrees, karstGeo, addSkyKit, flagBatch, whiten } from "./kit.js";
 import { envPart, envLOD } from "./glb.js";
 import { ENV_HULL } from "./boats.js";
 
 // Mô hình môi trường cảnh B20 (scenery-b20.js) và thuyền K1–K5 (boats.js ENV_HULL): màn tải nạp trước (main.js loadModels); tests/env.test.mjs
 // giữ danh sách khớp với các lời gọi envPart.
-export const B20_ENV = ["ENV_be_co", "ENV_cau_tau_dau", "ENV_choi_tranh", "ENV_day_nui_xa", "ENV_lum_cay_ven_song", "ENV_nha_bat_chi_huy", "ENV_nui_da_a",
-  "ENV_nui_da_b", "ENV_nui_da_c", "ENV_thap_canh_tran", "ENV_toi_neo", "ENV_trong_dong", ...Object.values(ENV_HULL).map((e) => e.id)];
+export const B20_ENV = ["ENV_be_co", "ENV_cau_tau_dau", "ENV_choi_tranh", "ENV_da_a", "ENV_day_nui_xa", "ENV_gia_cheo", "ENV_go_chan_song", "ENV_leu_tran",
+  "ENV_lum_cay_ven_song", "ENV_nha_bat_chi_huy", "ENV_nui_da_a", "ENV_nui_da_b", "ENV_nui_da_c", "ENV_thap_canh_tran", "ENV_toi_neo", "ENV_trong_dong",
+  ...Object.values(ENV_HULL).map((e) => e.id)];
 
 const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 // Nhuộm mẫu cột đá vôi (nướng nâu ô liu) về bảng màu cột code (kit.js karstGeo: đá xám KROCK, rêu cây KGREEN): mặt xanh của mẫu, mặt ngửa ở nửa trên
@@ -402,7 +404,9 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   const rg = reedGeo(4, 1.7); geos.push(rg);
   const reeds = track(inst(rg, LO.reeds.length)); reeds.name = "reeds";
   for (const r of LO.reeds) reeds.put(r.x, gy(r.x, r.z) - 0.1, r.z, r.ry, r.s, r.sy, new THREE.Color().setHSL(0.13 + r.c * 0.06, 0.35 + r.c * 0.15, 0.36 + (1 - r.c) * 0.14).getHex());
-  const rk = rockGeo(); geos.push(rk);
+  // đá tảng: mẫu ENV_da_a mức xa (60 tam giác; code 20) co về khối đơn vị như rockGeo (ngang ±0,85, cao ±0,55), màu nâng sáng để màu từng bản quyết sắc
+  // đá như khối code trắng. Lau sậy giữ code: mẫu ENV_lau_say mức xa 34 tam giác × 800 khóm = +17.600, vượt ngân sách cảnh 120 nghìn
+  const rk = whiten(envPart("ENV_da_a", { lod: 1, sx: 1.7 / 1.81, sz: 1.7 / 1.89, sy: 1.106 / 0.97, y: -0.553 })) || rockGeo(); geos.push(rk);
   const rocks = track(inst(rk, LO.rocks.length, { cast: true })); rocks.name = "rocks";
   const ROCK = [0x9a968a, 0x857f70, 0xa39f92, 0x77736a];
   for (const r of LO.rocks) { rocks.put(r.x, gy(r.x, r.z) + r.s * 0.12, r.z, r.ry, r.s, r.s * rng.range(0.6, 1.0), rng.pick(ROCK), rng.range(-0.2, 0.2), rng.range(-0.2, 0.2)); if (r.s > 1.8) solid(r.x, r.z, r.s * 0.8); }
@@ -441,7 +445,9 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
   ropeIM.count = ropeIM.max; raftIM.frustumCulled = ropeIM.frustumCulled = buoyIM.frustumCulled = false;
 
   // -- phao chặn luồng x 840 (ẩn tới pha 2): InstancedMesh khúc gỗ, mỗi khúc nổi theo con nước (không chìm vào bùn)
-  const B = LO.boom, blg = boomLogGeo(); geos.push(blg);
+  // khúc gỗ: mẫu ENV_go_chan_song mức xa (80 tam giác: thân vỏ cây, đai dây hai đầu, dây trên lưng; code 68) dài dọc z → xoay dọc x như boomLogGeo, tâm
+  // thân (cao 0,71) về gốc
+  const B = LO.boom, blg = envPart("ENV_go_chan_song", { lod: 1, ry: Math.PI / 2, y: -0.355 }) || boomLogGeo(); geos.push(blg);
   const boomIM = track(inst(blg, B.logs.length, { cast: true })); boomIM.name = "boom"; boomIM.frustumCulled = false;
   for (const l of B.logs) boomIM.put(l.x, 0, l.z, l.yaw);
   boomIM.visible = false;
@@ -496,8 +502,9 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     // chòi tranh, giá mái chèo, thúng, cờ trên cột ở gốc bến
     const hut = at(-6, p.w + 3.2), hy = minG(hut.x, hut.z, 2.2, 6);
     statics.push(hutGeo(1, hut.x, hy, hut.z, yaw + Math.PI / 2)); solid(hut.x, hut.z, 2.1);
+    // giá mái chèo: mẫu ENV_gia_cheo (rộng 2 m dọc x như đòn code, bốn chèo 2,6 m dựng nghiêng), không có thì trụ, đòn, chèo code
     const rk2 = at(-3.5, -(p.w + 2.2)), ry2 = gy(rk2.x, rk2.z);
-    statics.push(placeParts([part(box(0.1, 1.4, 0.1), WOOD, { x: -0.9, y: 0.7 }), part(box(0.1, 1.4, 0.1), WOOD, { x: 0.9, y: 0.7 }), part(box(2.0, 0.08, 0.08), WOOD, { y: 1.3 }),
+    statics.push(envPart("ENV_gia_cheo", { x: rk2.x, y: ry2 - 0.03, z: rk2.z, ry: yaw }) || placeParts([part(box(0.1, 1.4, 0.1), WOOD, { x: -0.9, y: 0.7 }), part(box(0.1, 1.4, 0.1), WOOD, { x: 0.9, y: 0.7 }), part(box(2.0, 0.08, 0.08), WOOD, { y: 1.3 }),
       ...[0, 1, 2, 3].map((k) => part(box(0.12, 2.6, 0.04), 0x8a6a44, { x: -0.6 + k * 0.4, y: 1.1, z: 0.18, rx: -0.2 }))], rk2.x, ry2, rk2.z, yaw));
     for (const [s, l] of [[-2, 2.4], [-2.6, 3.3]]) { const q = at(s, l); statics.push(part(cyl(0.7, 0.5, 0.45, 8), 0x8c7a52, { x: q.x, y: gy(q.x, q.z) + 0.2, z: q.z, rz: 0.2 })); }
     const fp = at(-1, -(hwid + 1.2)), fy = gy(fp.x, fp.z);
@@ -578,11 +585,12 @@ export function addSceneryB20(scene, world, { shadows = true, mat = lambert(), g
     // cờ "陳" góc sau
     for (const s of [-1, 1]) { const a = Q.gate + Math.PI + s * 0.75, x = Q.x + Math.cos(a) * (Q.palR - 1.5), z = Q.z + Math.sin(a) * (Q.palR - 1.5), y = gy(x, z);
       rod(statics, PAL.then, x, y - 0.3, z, x, y + 8.4, z, 0.08, { sides: 5 }); flags.push({ x, y: y + 8.2, z, w: 1.2, h: 2.6, yaw: a + Math.PI * 0.5, cell: 0 }); }
-    // lều quanh (chừa đường cổng → nhà bạt)
+    // lều quanh (chừa đường cổng → nhà bạt): mẫu ENV_leu_tran mức xa (198 tam giác, chóp rộng 3 m, cửa đen ở +z mẫu → quay vào nhà bạt như vạt cửa
+    // code) ×1,1 cho cùng đáy chóp code 3,25 m; không có thì chóp code
     const TC = [PAL.son, PAL.vai, PAL.sonDam, PAL.vai, 0xc9b98f, PAL.son];
     [[-2.2, 11.5], [-1.5, 12.5], [-0.8, 13], [0.8, 13], [1.5, 12.5], [2.2, 11.5]].forEach(([da, r], i) => {
-      const a = Q.gate + Math.PI + da * 0.62, x = Q.x + Math.cos(a) * r, z = Q.z + Math.sin(a) * r;
-      statics.push(placeParts(tentParts(TC[i], 1.05), x, gy(x, z), z, Math.atan2(Q.x - x, Q.z - z))); solid(x, z, 2.3);
+      const a = Q.gate + Math.PI + da * 0.62, x = Q.x + Math.cos(a) * r, z = Q.z + Math.sin(a) * r, ty = Math.atan2(Q.x - x, Q.z - z);
+      statics.push(envPart("ENV_leu_tran", { x, y: minG(x, z, 1.5, 4) - 0.05, z, ry: ty, s: 1.1, lod: 1 }) || placeParts(tentParts(TC[i], 1.05), x, gy(x, z), z, ty)); solid(x, z, 2.3);
     });
     // trống trận, giá vũ khí hai bên đường vào
     const dp = { x: Q.x + gx * 11 - tx * 5, z: Q.z + gz * 11 - tz * 5 };

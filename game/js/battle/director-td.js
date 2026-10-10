@@ -20,6 +20,8 @@ import { TIERS } from "../data/tuning.js";
 import { can, RANKS, KILL_REP, MISSION_MULT } from "../data/career.js";
 import { GUARD_ORDERS, REVIVE, guardSlots, guardStats, formationSlot, reviveStep } from "../data/guards.js";
 import { SITES } from "../data/skirmish.js";
+import { envMesh, envPart } from "./glb.js";
+import { lambert } from "./models.js";
 
 const HOLD = { ringPad: 2, drainPer: 2.2, drainEmpty: 5 };       // Giữ đồn: %/s mỗi lính địch hơn số người giữ, %/s khi đồn trống
 const BURN_SEC = 2.5, FREE_R = 2.4, CLEAR_R = 4.5;                // châm lều / cởi trói: giây, tầm, không địch trong tầm này
@@ -260,9 +262,41 @@ export class TDDirector {
     for (let i = 0; i < s.allies; i++) { const a = rng.range(0, Math.PI * 2), r = rng.range(1, s.ring - 2); this.spawnAlly(s.site.x + Math.cos(a) * r, s.site.z + Math.sin(a) * r, { role: "squad" }); }
     this.flag({ x: s.site.x - 3, z: s.site.z + 3 }, COL.ta, 8);
   }
+  // Lều lương (mục tiêu đốt): mẫu ENV_leu_luong (lều nóc 5 × 4 m, nóc 3 m, texture — người chơi tới sát), lưới riêng mỗi lều; không va chạm (như mọi lều).
+  // Điểm mục tiêu (skirmish.js, cách tâm 8 m) giữ nguyên; hình đặt lệch ≤ 1,5 m quanh nó (điểm vẫn trong lều), nóc dọc vòng trại hoặc dọc bán kính —
+  // chọn chỗ ít đè lên nhà, cọc tập, giá giáo, lều… trong sân doanh trại nhất (world.js L.yard), chân ở chỗ đất thấp nhất dưới lều. Cháy rồi thì thay khung
+  // lều cháy ENV_khung_leu_chay giãn về chân lều (x ×1,25, z ×1,56). Chưa nạp mẫu thì không có hình như trước (ô trên bản đồ nhỏ, lửa khi cháy).
+  grainTent(p, c) {
+    const m = envMesh("ENV_leu_luong"); if (!m) return null;
+    const yard = this.ctx?.world?.forts?.find((L) => Math.hypot(L.cx - c.x, L.cz - c.z) < 1)?.yard || [];
+    const a = Math.atan2(p.x - c.x, p.z - c.z), ux = Math.sin(a), uz = Math.cos(a);
+    const at = (x, z, ry, i, j) => [x + i * Math.cos(ry) + j * Math.sin(ry), z + j * Math.cos(ry) - i * Math.sin(ry)];
+    let best = null;
+    for (const ry of [a + Math.PI / 2, a]) for (const dr of [0, -0.75, 0.75, -1.5, 1.5]) for (const dt of [0, -0.75, 0.75, -1.5, 1.5]) {
+      const x = p.x + ux * dr + uz * dt, z = p.z + uz * dr - ux * dt;
+      let hit = 0;
+      for (let i = -1.75; i <= 1.75; i += 0.5) for (let j = -2.25; j <= 2.25; j += 0.5) {
+        const [qx, qz] = at(x, z, ry, i, j);
+        if (yard.some(([x0, z0, x1, z1]) => qx > x0 && qx < x1 && qz > z0 && qz < z1)) hit++;
+      }
+      if (!best || hit < best.hit) best = { hit, x, z, ry };
+    }
+    const { x, z, ry } = best;
+    let y = heightAt(x, z);
+    for (const [i, j] of [[-2, -2.5], [2, -2.5], [-2, 2.5], [2, 2.5]]) y = Math.min(y, heightAt(...at(x, z, ry, i, j)));
+    m.position.set(x, y - 0.05, z); m.rotation.y = ry; m.castShadow = true; m.receiveShadow = true; this.props.add(m);
+    return m;
+  }
+  burnTent(t) {
+    if (!t.mesh) return;
+    t.mesh.visible = false;
+    const g = envPart("ENV_khung_leu_chay", { sx: 1.25, sz: 1.56 });
+    if (!g) return;
+    const f = new THREE.Mesh(g, (this.envMat ||= lambert())); f.position.copy(t.mesh.position); f.rotation.y = t.mesh.rotation.y; f.castShadow = true; this.props.add(f);
+  }
   setupRaid() {
     const s = this.sk, c = s.camp, rng = this.ctx.rng;
-    this.tents = c.tents.map((p) => ({ x: p.x, z: p.z, p: 0, burnt: false }));
+    this.tents = c.tents.map((p) => ({ x: p.x, z: p.z, p: 0, burnt: false, mesh: this.grainTent(p, c.center) }));
     for (let i = 0; i < c.garrison; i++) { const a = rng.range(0, Math.PI * 2), r = rng.range(2, c.r - 1); this.spawnEnemy(c.center.x + Math.cos(a) * r, c.center.z + Math.sin(a) * r, { role: "garrison", anchor: { x: c.center.x, z: c.center.z, r: c.r }, elite: 0.1 + 0.03 * this.rank }); }
     this.keeper = c.keeper ? this.spawnOfficer(c.keeper, c.center.x + 2, c.center.z, { aggro: 18, name: `${TIERS[c.keeper].name} giữ trại` }) : null;
     if (this.rank >= 4) this.spawnOfficer("doitruong", c.center.x - 4, c.center.z + 3, { aggro: 18 });
@@ -360,7 +394,7 @@ export class TDDirector {
         if (!blocked) t.p += dt / BURN_SEC;
         prompt = { text: blocked ? "Địch kề bên — dẹp chúng rồi châm lửa" : "Châm lửa lều lương", p: t.p };
         if (t.p >= 1) {
-          t.burnt = true; this.burnt++; this.ctx.fx.fire(t.x, heightAt(t.x, t.z), t.z, 9999, 3.5); this.ctx.audio.play("fire", t.x, t.z);
+          t.burnt = true; this.burnt++; this.burnTent(t); this.ctx.fx.fire(t.x, heightAt(t.x, t.z), t.z, 9999, 3.5); this.ctx.audio.play("fire", t.x, t.z);
           this.banner(`ĐỐT LỀU ${this.burnt}/${this.tents.length}`, "#ffb07a", 1.1); this.hk(8, "Đốt lều");
         }
       }

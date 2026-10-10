@@ -16,7 +16,9 @@
 // tên, bó rơm; thuyền mui và cây đa đặt riêng nên dùng envLOD (gần / xa). Đường code và đường mẫu rút rng y hệt nhau (vị trí mọi thứ khác không
 // đổi), vật va chạm không đổi. Kè ván mái lũy giữ code (mái lồi, tấm phẳng ENV_ke_van chìm nửa trên), rào ruộng giữ code (gãy, xiêu từng cột).
 // Đồ thêm không có bản code (VILLAGE_PROPS, WORLD_PROPS): miếu, chòi, chuối, rào tre, đồ dân bỏ lại ở làng, cây gạo, ngựa, cọc trói — chưa nạp thì bỏ.
-// Võ trường (addArenaScenery, world.js ARENA_ENV): khán đài (envLOD, gần có texture), đài chỉ huy, bia rơm, vạc lửa.
+// Đợt năm: khóm tre (mức xa, InstancedMesh), lau sậy quanh hố ngập (mức xa), gò đá (đồ thêm WORLD_PROPS).
+// Võ trường (addArenaScenery, world.js ARENA_ENV): khán đài (envLOD, gần có texture), đài chỉ huy, bia rơm, vạc lửa, bia đá Sát Thát (chữ vẫn vẽ
+// canvas), lều trại.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -45,11 +47,15 @@ export const VILLAGE_PROPS = [
   { id: "PROP_tay_nai", dx: -3, dz: 7.2 }, { id: "PROP_tay_nai", dx: -11, dz: -3, ry: 1 }, { id: "PROP_tay_nai", dx: -1.2, dz: -42.5, ry: 2 }, { id: "PROP_tay_nai", dx: 4.4, dz: -50 },
 ];
 // Đồ thêm ngoài làng (toạ độ thế giới): cây gạo trên bờ sông bắc (mốc bến quê; Hư cấu), ngựa tướng buộc cọc trong bản doanh ta, hai cọc trói trong trại
-// Nguyên ngoài thành (Hư cấu). foot: bán kính chân cho kiểm thử đường đi (cây: gốc, tán ở trên cao). Ngựa Nguyên ở cọc buộc ngựa: addScenery.
+// Nguyên ngoài thành (Hư cấu), gò đá ENV_go_da (cụm tảng 9 × 10 m, cao 3,2) trên đỉnh gò tây (ZONES.knolls x 160, z −18) — chỗ trống giữa khóm tre và cây,
+// xa mọi đường đi; một tảng lớn code (có va chạm) nằm trong chân gò. Đá xếp ở các gò vẫn là InstancedMesh code (rút rng, va chạm như cũ); ba gò kia nằm
+// sát chỗ xuất phát và đường xe lương "Chặn tiếp tế" (Tự do), đường xe húc B16, lối tắt giữa hai doanh trại nên không đặt (gò không va chạm). foot: bán
+// kính chân cho kiểm thử đường đi (cây: gốc, tán ở trên cao). Ngựa Nguyên ở cọc buộc ngựa: addScenery.
 export const WORLD_PROPS = [
   { id: "ENV_cay_gao", x: 66, z: -154, ry: 0.6, foot: 0.8 }, { id: "ENV_cay_gao", x: 262, z: -152, ry: 2.2, s: 0.9, foot: 0.8 },
   { id: "ENV_coc_buoc_ngua", x: 28, z: -13.2, ry: Math.PI / 2 }, { id: "MOUNT_ngua_tuong", x: 28.3, z: -11.7, ry: -Math.PI / 2 },
   { id: "ENV_coc_troi", x: 404, z: 28, ry: 0.3 }, { id: "ENV_coc_troi", x: 407.5, z: 30.5, ry: -0.4 },
+  { id: "ENV_go_da", x: 163, z: -13, ry: 0.5 },
 ];
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -187,7 +193,9 @@ export function addScenery(scene, world, { shadows, mat }) {
     }
     return g;
   };
-  const bambooGeo = merge([
+  // mẫu ENV_khom_tre mức xa (82 tam giác, khóm cao 9 m, bụi gốc Ø 2,4 như va chạm r 1,2–1,3; code 500) nâng sáng ×2,3 về độ sáng trung bình mặt
+  // của khối code (mẫu nướng sẫm gấp đôi) để màu từng bản (instanceColor) cho cùng sắc tre như trước; không có thì khối code
+  const bambooGeo = whiten(envPart("ENV_khom_tre", { lod: 1 }), 0.16) || merge([
     ...stalk(0, 0, 8.5, [0.05, -0.08]), ...stalk(0.5, 0.2, 7.6, [0.16, 0.14]), ...stalk(-0.4, 0.4, 9.2, [-0.1, -0.18]),
     ...stalk(0.2, -0.5, 7, [-0.2, 0.08]), ...stalk(-0.3, -0.3, 8, [0.1, 0.22]), ...stalk(0.7, -0.2, 6.4, [0.02, 0.26]),
     part(ico(1.2, 0), 0x55732e, { y: 1.2, sy: 0.9 }),                  // bụi măng, lá gốc
@@ -497,8 +505,8 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   // sọt đất: sọt tre đan, đai sẫm, miệng đầy đất (mẫu ENV_so_dat: Ø 0,6 m, cao 0,48, đáy ở gốc như code)
   const basket = envPart("ENV_so_dat") || merge([part(cyl(0.3, 0.2, 0.42, 8), 0xab9661, { y: 0.21 }), part(cyl(0.31, 0.31, 0.04, 8), WICKER_D, { y: 0.41 }),   // sọt tre loe miệng, nẹp vành
     part(cyl(0.255, 0.24, 0.05, 8), WICKER_D, { y: 0.13 }), part(ico(0.27, 0), 0x5e4b35, { y: 0.43, sy: 0.42 })]);                    // đai đáy, đất vun trên miệng
-  // khóm lau sậy quanh hố ngập
-  const reeds = merge([0, 1, 2, 3, 4].map((k) => part(blade(0.05, 1.2 + (k % 3) * 0.22), k % 2 ? 0x8f8a4a : 0x76843e,
+  // khóm lau sậy quanh hố ngập (mẫu ENV_lau_say mức xa 34 tam giác ×0,8: cao 1,36 m như năm lá code 1,2–1,64; code 15 tam giác)
+  const reeds = envPart("ENV_lau_say", { lod: 1, s: 0.8 }) || merge([0, 1, 2, 3, 4].map((k) => part(blade(0.05, 1.2 + (k % 3) * 0.22), k % 2 ? 0x8f8a4a : 0x76843e,
     { x: Math.cos(k * 1.3) * 0.13, y: 0.6 + (k % 3) * 0.11, z: Math.sin(k * 1.3) * 0.13, rx: Math.sin(k * 1.3) * 0.18, rz: -Math.cos(k * 1.3) * 0.18 })));
   // cung sừng nằm phẳng (tay cầm ở gốc, hai đầu cong ngược), ống tên nằm (miệng phía +x, đuôi tên thò ra)
   const bow = (() => {
@@ -1127,19 +1135,33 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
     statics.push(place(env ? [env] : p, x, z, ry, heightAt(...at(a, R + 9)))); solid(x, z, 4.2);
   }
 
-  // bia đá "Sát Thát" (Chính sử: quân Trần thích hai chữ Sát Thát lên cánh tay — bia là Hư cấu)
+  // bia đá "Sát Thát" (Chính sử: quân Trần thích hai chữ Sát Thát lên cánh tay — bia là Hư cấu). Mẫu ENV_bia_da (đế, thân 1,3 × 2,55 × 0,4 m từ 0,75 m,
+  // mũ; cao 3,6 m, hai mặt trơn) gộp lưới tĩnh; hai chữ và viền vẽ canvas nền trong suốt lên tấm dán (alphaTest) sát hai mặt thân bia — một lưới, một
+  // lượt vẽ (hộp thân bia code sáu vật liệu: sáu lượt). Không có mẫu thì hộp thân bia texture đầy, đế, mũ code như cũ
   {
-    const a = Math.PI * 0.4, [x, z] = at(a, R + 9);
+    const a = Math.PI * 0.4, [x, z] = at(a, R + 9), ry = Math.atan2(-x, -z), y0 = heightAt(x, z);
+    const env = envPart("ENV_bia_da", { x, y: y0 - 0.05, z, ry });
     const c = document.createElement("canvas"); c.width = 128; c.height = 256;
-    const g2 = c.getContext("2d"); g2.fillStyle = "#8a8474"; g2.fillRect(0, 0, 128, 256);
+    const g2 = c.getContext("2d");
+    if (!env) { g2.fillStyle = "#8a8474"; g2.fillRect(0, 0, 128, 256); }
     g2.strokeStyle = "#5c574b"; g2.lineWidth = 6; g2.strokeRect(8, 8, 112, 240);
     g2.fillStyle = "#3a352c"; g2.font = "bold 84px serif"; g2.textAlign = "center"; g2.textBaseline = "middle";
     g2.fillText("殺", 64, 82); g2.fillText("韃", 64, 180);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.8, 0.45), [0, 0, 0, 0, 1, 1].map((i) => new THREE.MeshLambertMaterial(i ? { map: tex } : { color: 0x8a8474 })));
-    const y0 = heightAt(x, z);
-    slab.position.set(x, y0 + 1.9, z); slab.rotation.y = Math.atan2(-x, -z); slab.castShadow = shadows; scene.add(slab);
-    statics.push(part(box(2.2, 0.5, 1.2), 0x6f6a5c, { x, y: y0 + 0.25, z, ry: Math.atan2(-x, -z) }), part(box(1.7, 0.25, 0.7), 0x6f6a5c, { x, y: y0 + 3.45, z, ry: Math.atan2(-x, -z) }));
+    if (env) {
+      statics.push(env);
+      // tấm dán 1,2 × 2,4 m giữa thân bia (y 2,03 trên chân mẫu), cách tâm 0,23 m: mặt trước quay vào sân, mặt sau quay ra
+      const q = (s) => { const g = new THREE.PlaneGeometry(1.2, 2.4); if (s < 0) g.rotateY(Math.PI); return g.translate(0, 0, 0.23 * s); };
+      const A = q(1), B = q(-1), geo = new THREE.BufferGeometry();
+      for (const k of ["position", "normal", "uv"]) geo.setAttribute(k, new THREE.Float32BufferAttribute([...A.attributes[k].array, ...B.attributes[k].array], A.attributes[k].itemSize));
+      geo.setIndex([...A.index.array, ...Array.from(B.index.array, (i) => i + A.attributes.position.count)]);
+      const decal = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5 }));
+      decal.position.set(x, y0 - 0.05 + 2.03, z); decal.rotation.y = ry; decal.receiveShadow = true; scene.add(decal);
+    } else {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.8, 0.45), [0, 0, 0, 0, 1, 1].map((i) => new THREE.MeshLambertMaterial(i ? { map: tex } : { color: 0x8a8474 })));
+      slab.position.set(x, y0 + 1.9, z); slab.rotation.y = ry; slab.castShadow = shadows; scene.add(slab);
+      statics.push(part(box(2.2, 0.5, 1.2), 0x6f6a5c, { x, y: y0 + 0.25, z, ry }), part(box(1.7, 0.25, 0.7), 0x6f6a5c, { x, y: y0 + 3.45, z, ry }));
+    }
     solid(x, z, 1.1);
   }
 
@@ -1179,11 +1201,16 @@ export function addArenaScenery(scene, world, { shadows, mat, R }) {
     for (let k = -3; k <= 3; k++) { const [x, z] = at(a + k * 0.05, base); statics.push(part(box(0.9, 0.06, 0.2), 0xe6dcc3, { x, y: heightAt(x, z) + 0.03, z, ry: -a })); }
   }
 
-  // lều trại quanh sân, giá phơi áo, đống củi
-  const tent = (x, z, ry, col) => statics.push(place([
-    part(cone(3.2, 3.2, 4), col, { y: 1.6, ry: Math.PI / 4, sx: 1, sz: 1.5 }), part(box(0.1, 3.6, 0.1), PAL.go, { y: 1.8 }),
-    part(box(1.2, 1.6, 0.05), PAL.then, { y: 0.8, z: 2.0 }),
-  ], x, z, ry));
+  // lều trại quanh sân, giá phơi áo, đống củi. Lều: mẫu ENV_leu_tran giãn x ×1,45, z ×2,2, cao ×1,33 (chữ nhật 4,3 × 6,5 m, cao 3,2 — cùng diện tích
+  // hình thoi của chóp code giãn sz 1,5 rồi xoay, va chạm r 2,4 như cũ; vạt cửa đen ở +z như cửa code), chân ở chỗ đất thấp nhất dưới lều; không có
+  // thì chóp, cột, vạt cửa code
+  const tent = (x, z, ry, col) => {
+    let y = heightAt(x, z); for (const [a, b] of [[-2.1, -3.2], [2.1, -3.2], [-2.1, 3.2], [2.1, 3.2]]) y = Math.min(y, heightAt(x + a * Math.cos(ry) + b * Math.sin(ry), z + b * Math.cos(ry) - a * Math.sin(ry)));
+    statics.push(envPart("ENV_leu_tran", { x, y: y - 0.05, z, ry, sx: 1.45, sy: 1.33, sz: 2.2 }) || place([
+      part(cone(3.2, 3.2, 4), col, { y: 1.6, ry: Math.PI / 4, sx: 1, sz: 1.5 }), part(box(0.1, 3.6, 0.1), PAL.go, { y: 1.8 }),
+      part(box(1.2, 1.6, 0.05), PAL.then, { y: 0.8, z: 2.0 }),
+    ], x, z, ry));
+  };
   for (let k = 0; k < 16; k++) {
     const a = rng.range(0, Math.PI * 2);
     if (Math.abs(Math.sin(2 * a)) < 0.2) continue;                        // chừa đường từ 4 cổng

@@ -206,7 +206,8 @@ export class DirectorB16 {
     this.palArc = this.arcMesh(PALACE, PALACE.r);
     this.palFlag = this.flag({ x: PALACE.x + 6, z: PALACE.z + 5 }, COL.dich, 11);
     this.ctx.world.colliders.push({ x0: pc.x - 9, z0: pc.z - 10, x1: pc.x + 9, z1: pc.z - 10, r: 5.2 });      // thân điện (đoạn dày 10,4 m)
-    // lau sậy dày hai bên cầu bến (lối lẻn vào), đê đất phía nam bến (đi trên đê là bị thấy)
+    // lau sậy dày hai bên cầu bến (lối lẻn vào), đê đất phía nam bến (đi trên đê là bị thấy). Lau giữ nón code: mẫu ENV_lau_say mức xa 34 tam giác ×
+    // 1.406 khóm = 47,8 nghìn (nón 8 tam giác: 11,2 nghìn) — gấp 4,3 lần cho một bãi lau
     const reedMat = new THREE.MeshLambertMaterial({ color: 0x8a8a4a }), reedGeo = new THREE.ConeGeometry(0.22, 2.6, 4);
     let nReed = 0; for (const R of REEDS) nReed += Math.floor(((R.x1 - R.x0) * (R.z1 - R.z0)) / 2.2);
     const reeds = new THREE.InstancedMesh(reedGeo, reedMat, nReed), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();

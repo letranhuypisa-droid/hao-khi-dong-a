@@ -3,8 +3,8 @@
 // (2) glb.js envPart: lưới không chỉ số gộp được với models.js merge, tint, cut tách đúng.
 // (3) đất Hàm Tử (world.js buildWorld, cả đồn có tường) dựng khi đã nạp mô hình và khi chưa nạp (Node, lỗi mạng) ra cùng vật va chạm,
 //     Cứ Điểm, cổng — mô phỏng không phụ thuộc mô hình; khi đã nạp thì thuyền, cây, cổng thật sự dùng mô hình.
-// (4) danh sách nạp trước world.js WORLD_ENV, ARENA_ENV, scenery-b20.js B20_ENV khớp các mã mà world.js, scenery.js, director-b16.js,
-//     scenery-b20.js, world-b20.js gọi (envPart, envLOD) và boats.js ENV_HULL.
+// (4) danh sách nạp trước world.js WORLD_ENV, ARENA_ENV, scenery-b20.js B20_ENV khớp các mã mà world.js, scenery.js, director-b16.js, kesach.js,
+//     ambient.js, director-td.js, scenery-b20.js, world-b20.js gọi (envPart, envLOD, envMesh) và boats.js ENV_HULL.
 // (5) B20 (world-b20.js buildWorldB20, scenery-b20.js) và Võ trường (world.js buildArena) dựng khi đã nạp / chưa nạp ra cùng vật va chạm, cùng
 //     xếp chỗ (rng thế giới rút y hệt), cùng số lưới (không thêm lượt vẽ); khi đã nạp thì tháp canh, bè, cây, khán đài… thật sự dùng mẫu.
 // (6) thuyền B20 (boats.js): mẫu K1–K5 thay LOD0 trong TRI_BUDGET, LOD1 / hình thay thế vẫn code; mặt boong mẫu đã nắn nằm đúng độ cao các mặt
@@ -146,6 +146,15 @@ t("đã nạp: 7 thuyền sông, 260 cây, nhà cổng dùng mô hình (Node kh�
   let house = null; scenes[1].traverse((o) => { if (o.isLOD && o.levels[0].object.isMesh && tris(o.levels[0].object) === index["env/ENV_cong_ham_tu"].tris && Math.hypot(o.position.x - gate.x, o.position.z - gate.z) < 0.01) house = o; });
   assert.ok(house, "nhà cổng mô hình (LOD) ở chỗ cổng");
 });
+t("đợt năm đã nạp: khóm tre ENV_khom_tre, lau sậy ven sông ENV_lau_say là InstancedMesh mức xa; lưới tĩnh dài thêm lều, lều nỉ, nhà làng, gò đá; chưa nạp: khối code", () => {
+  const tris = (m) => (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+  const ims = (scene) => { const s = []; scene.traverse((o) => { if (o.isInstancedMesh) s.push(tris(o)); }); return s; };
+  for (const id of ["ENV_khom_tre", "ENV_lau_say"]) {
+    assert.ok(ims(scenes[1]).includes(index["env/" + id].lods[1]), id + " mức xa");
+    assert.ok(!ims(scenesOff[1]).includes(index["env/" + id].lods[1]), id + " chưa nạp");
+  }
+  assert.ok(withM[1].envProps.some((q) => q.id === "ENV_go_da"), "gò đá");
+});
 // đồn có tường (world.js buildFort): cổng, tháp góc là THREE.LOD theo tâm đồn — gần: hai cổng, bốn tháp lưới riêng (tháp mẫu: LOD gần / xa riêng),
 // xa: một lưới gộp đúng bằng mức xa của bốn tháp cộng hai cổng, chỉ hiện khi tháp góc nào cũng xa camera hơn ngưỡng mức xa của nó
 t("đồn có tường: cổng + tháp góc xa tâm đồn thành một lưới gộp (= mức xa bốn tháp + hai cổng, cùng chỗ), ngưỡng ≥ ngưỡng mức xa của tháp + góc xa nhất; cổng, tháp làm mờ đo từ chỗ của nó", () => {
@@ -221,16 +230,19 @@ t("B20: cùng vật va chạm, xếp chỗ cảnh, bè, phao chặn luồng, boo
   assert.deepEqual(meshes(b20[1].scene).map((m) => m.name || m.type), meshes(b20[0].scene).map((m) => m.name || m.type));
 });
 // Ngân sách: b20-statics tăng ≤ 1.500 cho tháp canh, đầu bến, tời neo (bù bằng cây mức xa), cộng ≤ 6.500 cho bốn chòi tranh (4 × 1.192) và trống đồng
-// bản doanh (1.200) — mẫu làm riêng cho các chỗ đó; nhà bạt chỉ huy là lưới riêng (hq-pavilion, 3.000); cả cảnh lúc dựng (info, triều cao) ≤ 120 nghìn.
-t("B20 đã nạp: tháp canh, đầu bến, tời neo, chòi, trống đồng vào b20-statics, nhà bạt mẫu ENV_nha_bat_chi_huy (lưới riêng), bè mẫu ENV_be_co mức xa, cây ENV_lum_cay_ven_song mức xa, cột đá vôi ENV_nui_da_a/b/c mức xa, núi xa ENV_day_nui_xa; tổng cảnh ≤ 120 nghìn tam giác, b20-statics tăng ≤ 8.000", () => {
+// bản doanh (1.200) — mẫu làm riêng cho các chỗ đó, cộng ≤ 2.000 cho sáu lều bản doanh (ENV_leu_tran mức xa 6 × 198) và hai giá mái chèo (ENV_gia_cheo
+// 2 × 498) của đợt năm; nhà bạt chỉ huy là lưới riêng (hq-pavilion, 3.000); cả cảnh lúc dựng (info, triều cao) ≤ 120 nghìn.
+t("B20 đã nạp: tháp canh, đầu bến, tời neo, chòi, trống đồng, lều, giá chèo vào b20-statics, nhà bạt mẫu ENV_nha_bat_chi_huy (lưới riêng), bè mẫu ENV_be_co mức xa, cây ENV_lum_cay_ven_song mức xa, đá tảng ENV_da_a mức xa, khúc gỗ phao chặn luồng ENV_go_chan_song mức xa, cột đá vôi ENV_nui_da_a/b/c mức xa, núi xa ENV_day_nui_xa; tổng cảnh ≤ 120 nghìn tam giác, b20-statics tăng ≤ 10.000", () => {
   const by = (k, n) => meshes(b20[k].scene).find((m) => m.name === n);
   assert.equal(triOf(by(1, "rafts")), index["env/ENV_be_co"].lods[1]);
   assert.equal(triOf(by(1, "trees")), index["env/ENV_lum_cay_ven_song"].lods[1]);
+  assert.equal(triOf(by(1, "rocks")), index["env/ENV_da_a"].lods[1]);
+  assert.equal(triOf(by(1, "boom")), index["env/ENV_go_chan_song"].lods[1]);
   for (const k of ["A", "B", "C"]) assert.equal(triOf(by(1, "karst-" + k)), index["env/ENV_nui_da_" + k.toLowerCase()].lods[1], "karst-" + k);
   assert.equal(triOf(by(1, "far-ridges")) - triOf(by(0, "far-ridges")), 2 * index["env/ENV_day_nui_xa"].tris, "hai cụm núi xa");
   assert.equal(triOf(by(1, "hq-pavilion")), index["env/ENV_nha_bat_chi_huy"].tris);
   const st = [triOf(by(0, "b20-statics")), triOf(by(1, "b20-statics"))];
-  assert.ok(st[1] > st[0] && st[1] - st[0] <= 8000, `b20-statics ${st[0]} → ${st[1]}`);
+  assert.ok(st[1] > st[0] && st[1] - st[0] <= 10000, `b20-statics ${st[0]} → ${st[1]}`);
   const info = b20[1].w.scenery.info();
   assert.ok(info.tris <= 120000, `cảnh B20 ${info.tris}`);
 });
@@ -248,6 +260,10 @@ t("Võ trường: cùng vật va chạm, chỗ khán giả, cổng; cùng số l
   assert.equal(lods.length, 10);
   for (const l of lods) assert.equal(triOf(l.levels[0].object), index["env/ENV_khan_dai"].lods[0]);
   assert.deepEqual(imSnap(arena[1].scene), imSnap(arena[0].scene), "InstancedMesh (cây, cỏ)");
+  // bia Sát Thát: đã nạp — tấm dán chữ một vật liệu (alphaTest) thay hộp thân bia sáu vật liệu
+  const slab = (k) => meshes(arena[k].scene).filter((m) => Array.isArray(m.material) && m.material.length === 6).length;
+  const decal = (k) => meshes(arena[k].scene).filter((m) => !Array.isArray(m.material) && m.material.map && m.material.alphaTest === 0.5).length;
+  assert.deepEqual([slab(0), decal(0), slab(1), decal(1)], [1, 0, 0, 1]);
 });
 
 console.log("Thuyền B20 (mẫu K1–K5)");
@@ -296,11 +312,12 @@ const callIds = (src) => {
   return used;
 };
 const srcOf = (f) => readFileSync(join(here, "../js/battle", f), "utf8");
-t("WORLD_ENV = các mã mô hình môi trường của world.js, scenery.js (trừ phần Võ trường), director-b16.js, kesach.js; ARENA_ENV = phần Võ trường (buildArena, addArenaScenery); mã nào cũng có trong index", () => {
+t("WORLD_ENV = các mã mô hình môi trường của world.js, scenery.js (trừ phần Võ trường), director-b16.js, kesach.js, ambient.js (trâu), director-td.js (lều lương Tự do); ARENA_ENV = phần Võ trường (buildArena, addArenaScenery); mã nào cũng có trong index", () => {
   const split = (f, fn) => { const s = srcOf(f), i = s.indexOf("export function " + fn + "("); assert.ok(i > 0, fn); return [s.slice(0, i), s.slice(i)]; };
   const [w0, w1] = split("world.js", "buildArena"), [s0, s1] = split("scenery.js", "addArenaScenery");
   const decl = (s) => s.replace(/export const (?:WORLD|ARENA)_ENV = \[[^\]]*\];/g, "");      // bỏ chính hai danh sách khỏi phần quét
-  assert.deepEqual([...new Set([...callIds(decl(w0)), ...callIds(s0), ...callIds(srcOf("director-b16.js")), ...callIds(srcOf("kesach.js"))])].sort(), [...W.WORLD_ENV].sort());
+  const more = ["director-b16.js", "kesach.js", "ambient.js", "director-td.js"].flatMap((f) => [...callIds(srcOf(f))]);
+  assert.deepEqual([...new Set([...callIds(decl(w0)), ...callIds(s0), ...more])].sort(), [...W.WORLD_ENV].sort());
   assert.deepEqual([...new Set([...callIds(decl(w1)), ...callIds(s1)])].sort(), [...W.ARENA_ENV].sort());
   for (const id of [...W.WORLD_ENV, ...W.ARENA_ENV]) assert.ok(index["env/" + id], id);
 });
