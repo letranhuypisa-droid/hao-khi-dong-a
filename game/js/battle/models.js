@@ -540,8 +540,10 @@ export const modelOf = (code) => (!meshyAll && (code in HUN2 || code === "OFF_do
 export const sizeOf = (code, scale) => (!meshyAll && code in HUN2 ? +(scale * HUN2[code]).toFixed(4) : scale);
 // Lính đám đông cũng có bản Hunyuan3D (kit/<mã>h, design/tools/bake/catalog.mjs HUN_KITS; cùng bảng mức chi tiết, vũ khí, tua): crowd.js, lab.js, main.js chọn tệp qua kitOf, kitFiles.
 const HUN_KIT = ["DV_GIAO", "DV_DAO", "DV_NO", "NG_DAO", "NG_GIAO", "NG_CUNG", "NG_TANK", "NG_KY"];
-export const kitOf = (k) => (!meshyAll && HUN_KIT.includes(k) ? k + "h" : k);
-export const kitFiles = () => HUN_KIT.map(kitOf);
+// HUN_ONLY: kiểu lính chỉ có bản Hunyuan3D, không có bản Meshy để quay về (quân áo Tống DV_AOTONG, Cờ áo Tống): luôn dùng kit/<mã>h, kể cả khi useMeshy().
+const HUN_ONLY = ["DV_AOTONG"];
+export const kitOf = (k) => (HUN_ONLY.includes(k) || (!meshyAll && HUN_KIT.includes(k)) ? k + "h" : k);
+export const kitFiles = () => [...HUN_KIT.map(kitOf), ...HUN_ONLY.map(kitOf)];
 export const MESHY = { hero: ["H35", 1.08], H31: ["H31", 1.12], H33: ["H33", 1.15], H40: ["H40", 1.15], X19: ["X19", 1.38], doitruong: ["OFF_doitruong", 1.12], photuong: ["OFF_photuong", 1.22] };
 for (const [k, [model, scale]] of Object.entries(MESHY)) RIGS[k + "m"] = { ...RIGS[k], model, scale };
 export function useMeshy() { meshyAll = true; for (const [k, [model, scale]] of Object.entries(MESHY)) Object.assign(RIGS[k], { model, scale }); }

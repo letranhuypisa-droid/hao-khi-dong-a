@@ -178,7 +178,7 @@ const ATTACK = {
     { ty: 0.85, lax: -1.55, lay: -0.85, lfx: 0, rax: -1.3, ray: -0.3, raz: 0.3, rfx: -1.5 },
   ],
 };
-export const KIT_WEAPON = { NG_DAO: "dao", NG_GIAO: "giao", NG_CUNG: "cung", NG_TANK: "chuy", NG_KY: "ky", DV_GIAO: "giao", DV_DAO: "dao", DV_NO: "no" };
+export const KIT_WEAPON = { NG_DAO: "dao", NG_GIAO: "giao", NG_CUNG: "cung", NG_TANK: "chuy", NG_KY: "ky", DV_GIAO: "giao", DV_DAO: "dao", DV_NO: "no", DV_AOTONG: "cung" };
 
 const P = {};
 for (const k of KEYS) P[k] = 0;

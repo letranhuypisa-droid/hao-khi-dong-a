@@ -160,8 +160,9 @@ export class KeSachManager {
     b.landed = true;
     const f = ctx.sim.fronts.A;
     f.q.ta.GIAO_DV += def.effect.qTa;                // quân Triệu Trung nhập cánh A (ĐỀ XUẤT BẢN THỬ)
+    // cung thủ áo Tống (kit DV_AOTONG, tuning.js KITS; mô hình kit/DV_AOTONGh): trước đây giáo binh Đại Việt nhuộm hổ phách (tint), nay áo, khăn, cung đúng tranh D2
     for (let i = 0; i < def.effect.troops; i++) {
-      ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", role: "zone", front: "A", tint: [1.25, 0.9, 0.55],
+      ctx.crowd.spawn({ side: "ta", unit: "GIAO_DV", kit: "DV_AOTONG", role: "zone", front: "A",
         x: L.x + ctx.rng.range(-6, 6), z: L.z + ctx.rng.range(-3, 3), legionMult: ctx.stats.legionMult });
     }
     this.reward(k, def.perBoat);

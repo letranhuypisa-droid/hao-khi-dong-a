@@ -296,6 +296,13 @@ const BUILD = {
       flF: merge([...cloth(-1), ...cloth(1)]), flB: EMPTY(), tas: tail };
   },
 
+  // Cung thủ áo Tống (Cờ áo Tống): chỉ dùng khi chưa nạp được kit/DV_AOTONGh (thử trong Node, mô hình lỗi) — áo hổ phách, khăn xanh ngọc, cung Việt ở tay trái, ống tên sau lưng.
+  DV_AOTONG: () => human({
+    cloth: 0xb0752c, armor: PAL.nau, skirt: 0xb0752c, pants: PAL.then, boot: PAL.then,
+    hat: [part(box(0.34, 0.06, 0.31), PAL.then, { y: 0.72 }), part(ico(0.085, 0), PAL.toc, { y: 0.84, z: -0.04 })],
+    back: quiver(), wrap: 0x3f8f7a, left: W.cung(),
+  }),
+
   // ==== DÂN LÀNG chạy loạn (Hư cấu) — chỉ ambient.js dựng; KHÔNG thêm vào KITS trong tuning.js (Crowd dựng
   // lưới cho mọi kiểu trong KITS và code đánh nhau duyệt tác tử đám đông; dân không phải tác tử). Hàm dựng
   // villager() ở cuối file. ==========================================================================

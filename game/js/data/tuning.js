@@ -161,6 +161,9 @@ export const KITS = {
   DV_GIAO: { unit: "GIAO_DV", name: "Giáo binh",    w: 0.50, hp: 1.0, cong: 1.0, giap: 1.0, speed: 1.0,  reach: 2.4, windup: 0.5 },
   DV_DAO:  { unit: "GIAO_DV", name: "Đao khiên",    w: 0.30, hp: 1.15, cong: 0.95, giap: 1.1, speed: 1.0, reach: 1.7, windup: 0.42 },
   DV_NO:   { unit: "GIAO_DV", name: "Nỏ thủ",       w: 0.20, hp: 0.8, cong: 0.9, giap: 0.8, speed: 1.0,  ranged: true, range: 14, windup: 0.9 },
+  // Cung thủ áo Tống (Kế Sách Cờ áo Tống, quân Triệu Trung đổ bộ ở kesach.js landBoat): w 0 — không bao giờ do pickKit chọn, chỉ sinh có chủ ý (kit: "DV_AOTONG"). Số lấy của nỏ thủ
+  // (ĐỀ XUẤT BẢN THỬ): trước đây mười hai giáo binh nhuộm hổ phách, nay cung thủ khăn xanh ngọc theo tranh D2; tầm 14 m, nhịp bắn như DV_NO.
+  DV_AOTONG: { unit: "GIAO_DV", name: "Cung thủ áo Tống", w: 0, hp: 0.8, cong: 0.9, giap: 0.8, speed: 1.0, ranged: true, range: 14, windup: 0.9 },
 };
 // ---- AI lính vùng chiến đấu (ĐỀ XUẤT BẢN THỬ) ------------------------------------------------
 // block: tỉ lệ đỡ khiên đòn N trúng trước mặt (đòn C, đòn hất tung luôn phá được), đỡ xong nhận
@@ -203,7 +206,8 @@ export const KITS_OF =Object.fromEntries(Object.keys(UNITS).map((u) => [u, Objec
 export function pickKit(unit, u) {
   let acc = 0;
   for (const k of KITS_OF[unit]) { acc += KITS[k].w; if (u < acc) return k; }
-  return KITS_OF[unit][KITS_OF[unit].length - 1];
+  const pick = KITS_OF[unit].filter((k) => KITS[k].w > 0);              // w 0 (kiểu chỉ sinh có chủ ý, vd DV_AOTONG): không phải kiểu dự phòng
+  return pick[pick.length - 1];
 }
 
 // khắc chế trong mô phỏng: 1,5 nếu i khắc j, 0,75 nếu j khắc i, còn lại 1 (mục 3.12 khacChe)
