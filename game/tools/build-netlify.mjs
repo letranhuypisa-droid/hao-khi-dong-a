@@ -110,13 +110,14 @@ export function checkDeploy(root) {
   }
   for (const [name, from] of icons) need(`assets/icons/${name}.webp`, "icon", from);
 
-  // 5) mô hình GLB nướng sẵn (battle/glb.js): mọi tệp trong assets/models/index.json, và mô hình nhân vật code xin (model: "H35"; tên ghép như "CV_" + id thì bỏ qua)
+  // 5) mô hình GLB nướng sẵn (battle/glb.js): mọi tệp trong assets/models/index.json (texture nếu mục có: vật môi trường env/ phần lớn không có), và mô hình
+  // nhân vật code xin (model: "H35"; tên ghép như "CV_" + id thì bỏ qua)
   const MI = "assets/models/index.json", mi = read(MI);
   if (mi === null) unreadable("model", MI, "không có index.json");
   else {
     let idx = null; try { idx = JSON.parse(mi); } catch (e) { unreadable("model", MI, e.message); }
     if (idx) {
-      for (const [id, m] of Object.entries(idx)) { need(`assets/models/${m.file}`, "model", MI + " " + id); need(`assets/models/${m.tex}`, "model", MI + " " + id); }
+      for (const [id, m] of Object.entries(idx)) { need(`assets/models/${m.file}`, "model", MI + " " + id); if (m.tex) need(`assets/models/${m.tex}`, "model", MI + " " + id); }   // env màu phẳng: không texture
       for (const [f, src] of jsSrc) for (const m of src.matchAll(/\bmodel:\s*"([A-Za-z0-9_]+)"(?!\s*\+)/g)) need(`assets/models/char/${m[1]}.hkm`, "model", f);
     }
   }

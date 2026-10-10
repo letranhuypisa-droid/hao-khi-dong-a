@@ -1,16 +1,18 @@
 // design/tools/glb-bake.mjs — nướng GLB Meshy (design/glb/) thành tài nguyên game (game/assets/models/): nhân vật gắn sẵn trọng
 // số theo 15 khớp rig, lính đám đông theo bộ khớp instanced, vũ khí theo khung tay, ngựa. Định dạng .hkm (bake/io.mjs) + WebP.
 //   cd design/tools && npm i
-//   node design/tools/glb-bake.mjs [char|kit|wpn|all] [--only H35,DV_GIAO]
-// Không cần mạng, không tốn credit: chỉ đọc design/glb/*.glb đã có trong repo.
+//   node design/tools/glb-bake.mjs [char|kit|wpn|env|all] [--only H35,DV_GIAO] [--raw <thư mục GLB môi trường, mặc định design/>]
+// Không cần mạng, không tốn credit: chỉ đọc design/glb/*.glb đã có trong repo. env: vật tĩnh của cảnh (bake/env.mjs, catalog ENV) từ GLB
+// Hunyuan3D thả ở design/<mã>.glb (ngoài git) → assets/models/env/; thiếu tệp gốc thì bỏ qua mã đó, giữ bản nướng cũ.
 import { registerHooks } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from "node:fs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const threeUrl = pathToFileURL(join(ROOT, "game/vendor/three/three.module.js")).href;
 registerHooks({ resolve: (s, c, next) => (s === "three" ? { url: threeUrl, shortCircuit: true } : next(s, c)) });
-const { CHARS, WEAPONS, KIT_LIST } = await import("./bake/catalog.mjs");
+const { CHARS, WEAPONS, KIT_LIST, ENV } = await import("./bake/catalog.mjs");
+const { bakeEnv } = await import("./bake/env.mjs");
 const { bakeKit, bakeHorseKit, sampleColors } = await import("./bake/kit.mjs");
 const { bakeWeapon } = await import("./bake/wpn.mjs");
 const { bakeChar } = await import("./bake/char.mjs");
@@ -18,6 +20,7 @@ const { writeHKM, writeTexture, writeRaw, rawImage } = await import("./bake/io.m
 
 const args = process.argv.slice(2), what = args[0] || "all";
 const only = (() => { const i = args.indexOf("--only"); return i >= 0 ? args[i + 1].split(",") : null; })();
+const RAW = (() => { const i = args.indexOf("--raw"); return i >= 0 ? resolve(args[i + 1]) : join(ROOT, "design"); })();
 const OUT = join(ROOT, "game/assets/models");
 const man = JSON.parse(readFileSync(join(ROOT, "design/glb/manifest.json"), "utf8"));
 const INDEX = join(OUT, "index.json");
@@ -67,6 +70,20 @@ if (what === "kit" || what === "all") {
     const tris = r.lods.map((m) => m.index.a.length / 3);
     index["kit/" + code] = { kind: "kit", file: `kit/${code}.hkm`, tex: `kit/${code}.webp`, tris: tris[0], lods: tris, bytes: size(hkm) + size(tex) };
     console.log(`✓ ${code.padEnd(8)} LOD ${tris.join(" / ")} tg · ${((size(hkm) + size(tex)) / 1024).toFixed(0)} KB${r.split ? ` · tách cầu ${r.split} tg trước khi buông tay` : ""} · ${Date.now() - t0} ms${r.info ? " · ngựa " + JSON.stringify(r.info, (k, v) => (typeof v === "number" ? +v.toFixed(3) : v)) : ""}${r.warnings.length ? " · " + r.warnings.join("; ") : ""}`);
+  }
+}
+if (what === "env" || what === "all") {
+  for (const [code, c] of Object.entries(ENV)) {
+    if (only && !only.includes(code)) continue;
+    const src = join(RAW, code + ".glb");
+    if (!existsSync(src)) { console.log(`· ${code.padEnd(24)} không có ${src}: giữ bản nướng cũ`); continue; }
+    const t0 = Date.now(), r = await bakeEnv(src, c);
+    const hkm = join(OUT, "env", code + ".hkm"), tex = r.image ? join(OUT, "env", code + ".webp") : null;
+    writeHKM(hkm, { ...r.meta, ...(tex ? { tex: code + ".webp" } : {}) }, Object.fromEntries(r.lods.map((m, i) => ["lod" + i, m])));
+    if (tex) await writeRaw(tex, r.image, c.tex);
+    const bytes = size(hkm) + (tex ? size(tex) : 0);
+    index["env/" + code] = { kind: "env", file: `env/${code}.hkm`, ...(tex ? { tex: `env/${code}.webp` } : {}), tris: r.tris[0], lods: r.tris, bytes };
+    console.log(`✓ ${code.padEnd(24)} LOD ${r.tris.join(" / ")} tg (gốc ${r.trisBefore}) · ${(bytes / 1024).toFixed(0)} KB · ×${r.meta.scale} · ${r.meta.lo.join(",")} → ${r.meta.hi.join(",")} · ${Date.now() - t0} ms`);
   }
 }
 writeFileSync(INDEX, JSON.stringify(Object.fromEntries(Object.entries(index).sort()), null, 1) + "\n");

@@ -9,6 +9,7 @@
 //   &cap=40         trần thuyền LOD1 (24/40/60) · &noshadow · &nofleet · &hide (ẩn bảng) · &play (chạy thời gian)
 //   &stakes=active  trạng thái cả ba mốc cọc (hidden/active/exposed) · &boom (hiện phao chặn luồng)
 //   &still          không chạy vòng khung (chỉ vẽ khi gọi __labb20: chụp màn tất định)
+//   &noenv          không nạp mô hình môi trường nướng (scenery-b20.js B20_ENV: thuyền K1–K5, tháp canh, bến, bè, cây) — xem khối code
 // Chuột: kéo trái xoay, kéo phải / Shift+kéo dời, lăn thu phóng; bật "Người" rồi nhấp để đặt người thử (đứng trên boong
 // nếu trúng boong, theo boong khi thuyền dập dềnh). Phím I J K L đi, U/O xoay người.
 // window.__labb20: API cho kịch bản chụp màn (tools/shot.mjs) — xem cuối file.
@@ -20,8 +21,11 @@ import { zc, hw, bedHeight, inReach, stakeFieldAt, TIDE_Y } from "./data/terrain
 import { MAP, FLEET, LIGHT_BOATS } from "./data/battle-b20.js";
 import { STAKE_FIELDS } from "./data/river-b20.js";
 import { makeRig, RIGS } from "./battle/models.js";
+import { preloadModels } from "./battle/glb.js";
+import { B20_ENV } from "./battle/scenery-b20.js";
 
 const Q = new URLSearchParams(location.search);
+if (!Q.has("noenv")) await preloadModels(B20_ENV.map((id) => "env/" + id), 15000);   // như màn tải của trận (main.js loadModels)
 const num = (k, d) => (Q.has(k) && Q.get(k) !== "" ? Number(Q.get(k)) : d);
 if (Q.has("hide")) document.body.classList.add("hide");
 

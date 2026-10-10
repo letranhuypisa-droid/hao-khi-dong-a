@@ -95,7 +95,7 @@ export function packMesh(m) {
   const n = m.pos.length / 3, attrs = {};
   attrs.position = { a: m.pos, t: "f32", s: 3 };
   attrs.normal = { a: Int8Array.from(m.nor, (x) => Math.round(Math.max(-1, Math.min(1, x)) * 127)), t: "i8n", s: 3 };
-  attrs.uv = { a: Uint16Array.from(m.uv, (x) => Math.round(Math.max(0, Math.min(1, x)) * 65535)), t: "u16n", s: 2 };
+  if (m.uv) attrs.uv = { a: Uint16Array.from(m.uv, (x) => Math.round(Math.max(0, Math.min(1, x)) * 65535)), t: "u16n", s: 2 };   // môi trường màu phẳng (env.mjs): không UV
   if (m.si) attrs.skinIndex = { a: m.si, t: "u8", s: 4 };
   if (m.sw) attrs.skinWeight = { a: m.sw, t: "u8n", s: 4 };
   for (const [k, v] of Object.entries(m.extra || {})) attrs[k] = v;

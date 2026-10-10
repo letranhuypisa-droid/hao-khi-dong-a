@@ -17,6 +17,7 @@ for (const p of inputs) {
 const COMP = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 }, NCOMP = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 
 function imageInfo(fd, j, binStart, img) {
+  if (img.bufferView === undefined) return { kind: img.uri?.startsWith("data:") ? "data-uri" : "uri", w: 0, h: 0, bytes: 0 };   // ảnh ngoài / data URI: không đọc
   const bv = j.bufferViews[img.bufferView];
   const buf = Buffer.alloc(Math.min(bv.byteLength, 65536));
   fs.readSync(fd, buf, 0, buf.length, binStart + (bv.byteOffset || 0));
