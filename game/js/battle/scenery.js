@@ -9,6 +9,10 @@
 // data/terrain-b15.js — cọc nhọn, kè ván, cờ rách trên lũy Nguyên, cọc đổ ở chỗ vỡ và dưới hào, cọc ven
 // hào thành, cọc tre, sọt đất, khiên nhật trên ụ quân ta, chông trong hố, rào ruộng gãy, cự mã, xác ngựa,
 // đồ rơi dày hơn ở bãi giằng co và trước cổng (addLaneProps). Đạo cụ ngẫu nhiên cũ tránh lũy, hào, hố.
+//
+// Mô hình môi trường nướng (glb.js envPart, màu phẳng gộp vào cùng lưới tĩnh / InstancedMesh) thay khối code khi đã nạp: bến gỗ, thuyền
+// mui, thúng câu, xe lương, hòm, thùng, khung lều cháy, bếp lửa, cọc buộc ngựa, cây đa, cau, cự mã nguyên, cờ đuôi ngựa; thuyền mui và cây
+// đa đặt riêng nên dùng envLOD (gần / xa). Đường code và đường mẫu rút rng y hệt nhau (vị trí mọi thứ khác không đổi), vật va chạm không đổi.
 
 import * as THREE from "three";
 import { PAL, merge, part, lambert } from "./models.js";
@@ -17,6 +21,7 @@ import { laneFeaturesOn, featureNear, TERRAIN_FEATURES } from "./ground.js";
 import { MAP, FRONTS, VILLAGE, KE_SACH } from "../data/battle-b15.js";
 import { LANE_TERRAIN } from "../data/terrain-b15.js";
 import { makeRng } from "../core/rng.js";
+import { envPart, envLOD, model } from "./glb.js";
 
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const cyl = (rt, rb, h, s = 6) => new THREE.CylinderGeometry(rt, rb, h, s);
@@ -208,10 +213,14 @@ export function addScenery(scene, world, { shadows, mat }) {
   // ---- bến gỗ, thuyền nan ----------------------------------------------------------------------------
   const pier = (x, len, ang = 0) => {
     const zb = MAP.riverNorthZ + 3, y = 0.95;
+    // mẫu ENV_ben_go dài 10 m dọc z, mặt sàn ở 1,2 m trên đáy cọc: kéo theo chiều dài bến, sàn ở 0,95 như ván code
+    const env = envPart("ENV_ben_go", { x, y: y - 1.2, z: zb - len / 2, sz: len / 10 });
+    if (env) { statics.push(env); return { x, z: zb - len }; }
     for (let t = 0; t < len; t += 1.1) statics.push(part(box(2.4, 0.12, 1.0), t % 3.3 < 1.1 ? 0x7a5a3a : PAL.go, { x: x + Math.sin(ang) * t, y, z: zb - t, ry: ang + (vnoise(t, x) - 0.5) * 0.06 }));
     for (let t = 0; t < len; t += 3.3) for (const s of [-1, 1]) statics.push(part(cyl(0.12, 0.14, 3, 5), 0x4a3524, { x: x + s * 1.1, y: y - 1.0, z: zb - t }));
     return { x, z: zb - len };
   };
+  const skiffY = model("env/ENV_thuyen_mui") ? 0.33 : 0.3;                          // mẫu: gốc ở mớn nước
   const skiffGeo = merge([
     part(box(1.2, 0.45, 4.2), PAL.nau, { y: 0.22 }), part(cone(0.62, 1.1, 4), PAL.nau, { y: 0.22, z: 2.5, rx: Math.PI / 2, ry: Math.PI / 4, sz: 0.5 }),
     part(cyl(0.9, 0.9, 1.6, 8, 1), 0x8c7a52, { y: 0.75, z: -0.4, rz: Math.PI / 2, sx: 0.8 }),     // mui thuyền đan tre
@@ -221,18 +230,18 @@ export function addScenery(scene, world, { shadows, mat }) {
   for (const [px, len] of [[120, 9], [214, 12], [318, 8], [402, 10]]) {
     const end = pier(px, len);
     for (let s = 0; s < 2; s++) {
-      const b = new THREE.Mesh(skiffGeo, mat); b.castShadow = shadows;
-      b.position.set(px + (s ? 2.8 : -2.8), 0.3, end.z + 2 + s * 3); b.rotation.y = (s ? 0.25 : -0.2);
+      const b = envLOD("ENV_thuyen_mui", mat, { far: 45, cast: shadows }) || new THREE.Mesh(skiffGeo, mat); b.castShadow = shadows;
+      b.position.set(px + (s ? 2.8 : -2.8), skiffY, end.z + 2 + s * 3); b.rotation.y = (s ? 0.25 : -0.2);
       scene.add(b); skiffs.push(b);
     }
   }
   // thúng câu, lưới phơi trên bờ
   for (const [x, z] of [[160, -158], [270, -157], [372, -159]]) {
-    statics.push(part(cyl(0.9, 0.6, 0.5, 8), 0x8c7a52, { x, y: heightAt(x, z) + 0.2, z, rz: 0.4 }));
+    statics.push(envPart("ENV_thung_cau", { x, y: heightAt(x, z) - 0.05, z, rz: 0.4 }) || part(cyl(0.9, 0.6, 0.5, 8), 0x8c7a52, { x, y: heightAt(x, z) + 0.2, z, rz: 0.4 }));
     statics.push(part(box(0.08, 1.8, 0.08), PAL.go, { x: x + 2, y: heightAt(x + 2, z) + 0.9, z }), part(box(0.08, 1.8, 0.08), PAL.go, { x: x + 5, y: heightAt(x + 5, z) + 0.9, z }),
       part(box(3, 1.2, 0.03), 0x5a5540, { x: x + 3.5, y: heightAt(x + 3.5, z) + 1.1, z }));
   }
-  world.animated.push((t) => skiffs.forEach((b, i) => { b.position.y = 0.3 + 0.08 * Math.sin(t * 1.3 + i); b.rotation.z = 0.05 * Math.sin(t + i * 1.7); }));
+  world.animated.push((t) => skiffs.forEach((b, i) => { b.position.y = skiffY + 0.08 * Math.sin(t * 1.3 + i); b.rotation.z = 0.05 * Math.sin(t + i * 1.7); }));
 
   // ---- dấu vết chiến trận: giáo gãy, khiên rơi, tên cắm, xe hỏng, trại cháy ---------------------------------
   const spearStuck = merge([part(cyl(0.025, 0.025, 2.2, 4), PAL.go, { y: 1.0 }), part(cone(0.05, 0.25, 4), PAL.sat, { y: 2.2 })]);
@@ -253,6 +262,8 @@ export function addScenery(scene, world, { shadows, mat }) {
   }
   const cart = (x, z, ry, broken) => {
     const y = heightAt(x, z);
+    const env = envPart(broken ? "ENV_xe_luong_vo" : "ENV_xe_luong", { x, y, z, ry });            // mẫu xe vỡ đã nằm đổ, không nghiêng thêm
+    if (env) { statics.push(env); solid(x, z, 1.4); return; }
     const g = [part(box(1.6, 0.3, 2.8), PAL.go, { y: 0.8 }), part(box(0.08, 0.5, 2.8), PAL.go, { x: 0.78, y: 1.1 }), part(box(0.08, 0.5, 2.8), PAL.go, { x: -0.78, y: 1.1 }),
       part(box(0.1, 0.1, 2.2), PAL.go, { y: 0.8, z: 2.4 }), part(cyl(0.6, 0.6, 0.12, 8), PAL.nau, { x: 0.9, y: 0.6, rz: Math.PI / 2 })];
     if (!broken) g.push(part(cyl(0.6, 0.6, 0.12, 8), PAL.nau, { x: -0.9, y: 0.6, rz: Math.PI / 2 }), part(box(1.2, 0.6, 1.2), 0xb09a6a, { y: 1.25, z: -0.4 }));
@@ -267,19 +278,33 @@ export function addScenery(scene, world, { shadows, mat }) {
     const x = rng.range(S.x0 + 6, S.x1 - 6), z = rng.range(-150, 150);
     if ((busy(x, z, -12) && Math.abs(z) > 20) || blocked(x, z, 1.8)) continue;
     const y = heightAt(x, z), r = rng.next();
-    if (r < 0.4) statics.push(part(box(0.9, 0.7, 0.9), 0x7a6040, { x, y: y + 0.35, z, ry: rng.range(0, 3) }), part(box(0.95, 0.08, 0.95), PAL.then, { x, y: y + 0.72, z, ry: rng.range(0, 3) }));
-    else if (r < 0.7) statics.push(part(cyl(0.38, 0.4, 0.9, 7), 0x6a4a2a, { x, y: y + 0.45, z }), part(cyl(0.41, 0.41, 0.07, 7), PAL.then, { x, y: y + 0.7, z }));
-    else if (r < 0.85) {
-      for (let s = 0; s < 5; s++) statics.push(part(box(0.1, 2.2, 0.1), 0x2a221a, { x: x + Math.cos(s * 1.25) * 1.6, y: y + 0.9, z: z + Math.sin(s * 1.25) * 1.6, rx: Math.sin(s * 1.25) * 0.5, rz: -Math.cos(s * 1.25) * 0.5 }));
+    if (r < 0.4) {
+      const ry0 = rng.range(0, 3), ry1 = rng.range(0, 3), env = envPart("ENV_hom_go", { x, y, z, ry: ry0 });
+      if (env) statics.push(env);
+      else statics.push(part(box(0.9, 0.7, 0.9), 0x7a6040, { x, y: y + 0.35, z, ry: ry0 }), part(box(0.95, 0.08, 0.95), PAL.then, { x, y: y + 0.72, z, ry: ry1 }));
+    } else if (r < 0.7) {
+      const env = envPart("ENV_thung_go", { x, y, z, ry: x });
+      if (env) statics.push(env);
+      else statics.push(part(cyl(0.38, 0.4, 0.9, 7), 0x6a4a2a, { x, y: y + 0.45, z }), part(cyl(0.41, 0.41, 0.07, 7), PAL.then, { x, y: y + 0.7, z }));
+    } else if (r < 0.85) {
+      const env = envPart("ENV_khung_leu_chay", { x, y: y - 0.05, z, ry: z });
+      if (env) statics.push(env);
+      else for (let s = 0; s < 5; s++) statics.push(part(box(0.1, 2.2, 0.1), 0x2a221a, { x: x + Math.cos(s * 1.25) * 1.6, y: y + 0.9, z: z + Math.sin(s * 1.25) * 1.6, rx: Math.sin(s * 1.25) * 0.5, rz: -Math.cos(s * 1.25) * 0.5 }));
     } else {
-      statics.push(part(cyl(0.9, 1.0, 0.12, 8), 0x2a2622, { x, y: y + 0.05, z }));
-      for (let s = 0; s < 4; s++) statics.push(part(box(0.12, 0.12, 1.2), 0x3a2a1a, { x, y: y + 0.15, z, ry: s * 0.8 }));
+      const env = envPart("ENV_bep_lua", { x, y: y - 0.03, z, ry: x });
+      if (env) statics.push(env);
+      else {
+        statics.push(part(cyl(0.9, 1.0, 0.12, 8), 0x2a2622, { x, y: y + 0.05, z }));
+        for (let s = 0; s < 4; s++) statics.push(part(box(0.12, 0.12, 1.2), 0x3a2a1a, { x, y: y + 0.15, z, ry: s * 0.8 }));
+      }
       if (world.smokes) world.smokes.push({ x, z }); else world.smokes = [{ x, z }];
     }
   }
   // cọc buộc ngựa dọc đường vào cổng (bật làn đánh: bỏ cọc rơi vào hào thành, hàng cự mã)
   for (const zz of [-60, 60]) for (let t = 0; t < 6; t++) {
     if (blocked(440 + t * 3, zz, 0.3) || blocked(443 + t * 3, zz, 0.3)) continue;
+    const env = envPart("ENV_coc_buoc_ngua", { x: 441.5 + t * 3, y: heightAt(441.5 + t * 3, zz) - 0.05, z: zz, ry: Math.PI / 2 });     // khúc 3 m, hai cọc đầu
+    if (env) { statics.push(env); continue; }
     statics.push(part(box(0.14, 1.2, 0.14), PAL.go, { x: 440 + t * 3, y: heightAt(440 + t * 3, zz) + 0.6, z: zz }), part(box(3, 0.1, 0.1), PAL.go, { x: 441.5 + t * 3, y: heightAt(441.5 + t * 3, zz) + 1.05, z: zz }));
   }
 
@@ -289,15 +314,15 @@ export function addScenery(scene, world, { shadows, mat }) {
   // chui vào tán, màn hình đen lá, mất tướng. Vì vậy cây là lưới riêng (+1 draw) tự mờ như cột cờ, khán đài
   // (world.addFadeable, r 5,5: mờ khi camera cách gốc < 11,5 m hoặc gốc lệch hành lang camera → tướng < 6,6 m).
   const banyan = (x, z) => {
-    const y = heightAt(x, z), g = [part(cyl(0.9, 1.4, 5, 7), 0x6a5238, { y: 2.5 })];
+    const y = heightAt(x, z), env = envLOD("ENV_cay_da", mat, { far: 80, cast: shadows }), g = [part(cyl(0.9, 1.4, 5, 7), 0x6a5238, { y: 2.5 })];
     for (let k = 0; k < 7; k++) g.push(part(cyl(0.05, 0.05, 4, 3), 0x5a4630, { x: Math.cos(k) * 2.4, y: 2.8, z: Math.sin(k) * 2.4 }));
     for (let k = 0; k < 6; k++) g.push(part(ico(3.2, 0), k % 2 ? 0x46602e : 0x55703a, { x: Math.cos(k * 1.05) * 3.2, y: 6.6 + (k % 3) * 0.6, z: Math.sin(k * 1.05) * 3.2, sy: 0.7 }));
     g.push(part(ico(3.6, 0), 0x4c6632, { y: 8.2, sy: 0.75 }));
-    const m = new THREE.Mesh(merge(g), mat); m.position.set(x, y - 0.1, z); m.castShadow = shadows; m.receiveShadow = true;
+    const m = env || new THREE.Mesh(merge(g), mat); m.position.set(x, y - 0.1, z); m.castShadow = shadows; m.receiveShadow = true;
     scene.add(m); world.addFadeable(m, 5.5); solid(x, z, 1.6);
   };
   banyan(VILLAGE.x - 6, VILLAGE.z - VILLAGE.r - 9);
-  const arecaGeo = merge([part(cyl(0.1, 0.13, 9, 5), 0x9a8a6a, { y: 4.5 }), ...[0, 1, 2, 3, 4, 5].map((k) => part(box(0.4, 0.05, 2.2), 0x5f7f32, { y: 9, ry: k * 1.05, rx: 0.5, z: 0 }))]);
+  const arecaGeo = envPart("ENV_cum_cau", { lod: 1 }) || merge([part(cyl(0.1, 0.13, 9, 5), 0x9a8a6a, { y: 4.5 }), ...[0, 1, 2, 3, 4, 5].map((k) => part(box(0.4, 0.05, 2.2), 0x5f7f32, { y: 9, ry: k * 1.05, rx: 0.5, z: 0 }))]);
   const areca = inst(arecaGeo, 30, { cast: true });
   for (let k = 0; k < 30; k++) {
     const a = rng.range(0, 6.28), r = rng.range(4, VILLAGE.r - 2), x = VILLAGE.x + Math.cos(a) * r, z = VILLAGE.z + Math.sin(a) * r;
@@ -478,7 +503,8 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
   };
   // cờ đuôi ngựa (tua lông đen rủ dưới đĩa, chĩa ba trên đỉnh) — dáng cờ Mông Cổ nhận ra từ xa
   const tug = (x, z) => {
-    const y = gy(x, z) - 0.3, h = 4.0;
+    const y = gy(x, z) - 0.3, h = 4.0, env = envPart("ENV_co_duoi_ngua", { x, y, z, s: (h + 0.4) / 4.4 });
+    if (env) { big.push(env); return; }
     rod(big, 0x3a2c20, x, y, z, x, y + h, z, 0.05, { sides: 5 });
     big.push(part(cyl(0.2, 0.2, 0.06, 8), PAL.xam, { x, y: y + h - 0.2, z }), part(cone(0.26, 0.9, 7), 0x221b16, { x, y: y + h - 0.68, z, rx: Math.PI }),
       part(box(0.34, 0.035, 0.035), PAL.sat, { x, y: y + h + 0.02, z }));
@@ -781,7 +807,7 @@ function addLaneProps(scene, world, { mat, shadows, spears, arrows, shields, blo
       const s0 = k * Lu + 0.06, s1 = (k + 1) * Lu - 0.06, x0 = ax + ux * s0, z0 = az + uz * s0, x1 = ax + ux * s1, z1 = az + uz * s1;
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
       const pit = TERRAIN_FEATURES.some((p) => p.type === "pit" && Math.hypot(cx - p.x, cz - p.z) < p.r * 1.15);
-      if (!inGap((s0 + s1) / 2) && !pit) { placeCheval(chevalGeo(s1 - s0, false), x0, gy(x0, z0), z0, x1, gy(x1, z1), z1); continue; }
+      if (!inGap((s0 + s1) / 2) && !pit) { const g = chevalGeo(s1 - s0, false); placeCheval(envPart("ENV_cu_ma", { sz: (s1 - s0) / 3.4 }) || g, x0, gy(x0, z0), z0, x1, gy(x1, z1), z1); continue; }
       if (pit) { placeCheval(chevalGeo(s1 - s0, true), x0, gy(x0, z0) - 0.15, z0, x1, gy(x1, z1) - 0.15, z1, rng.range(-0.3, 0.3)); continue; }   // chúi xuống hố
       // bị xô về phía đông (quân ta phá hàng), xoay lệch, một đầu sụp; cọc rời nằm quanh
       const yaw = rng.range(-0.7, 0.7), c = Math.cos(yaw), s = Math.sin(yaw), dx = ux * c - uz * s, dz = uz * c + ux * s, half = (s1 - s0) * 0.45;

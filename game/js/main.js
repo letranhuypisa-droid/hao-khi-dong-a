@@ -290,13 +290,14 @@ function tudoIntro(c) {
 }
 // Mô hình GLB (battle/glb.js) và ảnh fx (battle/fx.js) trong lúc màn tải hiện: chờ mọi thứ trận dùng — tướng người chơi, tướng đồng minh và
 // boss của trận (data/battles.js models: ra giữa trận cũng nạp trước, đợt 19c — trước đây tải ngầm khi trận đã chạy nên tướng đồng minh
-// trận đầu là hình khối, việc đọc mô hình rơi vào mấy giây đầu trận), lính đám đông, vũ khí, cận vệ, sĩ quan. Tối đa 12 s; mạng chậm, lỗi:
+// trận đầu là hình khối, việc đọc mô hình rơi vào mấy giây đầu trận), lính đám đông, vũ khí, cận vệ, sĩ quan, vật môi trường của đất Hàm Tử
+// (world.js WORLD_ENV: thuyền, bến, cổng, tháp, cây…). Tối đa 12 s; mạng chậm, lỗi:
 // trận vẫn chạy với hình dựng bằng code. Mô hình của trận khác không tải ngầm giữa trận nữa: màn tải của trận đó tự nạp.
 // chars: mã tướng / boss (heroes.js, data/battles.js models) hoặc mã mô hình (lính Tự do LINH_*); mã tướng đổi qua RIGS thành mô hình đã nướng (H35 → H35h).
 async function loadModels(chars = []) {
   try {
-    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js")]);
-    await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + (RIGS[HEROES[c]?.rig || c]?.model || modelOf(c))), ...kitFiles().map((k) => "kit/" + k), "wpn/*",
+    const [{ preloadModels }, { preloadFx }, { loadClips }, { RIGS, modelOf, kitFiles }, { WORLD_ENV }] = await Promise.all([import("./battle/glb.js"), import("./battle/fx.js"), import("./battle/clips.js"), import("./battle/models.js"), import("./battle/world.js")]);
+    await Promise.race([Promise.all([preloadModels([...chars.map((c) => "char/" + (RIGS[HEROES[c]?.rig || c]?.model || modelOf(c))), ...kitFiles().map((k) => "kit/" + k), "wpn/*", ...WORLD_ENV.map((id) => "env/" + id),
       ...["CV_khien", "CV_giao", "CV_cung", "CV_songdao", "CV_daidao", "OFF_tuong", "OFF_photuong", "OFF_doitruong"].map((c) => "char/" + modelOf(c))], 12000), preloadFx(), loadClips()]),
       new Promise((r) => setTimeout(r, 12000))]);
   } catch (e) { console.warn("mô hình", e); }

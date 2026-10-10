@@ -18,7 +18,7 @@
 import { readFileSync, existsSync } from "node:fs";
 
 const MD = new URL("../assets/models/", import.meta.url);
-const { CHARS, WEAPONS, KIT_LIST } = await import("../../design/tools/bake/catalog.mjs");
+const { CHARS, WEAPONS, KIT_LIST, ENV } = await import("../../design/tools/bake/catalog.mjs");
 const { SKELETONS, JOINT_NAMES } = await import("../js/battle/soldier-motion.js");
 const { HELPERS, HELPER_NAMES, driveQuat } = await import("../js/battle/rig-helpers.js");
 
@@ -127,20 +127,20 @@ const C = Object.fromEntries(ids("char").map((id) => [id, charInfo(id)]));
 const forChars = (fn) => Object.entries(C).flatMap(([id, c]) => { const msg = fn(c, id); return msg ? [{ id, msg }] : []; });
 
 console.log("Tệp nướng: index.json khớp tệp và bảng nướng");
-t("index", "mọi mục index.json có .hkm + .webp, đúng loại, đúng số tam giác; mọi mục của catalog.mjs đã nướng", () => {
+t("index", "mọi mục index.json có .hkm + .webp (env: texture chỉ khi có), đúng loại, đúng số tam giác; mọi mục của catalog.mjs đã nướng", () => {
   const probs = [];
   for (const [k, e] of Object.entries(INDEX)) {
     const bad = [];
-    for (const f of [e.file, e.tex]) if (!existsSync(new URL(f, MD))) bad.push("thiếu " + f);
+    for (const f of [e.file, e.tex]) if ((f || e.kind !== "env") && !existsSync(new URL(f, MD))) bad.push("thiếu " + f);
     if (!bad.length) {
       const { meta, meshes } = readHKM(e.file), first = meshes.body || meshes.lod0;
       if (meta.kind !== e.kind) bad.push(`kind ${meta.kind} ≠ ${e.kind}`);
       if (first.index.length / 3 !== e.tris) bad.push(`tris ${first.index.length / 3} ≠ ${e.tris}`);
-      if (e.kind === "kit") { const n = Object.keys(meshes).map((m) => meshes[m].index.length / 3); if (String(n) !== String(e.lods)) bad.push(`lods ${n} ≠ ${e.lods}`); }
+      if (e.kind === "kit" || e.kind === "env") { const n = Object.keys(meshes).map((m) => meshes[m].index.length / 3); if (String(n) !== String(e.lods)) bad.push(`lods ${n} ≠ ${e.lods}`); }
     }
     if (bad.length) probs.push({ id: k, msg: bad.join(", ") });
   }
-  for (const [kind, cat] of [["char", CHARS], ["wpn", WEAPONS], ["kit", KIT_LIST]]) for (const id of Object.keys(cat)) if (!INDEX[`${kind}/${id}`]) probs.push({ id: `${kind}/${id}`, msg: "có trong catalog.mjs, chưa nướng" });
+  for (const [kind, cat] of [["char", CHARS], ["wpn", WEAPONS], ["kit", KIT_LIST], ["env", ENV]]) for (const id of Object.keys(cat)) if (!INDEX[`${kind}/${id}`]) probs.push({ id: `${kind}/${id}`, msg: "có trong catalog.mjs, chưa nướng" });
   return probs;
 });
 

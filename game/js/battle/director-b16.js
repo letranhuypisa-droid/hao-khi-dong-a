@@ -10,7 +10,8 @@ import * as THREE from "three";
 import { BigUnit } from "./units.js";
 import { heightAt } from "./world.js";
 import { BannerQueue } from "./banner-queue.js";
-import { flagTexture } from "./models.js";
+import { flagTexture, lambert, merge } from "./models.js";
+import { envPart } from "./glb.js";
 import { gateTarget as pickGate, gatePct } from "./gatebar.js";
 import { gain, tick as hkTick, activate as hkActivate, tpcReady, milestone } from "../sim/haokhi.js";
 import { HAO_KHI, TIERS, MODES, HERO, S } from "../data/tuning.js";
@@ -133,15 +134,18 @@ export class DirectorB16 {
     m.geometry = new THREE.RingGeometry(m.userData.r - 1.3, m.userData.r - 0.5, 56, 1, Math.PI / 2, Math.max(0.001, Math.min(1, p) * Math.PI * 2));
   }
   flag(p, color, h = 7, text = null) {
-    const g = new THREE.Group(), y = heightAt(p.x, p.z);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
-    pole.position.y = h / 2; g.add(pole);
+    const g = new THREE.Group(), y = heightAt(p.x, p.z), env = envPart("ENV_cot_co", { s: h / 9 });          // cột mẫu cao 9 m (đế gỗ), không có thì trụ
+    const pole = env ? new THREE.Mesh(env, this.envMat()) : new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), new THREE.MeshLambertMaterial({ color: 0x4a3626 }));
+    if (!env) pole.position.y = h / 2;
+    g.add(pole);
     const cloth = new THREE.Mesh(text ? new THREE.PlaneGeometry(0.8, 2.4) : new THREE.PlaneGeometry(1.8, 1.1),
       new THREE.MeshLambertMaterial(text ? { map: flagTexture(text), side: THREE.DoubleSide } : { color, side: THREE.DoubleSide }));
     cloth.position.set(text ? 0.45 : 0.92, h - (text ? 1.4 : 0.7), 0); g.add(cloth);
     g.position.set(p.x, y, p.z); this.props.add(g); g.cloth = cloth;
     return g;
   }
+  // vật liệu màu đỉnh phẳng cho mô hình môi trường nướng (glb.js envPart: thuyền, cột cờ, bao lương), như lưới tĩnh của world.js
+  envMat() { return (this._envMat ||= lambert()); }
   buildProps() {
     const P = this.props, wood = new THREE.MeshLambertMaterial({ color: 0x5a3d26 }), dark = new THREE.MeshLambertMaterial({ color: 0x2a2018 });
     const sail = new THREE.MeshLambertMaterial({ color: 0xc9b98f }), roof = new THREE.MeshLambertMaterial({ color: 0x8f7a4a }), wall = new THREE.MeshLambertMaterial({ color: 0xa08560 });
@@ -158,14 +162,24 @@ export class DirectorB16 {
         const r = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.8, 4), roof); r.position.set(x, y + 3.1, z); r.rotation.y = ry + Math.PI / 4; r.scale.x = 1.25; r.castShadow = true; P.add(r);
       });
     }
-    // 12 thuyền neo
+    // 12 thuyền neo: mẫu ENV_thuyen_song_nguyen (gốc ở mớn nước) tách thân / cột buồm ở 1,9 m — thuyền cháy giữ thân cháy đen, mất cột buồm.
+    // Mỗi phần một THREE.LOD (gần LOD0, từ 60 m LOD1; lưới dùng chung 12 thuyền): không thêm lượt vẽ.
+    const boatId = "ENV_thuyen_song_nguyen", cuts = envPart(boatId) && [{ y1: 1.9 }, { y0: 1.9 }].map((cut) => [envPart(boatId, { cut }), envPart(boatId, { cut, lod: 1 })]);
+    const boatPart = ([near, far]) => {
+      const l = new THREE.LOD(); l.addLevel(new THREE.Mesh(near, this.envMat()), 0); l.addLevel(new THREE.Mesh(far, this.envMat()), 60);
+      for (const v of l.levels) v.object.castShadow = true;
+      return l;
+    };
     this.boatMesh = BOATS.map((B) => {
       const g = new THREE.Group();
-      g.add(box(3.2, 1.1, 10, wood, 0, 0.55, 0), box(2.6, 0.9, 3.2, wood, 0, 1.5, -2.6));
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 7, 5), dark); mast.position.set(0, 4.4, 0.6); g.add(mast);
-      const s = box(0.08, 3.8, 3.2, sail, 0, 5, 0.6); g.add(s); g.sail = s;
-      g.position.set(B.x, 0.1, B.z); g.rotation.y = B.yaw; P.add(g);
-      for (const m of g.children) m.userData.mat0 = m.material;
+      if (cuts) { const top = boatPart(cuts[1]); g.add(boatPart(cuts[0]), top); g.sail = top; }
+      else {
+        g.add(box(3.2, 1.1, 10, wood, 0, 0.55, 0), box(2.6, 0.9, 3.2, wood, 0, 1.5, -2.6));
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 7, 5), dark); mast.position.set(0, 4.4, 0.6); g.add(mast);
+        const s = box(0.08, 3.8, 3.2, sail, 0, 5, 0.6); g.add(s); g.sail = s;
+      }
+      g.position.set(B.x, cuts ? 0.3 : 0.1, B.z); g.rotation.y = B.yaw; P.add(g);
+      g.traverse((m) => { if (m.isMesh) m.userData.mat0 = m.material; });
       return g;
     });
     this.landRing = this.ringMesh(LANDING, LANDING.r, COL.ring, 0.45);
@@ -206,10 +220,14 @@ export class DirectorB16 {
     const dyke = new THREE.Mesh(new THREE.BoxGeometry(dk.x1 - dk.x0, dk.h * 0.45, dk.z1 - dk.z0), new THREE.MeshLambertMaterial({ color: 0x9a7a52 }));
     dyke.position.set((dk.x0 + dk.x1) / 2, dy + dk.h * 0.2, (dk.z0 + dk.z1) / 2); dyke.receiveShadow = true; P.add(dyke);
     // kho quân nhu: đống bao, mái che, cờ
+    // đống bao: 6 đống mẫu ENV_bao_gao (1,2 × 0,75 m) ×1,15 dưới, 2 đống trên — cùng chỗ hai khối bao code (4,2 × 3 m, cao 2,4 m)
     const sack = new THREE.MeshLambertMaterial({ color: 0xb59a68 });
+    const pile = envPart("ENV_bao_gao") && merge([...[-1.4, 0, 1.4].flatMap((x) => [-0.75, 0.75].map((z) => envPart("ENV_bao_gao", { x, z, s: 1.15, ry: (x + z) * 2 }))),
+      envPart("ENV_bao_gao", { x: -0.7, y: 0.75, s: 1.2, ry: 1.4 }), envPart("ENV_bao_gao", { x: 0.7, y: 0.75, s: 1.2, ry: -1.7 })]);
     this.depotMesh = DEPOTS.map((D) => {
       const g = new THREE.Group(), y = heightAt(D.x, D.z);
-      g.add(box(4.2, 1.4, 3, sack, 0, 0.7, 0), box(3.2, 1, 2.2, sack, 0, 1.9, 0));
+      if (pile) { const m = new THREE.Mesh(pile, this.envMat()); m.castShadow = true; g.add(m); }
+      else g.add(box(4.2, 1.4, 3, sack, 0, 0.7, 0), box(3.2, 1, 2.2, sack, 0, 1.9, 0));
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.16, 3.2, 0.16, wood, sx * 2.4, 1.6, sz * 1.8));
       g.add(box(5.2, 0.15, 4, roof, 0, 3.25, 0));
       g.position.set(D.x, y, D.z); P.add(g);
@@ -219,7 +237,9 @@ export class DirectorB16 {
     // Vương Kỳ Trấn Nam: cột cao, cờ vàng chữ 鎮南
     this.bannerMesh = BANNERS.map((B) => {
       const g = new THREE.Group();
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 9, 6), dark); pole.position.y = 4.5; g.add(pole);
+      const env = envPart("ENV_cot_co", { s: 1.05 }), pole = env ? new THREE.Mesh(env, this.envMat()) : new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 9, 6), dark);
+      if (!env) pole.position.y = 4.5;
+      g.add(pole);
       const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 3.6), new THREE.MeshLambertMaterial({ map: flagTexture("鎮南王"), color: 0xffe08a, side: THREE.DoubleSide }));
       cloth.position.set(0.75, 6.8, 0); g.add(cloth);
       g.position.set(B.x, heightAt(B.x, B.z), B.z); g.visible = false; P.add(g);
@@ -241,7 +261,7 @@ export class DirectorB16 {
       g.sail.visible = !burnt;
       if (g.burnt === burnt) return;
       g.burnt = burnt; this.charMat ||= new THREE.MeshLambertMaterial({ color: 0x1e1814 });
-      for (const m of g.children) if (m !== g.sail) m.material = burnt ? this.charMat : m.userData.mat0;
+      for (const c of g.children) if (c !== g.sail) c.traverse((m) => { if (m.isMesh) m.material = burnt ? this.charMat : m.userData.mat0; });
     });
     this.landRing.visible = st.phase === 1 && st.burnt >= BOATS.length;
     this.setArc(this.landArc, st.landing.p, this.landRing.visible);
